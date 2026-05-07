@@ -1,6 +1,8 @@
-// Trigger Map page from e108b48a* in the design bundle.
+"use client";
+// Trigger Map page from e108b48a* in the design bundle. Full version with
+// expandable rows, ARMED/BREACHED counts, and a touch-history detail strip.
+import { useState } from "react";
 import type { Snapshot, TriggerStatus } from "@/lib/types";
-import { BiasBar } from "./bias-bar";
 
 const STATUS_PILL: Record<TriggerStatus, string> = {
   ARMED: "pill pill-amber",
@@ -9,51 +11,107 @@ const STATUS_PILL: Record<TriggerStatus, string> = {
   STALE: "pill pill-stale",
 };
 
-function fmt(n: number, d = 2) {
-  return n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+function BiasBar({ value }: { value: number }) {
+  const pct = Math.max(-100, Math.min(100, value));
+  const w = Math.abs(pct) / 2;
+  const color = pct >= 0 ? "var(--green)" : "var(--red)";
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%" }}>
+      <div style={{ flex: 1, height: 4, background: "var(--surface-pressed)", position: "relative", borderRadius: 2 }}>
+        <div style={{ position: "absolute", left: "50%", top: -2, bottom: -2, width: 1, background: "var(--border-emphasis)" }}/>
+        <div style={{
+          position: "absolute",
+          left: pct >= 0 ? "50%" : `${50 - w}%`,
+          top: 0, height: "100%",
+          width: `${w}%`,
+          background: color,
+          borderRadius: 1,
+        }}/>
+      </div>
+      <span className="t-caption mono" style={{ minWidth: 32, textAlign: "right", color }}>
+        {pct > 0 ? "+" : ""}{pct}
+      </span>
+    </div>
+  );
 }
 
 export function TriggerMap({ snap }: { snap: Snapshot }) {
+  const rows = snap.triggers;
+  const armed = rows.filter((r) => r.status === "ARMED").length;
+  const breached = rows.filter((r) => r.status === "BREACHED").length;
+  const [expanded, setExpanded] = useState<number | null>(null);
+
   return (
-    <section className="px-10 py-8">
-      <header className="mb-6">
-        <h2 className="text-[18px] font-semibold tracking-tight">Trigger Map</h2>
-        <p className="text-[11px] tracking-[0.12em] uppercase text-text-muted mt-1">
-          Distance · BPS · Bias · Status
-        </p>
-      </header>
-      <div className="rounded-md border border-border overflow-hidden">
-        <table className="w-full text-[12.5px]">
-          <thead className="bg-surface-2 text-text-dim text-[10px] tracking-[0.12em] uppercase">
-            <tr>
-              <th className="text-left font-medium px-4 py-2">Line</th>
-              <th className="text-right font-medium px-4 py-2 tabular">Level</th>
-              <th className="text-right font-medium px-4 py-2 tabular">Dist</th>
-              <th className="text-right font-medium px-4 py-2 tabular">bps</th>
-              <th className="text-left font-medium px-4 py-2 w-48">Bias</th>
-              <th className="text-right font-medium px-4 py-2">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {snap.triggers.map((t) => (
-              <tr key={t.line} className="border-t border-border hover:bg-surface-2/40">
-                <td className="px-4 py-2.5 text-text-primary">{t.line}</td>
-                <td className="px-4 py-2.5 text-right tabular text-text-primary">{fmt(t.level)}</td>
-                <td className={`px-4 py-2.5 text-right tabular ${t.dist >= 0 ? "text-accent-green" : "text-accent-amber"}`}>
-                  {t.dist > 0 ? "+" : ""}{fmt(t.dist)}
-                </td>
-                <td className={`px-4 py-2.5 text-right tabular ${t.bps >= 0 ? "text-accent-green" : "text-accent-amber"}`}>
-                  {t.bps > 0 ? "+" : ""}{t.bps}
-                </td>
-                <td className="px-4 py-2.5"><BiasBar value={t.bias} /></td>
-                <td className="px-4 py-2.5 text-right">
-                  <span className={STATUS_PILL[t.status]}>{t.status}</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <div className="card" style={{ marginBottom: 16 }}>
+      <div style={{
+        height: 48, display: "flex", alignItems: "center",
+        padding: "0 20px", borderBottom: "1px solid var(--border-subtle)", gap: 16,
+      }}>
+        <span className="t-heading">TRIGGER MAP</span>
+        <span className="t-caption c-tertiary">{armed} ARMED · {breached} BREACHED</span>
+        <div style={{ flex: 1 }}/>
+        <button className="btn" style={{ height: 24, fontSize: 11 }}>by distance ▾</button>
       </div>
-    </section>
+
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "15% 15% 20% 25% 15% 10%",
+        padding: "8px 20px",
+        borderBottom: "1px solid var(--border-subtle)",
+        background: "var(--surface-pressed)",
+      }}>
+        <span className="t-label c-tertiary">Line</span>
+        <span className="t-label c-tertiary" style={{ textAlign: "right" }}>Level</span>
+        <span className="t-label c-tertiary" style={{ textAlign: "right" }}>Distance</span>
+        <span className="t-label c-tertiary">Bias contribution</span>
+        <span className="t-label c-tertiary">Status</span>
+        <span/>
+      </div>
+
+      {rows.map((r, i) => (
+        <div key={r.line}>
+          <div
+            onClick={() => setExpanded(expanded === i ? null : i)}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "15% 15% 20% 25% 15% 10%",
+              padding: "10px 20px",
+              alignItems: "center",
+              borderBottom: i === rows.length - 1 ? 0 : "1px solid var(--border-subtle)",
+              cursor: "pointer",
+              minHeight: 40,
+            }}
+          >
+            <span className="t-body c-primary">{r.line}</span>
+            <span className="t-body-num c-primary" style={{ textAlign: "right" }}>{r.level.toFixed(2)}</span>
+            <span className="t-body-num" style={{ textAlign: "right", color: r.dist >= 0 ? "var(--green)" : "var(--red)" }}>
+              {r.dist >= 0 ? "+" : ""}{r.dist.toFixed(2)} <span className="c-tertiary">/ {r.bps >= 0 ? "+" : ""}{r.bps}bps</span>
+            </span>
+            <BiasBar value={r.bias}/>
+            <span className={`${STATUS_PILL[r.status]} ${r.status === "ARMED" ? "pill-armed-anim" : ""}`}>{r.status}</span>
+            <span className="c-tertiary" style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontSize: 11 }}>
+              {expanded === i ? "▾" : "▸"}
+            </span>
+          </div>
+          {expanded === i && (
+            <div style={{
+              padding: "12px 20px 16px",
+              background: "var(--surface-pressed)",
+              borderBottom: i === rows.length - 1 ? 0 : "1px solid var(--border-subtle)",
+              display: "flex", gap: 32, alignItems: "center",
+            }}>
+              <svg width="160" height="32" viewBox="0 0 160 32">
+                <polyline points="0,20 20,18 40,22 60,16 80,12 100,18 120,10 140,14 160,8"
+                  fill="none" stroke="var(--blue)" strokeWidth="1.5"/>
+              </svg>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <span className="t-caption c-tertiary">LAST 3 TOUCHES</span>
+                <span className="t-caption mono c-secondary">14:18:42 · 13:42:11 · 11:08:55</span>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
