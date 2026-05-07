@@ -150,9 +150,9 @@ export function Landing({ snap, err, onEnter }: LandingProps) {
               color: "var(--text-primary)",
               maxWidth: 720,
             }}>
-              Read structure.<br/>
-              Arm the trigger.<br/>
-              <span style={{ color: "var(--amber)" }}>Earn the verb.</span>
+              See the levels SPY respects.<br/>
+              Wait for the rejection candle.<br/>
+              <span style={{ color: "var(--amber)" }}>Trade the qualified setup.</span>
             </h1>
 
             <p style={{
@@ -160,7 +160,7 @@ export function Landing({ snap, err, onEnter }: LandingProps) {
               fontSize: 17, lineHeight: 1.6,
               color: "var(--text-secondary)",
             }}>
-              SPY/Prophet is not a signal feed. It is a discipline — a private cockpit that reads the same SPY every other screen does, but holds you to the rules you wrote when the market wasn't shouting.
+              SPY Prophet maps yesterday&apos;s high and low pivots forward into today&apos;s session, watches every hourly candle for a clean rejection at those levels, and grades each setup A through D before you take it.
             </p>
 
             <div style={{ marginTop: 48, display: "flex", gap: 12, alignItems: "center" }}>
