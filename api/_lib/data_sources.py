@@ -21,6 +21,7 @@ from typing import Any
 
 import pandas as pd
 
+from . import premarket_anchors as pma
 from . import prophet_core as pc
 from . import seed_snapshot
 from . import tastytrade
@@ -165,6 +166,13 @@ def _triggers_from_lines(
         "LD": "Lower Desc Trigger",
     }
 
+    def _label_for(name: str) -> str:
+        if name in name_to_label:
+            return name_to_label[name]
+        if name.startswith("ANC_"):
+            return _anchor_display_label(name)
+        return name
+
     armed_set = {l.name for l in pc.active_entry_lines(primary_lines, current_price, current_dt)}
 
     def _bias_contribution(dist: float, price: float, decay_pct: float = 1.2) -> int:
@@ -190,7 +198,7 @@ def _triggers_from_lines(
         else:
             status = "WATCHING"
         rows.append({
-            "line": name_to_label.get(line.name, line.name),
+            "line": _label_for(line.name),
             "level": round(float(v), 2),
             "dist": round(float(dist), 2),
             "bps": bps,
@@ -277,12 +285,64 @@ def _candles_for_chart(rth_today: pd.DataFrame, intraday: pd.DataFrame) -> list[
     return out[-90:]
 
 
+def _anchor_display_label(name: str) -> str:
+    """Convert ANC_<role>_<HHMM>_<BAND> to a readable label."""
+    if not name.startswith("ANC_"):
+        return name
+    parts = name.split("_")
+    if len(parts) < 4:
+        return "Anchor"
+    band = parts[-1]
+    band_label = {"UPPER": "Upper", "MAIN": "Main", "LOWER": "Lower"}.get(band, band.title())
+    role = parts[1]
+    if role == "ANCHOR" and len(parts) >= 5 and parts[2] == "2":
+        return f"Anchor 2 {band_label}"
+    if role == "PRIMARY":
+        return f"Anchor {band_label}"
+    if role == "SECONDARY":
+        return f"Backup {band_label}"
+    return f"{role.title()} {band_label}"
+
+
 def _chart_lines_from_primary(
     primary_lines: list[pc.DynamicLine],
     current_dt: datetime,
     rth_today: pd.DataFrame,
 ) -> list[dict]:
     lines: list[dict] = []
+
+    # Anchor-line path: render Upper / Main / Lower for each PRIMARY anchor
+    # (and Anchor 2 if present). Secondaries are skipped to keep the chart
+    # legible.
+    anchor_primaries = [l for l in primary_lines if l.is_primary and l.name.startswith("ANC_")]
+    if anchor_primaries:
+        zone_color = {
+            "CALL_ZONE":  "var(--green)",   # Upper (+3.4)
+            "MAIN":       "var(--amber)",   # Main entry line
+            "PUT_ZONE":   "var(--red)",     # Lower (-3.4)
+        }
+        for line in anchor_primaries:
+            v = line.tradable_value_at(current_dt)
+            if v is None or pd.isna(v):
+                continue
+            lines.append({
+                "label": _anchor_display_label(line.name),
+                "value": round(float(v), 2),
+                "color": zone_color.get(line.zone_type, "var(--text-secondary)"),
+                "dash": False,
+                "armed": line.zone_type == "MAIN",  # main entry line is the headline
+            })
+        if rth_today is not None and not rth_today.empty:
+            lines.append({
+                "label": "Open",
+                "value": round(float(rth_today.iloc[0]["Open"]), 2),
+                "color": "var(--text-secondary)",
+                "dash": True,
+                "armed": False,
+            })
+        return lines
+
+    # Fallback (no qualifying anchor): old UA/LA pivot lines.
     label_for_role = {
         "supply": "4H Supply",
         "pivot_low": "Pivot Low",
@@ -636,9 +696,19 @@ def build_live_snapshot() -> dict:
     high_pivot = pc.find_high_pivot(structure_frame)
     low_pivot = pc.find_low_pivot(structure_frame)
     slope = pc.get_structure_calibration()
-    primary_lines = pc.build_primary_lines(high_pivot, low_pivot, slope)
     secondary_pivots = pc.find_secondary_pivots(structure_frame)
     secondary_lines = pc.build_secondary_lines(secondary_pivots, slope)
+
+    # Premarket-anchor primary lines (replaces UA/UD/LA/LD when a qualifying
+    # bearish anchor is found). Falls back to the old pivot lines otherwise.
+    anchor_payload = pma.find_premarket_anchors(df, signal_day)
+    anchor_lines = pma.build_all_anchor_lines(anchor_payload, slope)
+    if anchor_lines:
+        primary_lines = anchor_lines
+        primary_source = "premarket_anchor"
+    else:
+        primary_lines = pc.build_primary_lines(high_pivot, low_pivot, slope)
+        primary_source = "pivot_fallback"
 
     projection_time = _structure_projection_time(now_ct).to_pydatetime()
 
