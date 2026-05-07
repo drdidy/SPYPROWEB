@@ -1,27 +1,133 @@
-// Structure Read editorial — long-form analysis with an italic close-out.
-// Lifted from e108b48a* in the design bundle.
+"use client";
+// Structure Read — live, templated facts from the snapshot. No LLM, no
+// fiction. Reads anchor lines, bias, market context, and signals to
+// produce two short paragraphs and a one-line directive.
+import type { Snapshot } from "@/lib/types";
 
-export function StructureRead() {
+function fmt(n: number | null | undefined, digits = 2): string {
+  if (n == null || Number.isNaN(n)) return "—";
+  return n.toFixed(digits);
+}
+
+function fmtSigned(n: number | null | undefined, digits = 2): string {
+  if (n == null || Number.isNaN(n)) return "—";
+  const sign = n >= 0 ? "+" : "";
+  return `${sign}${n.toFixed(digits)}`;
+}
+
+function asOfClock(asOf: string): string {
+  try {
+    const d = new Date(asOf);
+    const time = d.toLocaleTimeString("en-US", {
+      hour: "numeric", minute: "2-digit", hour12: false, timeZone: "America/Chicago",
+    });
+    return `${time} CT`;
+  } catch {
+    return "—";
+  }
+}
+
+export function StructureRead({ snap }: { snap?: Snapshot }) {
+  const header = (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+      <div style={{ width: 4, height: 18, background: "var(--amber)", borderRadius: 1 }}/>
+      <span className="t-heading">STRUCTURE READ</span>
+      <div style={{ flex: 1 }}/>
+      <span className="t-caption c-tertiary">{snap ? `updated ${asOfClock(snap.asOf)}` : "loading"}</span>
+    </div>
+  );
+
+  if (!snap) {
+    return (
+      <div className="card" style={{ padding: 24, marginBottom: 16 }}>
+        {header}
+        <p className="t-body c-secondary" style={{ margin: 0 }}>Loading snapshot…</p>
+      </div>
+    );
+  }
+
+  const last = snap.quote.last;
+
+  // Anchor lines from chartLines (only present when a qualifying anchor exists)
+  const upper = snap.chartLines.find((l) => l.label === "Anchor Upper");
+  const main  = snap.chartLines.find((l) => l.label === "Anchor Main");
+  const lower = snap.chartLines.find((l) => l.label === "Anchor Lower");
+  const a2Main = snap.chartLines.find((l) => l.label === "Anchor 2 Main");
+  const hasAnchor = !!main;
+
+  let p1 = "";
+  if (hasAnchor && main) {
+    const dist = last - main.value;
+    const side = dist >= 0 ? "above" : "below";
+    p1 = `SPY ${fmt(last)} sits ${fmt(Math.abs(dist))} pts ${side} the Anchor Main at ${fmt(main.value)}.`;
+    if (upper && lower) {
+      p1 += ` The ±3.4 band runs ${fmt(lower.value)} (Lower) to ${fmt(upper.value)} (Upper).`;
+    }
+    if (a2Main) {
+      p1 += ` Anchor 2 Main is at ${fmt(a2Main.value)}.`;
+    }
+  } else {
+    p1 = `SPY ${fmt(last)}. No qualifying premarket bearish anchor today — structure is on the pivot fallback (UA/UD/LA/LD).`;
+  }
+
+  // Paragraph 2 — bias + context + signal census
+  const parts: string[] = [];
+  parts.push(`Bias: ${snap.bias.label} (${fmtSigned(snap.bias.score, 0)}).`);
+
+  const vix = snap.marketContext?.vix;
+  if (vix?.value != null) {
+    parts.push(`VIX ${fmt(vix.value)} (${vix.label}).`);
+  }
+
+  const pressure = snap.marketContext?.spyPressure;
+  if (pressure && pressure.label !== "—") {
+    const tail = pressure.value != null ? ` (${fmtSigned(pressure.value)} pts / 3 bars)` : "";
+    parts.push(`SPY pressure: ${pressure.label}${tail}.`);
+  }
+
+  const confirmed = snap.signals.filter((s) => s.status === "CONFIRMED");
+  const pending = snap.signals.filter((s) => s.status === "PENDING_CONFIRMATION");
+  if (confirmed.length > 0) {
+    parts.push(`${confirmed.length} confirmed signal${confirmed.length > 1 ? "s" : ""} on the tape.`);
+  } else if (pending.length > 0) {
+    parts.push(`${pending.length} pending rejection awaiting confirmation.`);
+  } else {
+    parts.push("No anchor triggers have printed yet.");
+  }
+  const p2 = parts.join(" ");
+
+  // One-line directive
+  const lastSignal = snap.signals[0];
+  let close = "Watching the active lines for a touch + close pattern.";
+  if (lastSignal && lastSignal.status === "CONFIRMED") {
+    const sideWord = lastSignal.dir === "up" ? "long" : lastSignal.dir === "down" ? "short" : "flat";
+    const entry = lastSignal.entry != null ? ` entry ${fmt(lastSignal.entry)}` : "";
+    close = `Last confirmed: ${lastSignal.line} ${sideWord}${entry} at ${lastSignal.ts}.`;
+  } else if (lastSignal && lastSignal.status === "PENDING_CONFIRMATION") {
+    close = `Pending: ${lastSignal.line} rejection at ${lastSignal.ts} — wait for the next candle to open.`;
+  } else {
+    const gap = snap.marketContext?.triggerGap;
+    if (gap && gap.points != null && gap.lineName !== "—") {
+      const side = gap.points >= 0 ? "above" : "below";
+      close = `Closest line: ${gap.lineName} — ${fmt(Math.abs(gap.points))} pts ${side} (${gap.label}). Watching for the touch + close.`;
+    }
+  }
+
   return (
     <div className="card" style={{ padding: 24, marginBottom: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-        <div style={{ width: 4, height: 18, background: "var(--amber)", borderRadius: 1 }}/>
-        <span className="t-heading">STRUCTURE READ</span>
-        <div style={{ flex: 1 }}/>
-        <span className="t-caption c-tertiary">updated 11:48 CT</span>
-      </div>
+      {header}
       <p className="t-body-l c-primary" style={{ margin: "0 0 14px", lineHeight: 1.7, maxWidth: 760 }}>
-        SPY pushed into the 4H supply zone at 583.40 and printed a textbook rejection — a clean upper wick on a 5-minute candle, declining tape volume into the high, and breadth deteriorating off the morning strength. The bid that defended 581.85 through the European session has thinned, and the day's open at 582.40 is now functioning as the line of control rather than a magnet.
+        {p1}
       </p>
       <p className="t-body-l c-primary" style={{ margin: "0 0 14px", lineHeight: 1.7, maxWidth: 760 }}>
-        The setup is structural rather than aggressive. With VIX compressing from 15.8 toward 14.5 and dealer gamma flipping positive above 583, upside is capped in the absence of a fresh catalyst. The asymmetric trade is patience: allow price to retrace into 581.85 on diminishing volume, observe how the bid behaves at the level, and only then commit. Anything between 582.20 and 583.20 is range-bound — fade the edges, never the middle.
+        {p2}
       </p>
       <p style={{
         margin: 0, fontStyle: "italic",
         color: "var(--text-secondary)",
         fontSize: 15, lineHeight: 1.6,
       }}>
-        If 583.40 holds for the next 15 minutes, the 581.85 retest is the highest-quality entry on the board.
+        {close}
       </p>
     </div>
   );
