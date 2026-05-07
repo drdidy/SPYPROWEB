@@ -44,6 +44,26 @@ export interface Snapshot {
   candles: Candle[];
   chartLines: ChartLine[];
   options: OptionsSnapshot | null;
+  signals: Signal[];
+}
+
+export type SignalDir = "up" | "down" | "neutral";
+export type SignalStatus = "PENDING_CONFIRMATION" | "CONFIRMED";
+
+export interface Signal {
+  id: string;
+  type: "REJECTION";
+  line: string;
+  ts: string;
+  score: number;
+  grade: string;
+  dir: SignalDir;
+  status: SignalStatus;
+  outcome: number | null;
+  entry: number | null;
+  stop: number | null;
+  target: number | null;
+  rr: number | null;
 }
 
 export interface OptionRow {

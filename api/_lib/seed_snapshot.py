@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-# Intraday spark from the Landing component in 81ed613d* of the design bundle.
 SPARK = [
     583.28, 583.31, 583.45, 583.62, 583.78, 583.91, 583.74, 583.55, 583.41, 583.30,
     583.18, 583.04, 582.91, 582.85, 582.74, 582.68, 582.71, 582.79, 582.92, 583.05,
@@ -19,7 +18,6 @@ SPARK = [
     582.71, 582.65, 582.74, 582.81, 582.85, 582.88, 582.91, 582.89, 582.87, 582.86,
 ]
 
-# Trigger rows from e108b48a* (Trigger Map page).
 TRIGGERS = [
     {"line": "4H Supply",     "level": 583.40, "dist":  0.43, "bps":   7, "bias": -72, "status": "ARMED"},
     {"line": "Pivot Low",     "level": 581.85, "dist": -1.12, "bps": -19, "bias":  44, "status": "WATCHING"},
@@ -32,9 +30,6 @@ TRIGGERS = [
 ]
 
 
-# Deterministic seeded candles for the chart; one bar per 5 minutes of RTH.
-# Generated with the same algorithm the React component uses, so the seed
-# fixture and the design bundle agree pixel-for-pixel.
 def _seed_candles() -> list[dict]:
     rnd = 7
     out: list[dict] = []
@@ -55,6 +50,18 @@ def _seed_candles() -> list[dict]:
     out[-1]["c"] = 582.97
     out[-1]["h"] = max(out[-1]["h"], out[-1]["c"] + 0.05)
     return out
+
+
+SIGNALS = [
+    {"id": "seed-1", "type": "REJECTION",  "line": "4H SUPPLY",   "ts": "11:42:18", "score": 8.2, "grade": "A",  "dir": "down",    "status": "PENDING_CONFIRMATION", "outcome": None,  "entry": None,   "stop": None,   "target": None,   "rr": None},
+    {"id": "seed-2", "type": "REJECTION",  "line": "PIVOT LOW",   "ts": "11:18:04", "score": 6.4, "grade": "B",  "dir": "down",    "status": "CONFIRMED",            "outcome": -0.34, "entry": 581.85, "stop": 582.55, "target": 579.20, "rr": 1.8},
+    {"id": "seed-3", "type": "REJECTION",  "line": "DAY OPEN",    "ts": "10:58:31", "score": 5.1, "grade": "C",  "dir": "neutral", "status": "CONFIRMED",            "outcome": 0.0,   "entry": 582.40, "stop": 583.10, "target": 581.00, "rr": 1.2},
+    {"id": "seed-4", "type": "REJECTION",  "line": "1H VWAP",     "ts": "10:42:09", "score": 7.8, "grade": "A",  "dir": "up",      "status": "CONFIRMED",            "outcome": 0.82,  "entry": 582.81, "stop": 582.10, "target": 583.91, "rr": 2.1},
+    {"id": "seed-5", "type": "REJECTION",  "line": "PDH",         "ts": "10:24:55", "score": 7.0, "grade": "B",  "dir": "down",    "status": "CONFIRMED",            "outcome": 0.41,  "entry": 584.12, "stop": 584.82, "target": 582.55, "rr": 2.0},
+    {"id": "seed-6", "type": "REJECTION",  "line": "GLOBEX HIGH", "ts": "10:08:12", "score": 5.6, "grade": "C",  "dir": "up",      "status": "CONFIRMED",            "outcome": 0.18,  "entry": 583.05, "stop": 582.40, "target": 583.91, "rr": 1.5},
+    {"id": "seed-7", "type": "REJECTION",  "line": "PIVOT LOW",   "ts": "09:54:48", "score": 4.2, "grade": "D",  "dir": "neutral", "status": "CONFIRMED",            "outcome": 0.0,   "entry": 581.85, "stop": 582.55, "target": 580.80, "rr": 1.0},
+    {"id": "seed-8", "type": "REJECTION",  "line": "DAY OPEN",    "ts": "09:36:02", "score": 6.9, "grade": "B",  "dir": "up",      "status": "CONFIRMED",            "outcome": 0.55,  "entry": 582.40, "stop": 581.80, "target": 583.50, "rr": 1.8},
+]
 
 
 CHART_LINES = [
@@ -89,4 +96,5 @@ def build() -> dict:
         "candles": _seed_candles(),
         "chartLines": CHART_LINES,
         "options": None,
+        "signals": SIGNALS,
     }
