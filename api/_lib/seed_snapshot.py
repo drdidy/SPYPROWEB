@@ -32,6 +32,39 @@ TRIGGERS = [
 ]
 
 
+# Deterministic seeded candles for the chart; one bar per 5 minutes of RTH.
+# Generated with the same algorithm the React component uses, so the seed
+# fixture and the design bundle agree pixel-for-pixel.
+def _seed_candles() -> list[dict]:
+    rnd = 7
+    out: list[dict] = []
+    price = 580.20
+    for i in range(80):
+        rnd = (rnd * 9301 + 49297) % 233280
+        rand1 = rnd / 233280
+        rnd = (rnd * 9301 + 49297) % 233280
+        rand2 = rnd / 233280
+        rnd = (rnd * 9301 + 49297) % 233280
+        rand3 = rnd / 233280
+        o = price
+        c = o + (rand1 - 0.48) * 0.6
+        h = max(o, c) + rand2 * 0.35
+        lo = min(o, c) - rand3 * 0.35
+        out.append({"t": f"2026-05-06T{8 + i // 12:02d}:{(i % 12) * 5:02d}:00", "o": round(o, 2), "h": round(h, 2), "l": round(lo, 2), "c": round(c, 2)})
+        price = c
+    out[-1]["c"] = 582.97
+    out[-1]["h"] = max(out[-1]["h"], out[-1]["c"] + 0.05)
+    return out
+
+
+CHART_LINES = [
+    {"label": "4H Supply", "value": 583.40, "color": "var(--red)",  "dash": False, "armed": False},
+    {"label": "Pivot Low", "value": 581.85, "color": "var(--blue)", "dash": False, "armed": False},
+    {"label": "Open",      "value": 582.40, "color": "var(--text-secondary)", "dash": True, "armed": False},
+    {"label": "Trigger",   "value": 583.40, "color": "var(--amber)", "dash": False, "armed": True},
+]
+
+
 def build() -> dict:
     return {
         "asOf": datetime.now(timezone.utc).isoformat(),
@@ -53,4 +86,7 @@ def build() -> dict:
         "context": {"vix": 14.82, "dxy": 104.31, "vvix": 91.4},
         "spark": SPARK,
         "triggers": TRIGGERS,
+        "candles": _seed_candles(),
+        "chartLines": CHART_LINES,
+        "options": None,
     }

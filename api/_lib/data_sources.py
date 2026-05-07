@@ -23,6 +23,7 @@ import pandas as pd
 
 from . import prophet_core as pc
 from . import seed_snapshot
+from . import tastytrade
 
 
 # ---------------------------------------------------------------------------
@@ -39,6 +40,23 @@ def fetch_spy_hourly(period: str = "5d") -> pd.DataFrame:
         import yfinance as yf  # imported lazily
         ticker = yf.Ticker(pc.SYMBOL)
         df = ticker.history(period=period, interval="60m", auto_adjust=False)
+    except Exception:
+        return pd.DataFrame()
+    if df is None or df.empty:
+        return pd.DataFrame()
+    df = pc.normalize_yfinance_frame(df)
+    df = pc.ensure_central_index(df)
+    return df
+
+
+@pc.ttl_cache(ttl_seconds=30.0, maxsize=8)
+def fetch_spy_intraday(period: str = "1d", interval: str = "5m") -> pd.DataFrame:
+    """5-minute SPY bars for the chart. Tighter TTL than hourly because the
+    chart is the most-watched surface."""
+    try:
+        import yfinance as yf
+        ticker = yf.Ticker(pc.SYMBOL)
+        df = ticker.history(period=period, interval=interval, auto_adjust=False)
     except Exception:
         return pd.DataFrame()
     if df is None or df.empty:
@@ -89,13 +107,23 @@ def _triggers_from_lines(
 
     armed_set = {l.name for l in pc.active_entry_lines(primary_lines, current_price, current_dt)}
 
+    def _bias_contribution(dist: float, price: float, decay_pct: float = 1.2) -> int:
+        # Bias magnitude decays linearly with percent distance; zero past
+        # `decay_pct * 2`. This avoids the design's clamp-at-100 saturation
+        # when SPY itself is bigger than the design's $580 reference.
+        if not price:
+            return 0
+        dist_pct = abs(dist) / price * 100
+        mag = max(0.0, 100.0 * (1.0 - dist_pct / (decay_pct * 2)))
+        sign = -1 if dist > 0 else 1
+        return int(round(sign * mag))
+
     for line in primary_lines:
         v = line.tradable_value_at(current_dt)
         if pd.isna(v):
             continue
         dist = current_price - v
         bps = round((dist / current_price) * 10000) if current_price else 0
-        bias = max(-100, min(100, int(round(-dist * 25))))
         if line.name in armed_set:
             status = "ARMED"
         elif abs(dist) < 0.20:
@@ -109,7 +137,7 @@ def _triggers_from_lines(
             "level": round(float(v), 2),
             "dist": round(float(dist), 2),
             "bps": bps,
-            "bias": bias,
+            "bias": _bias_contribution(dist, current_price),
             "status": status,
         })
 
@@ -124,7 +152,7 @@ def _triggers_from_lines(
                 "level": round(level, 2),
                 "dist": round(dist, 2),
                 "bps": bps,
-                "bias": max(-100, min(100, int(round(-dist * 18)))),
+                "bias": _bias_contribution(dist, current_price, decay_pct=1.6),
                 "status": "ARMED" if abs(dist) < 0.50 else ("WATCHING" if abs(dist) < 1.50 else "STALE"),
             })
 
@@ -137,7 +165,7 @@ def _triggers_from_lines(
             "level": round(day_open, 2),
             "dist": round(dist, 2),
             "bps": bps,
-            "bias": max(-100, min(100, int(round(-dist * 22)))),
+            "bias": _bias_contribution(dist, current_price, decay_pct=1.0),
             "status": "BREACHED" if abs(dist) > 0.30 else "WATCHING",
         })
 
@@ -145,15 +173,24 @@ def _triggers_from_lines(
 
 
 def _bias_label_and_score(state: pc.BiasState, current_price: float) -> tuple[str, int]:
+    # Soften prophet_core's strength score with tanh so the chip doesn't
+    # peg at 100 in any trending session. tanh(strength/80) maps 100->85,
+    # 50->55, 20->25, which leaves visible headroom for stronger signals.
     if state.bias in {"BULLISH", "BEARISH"}:
         sign = 1 if state.bias == "BULLISH" else -1
-        score = int(round(sign * state.strength_score))
+        smoothed = 100.0 * math.tanh(float(state.strength_score) / 80.0)
+        score = int(round(sign * smoothed))
     elif state.bias == "REGULAR_SESSION":
         center = (state.ua_value + state.ud_value) / 2 if (
             not pd.isna(state.ua_value) and not pd.isna(state.ud_value)
         ) else current_price
-        delta = current_price - center
-        score = max(-100, min(100, int(round(delta * 30))))
+        # Scale by the channel half-width, not raw points, so it works at
+        # any SPY price level.
+        half_width = max(0.01, abs(state.ua_value - state.ud_value) / 2) if (
+            not pd.isna(state.ua_value) and not pd.isna(state.ud_value)
+        ) else 1.0
+        delta_norm = (current_price - center) / half_width
+        score = int(round(100.0 * math.tanh(delta_norm)))
     else:
         score = 0
     if score >= 50:
@@ -167,6 +204,72 @@ def _bias_label_and_score(state: pc.BiasState, current_price: float) -> tuple[st
     else:
         label = "NEUTRAL"
     return label, score
+
+
+def _candles_for_chart(rth_today: pd.DataFrame, intraday: pd.DataFrame) -> list[dict]:
+    """Pick the best frame for the chart and emit a list of OHLC + ts dicts."""
+    frame = intraday if not intraday.empty else rth_today
+    if frame is None or frame.empty:
+        return []
+    out: list[dict] = []
+    for ts, row in frame.iterrows():
+        try:
+            out.append({
+                "t": pd.Timestamp(ts).isoformat(),
+                "o": round(float(row["Open"]), 2),
+                "h": round(float(row["High"]), 2),
+                "l": round(float(row["Low"]), 2),
+                "c": round(float(row["Close"]), 2),
+            })
+        except Exception:
+            continue
+    # Cap at the last 90 bars so the chart payload stays small.
+    return out[-90:]
+
+
+def _chart_lines_from_primary(
+    primary_lines: list[pc.DynamicLine],
+    current_dt: datetime,
+    rth_today: pd.DataFrame,
+) -> list[dict]:
+    """Produce the structure-line payload the chart overlays on the candles.
+
+    The design renders four lines: 4H Supply / Pivot Low / Open / Trigger.
+    We map them to UA (supply) / LA (pivot low) / day open / closest active
+    line (trigger) so the chart updates with prophet_core's calculations.
+    """
+    lines: list[dict] = []
+    label_for_role = {
+        "supply": "4H Supply",
+        "pivot_low": "Pivot Low",
+        "open": "Open",
+        "trigger": "Trigger",
+    }
+    by_name = {l.name: l for l in primary_lines}
+
+    def add(role: str, value: float, color: str, dash: bool = False, armed: bool = False):
+        if value is None or pd.isna(value):
+            return
+        lines.append({
+            "label": label_for_role[role],
+            "value": round(float(value), 2),
+            "color": color,
+            "dash": dash,
+            "armed": armed,
+        })
+
+    ua = by_name.get("UA")
+    la = by_name.get("LA")
+    if ua is not None:
+        add("supply", ua.tradable_value_at(current_dt), "var(--red)")
+    if la is not None:
+        add("pivot_low", la.tradable_value_at(current_dt), "var(--blue)")
+    if rth_today is not None and not rth_today.empty:
+        add("open", float(rth_today.iloc[0]["Open"]), "var(--text-secondary)", dash=True)
+    closest = pc.get_closest_primary_line(primary_lines, current_dt, float(rth_today.iloc[-1]["Close"]) if not rth_today.empty else 0.0)
+    if closest is not None:
+        add("trigger", closest.tradable_value_at(current_dt), "var(--amber)", armed=True)
+    return lines
 
 
 def _bias_note(state: pc.BiasState, vix: float) -> str:
@@ -234,6 +337,15 @@ def build_live_snapshot() -> dict:
 
     triggers = _triggers_from_lines(primary_lines, current_dt, current_price, rth_today, rth_yesterday)
 
+    # 5-min intraday OHLC for the chart, falling back to the hourly RTH frame
+    # if the 5m provider hiccups (rare). chart_lines drives the 4 overlays.
+    intraday = fetch_spy_intraday("1d", "5m")
+    candles = _candles_for_chart(rth_today, intraday)
+    chart_lines = _chart_lines_from_primary(primary_lines, current_dt, rth_today)
+
+    # Options chain (Tastytrade); None if secrets aren't set or the call fails.
+    options = tastytrade.fetch_options_snapshot(current_price)
+
     return {
         "asOf": pd.Timestamp(current_dt).isoformat(),
         "source": "live",
@@ -258,6 +370,9 @@ def build_live_snapshot() -> dict:
         },
         "spark": spark,
         "triggers": triggers,
+        "candles": candles,
+        "chartLines": chart_lines,
+        "options": options,
     }
 
 
