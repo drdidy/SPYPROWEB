@@ -9,6 +9,22 @@ export interface Trigger {
   status: TriggerStatus;
 }
 
+export interface Candle {
+  t: string;
+  o: number;
+  h: number;
+  l: number;
+  c: number;
+}
+
+export interface ChartLine {
+  label: string;
+  value: number;
+  color: string;
+  dash: boolean;
+  armed: boolean;
+}
+
 export interface Snapshot {
   asOf: string;
   source: "seed" | "live" | "degraded" | "error";
@@ -25,4 +41,32 @@ export interface Snapshot {
   context: { vix: number; dxy: number; vvix: number };
   spark: number[];
   triggers: Trigger[];
+  candles: Candle[];
+  chartLines: ChartLine[];
+  options: OptionsSnapshot | null;
+}
+
+export interface OptionRow {
+  strike: number;
+  bid: number;
+  ask: number;
+  iv: number;
+  delta: number;
+  gamma: number;
+  oi: number;
+  volume: number;
+}
+
+export interface OptionsSnapshot {
+  expiration: string;
+  atm: number;
+  calls: OptionRow[];
+  puts: OptionRow[];
+  totals: {
+    callOi: number;
+    putOi: number;
+    callVol: number;
+    putVol: number;
+    pcr: number | null;
+  };
 }

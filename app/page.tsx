@@ -20,6 +20,9 @@ import { SignalLog } from "@/components/pages/signal-log";
 import { Analytics } from "@/components/pages/analytics";
 import { Configuration } from "@/components/pages/configuration";
 import { PageHeader } from "@/components/page-header";
+import { Landing } from "@/components/landing";
+
+const ENTERED_KEY = "spy-prophet-entered";
 
 function biasToVerb(score: number): Verb {
   if (score <= -50) return "SHORT";
@@ -33,6 +36,13 @@ export default function Home() {
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [page, setPage] = useState("chart");
   const [err, setErr] = useState<string | null>(null);
+  const [entered, setEntered] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(ENTERED_KEY) === "1") setEntered(true);
+    } catch { /* sessionStorage unavailable; stay on landing */ }
+  }, []);
 
   useEffect(() => {
     fetch("/api/snapshot")
@@ -40,6 +50,15 @@ export default function Home() {
       .then((data: Snapshot) => setSnap(data))
       .catch((e: Error) => setErr(e.message));
   }, []);
+
+  const handleEnter = () => {
+    setEntered(true);
+    try { sessionStorage.setItem(ENTERED_KEY, "1"); } catch { /* ignore */ }
+  };
+
+  if (!entered) {
+    return <Landing snap={snap} err={err} onEnter={handleEnter} />;
+  }
 
   return (
     <div className="app">
@@ -54,7 +73,7 @@ export default function Home() {
           {snap && page === "chart" && (
             <>
               <DecisionSlate verb={biasToVerb(snap.bias.score)} />
-              <ProphetChart />
+              <ProphetChart snap={snap} />
               <TriggerMap snap={snap} />
               <SignalTape />
               <StructureRead />
@@ -95,9 +114,9 @@ export default function Home() {
 
           {page === "brief"     && <DailyBrief     />}
           {page === "foresight" && <Foresight      />}
-          {page === "replay"    && <ReplayLab      />}
-          {page === "options"   && <OptionsCockpit />}
-          {page === "flow"      && <OrderFlow      />}
+          {snap && page === "replay" && <ReplayLab snap={snap} />}
+          {snap && page === "options" && <OptionsCockpit snap={snap} />}
+          {snap && page === "flow"    && <OrderFlow      snap={snap} />}
           {page === "context"   && <MarketContext  />}
           {page === "log"       && <SignalLog      />}
           {page === "analytics" && <Analytics      />}

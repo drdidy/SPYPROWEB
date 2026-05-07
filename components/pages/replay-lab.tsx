@@ -1,8 +1,9 @@
 // Replay Lab — chart + scrubber + as-of decision panel. From 81ed613d*.
+import type { Snapshot } from "@/lib/types";
 import { PageHeader } from "../page-header";
 import { ProphetChart } from "../prophet-chart";
 
-export function ReplayLab() {
+export function ReplayLab({ snap }: { snap: Snapshot }) {
   return (
     <>
       <PageHeader
@@ -12,7 +13,7 @@ export function ReplayLab() {
       />
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 280px", gap: 16 }}>
         <div>
-          <ProphetChart/>
+          <ProphetChart snap={snap}/>
           <div className="card" style={{ padding: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
               <span className="t-heading">SCRUBBER</span>
