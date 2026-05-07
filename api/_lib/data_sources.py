@@ -31,15 +31,21 @@ from . import tastytrade
 # ---------------------------------------------------------------------------
 
 @pc.ttl_cache(ttl_seconds=60.0, maxsize=8)
-def fetch_spy_hourly(period: str = "5d") -> pd.DataFrame:
+def fetch_spy_hourly(period: str = "60d") -> pd.DataFrame:
     """Hourly SPY bars from Yahoo, normalized + indexed in CT.
 
     Returns an empty frame on any failure; callers handle the empty case.
+    The 60d window matches spyprost so available_session_days agrees
+    across holiday weeks.
     """
     try:
         import yfinance as yf  # imported lazily
-        ticker = yf.Ticker(pc.SYMBOL)
-        df = ticker.history(period=period, interval="60m", auto_adjust=False)
+        # Match spyprost's call signature exactly (yf.download + same flags)
+        # so the resulting frame is byte-identical, not just close-enough.
+        df = yf.download(
+            tickers=pc.SYMBOL, period=period, interval="60m",
+            prepost=True, progress=False, auto_adjust=False, actions=False,
+        )
     except Exception:
         return pd.DataFrame()
     if df is None or df.empty:
@@ -47,6 +53,70 @@ def fetch_spy_hourly(period: str = "5d") -> pd.DataFrame:
     df = pc.normalize_yfinance_frame(df)
     df = pc.ensure_central_index(df)
     return df
+
+
+# --- Spyprost session-clock helpers, ported verbatim ----------------------
+
+def _get_latest_available_trading_day(df: pd.DataFrame, current_dt: datetime) -> Any:
+    if df is None or df.empty:
+        return None
+    ct = pc.get_central_tz()
+    cur = pd.Timestamp(current_dt)
+    cur = cur.tz_localize(ct) if cur.tzinfo is None else cur.tz_convert(ct)
+    for day in reversed(pc.get_available_trading_days(df)):
+        if day <= cur.date():
+            return day
+    return None
+
+
+def _get_live_signal_day(df: pd.DataFrame, current_dt: datetime) -> Any:
+    latest_day = _get_latest_available_trading_day(df, current_dt)
+    if latest_day is None:
+        return None
+    ct = pc.get_central_tz()
+    cur = pd.Timestamp(current_dt)
+    cur = cur.tz_localize(ct) if cur.tzinfo is None else cur.tz_convert(ct)
+    if latest_day < cur.date():
+        return cur.date()
+    return latest_day
+
+
+def _get_prior_trading_day(df: pd.DataFrame, current_dt: datetime) -> Any:
+    if df is None or df.empty:
+        return None
+    ct = pc.get_central_tz()
+    cur = pd.Timestamp(current_dt)
+    cur = cur.tz_localize(ct) if cur.tzinfo is None else cur.tz_convert(ct)
+    for day in reversed(pc.get_available_trading_days(df)):
+        if day < cur.date():
+            return day
+    return None
+
+
+def _latest_price_for_session(df: pd.DataFrame, session_day: Any) -> float | None:
+    if df is None or df.empty or "Close" not in df:
+        return None
+    rth_df = pc.filter_rth_session(df, session_day)
+    if not rth_df.empty and not rth_df["Close"].dropna().empty:
+        return float(rth_df["Close"].dropna().iloc[-1])
+    day_df = df[df.index.date == session_day].sort_index()
+    if not day_df.empty and not day_df["Close"].dropna().empty:
+        return float(day_df["Close"].dropna().iloc[-1])
+    close_series = df.get("Close", pd.Series(dtype="float64")).dropna()
+    return float(close_series.iloc[-1]) if not close_series.empty else None
+
+
+def _structure_projection_time(now_ct: pd.Timestamp, hour: int = 9, minute: int = 0) -> pd.Timestamp:
+    """Today at 9:00 AM CT (or whatever hour/minute). Spyprost projects all
+    line values to this timestamp so the 'level' column is stable through
+    the whole RTH session, not drifting with the slope."""
+    ct = pc.get_central_tz()
+    now = now_ct
+    if now.tzinfo is None:
+        now = now.tz_localize(ct)
+    else:
+        now = now.tz_convert(ct)
+    return pd.Timestamp(now.date(), tz=ct) + pd.Timedelta(hours=hour, minutes=minute)
 
 
 @pc.ttl_cache(ttl_seconds=30.0, maxsize=8)
@@ -86,10 +156,6 @@ def fetch_last_close(symbol: str) -> float:
 # Snapshot assembly
 # ---------------------------------------------------------------------------
 
-# The Trigger Map UI expects rows shaped like the design fixture. We translate
-# prophet_core's primary lines + a few well-known reference points (PDH/PDL,
-# day open) into that shape.
-
 def _triggers_from_lines(
     primary_lines: list[pc.DynamicLine],
     current_dt: datetime,
@@ -108,9 +174,6 @@ def _triggers_from_lines(
     armed_set = {l.name for l in pc.active_entry_lines(primary_lines, current_price, current_dt)}
 
     def _bias_contribution(dist: float, price: float, decay_pct: float = 1.2) -> int:
-        # Bias magnitude decays linearly with percent distance; zero past
-        # `decay_pct * 2`. This avoids the design's clamp-at-100 saturation
-        # when SPY itself is bigger than the design's $580 reference.
         if not price:
             return 0
         dist_pct = abs(dist) / price * 100
@@ -173,22 +236,17 @@ def _triggers_from_lines(
 
 
 def _bias_label_and_score(state: pc.BiasState, current_price: float) -> tuple[str, int]:
-    # Soften prophet_core's strength score with tanh so the chip doesn't
-    # peg at 100 in any trending session. tanh(strength/80) maps 100->85,
-    # 50->55, 20->25, which leaves visible headroom for stronger signals.
     if state.bias in {"BULLISH", "BEARISH"}:
         sign = 1 if state.bias == "BULLISH" else -1
         smoothed = 100.0 * math.tanh(float(state.strength_score) / 80.0)
         score = int(round(sign * smoothed))
-    elif state.bias == "REGULAR_SESSION":
-        center = (state.ua_value + state.ud_value) / 2 if (
-            not pd.isna(state.ua_value) and not pd.isna(state.ud_value)
-        ) else current_price
-        # Scale by the channel half-width, not raw points, so it works at
-        # any SPY price level.
-        half_width = max(0.01, abs(state.ua_value - state.ud_value) / 2) if (
-            not pd.isna(state.ua_value) and not pd.isna(state.ud_value)
-        ) else 1.0
+    elif state.bias in {"NEUTRAL", "REGULAR_SESSION"}:
+        if not pd.isna(state.ua_value) and not pd.isna(state.ud_value):
+            center = (state.ua_value + state.ud_value) / 2
+            half_width = max(0.01, abs(state.ua_value - state.ud_value) / 2)
+        else:
+            center = current_price
+            half_width = 1.0
         delta_norm = (current_price - center) / half_width
         score = int(round(100.0 * math.tanh(delta_norm)))
     else:
@@ -207,7 +265,6 @@ def _bias_label_and_score(state: pc.BiasState, current_price: float) -> tuple[st
 
 
 def _candles_for_chart(rth_today: pd.DataFrame, intraday: pd.DataFrame) -> list[dict]:
-    """Pick the best frame for the chart and emit a list of OHLC + ts dicts."""
     frame = intraday if not intraday.empty else rth_today
     if frame is None or frame.empty:
         return []
@@ -223,7 +280,6 @@ def _candles_for_chart(rth_today: pd.DataFrame, intraday: pd.DataFrame) -> list[
             })
         except Exception:
             continue
-    # Cap at the last 90 bars so the chart payload stays small.
     return out[-90:]
 
 
@@ -232,12 +288,6 @@ def _chart_lines_from_primary(
     current_dt: datetime,
     rth_today: pd.DataFrame,
 ) -> list[dict]:
-    """Produce the structure-line payload the chart overlays on the candles.
-
-    The design renders four lines: 4H Supply / Pivot Low / Open / Trigger.
-    We map them to UA (supply) / LA (pivot low) / day open / closest active
-    line (trigger) so the chart updates with prophet_core's calculations.
-    """
     lines: list[dict] = []
     label_for_role = {
         "supply": "4H Supply",
@@ -283,19 +333,42 @@ def _bias_note(state: pc.BiasState, vix: float) -> str:
 
 
 def build_live_snapshot() -> dict:
-    """Run the whole pipeline; raise on any unrecoverable error."""
-    df = fetch_spy_hourly("5d")
+    """Run the whole pipeline; raise on any unrecoverable error.
+
+    Mirrors spyprost's main flow exactly so the trigger map / bias chip
+    show the same numbers users see in the Streamlit cockpit:
+
+      - SPY hourly @ 60d (matches yf.download flags spyprost uses).
+      - signal_day = latest available day or today if today missing.
+      - prior_day = previous trading day in the frame (pivots come from
+        prior_day's RTH).
+      - now_ct = current wall clock in CT (NOT the latest bar's
+        timestamp); used for bias state.
+      - projection_time = today at 9:00 AM CT; used to project line
+        values into the 'level' column. Keeps trigger levels stable
+        through the session instead of drifting with slope*hours.
+      - latest_price falls back gracefully (RTH -> any session -> last
+        non-null close) the same way spyprost's
+        latest_price_for_session does.
+    """
+    df = fetch_spy_hourly("60d")
     if df.empty:
         raise RuntimeError("yfinance returned no SPY bars")
 
     days = pc.get_available_trading_days(df)
     if not days:
         raise RuntimeError("no trading days in SPY frame")
-    today = days[-1]
-    yesterday = days[-2] if len(days) >= 2 else None
 
-    rth_today = pc.filter_rth_session(df, today)
-    rth_yesterday = pc.filter_rth_session(df, yesterday) if yesterday else pd.DataFrame()
+    ct = pc.get_central_tz()
+    now_ct = pd.Timestamp.now(tz=ct)
+
+    signal_day = _get_live_signal_day(df, now_ct.to_pydatetime())
+    if signal_day is None:
+        raise RuntimeError("could not resolve signal day")
+    prior_day = _get_prior_trading_day(df, pd.Timestamp(signal_day).to_pydatetime())
+
+    rth_today = pc.filter_rth_session(df, signal_day)
+    rth_yesterday = pc.filter_rth_session(df, prior_day) if prior_day else pd.DataFrame()
 
     structure_frame = rth_yesterday if not rth_yesterday.empty else rth_today
     high_pivot = pc.find_high_pivot(structure_frame)
@@ -303,23 +376,25 @@ def build_live_snapshot() -> dict:
     slope = pc.get_structure_calibration()
     primary_lines = pc.build_primary_lines(high_pivot, low_pivot, slope)
 
-    if rth_today.empty:
-        latest = df.iloc[-1]
-    else:
-        latest = rth_today.iloc[-1]
-    current_price = float(latest["Close"])
-    current_dt = pd.Timestamp(latest.name).to_pydatetime()
+    projection_time = _structure_projection_time(now_ct).to_pydatetime()
 
-    bias_state = pc.determine_preopen_bias(primary_lines, current_price, current_dt)
+    current_price = _latest_price_for_session(df, signal_day)
+    if current_price is None:
+        current_price = float(df["Close"].dropna().iloc[-1])
+
+    bias_state = pc.determine_preopen_bias(primary_lines, current_price, now_ct.to_pydatetime())
 
     if not rth_today.empty:
         day_open = float(rth_today.iloc[0]["Open"])
         day_high = float(rth_today["High"].max())
         day_low = float(rth_today["Low"].min())
     else:
-        day_open = float(latest["Open"])
-        day_high = float(latest["High"])
-        day_low = float(latest["Low"])
+        latest_session = df[df.index.date == signal_day].sort_index()
+        if latest_session.empty:
+            latest_session = df.tail(1)
+        day_open = float(latest_session.iloc[0]["Open"]) if not latest_session.empty else current_price
+        day_high = float(latest_session["High"].max()) if not latest_session.empty else current_price
+        day_low = float(latest_session["Low"].min()) if not latest_session.empty else current_price
     prev_close = float(rth_yesterday.iloc[-1]["Close"]) if not rth_yesterday.empty else float("nan")
     chg = current_price - prev_close if not pd.isna(prev_close) else 0.0
     chg_pct = (chg / prev_close * 100) if prev_close else 0.0
@@ -335,19 +410,16 @@ def build_live_snapshot() -> dict:
     if not spark:
         spark = seed_snapshot.SPARK
 
-    triggers = _triggers_from_lines(primary_lines, current_dt, current_price, rth_today, rth_yesterday)
+    triggers = _triggers_from_lines(primary_lines, projection_time, current_price, rth_today, rth_yesterday)
 
-    # 5-min intraday OHLC for the chart, falling back to the hourly RTH frame
-    # if the 5m provider hiccups (rare). chart_lines drives the 4 overlays.
     intraday = fetch_spy_intraday("1d", "5m")
     candles = _candles_for_chart(rth_today, intraday)
-    chart_lines = _chart_lines_from_primary(primary_lines, current_dt, rth_today)
+    chart_lines = _chart_lines_from_primary(primary_lines, projection_time, rth_today)
 
-    # Options chain (Tastytrade); None if secrets aren't set or the call fails.
     options = tastytrade.fetch_options_snapshot(current_price)
 
     return {
-        "asOf": pd.Timestamp(current_dt).isoformat(),
+        "asOf": now_ct.isoformat(),
         "source": "live",
         "bias": {
             "label": bias_label,
