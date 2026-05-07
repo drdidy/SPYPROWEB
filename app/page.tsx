@@ -75,7 +75,7 @@ export default function Home() {
               <DecisionSlate verb={biasToVerb(snap.bias.score)} />
               <ProphetChart snap={snap} />
               <TriggerMap snap={snap} />
-              <SignalTape />
+              <SignalTape snap={snap} />
               <StructureRead />
               <LearningPanel />
             </>
@@ -98,10 +98,10 @@ export default function Home() {
             </>
           )}
 
-          {page === "signal" && (
+          {snap && page === "signal" && (
             <>
               <PageHeader title="Signal Tape" desc="The last eight signals, with score, line, and outcome." />
-              <SignalTape />
+              <SignalTape snap={snap} />
             </>
           )}
 
@@ -118,7 +118,7 @@ export default function Home() {
           {snap && page === "options" && <OptionsCockpit snap={snap} />}
           {snap && page === "flow"    && <OrderFlow      snap={snap} />}
           {page === "context"   && <MarketContext  />}
-          {page === "log"       && <SignalLog      />}
+          {snap && page === "log" && <SignalLog snap={snap} />}
           {page === "analytics" && <Analytics      />}
           {page === "config"    && <Configuration  />}
         </div>

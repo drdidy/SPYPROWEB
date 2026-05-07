@@ -40,8 +40,6 @@ def fetch_spy_hourly(period: str = "60d") -> pd.DataFrame:
     """
     try:
         import yfinance as yf  # imported lazily
-        # Match spyprost's call signature exactly (yf.download + same flags)
-        # so the resulting frame is byte-identical, not just close-enough.
         df = yf.download(
             tickers=pc.SYMBOL, period=period, interval="60m",
             prepost=True, progress=False, auto_adjust=False, actions=False,
@@ -54,8 +52,6 @@ def fetch_spy_hourly(period: str = "60d") -> pd.DataFrame:
     df = pc.ensure_central_index(df)
     return df
 
-
-# --- Spyprost session-clock helpers, ported verbatim ----------------------
 
 def _get_latest_available_trading_day(df: pd.DataFrame, current_dt: datetime) -> Any:
     if df is None or df.empty:
@@ -107,9 +103,6 @@ def _latest_price_for_session(df: pd.DataFrame, session_day: Any) -> float | Non
 
 
 def _structure_projection_time(now_ct: pd.Timestamp, hour: int = 9, minute: int = 0) -> pd.Timestamp:
-    """Today at 9:00 AM CT (or whatever hour/minute). Spyprost projects all
-    line values to this timestamp so the 'level' column is stable through
-    the whole RTH session, not drifting with the slope."""
     ct = pc.get_central_tz()
     now = now_ct
     if now.tzinfo is None:
@@ -121,8 +114,6 @@ def _structure_projection_time(now_ct: pd.Timestamp, hour: int = 9, minute: int 
 
 @pc.ttl_cache(ttl_seconds=30.0, maxsize=8)
 def fetch_spy_intraday(period: str = "1d", interval: str = "5m") -> pd.DataFrame:
-    """5-minute SPY bars for the chart. Tighter TTL than hourly because the
-    chart is the most-watched surface."""
     try:
         import yfinance as yf
         ticker = yf.Ticker(pc.SYMBOL)
@@ -138,7 +129,6 @@ def fetch_spy_intraday(period: str = "1d", interval: str = "5m") -> pd.DataFrame
 
 @pc.ttl_cache(ttl_seconds=60.0, maxsize=8)
 def fetch_last_close(symbol: str) -> float:
-    """Latest available close for a Yahoo symbol (used for VIX/DXY/VVIX)."""
     try:
         import yfinance as yf
         df = yf.Ticker(symbol).history(period="2d", interval="1d", auto_adjust=False)
@@ -151,10 +141,6 @@ def fetch_last_close(symbol: str) -> float:
     except Exception:
         return float("nan")
 
-
-# ---------------------------------------------------------------------------
-# Snapshot assembly
-# ---------------------------------------------------------------------------
 
 def _triggers_from_lines(
     primary_lines: list[pc.DynamicLine],
@@ -322,6 +308,47 @@ def _chart_lines_from_primary(
     return lines
 
 
+def _signals_for_tape(signals: list[pc.TradeSignal], current_price: float) -> list[dict]:
+    """Convert prophet_core signals into rows the Signal Tape and Signal
+    Log surfaces consume. Most recent first; outcome column is live P&L
+    for confirmed signals or null while pending."""
+    rows: list[dict] = []
+    for s in sorted(signals, key=lambda x: pd.Timestamp(x.rejection_time), reverse=True)[:20]:
+        try:
+            quality = pc.score_signal_quality(s)
+        except Exception:
+            continue
+        outcome: float | None = None
+        if s.status == "CONFIRMED" and not pd.isna(s.entry_price) and s.entry_price:
+            if s.signal_type == "CALL":
+                outcome = (current_price - float(s.entry_price)) / float(s.entry_price) * 100
+            else:
+                outcome = (float(s.entry_price) - current_price) / float(s.entry_price) * 100
+            outcome = round(outcome, 2)
+        ts = pd.Timestamp(s.rejection_time)
+        try:
+            ct_ts = ts.tz_convert(pc.get_central_tz()) if ts.tzinfo else ts.tz_localize(pc.get_central_tz())
+            ts_str = ct_ts.strftime("%H:%M:%S")
+        except Exception:
+            ts_str = str(ts)
+        rows.append({
+            "id": s.signal_id,
+            "type": "REJECTION",
+            "line": pc.compact_line_name(s.line_name).upper(),
+            "ts": ts_str,
+            "score": round(quality.score / 10.0, 1),
+            "grade": quality.grade,
+            "dir": "up" if s.signal_type == "CALL" else "down",
+            "status": s.status,
+            "outcome": outcome,
+            "entry": round(float(s.entry_price), 2) if not pd.isna(s.entry_price) else None,
+            "stop": round(float(s.stop_price), 2) if not pd.isna(s.stop_price) else None,
+            "target": round(float(s.target_price), 2) if not pd.isna(s.target_price) else None,
+            "rr": round(float(s.rr_ratio), 2) if not pd.isna(s.rr_ratio) else None,
+        })
+    return rows
+
+
 def _bias_note(state: pc.BiasState, vix: float) -> str:
     parts: list[str] = []
     if not pd.isna(vix):
@@ -333,24 +360,6 @@ def _bias_note(state: pc.BiasState, vix: float) -> str:
 
 
 def build_live_snapshot() -> dict:
-    """Run the whole pipeline; raise on any unrecoverable error.
-
-    Mirrors spyprost's main flow exactly so the trigger map / bias chip
-    show the same numbers users see in the Streamlit cockpit:
-
-      - SPY hourly @ 60d (matches yf.download flags spyprost uses).
-      - signal_day = latest available day or today if today missing.
-      - prior_day = previous trading day in the frame (pivots come from
-        prior_day's RTH).
-      - now_ct = current wall clock in CT (NOT the latest bar's
-        timestamp); used for bias state.
-      - projection_time = today at 9:00 AM CT; used to project line
-        values into the 'level' column. Keeps trigger levels stable
-        through the session instead of drifting with slope*hours.
-      - latest_price falls back gracefully (RTH -> any session -> last
-        non-null close) the same way spyprost's
-        latest_price_for_session does.
-    """
     df = fetch_spy_hourly("60d")
     if df.empty:
         raise RuntimeError("yfinance returned no SPY bars")
@@ -375,6 +384,8 @@ def build_live_snapshot() -> dict:
     low_pivot = pc.find_low_pivot(structure_frame)
     slope = pc.get_structure_calibration()
     primary_lines = pc.build_primary_lines(high_pivot, low_pivot, slope)
+    secondary_pivots = pc.find_secondary_pivots(structure_frame)
+    secondary_lines = pc.build_secondary_lines(secondary_pivots, slope)
 
     projection_time = _structure_projection_time(now_ct).to_pydatetime()
 
@@ -412,6 +423,9 @@ def build_live_snapshot() -> dict:
 
     triggers = _triggers_from_lines(primary_lines, projection_time, current_price, rth_today, rth_yesterday)
 
+    raw_signals = pc.detect_rejection_signals(rth_today, primary_lines, secondary_lines) if not rth_today.empty else []
+    signals = _signals_for_tape(raw_signals, current_price)
+
     intraday = fetch_spy_intraday("1d", "5m")
     candles = _candles_for_chart(rth_today, intraday)
     chart_lines = _chart_lines_from_primary(primary_lines, projection_time, rth_today)
@@ -445,16 +459,16 @@ def build_live_snapshot() -> dict:
         "candles": candles,
         "chartLines": chart_lines,
         "options": options,
+        "signals": signals,
     }
 
 
 def build_snapshot_with_fallback() -> dict:
-    """Try live, fall back to seed with `source: 'degraded'` on any error."""
     if os.getenv("SPYPROPHET_FORCE_SEED") == "1":
         return seed_snapshot.build()
     try:
         return build_live_snapshot()
-    except Exception as exc:  # pragma: no cover - boundary catch
+    except Exception as exc:
         seed = seed_snapshot.build()
         seed["source"] = "degraded"
         seed["error"] = str(exc)[:200]
