@@ -46,6 +46,24 @@ export interface Snapshot {
   options: OptionsSnapshot | null;
   signals: Signal[];
   pivots: PivotsSnapshot;
+  decision: Decision;
+}
+
+export type Verb = "LONG" | "SHORT" | "WAIT" | "HOLD" | "EXIT";
+
+export interface Decision {
+  verb: Verb;
+  bias: "BULLISH" | "BEARISH" | "NEUTRAL";
+  biasColor: string;
+  score: number;
+  grade: string;
+  conviction: number;
+  window: string;
+  rationale: string;
+  why: string;
+  rr: number | null;
+  winPct: number | null;
+  edgePct: number | null;
 }
 
 export interface PivotInfo {

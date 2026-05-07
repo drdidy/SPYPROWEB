@@ -114,4 +114,18 @@ def build() -> dict:
             "structureDay": "2026-05-06",
             "signalDay": "2026-05-07",
         },
+        "decision": {
+            "verb": "WAIT",
+            "bias": "NEUTRAL",
+            "biasColor": "var(--text-secondary)",
+            "score": 0.0,
+            "grade": "—",
+            "conviction": 2,
+            "window": "opens 08:30 CT",
+            "rationale": "SPY 582.86 inside yesterday's RTH range. No qualified rejection yet on the active triggers.",
+            "why": "Waiting for the first hourly RTH candle to print before the engine can score a setup.",
+            "rr": None,
+            "winPct": None,
+            "edgePct": None,
+        },
     }

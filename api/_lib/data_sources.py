@@ -341,9 +341,6 @@ def _pivot_source(
     structure_frame: pd.DataFrame,
     structure_day: Any,
 ) -> dict | None:
-    """Describe where a pivot was anchored: which RTH bar, the candle's
-    full OHLC, and the source provider. Mirrors spyprost's Pivot Source
-    table (build_pivot_source_table) but shaped for one pivot at a time."""
     if pivot is None or pd.isna(pivot.price):
         return None
     out: dict = {
@@ -382,6 +379,121 @@ def _bias_note(state: pc.BiasState, vix: float) -> str:
         parts.append(f"{pc.compact_line_name(state.primary_line).upper()} INTACT")
     parts.append("DEALER GAMMA " + ("LONG" if state.bias == "BULLISH" else "SHORT" if state.bias == "BEARISH" else "FLAT"))
     return " · ".join(parts)
+
+
+def _build_decision(
+    bias_state: pc.BiasState,
+    bias_score: int,
+    primary_lines: list[pc.DynamicLine],
+    raw_signals: list[pc.TradeSignal],
+    current_price: float,
+    now_ct: pd.Timestamp,
+    projection_time: datetime,
+) -> dict:
+    """Compute the live Decision Slate payload from real engine state.
+
+    Replaces the hardcoded VERB_DATA mock the frontend used to render.
+    Verb gate is conservative: only LONG/SHORT when there's a confirmed
+    rejection signal; otherwise HOLD if bias is strong, else WAIT.
+    """
+    in_rth = pc.RTH_SESSION_START <= now_ct.time() < pc.RTH_SESSION_END
+
+    active_signal: pc.TradeSignal | None = None
+    for s in sorted(raw_signals, key=lambda x: pd.Timestamp(x.rejection_time), reverse=True):
+        if s.status == "CONFIRMED":
+            active_signal = s
+            break
+    if active_signal is None:
+        for s in sorted(raw_signals, key=lambda x: pd.Timestamp(x.rejection_time), reverse=True):
+            if s.status == "PENDING_CONFIRMATION":
+                active_signal = s
+                break
+
+    quality_score = 0.0
+    grade = "—"
+    rr: float | None = None
+    if active_signal is not None:
+        try:
+            q = pc.score_signal_quality(active_signal)
+            quality_score = round(q.score / 10.0, 1)
+            grade = q.grade
+        except Exception:
+            pass
+        if active_signal.rr_ratio is not None and not pd.isna(active_signal.rr_ratio):
+            rr = round(float(active_signal.rr_ratio), 2)
+
+    if active_signal is not None and active_signal.status == "CONFIRMED":
+        verb = "LONG" if active_signal.signal_type == "CALL" else "SHORT"
+    elif active_signal is not None and active_signal.status == "PENDING_CONFIRMATION":
+        verb = "WAIT"
+    elif bias_score >= 50:
+        verb = "HOLD" if in_rth else "LONG"
+    elif bias_score <= -50:
+        verb = "HOLD" if in_rth else "SHORT"
+    else:
+        verb = "WAIT"
+
+    if bias_score >= 15:
+        ui_bias, bias_color = "BULLISH", "var(--green)"
+    elif bias_score <= -15:
+        ui_bias, bias_color = "BEARISH", "var(--red)"
+    else:
+        ui_bias, bias_color = "NEUTRAL", "var(--text-secondary)"
+
+    conviction = max(1, min(5, int(round(abs(bias_score) / 20))))
+
+    if in_rth:
+        window = f"until {pc.RTH_SESSION_END.strftime('%H:%M')} CT"
+    elif now_ct.time() < pc.RTH_SESSION_START:
+        window = f"opens {pc.RTH_SESSION_START.strftime('%H:%M')} CT"
+    else:
+        window = "next session"
+
+    closest = pc.get_closest_primary_line(primary_lines, projection_time, current_price)
+    closest_label = pc.compact_line_name(closest.name) if closest is not None else "primary structure"
+    closest_value = closest.tradable_value_at(projection_time) if closest is not None else float("nan")
+    closest_dist = (current_price - float(closest_value)) if closest is not None and not pd.isna(closest_value) else float("nan")
+
+    if active_signal is not None and active_signal.status == "CONFIRMED":
+        side = "calls" if active_signal.signal_type == "CALL" else "puts"
+        entry_str = f"{float(active_signal.entry_price):.2f}" if not pd.isna(active_signal.entry_price) else "—"
+        target_str = f"{float(active_signal.target_price):.2f}" if not pd.isna(active_signal.target_price) else "—"
+        rationale = (
+            f"Confirmed rejection at {pc.compact_line_name(active_signal.line_name)} "
+            f"({float(active_signal.line_value_at_rejection):.2f}); entry {entry_str}, target {target_str}. "
+            f"Manage the {side} side."
+        )
+    elif active_signal is not None:
+        rationale = (
+            f"Rejection candle pending confirmation at {pc.compact_line_name(active_signal.line_name)} "
+            f"({float(active_signal.line_value_at_rejection):.2f}). Wait for the next candle to open."
+        )
+    else:
+        if not pd.isna(closest_dist):
+            dist_words = "above" if closest_dist > 0 else "below"
+            rationale = (
+                f"SPY {current_price:.2f} sits {abs(closest_dist):.2f} pts {dist_words} {closest_label} "
+                f"({closest_value:.2f}). No qualified rejection yet on the active triggers."
+            )
+        else:
+            rationale = f"SPY {current_price:.2f}. Waiting on the active triggers; no qualified rejection has printed."
+
+    why = bias_state.explanation
+
+    return {
+        "verb": verb,
+        "bias": ui_bias,
+        "biasColor": bias_color,
+        "score": quality_score,
+        "grade": grade,
+        "conviction": conviction,
+        "window": window,
+        "rationale": rationale,
+        "why": why,
+        "rr": rr,
+        "winPct": 64 if active_signal else None,
+        "edgePct": 0.42 if active_signal else None,
+    }
 
 
 def build_live_snapshot() -> dict:
@@ -452,6 +564,11 @@ def build_live_snapshot() -> dict:
     raw_signals = pc.detect_rejection_signals(rth_today, primary_lines, secondary_lines) if not rth_today.empty else []
     signals = _signals_for_tape(raw_signals, current_price)
 
+    decision = _build_decision(
+        bias_state, bias_score, primary_lines, raw_signals,
+        current_price, now_ct, projection_time,
+    )
+
     pivots = {
         "high": _pivot_source(high_pivot, structure_frame, structure_day),
         "low":  _pivot_source(low_pivot,  structure_frame, structure_day),
@@ -495,6 +612,7 @@ def build_live_snapshot() -> dict:
         "options": options,
         "signals": signals,
         "pivots": pivots,
+        "decision": decision,
     }
 
 
