@@ -114,6 +114,15 @@ def build() -> dict:
             "structureDay": "2026-05-06",
             "signalDay": "2026-05-07",
         },
+        "marketContext": {
+            "vix": {"value": 14.82, "label": "NORMAL", "tone": "green",
+                    "copy": "Range-of-day intact; structure holds"},
+            "vvix": {"value": 91.4},
+            "dxy": {"value": 104.31, "chgPct": -0.18, "tone": "green"},
+            "tnx": {"value": 4.284, "chgBps": 1.4, "tone": "red"},
+            "spyPressure": {"label": "BALANCED", "tone": "neutral", "value": 0.05},
+            "triggerGap": {"points": 0.43, "lineName": "UA", "tone": "green", "label": "NEAR"},
+        },
         "decision": {
             "verb": "WAIT",
             "bias": "NEUTRAL",

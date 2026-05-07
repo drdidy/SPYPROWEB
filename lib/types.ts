@@ -47,6 +47,18 @@ export interface Snapshot {
   signals: Signal[];
   pivots: PivotsSnapshot;
   decision: Decision;
+  marketContext?: MarketContext;
+}
+
+export type MarketTone = "green" | "amber" | "red" | "neutral";
+
+export interface MarketContext {
+  vix: { value: number | null; label: string; tone: MarketTone; copy: string };
+  vvix: { value: number | null };
+  dxy: { value: number | null; chgPct: number | null; tone: MarketTone };
+  tnx: { value: number | null; chgBps: number | null; tone: MarketTone };
+  spyPressure: { label: string; tone: MarketTone; value: number | null };
+  triggerGap: { points: number | null; lineName: string; tone: MarketTone; label: string };
 }
 
 export type Verb = "LONG" | "SHORT" | "WAIT" | "HOLD" | "EXIT";

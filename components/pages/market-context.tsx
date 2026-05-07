@@ -1,6 +1,8 @@
 "use client";
-// Market Context — macro tiles + news + economic calendar. From 81ed613d*.
+// Market Context — live macro tiles from snap.marketContext, with the
+// news + economic calendar still on a stub feed (no provider wired yet).
 import { useMemo } from "react";
+import type { MarketContext as MarketContextData, MarketTone, Snapshot } from "@/lib/types";
 import { PageHeader } from "../page-header";
 
 const NEWS = [
@@ -25,6 +27,13 @@ const CALENDAR = [
 
 const SENTIMENT_COLOR = { bull: "var(--green)", bear: "var(--red)", neutral: "var(--text-tertiary)" } as const;
 const IMPACT_PILL = { HIGH: "pill-red", MED: "pill-amber", LOW: "pill-outline" } as const;
+
+const TONE_COLOR: Record<MarketTone, string> = {
+  green: "var(--green)",
+  amber: "var(--amber)",
+  red: "var(--red)",
+  neutral: "var(--text-secondary)",
+};
 
 function seeded(seed: number) {
   let s = seed;
@@ -78,47 +87,110 @@ function CalRow({ c, last }: { c: typeof CALENDAR[number]; last: boolean }) {
   );
 }
 
-export function MarketContext() {
+function fmtNum(v: number | null | undefined, digits = 2): string {
+  if (v == null || Number.isNaN(v)) return "—";
+  return v.toFixed(digits);
+}
+
+function fmtSigned(v: number | null | undefined, digits = 2, suffix = ""): string {
+  if (v == null || Number.isNaN(v)) return "—";
+  const sign = v >= 0 ? "+" : "";
+  return `${sign}${v.toFixed(digits)}${suffix}`;
+}
+
+function buildTiles(mc: MarketContextData | undefined) {
+  const empty = { value: null, label: "—", tone: "neutral" as MarketTone, copy: "—" };
+  const vix = mc?.vix ?? empty;
+  const dxy = mc?.dxy ?? { value: null, chgPct: null, tone: "neutral" as MarketTone };
+  const tnx = mc?.tnx ?? { value: null, chgBps: null, tone: "neutral" as MarketTone };
+  const vvix = mc?.vvix ?? { value: null };
+  const spy = mc?.spyPressure ?? { label: "—", tone: "neutral" as MarketTone, value: null };
+  const gap = mc?.triggerGap ?? { points: null, lineName: "—", tone: "neutral" as MarketTone, label: "—" };
+
+  return [
+    {
+      title: "VIX",
+      metric: vix.value != null ? fmtNum(vix.value) : "—",
+      sub: vix.label,
+      copy: vix.copy,
+      tone: vix.tone,
+    },
+    {
+      title: "VVIX",
+      metric: vvix.value != null ? fmtNum(vvix.value, 1) : "—",
+      sub: "vol of vol",
+      copy: "Higher VVIX = wider VIX moves",
+      tone: "neutral" as MarketTone,
+    },
+    {
+      title: "Dollar (DXY)",
+      metric: dxy.value != null ? fmtNum(dxy.value) : "—",
+      sub: dxy.chgPct != null ? fmtSigned(dxy.chgPct, 2, "%") : "—",
+      copy: dxy.chgPct != null && dxy.chgPct > 0 ? "Strong dollar pressures equities" : "Soft dollar supports equities",
+      tone: dxy.tone,
+    },
+    {
+      title: "10Y Yield",
+      metric: tnx.value != null ? `${tnx.value.toFixed(3)}%` : "—",
+      sub: tnx.chgBps != null ? `${fmtSigned(tnx.chgBps, 1)} bps` : "—",
+      copy: tnx.chgBps != null && tnx.chgBps > 0 ? "Yields rising; duration headwind" : "Yields easing; duration tailwind",
+      tone: tnx.tone,
+    },
+    {
+      title: "SPY Pressure",
+      metric: spy.label,
+      sub: spy.value != null ? fmtSigned(spy.value, 2, " pts / 3 bars") : "—",
+      copy: "Direction of last three hourly closes",
+      tone: spy.tone,
+    },
+    {
+      title: "Trigger Gap",
+      metric: gap.points != null ? `${fmtSigned(gap.points)} pts` : "—",
+      sub: `${gap.label} · ${gap.lineName}`,
+      copy: "Distance to nearest primary structure line",
+      tone: gap.tone,
+    },
+  ];
+}
+
+export function MarketContext({ snap }: { snap?: Snapshot }) {
+  const tiles = buildTiles(snap?.marketContext);
+
   const tilePolylines = useMemo(() => {
     const rand = seeded(7);
-    return Array.from({ length: 8 }, (_, i) =>
+    return Array.from({ length: tiles.length }, (_, i) =>
       Array.from({ length: 20 }, (_, j) =>
         `${j * 10},${30 + Math.sin((i + j) * 0.6) * 15 + (rand() - 0.5) * 4}`
       ).join(" ")
     );
-  }, []);
+  }, [tiles.length]);
 
-  const tiles = [
-    { title: "VIX Term", metric: "CONTANGO", sub: "+1.42 vol pts" },
-    { title: "Sector Rotation", metric: "XLK / XLE", sub: "tech > energy" },
-    { title: "Breadth", metric: "71% ADV", sub: "4,124 / 1,683" },
-    { title: "Dollar (DXY)", metric: "104.21", sub: "-0.18%" },
-    { title: "10Y Yield", metric: "4.284%", sub: "+1.4 bps" },
-    { title: "Yest. Auction", metric: "POC 582.55", sub: "balanced" },
-    { title: "Gamma Exp.", metric: "+$1.2B", sub: "flip @ 582.80" },
-    { title: "High-Yield Spread", metric: "287 bps", sub: "risk-on" },
-  ];
   return (
     <>
-      <PageHeader title="Market Context" desc="Macro primitives, market-moving headlines, and the economic calendar."/>
+      <PageHeader title="Market Context" desc="Live macro readings that shape today's setup, plus market-moving headlines and the calendar."/>
 
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
           <div style={{ width: 4, height: 14, background: "var(--amber)" }}/>
           <span className="t-label c-tertiary">MACRO PRIMITIVES</span>
+          {snap?.source && (
+            <span className="t-caption c-tertiary" style={{ marginLeft: 4 }}>· {snap.source}</span>
+          )}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
           {tiles.map((t, i) => (
             <div key={t.title} className="card" style={{ padding: 16 }}>
               <div className="t-label c-tertiary">{t.title}</div>
-              <div className="t-display-s" style={{ margin: "12px 0 4px", fontSize: 22 }}>{t.metric}</div>
+              <div className="t-display-s" style={{ margin: "12px 0 4px", fontSize: 22, color: TONE_COLOR[t.tone] }}>{t.metric}</div>
               <div className="t-caption c-secondary">{t.sub}</div>
+              <div className="t-caption c-tertiary" style={{ marginTop: 6, lineHeight: 1.4 }}>{t.copy}</div>
               <svg viewBox="0 0 200 60" style={{ width: "100%", height: 60, marginTop: 12 }}>
                 <polyline
                   points={tilePolylines[i]}
                   fill="none"
-                  stroke={i % 3 === 0 ? "var(--green)" : i % 3 === 1 ? "var(--blue)" : "var(--red)"}
+                  stroke={TONE_COLOR[t.tone]}
                   strokeWidth="1"
+                  opacity="0.5"
                 />
               </svg>
             </div>
@@ -133,7 +205,7 @@ export function MarketContext() {
             padding: "0 20px", borderBottom: "1px solid var(--border-subtle)", gap: 16,
           }}>
             <span className="t-heading">NEWS · SPY-RELEVANT</span>
-            <span className="t-caption c-tertiary">{NEWS.length} items · last 4h</span>
+            <span className="t-caption c-tertiary">stub feed · provider not wired</span>
             <div style={{ flex: 1 }}/>
             <div className="tf-group">
               {["ALL", "HIGH", "MED"].map((t, i) => (
@@ -170,7 +242,7 @@ export function MarketContext() {
           }}>
             <span className="t-heading">ECONOMIC CALENDAR</span>
             <div style={{ flex: 1 }}/>
-            <span className="t-caption c-tertiary">CT</span>
+            <span className="t-caption c-tertiary">CT · stub</span>
           </div>
           <div style={{ padding: "10px 20px", background: "var(--surface-pressed)", borderBottom: "1px solid var(--border-subtle)" }}>
             <span className="t-label c-tertiary">TODAY · THU</span>
