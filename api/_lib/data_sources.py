@@ -132,6 +132,24 @@ def fetch_last_close(symbol: str) -> float:
         return float("nan")
 
 
+@pc.ttl_cache(ttl_seconds=60.0, maxsize=8)
+def fetch_last_and_prev(symbol: str) -> tuple[float, float]:
+    """Last close and prior-day close for a symbol; (nan, nan) on failure."""
+    try:
+        import yfinance as yf
+        df = yf.Ticker(symbol).history(period="5d", interval="1d", auto_adjust=False)
+    except Exception:
+        return float("nan"), float("nan")
+    if df is None or df.empty or "Close" not in df:
+        return float("nan"), float("nan")
+    closes = df["Close"].dropna()
+    if closes.empty:
+        return float("nan"), float("nan")
+    last = float(closes.iloc[-1])
+    prev = float(closes.iloc[-2]) if len(closes) >= 2 else float("nan")
+    return last, prev
+
+
 def _triggers_from_lines(
     primary_lines: list[pc.DynamicLine],
     current_dt: datetime,
@@ -371,6 +389,103 @@ def _pivot_source(
     return out
 
 
+def _classify_vix(vix: float) -> dict:
+    if pd.isna(vix) or vix <= 0:
+        return {"value": None, "label": "—", "tone": "neutral", "copy": "VIX unavailable"}
+    if vix < 15:
+        return {"value": round(vix, 2), "label": "CALM", "tone": "green",
+                "copy": "Realized vol low; trends extend"}
+    if vix < 20:
+        return {"value": round(vix, 2), "label": "NORMAL", "tone": "green",
+                "copy": "Range-of-day intact; structure holds"}
+    if vix < 25:
+        return {"value": round(vix, 2), "label": "ELEVATED", "tone": "amber",
+                "copy": "Wider stops; expect overshoots"}
+    return {"value": round(vix, 2), "label": "STRESS", "tone": "red",
+            "copy": "Trend day risk; size down"}
+
+
+def _spy_pressure(rth_today: pd.DataFrame, lookback_bars: int = 3) -> dict:
+    if rth_today is None or rth_today.empty or "Close" not in rth_today:
+        return {"label": "—", "tone": "neutral", "value": None}
+    closes = rth_today["Close"].dropna()
+    if len(closes) < 2:
+        return {"label": "—", "tone": "neutral", "value": None}
+    n = min(lookback_bars, len(closes) - 1)
+    delta = float(closes.iloc[-1]) - float(closes.iloc[-1 - n])
+    if delta > 1.0:
+        label, tone = "LIFTING", "green"
+    elif delta < -1.0:
+        label, tone = "FADING", "red"
+    else:
+        label, tone = "BALANCED", "neutral"
+    return {"label": label, "tone": tone, "value": round(delta, 2)}
+
+
+def _trigger_gap_summary(
+    primary_lines: list[pc.DynamicLine],
+    current_price: float,
+    projection_time: datetime,
+) -> dict:
+    closest = pc.get_closest_primary_line(primary_lines, projection_time, current_price)
+    if closest is None:
+        return {"points": None, "lineName": "—", "tone": "neutral", "label": "NO STRUCTURE"}
+    v = closest.tradable_value_at(projection_time)
+    if pd.isna(v):
+        return {"points": None, "lineName": pc.compact_line_name(closest.name), "tone": "neutral", "label": "—"}
+    gap = current_price - float(v)
+    abs_gap = abs(gap)
+    if abs_gap < 0.30:
+        tone, label = "amber", "AT TRIGGER"
+    elif abs_gap < 1.00:
+        tone, label = "green", "NEAR"
+    else:
+        tone, label = "neutral", "DISTANT"
+    return {
+        "points": round(gap, 2),
+        "lineName": pc.compact_line_name(closest.name),
+        "tone": tone,
+        "label": label,
+    }
+
+
+def _build_market_context(
+    vix: float,
+    vvix: float,
+    dxy_last: float,
+    dxy_prev: float,
+    tnx_last: float,
+    tnx_prev: float,
+    rth_today: pd.DataFrame,
+    primary_lines: list[pc.DynamicLine],
+    current_price: float,
+    projection_time: datetime,
+) -> dict:
+    dxy_chg_pct: float | None = None
+    if not pd.isna(dxy_last) and not pd.isna(dxy_prev) and dxy_prev:
+        dxy_chg_pct = round((dxy_last - dxy_prev) / dxy_prev * 100, 2)
+    tnx_chg_bps: float | None = None
+    if not pd.isna(tnx_last) and not pd.isna(tnx_prev):
+        tnx_chg_bps = round((tnx_last - tnx_prev) * 10, 1)
+
+    return {
+        "vix": _classify_vix(vix),
+        "vvix": {"value": round(vvix, 2) if not pd.isna(vvix) else None},
+        "dxy": {
+            "value": round(dxy_last, 2) if not pd.isna(dxy_last) else None,
+            "chgPct": dxy_chg_pct,
+            "tone": "neutral" if dxy_chg_pct is None else ("red" if dxy_chg_pct > 0 else "green"),
+        },
+        "tnx": {
+            "value": round(tnx_last / 10, 3) if not pd.isna(tnx_last) else None,
+            "chgBps": tnx_chg_bps,
+            "tone": "neutral" if tnx_chg_bps is None else ("red" if tnx_chg_bps > 0 else "green"),
+        },
+        "spyPressure": _spy_pressure(rth_today),
+        "triggerGap": _trigger_gap_summary(primary_lines, current_price, projection_time),
+    }
+
+
 def _bias_note(state: pc.BiasState, vix: float) -> str:
     parts: list[str] = []
     if not pd.isna(vix):
@@ -549,8 +664,10 @@ def build_live_snapshot() -> dict:
     chg_pct = (chg / prev_close * 100) if prev_close else 0.0
 
     vix = fetch_last_close("^VIX")
-    dxy = fetch_last_close("DX-Y.NYB")
     vvix = fetch_last_close("^VVIX")
+    dxy_last, dxy_prev = fetch_last_and_prev("DX-Y.NYB")
+    tnx_last, tnx_prev = fetch_last_and_prev("^TNX")
+    dxy = dxy_last
 
     bias_label, bias_score = _bias_label_and_score(bias_state, current_price)
 
@@ -583,6 +700,19 @@ def build_live_snapshot() -> dict:
 
     options = tastytrade.fetch_options_snapshot(current_price)
 
+    market_context = _build_market_context(
+        vix=vix,
+        vvix=vvix,
+        dxy_last=dxy_last,
+        dxy_prev=dxy_prev,
+        tnx_last=tnx_last,
+        tnx_prev=tnx_prev,
+        rth_today=rth_today,
+        primary_lines=primary_lines,
+        current_price=current_price,
+        projection_time=projection_time,
+    )
+
     return {
         "asOf": now_ct.isoformat(),
         "source": "live",
@@ -613,6 +743,7 @@ def build_live_snapshot() -> dict:
         "signals": signals,
         "pivots": pivots,
         "decision": decision,
+        "marketContext": market_context,
     }
 
 

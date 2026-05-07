@@ -111,7 +111,7 @@ export default function Home() {
           {snap && page === "replay" && <ReplayLab snap={snap} />}
           {snap && page === "options" && <OptionsCockpit snap={snap} />}
           {snap && page === "flow"    && <OrderFlow      snap={snap} />}
-          {page === "context"   && <MarketContext  />}
+          {page === "context"   && <MarketContext snap={snap ?? undefined} />}
           {snap && page === "log" && <SignalLog snap={snap} />}
           {page === "analytics" && <Analytics      />}
           {page === "config"    && <Configuration  />}
