@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --canvas: #0a0e14;
+  --surface: #11161f;
+  --surface-2: #151b27;
+  --surface-pressed: #1a2130;
+  --border: #1d2533;
+  --border-emph: #2a3441;
+  --text-primary: #e6e8eb;
+  --text-muted: #8a93a3;
+  --text-dim: #5b6473;
+  --accent-amber: #f5b642;
+  --accent-cyan: #5fb3d4;
+  --accent-green: #4ade80;
+  --accent-red: #f87171;
+}
+
+html, body {
+  background: var(--canvas);
+  color: var(--text-primary);
+  font-feature-settings: "cv11", "ss01";
+}
+
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* Status pills lifted from the design bundle */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+.pill-amber   { background: rgba(245, 182, 66, 0.12); color: #f5b642; border: 1px solid rgba(245, 182, 66, 0.3); }
+.pill-outline { background: transparent;              color: #8a93a3; border: 1px solid #2a3441; }
+.pill-red     { background: rgba(248, 113, 113, 0.12); color: #f87171; border: 1px solid rgba(248, 113, 113, 0.3); }
+.pill-stale   { background: rgba(91, 100, 115, 0.1);   color: #5b6473; border: 1px solid rgba(91, 100, 115, 0.25); }
+.pill-green   { background: rgba(74, 222, 128, 0.12);  color: #4ade80; border: 1px solid rgba(74, 222, 128, 0.3); }
