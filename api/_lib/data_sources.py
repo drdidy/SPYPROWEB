@@ -93,7 +93,7 @@ def _latest_price_for_session(df: pd.DataFrame, session_day: Any) -> float | Non
     return float(close_series.iloc[-1]) if not close_series.empty else None
 
 
-def _structure_projection_time(now_ct: pd.Timestamp, hour: int = 9, minute: int = 0) -> pd.Timestamp:
+def _structure_projection_time(now_ct: pd.Timestamp, hour: int = 8, minute: int = 0) -> pd.Timestamp:
     ct = pc.get_central_tz()
     now = now_ct
     if now.tzinfo is None:
@@ -748,7 +748,15 @@ def build_live_snapshot() -> dict:
 
     triggers = _triggers_from_lines(primary_lines, projection_time, current_price, rth_today, rth_yesterday)
 
-    raw_signals = pc.detect_rejection_signals(rth_today, primary_lines, secondary_lines) if not rth_today.empty else []
+    # Trigger detection considers the 8am CT bar plus all RTH bars (8:30-15:00)
+    # so an 8am wick on the descending anchor line can fire the entry trigger.
+    if not rth_today.empty:
+        eight_am = pd.Timestamp(signal_day, tz=ct).replace(hour=8)
+        rth_end = pd.Timestamp(signal_day, tz=ct).replace(hour=15)
+        triggers_df = df[(df.index >= eight_am) & (df.index < rth_end)].sort_index()
+    else:
+        triggers_df = rth_today
+    raw_signals = pc.detect_rejection_signals(triggers_df, primary_lines, secondary_lines) if not triggers_df.empty else []
     signals = _signals_for_tape(raw_signals, current_price)
 
     decision = _build_decision(
