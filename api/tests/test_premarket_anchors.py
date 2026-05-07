@@ -178,7 +178,7 @@ def test_anchor_lines_returns_three_descending_lines_at_offset():
         assert ln.source == "premarket_anchor_primary"
 
 
-def test_anchor_lines_descend_at_slope_to_9am():
+def test_anchor_lines_descend_at_slope_starting_from_next_bar():
     ct = pc.get_central_tz()
     anchor = pa.PremarketAnchor(
         role="PRIMARY",
@@ -188,8 +188,13 @@ def test_anchor_lines_descend_at_slope_to_9am():
     )
     lines = pa.build_anchor_lines(anchor, slope=0.20)
     main = lines[1]
+    # Slope accumulates from the next bar after the anchor (6:00). At 6:00
+    # zero hours of slope have elapsed; line still equals the anchor low.
+    val_at_6 = main.tradable_value_at(pd.Timestamp("2026-05-07 06:00", tz=ct))
+    assert val_at_6 == 580.00
+    # By 9:00 only 3 hours of slope have elapsed: 580.0 - 0.20 * 3 = 579.40.
     val_at_9 = main.tradable_value_at(pd.Timestamp("2026-05-07 09:00", tz=ct))
-    assert val_at_9 == 579.20
+    assert val_at_9 == 579.40
 
 
 # trigger detection --------------------------------------------------------
@@ -308,6 +313,7 @@ def test_anchor_open_zone_categorizes_price():
         high=580.55, close=580.05, is_qualified=True, next_bar_color="green",
     )
     lines = pa.build_anchor_lines(anchor, slope=0.20)
+    # At 9:00 with slope from next bar: Main=579.40, Upper=582.80, Lower=576.00
     assert pa.anchor_open_zone(583.50, lines, ts_9) == "ABOVE_UPPER"
     assert pa.anchor_open_zone(581.00, lines, ts_9) == "UPPER_TO_MAIN"
     assert pa.anchor_open_zone(577.00, lines, ts_9) == "MAIN_TO_LOWER"
