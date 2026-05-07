@@ -48,26 +48,33 @@ export function StructureRead({ snap }: { snap?: Snapshot }) {
 
   const last = snap.quote.last;
 
-  // Anchor lines from chartLines (only present when a qualifying anchor exists)
-  const upper = snap.chartLines.find((l) => l.label === "Anchor Upper");
-  const main  = snap.chartLines.find((l) => l.label === "Anchor Main");
-  const lower = snap.chartLines.find((l) => l.label === "Anchor Lower");
-  const a2Main = snap.chartLines.find((l) => l.label === "Anchor 2 Main");
+  // Pull anchor / backup lines from chartLines. Primary anchors (qualified)
+  // use "Anchor *"; secondary fallback (no primary today) uses "Backup *".
+  const findLine = (label: string) => snap.chartLines.find((l) => l.label === label);
+  const upper = findLine("Anchor Upper") ?? findLine("Backup Upper");
+  const main  = findLine("Anchor Main")  ?? findLine("Backup Main");
+  const lower = findLine("Anchor Lower") ?? findLine("Backup Lower");
+  const a2Main = findLine("Anchor 2 Main");
+  const isBackup = !!findLine("Backup Main") && !findLine("Anchor Main");
+  const tier = isBackup ? "Backup" : "Anchor";
   const hasAnchor = !!main;
 
   let p1 = "";
   if (hasAnchor && main) {
     const dist = last - main.value;
     const side = dist >= 0 ? "above" : "below";
-    p1 = `SPY ${fmt(last)} sits ${fmt(Math.abs(dist))} pts ${side} the Anchor Main at ${fmt(main.value)}.`;
+    p1 = `SPY ${fmt(last)} sits ${fmt(Math.abs(dist))} pts ${side} the ${tier} Main at ${fmt(main.value)}.`;
     if (upper && lower) {
       p1 += ` The ±3.4 band runs ${fmt(lower.value)} (Lower) to ${fmt(upper.value)} (Upper).`;
     }
     if (a2Main) {
       p1 += ` Anchor 2 Main is at ${fmt(a2Main.value)}.`;
     }
+    if (isBackup) {
+      p1 += ` (No primary anchor qualified today — using the deepest premarket bearish bar as a backup reference.)`;
+    }
   } else {
-    p1 = `SPY ${fmt(last)}. No qualifying premarket bearish anchor today — structure is on the pivot fallback (UA/UD/LA/LD).`;
+    p1 = `SPY ${fmt(last)}. No premarket bearish bars on record — structure is on the pivot fallback (UA/UD/LA/LD).`;
   }
 
   // Paragraph 2 — bias + context + signal census
