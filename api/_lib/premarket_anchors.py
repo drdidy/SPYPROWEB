@@ -14,8 +14,8 @@ Spec:
   - Secondaries: every other bearish candle in 3:00-6:00 CT (whether or
     not it qualifies); shown as backup entry candidates.
   - Lines per anchor: Upper (+3.4 SPY pts), Main (anchor.low),
-    Lower (-3.4), all descending at the engine's calibrated slope, anchored
-    at the bearish-candle timestamp.
+    Lower (-3.4), all descending at the engine's calibrated slope. Slope
+    accumulation starts at the bar AFTER the anchor (anchor.timestamp + 1h).
   - Buy trigger: red candle wicks down to a line, closes above by 0 < d <= 1.7.
   - Sell trigger: green candle wicks up to a line, closes below by 0 < d <= 1.7.
   - Triggers fire on ANY RTH bar; the next bar is the expected entry.
@@ -174,18 +174,29 @@ def find_premarket_anchors(df: pd.DataFrame, signal_day) -> dict:
 
 
 def build_anchor_lines(anchor, slope: float):
-    """Three parallel descending lines from a single anchor: Upper/Main/Lower."""
+    """Three parallel descending lines from a single anchor: Upper/Main/Lower.
+
+    Slope accumulation starts at the END of the anchor candle (i.e., the
+    open of the next bar). For an hourly anchor at 5:00 CT this means:
+      5:00 anchor open -> line value = anchor.low (raw)
+      6:00 next bar    -> 0 hours of slope have elapsed; line = anchor.low
+      7:00             -> 1 hour of slope; line = anchor.low - slope
+      9:00             -> 3 hours of slope; line = anchor.low - 3*slope
+    Implemented by shifting the line's anchor_time forward by one hour so
+    DynamicLine.hours_since() returns 0 at the next-bar timestamp.
+    """
     if anchor is None:
         return []
     s = abs(float(slope))
     base = f"ANC_{anchor.role}_{anchor.timestamp.strftime('%H%M')}"
     is_primary = anchor.role in ("PRIMARY", "ANCHOR_2")
     src = f"premarket_anchor_{anchor.role.lower()}"
+    line_anchor_time = anchor.timestamp + pd.Timedelta(hours=1)
     return [
         pc.DynamicLine(
             name=f"{base}_UPPER",
             anchor_price=anchor.low + ANCHOR_BAND_OFFSET,
-            anchor_time=anchor.timestamp,
+            anchor_time=line_anchor_time,
             slope_per_hour=s,
             direction="descending",
             zone_type="CALL_ZONE",
@@ -196,7 +207,7 @@ def build_anchor_lines(anchor, slope: float):
         pc.DynamicLine(
             name=f"{base}_MAIN",
             anchor_price=anchor.low,
-            anchor_time=anchor.timestamp,
+            anchor_time=line_anchor_time,
             slope_per_hour=s,
             direction="descending",
             zone_type="MAIN",
@@ -207,7 +218,7 @@ def build_anchor_lines(anchor, slope: float):
         pc.DynamicLine(
             name=f"{base}_LOWER",
             anchor_price=anchor.low - ANCHOR_BAND_OFFSET,
-            anchor_time=anchor.timestamp,
+            anchor_time=line_anchor_time,
             slope_per_hour=s,
             direction="descending",
             zone_type="PUT_ZONE",
