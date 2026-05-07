@@ -85,7 +85,7 @@ export function TriggerMap({ snap }: { snap: Snapshot }) {
             <span className="t-body c-primary">{r.line}</span>
             <span className="t-body-num c-primary" style={{ textAlign: "right" }}>{r.level.toFixed(2)}</span>
             <span className="t-body-num" style={{ textAlign: "right", color: r.dist >= 0 ? "var(--green)" : "var(--red)" }}>
-              {r.dist >= 0 ? "+" : ""}{r.dist.toFixed(2)} <span className="c-tertiary">/ {r.bps >= 0 ? "+" : ""}{r.bps}bps</span>
+              {r.dist >= 0 ? "+" : ""}{r.dist.toFixed(2)}
             </span>
             <BiasBar value={r.bias}/>
             <span className={`${STATUS_PILL[r.status]} ${r.status === "ARMED" ? "pill-armed-anim" : ""}`}>{r.status}</span>
@@ -142,7 +142,7 @@ function RowDetail({ row, snap, last }: { row: Trigger; snap: Snapshot; last: bo
         <span className="t-body-num c-primary">{row.level.toFixed(2)}</span>
         <span className="t-caption c-tertiary" style={{ marginTop: 6 }}>DISTANCE</span>
         <span className="t-body-num" style={{ color: row.dist >= 0 ? "var(--green)" : "var(--red)" }}>
-          {row.dist >= 0 ? "+" : ""}{row.dist.toFixed(2)} ({row.bps >= 0 ? "+" : ""}{row.bps} bps)
+          {row.dist >= 0 ? "+" : ""}{row.dist.toFixed(2)} pts
         </span>
       </div>
     </div>
