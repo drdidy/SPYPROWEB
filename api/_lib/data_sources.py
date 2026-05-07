@@ -321,26 +321,60 @@ def _chart_lines_from_primary(
 ) -> list[dict]:
     lines: list[dict] = []
 
+    zone_color = {
+        "CALL_ZONE":  "var(--green)",   # Upper (+3.4)
+        "MAIN":       "var(--amber)",   # Main entry line
+        "PUT_ZONE":   "var(--red)",     # Lower (-3.4)
+    }
+
     # Anchor-line path: render Upper / Main / Lower for each PRIMARY anchor
-    # (and Anchor 2 if present). Secondaries are skipped to keep the chart
-    # legible.
+    # (and Anchor 2 if present). When no primary qualifies, fall back to the
+    # lowest-Main SECONDARY anchor so the chart still shows an actionable
+    # band tied to a real premarket bearish candle.
     anchor_primaries = [l for l in primary_lines if l.is_primary and l.name.startswith("ANC_")]
+    fallback_label_prefix = "Anchor"
+    if not anchor_primaries:
+        secondaries = [l for l in primary_lines if l.name.startswith("ANC_SECONDARY_")]
+        # group secondaries by their ANC_SECONDARY_HHMM prefix; each group has
+        # an Upper/Main/Lower triplet. Pick the group whose MAIN value is the
+        # lowest (the deepest premarket low).
+        groups: dict[str, list[pc.DynamicLine]] = {}
+        for line in secondaries:
+            base = "_".join(line.name.split("_")[:3])  # ANC_SECONDARY_HHMM
+            groups.setdefault(base, []).append(line)
+        best_group: list[pc.DynamicLine] | None = None
+        best_main_val = float("inf")
+        for group in groups.values():
+            main_line = next((l for l in group if l.zone_type == "MAIN"), None)
+            if main_line is None:
+                continue
+            v = main_line.tradable_value_at(current_dt)
+            if pd.isna(v):
+                continue
+            if float(v) < best_main_val:
+                best_main_val = float(v)
+                best_group = group
+        if best_group is not None:
+            anchor_primaries = best_group
+            fallback_label_prefix = "Backup"
+
     if anchor_primaries:
-        zone_color = {
-            "CALL_ZONE":  "var(--green)",   # Upper (+3.4)
-            "MAIN":       "var(--amber)",   # Main entry line
-            "PUT_ZONE":   "var(--red)",     # Lower (-3.4)
-        }
         for line in anchor_primaries:
             v = line.tradable_value_at(current_dt)
             if v is None or pd.isna(v):
                 continue
+            label = _anchor_display_label(line.name)
+            # Force "Backup" prefix when we're rendering a secondary fallback
+            # so the chart reads consistently with the trigger map labels.
+            if fallback_label_prefix == "Backup" and not label.startswith("Backup"):
+                band = label.split(" ", 1)[-1] if " " in label else label
+                label = f"Backup {band}"
             lines.append({
-                "label": _anchor_display_label(line.name),
+                "label": label,
                 "value": round(float(v), 2),
                 "color": zone_color.get(line.zone_type, "var(--text-secondary)"),
-                "dash": False,
-                "armed": line.zone_type == "MAIN",  # main entry line is the headline
+                "dash": fallback_label_prefix == "Backup",
+                "armed": line.zone_type == "MAIN",
             })
         if rth_today is not None and not rth_today.empty:
             lines.append({
@@ -352,7 +386,7 @@ def _chart_lines_from_primary(
             })
         return lines
 
-    # Fallback (no qualifying anchor): old UA/LA pivot lines.
+    # Final fallback (no anchors at all): old UA/LA pivot lines.
     label_for_role = {
         "supply": "4H Supply",
         "pivot_low": "Pivot Low",
