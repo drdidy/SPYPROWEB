@@ -1,10 +1,4 @@
-"""Seed snapshot used when live data is unavailable.
-
-Mirrors the fixtures embedded in the SPY Prophet design bundle so the
-preview UI renders identically to the static design before live data is
-wired up. Once the yfinance + tastytrade fetchers are online, this module
-becomes the deterministic offline-test fallback.
-"""
+"""Seed snapshot used when live data is unavailable."""
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -97,4 +91,27 @@ def build() -> dict:
         "chartLines": CHART_LINES,
         "options": None,
         "signals": SIGNALS,
+        "pivots": {
+            "high": {
+                "name": "HIGH_PIVOT", "price": 583.91, "source": "Yahoo SPY 60m RTH",
+                "anchorTime": "2026-05-06T14:00:00-05:00",
+                "candleStarts": "2026-05-06T14:00:00-05:00",
+                "candleCloses": "2026-05-06T15:00:00-05:00",
+                "fallbackUsed": False, "candleColor": "red",
+                "structureDay": "2026-05-06",
+                "candle": {"o": 583.62, "h": 583.91, "l": 582.71, "c": 582.85},
+            },
+            "low": {
+                "name": "LOW_PIVOT", "price": 581.76, "source": "Yahoo SPY 60m RTH",
+                "anchorTime": "2026-05-06T11:00:00-05:00",
+                "candleStarts": "2026-05-06T11:00:00-05:00",
+                "candleCloses": "2026-05-06T12:00:00-05:00",
+                "fallbackUsed": False, "candleColor": "red",
+                "structureDay": "2026-05-06",
+                "candle": {"o": 582.04, "h": 582.21, "l": 581.76, "c": 581.92},
+            },
+            "slope": 0.20,
+            "structureDay": "2026-05-06",
+            "signalDay": "2026-05-07",
+        },
     }

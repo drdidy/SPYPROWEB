@@ -26,20 +26,10 @@ from . import seed_snapshot
 from . import tastytrade
 
 
-# ---------------------------------------------------------------------------
-# Quote helpers
-# ---------------------------------------------------------------------------
-
 @pc.ttl_cache(ttl_seconds=60.0, maxsize=8)
 def fetch_spy_hourly(period: str = "60d") -> pd.DataFrame:
-    """Hourly SPY bars from Yahoo, normalized + indexed in CT.
-
-    Returns an empty frame on any failure; callers handle the empty case.
-    The 60d window matches spyprost so available_session_days agrees
-    across holiday weeks.
-    """
     try:
-        import yfinance as yf  # imported lazily
+        import yfinance as yf
         df = yf.download(
             tickers=pc.SYMBOL, period=period, interval="60m",
             prepost=True, progress=False, auto_adjust=False, actions=False,
@@ -309,9 +299,6 @@ def _chart_lines_from_primary(
 
 
 def _signals_for_tape(signals: list[pc.TradeSignal], current_price: float) -> list[dict]:
-    """Convert prophet_core signals into rows the Signal Tape and Signal
-    Log surfaces consume. Most recent first; outcome column is live P&L
-    for confirmed signals or null while pending."""
     rows: list[dict] = []
     for s in sorted(signals, key=lambda x: pd.Timestamp(x.rejection_time), reverse=True)[:20]:
         try:
@@ -349,6 +336,44 @@ def _signals_for_tape(signals: list[pc.TradeSignal], current_price: float) -> li
     return rows
 
 
+def _pivot_source(
+    pivot: pc.Pivot,
+    structure_frame: pd.DataFrame,
+    structure_day: Any,
+) -> dict | None:
+    """Describe where a pivot was anchored: which RTH bar, the candle's
+    full OHLC, and the source provider. Mirrors spyprost's Pivot Source
+    table (build_pivot_source_table) but shaped for one pivot at a time."""
+    if pivot is None or pd.isna(pivot.price):
+        return None
+    out: dict = {
+        "name": pivot.name,
+        "price": round(float(pivot.price), 2),
+        "source": pivot.source,
+        "anchorTime": pd.Timestamp(pivot.timestamp).isoformat() if pivot.timestamp is not None else None,
+        "fallbackUsed": bool(pivot.fallback_used),
+        "candleColor": pivot.candle_color,
+        "structureDay": str(structure_day) if structure_day is not None else None,
+    }
+    if structure_frame is not None and not structure_frame.empty:
+        col = "High" if pivot.name == "HIGH_PIVOT" else "Low"
+        try:
+            idx = structure_frame[col].idxmax() if pivot.name == "HIGH_PIVOT" else structure_frame[col].idxmin()
+            row = structure_frame.loc[idx]
+            close_time = pc.get_hourly_candle_close_time(structure_frame, idx)
+            out["candleStarts"] = pd.Timestamp(idx).isoformat()
+            out["candleCloses"] = pd.Timestamp(close_time).isoformat()
+            out["candle"] = {
+                "o": round(float(row["Open"]), 2),
+                "h": round(float(row["High"]), 2),
+                "l": round(float(row["Low"]), 2),
+                "c": round(float(row["Close"]), 2),
+            }
+        except Exception:
+            pass
+    return out
+
+
 def _bias_note(state: pc.BiasState, vix: float) -> str:
     parts: list[str] = []
     if not pd.isna(vix):
@@ -380,6 +405,7 @@ def build_live_snapshot() -> dict:
     rth_yesterday = pc.filter_rth_session(df, prior_day) if prior_day else pd.DataFrame()
 
     structure_frame = rth_yesterday if not rth_yesterday.empty else rth_today
+    structure_day = prior_day if not rth_yesterday.empty else signal_day
     high_pivot = pc.find_high_pivot(structure_frame)
     low_pivot = pc.find_low_pivot(structure_frame)
     slope = pc.get_structure_calibration()
@@ -426,6 +452,14 @@ def build_live_snapshot() -> dict:
     raw_signals = pc.detect_rejection_signals(rth_today, primary_lines, secondary_lines) if not rth_today.empty else []
     signals = _signals_for_tape(raw_signals, current_price)
 
+    pivots = {
+        "high": _pivot_source(high_pivot, structure_frame, structure_day),
+        "low":  _pivot_source(low_pivot,  structure_frame, structure_day),
+        "slope": round(float(slope), 4),
+        "structureDay": str(structure_day) if structure_day else None,
+        "signalDay": str(signal_day) if signal_day else None,
+    }
+
     intraday = fetch_spy_intraday("1d", "5m")
     candles = _candles_for_chart(rth_today, intraday)
     chart_lines = _chart_lines_from_primary(primary_lines, projection_time, rth_today)
@@ -460,6 +494,7 @@ def build_live_snapshot() -> dict:
         "chartLines": chart_lines,
         "options": options,
         "signals": signals,
+        "pivots": pivots,
     }
 
 

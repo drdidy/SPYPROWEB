@@ -45,6 +45,28 @@ export interface Snapshot {
   chartLines: ChartLine[];
   options: OptionsSnapshot | null;
   signals: Signal[];
+  pivots: PivotsSnapshot;
+}
+
+export interface PivotInfo {
+  name: "HIGH_PIVOT" | "LOW_PIVOT";
+  price: number;
+  source: string;
+  anchorTime: string | null;
+  candleStarts?: string;
+  candleCloses?: string;
+  fallbackUsed: boolean;
+  candleColor: string;
+  structureDay: string | null;
+  candle?: { o: number; h: number; l: number; c: number };
+}
+
+export interface PivotsSnapshot {
+  high: PivotInfo | null;
+  low: PivotInfo | null;
+  slope: number;
+  structureDay: string | null;
+  signalDay: string | null;
 }
 
 export type SignalDir = "up" | "down" | "neutral";

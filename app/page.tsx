@@ -21,6 +21,7 @@ import { Analytics } from "@/components/pages/analytics";
 import { Configuration } from "@/components/pages/configuration";
 import { PageHeader } from "@/components/page-header";
 import { Landing } from "@/components/landing";
+import { PivotSource } from "@/components/pivot-source";
 
 const ENTERED_KEY = "spy-prophet-entered";
 
@@ -85,9 +86,10 @@ export default function Home() {
             <>
               <PageHeader
                 title="Trigger Map"
-                desc="Every armed level on the board, with distance, bias contribution, and status."
+                desc="Every armed level on the board, with distance, bias contribution, and status. Pivot source below shows where today's structure is anchored."
               />
               <TriggerMap snap={snap} />
+              <PivotSource pivots={snap.pivots} />
             </>
           )}
 
