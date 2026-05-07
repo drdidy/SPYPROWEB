@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { Snapshot } from "@/lib/types";
 import { Sidebar } from "@/components/sidebar";
 import { Tickertape } from "@/components/tickertape";
-import { DecisionSlate, type Verb } from "@/components/decision-slate";
+import { DecisionSlate } from "@/components/decision-slate";
 import { ProphetChart } from "@/components/prophet-chart";
 import { TriggerMap } from "@/components/trigger-map";
 import { SignalTape } from "@/components/signal-tape";
@@ -24,14 +24,6 @@ import { Landing } from "@/components/landing";
 import { PivotSource } from "@/components/pivot-source";
 
 const ENTERED_KEY = "spy-prophet-entered";
-
-function biasToVerb(score: number): Verb {
-  if (score <= -50) return "SHORT";
-  if (score <= -15) return "WAIT";
-  if (score >= 50) return "LONG";
-  if (score >= 15) return "HOLD";
-  return "WAIT";
-}
 
 export default function Home() {
   const [snap, setSnap] = useState<Snapshot | null>(null);
@@ -73,7 +65,7 @@ export default function Home() {
 
           {snap && page === "chart" && (
             <>
-              <DecisionSlate verb={biasToVerb(snap.bias.score)} />
+              <DecisionSlate snap={snap} />
               <ProphetChart snap={snap} />
               <TriggerMap snap={snap} />
               <SignalTape snap={snap} />
