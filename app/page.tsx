@@ -3,8 +3,31 @@
 import { useEffect, useState } from "react";
 import type { Snapshot } from "@/lib/types";
 import { Sidebar } from "@/components/sidebar";
-import { LandingHero } from "@/components/landing";
+import { Tickertape } from "@/components/tickertape";
+import { DecisionSlate, type Verb } from "@/components/decision-slate";
+import { ProphetChart } from "@/components/prophet-chart";
 import { TriggerMap } from "@/components/trigger-map";
+import { SignalTape } from "@/components/signal-tape";
+import { StructureRead } from "@/components/structure-read";
+import { LearningPanel } from "@/components/learning-panel";
+import { DailyBrief } from "@/components/pages/daily-brief";
+import { Foresight } from "@/components/pages/foresight";
+import { ReplayLab } from "@/components/pages/replay-lab";
+import { OptionsCockpit } from "@/components/pages/options-cockpit";
+import { OrderFlow } from "@/components/pages/order-flow";
+import { MarketContext } from "@/components/pages/market-context";
+import { SignalLog } from "@/components/pages/signal-log";
+import { Analytics } from "@/components/pages/analytics";
+import { Configuration } from "@/components/pages/configuration";
+import { PageHeader } from "@/components/page-header";
+
+function biasToVerb(score: number): Verb {
+  if (score <= -50) return "SHORT";
+  if (score <= -15) return "WAIT";
+  if (score >= 50) return "LONG";
+  if (score >= 15) return "HOLD";
+  return "WAIT";
+}
 
 export default function Home() {
   const [snap, setSnap] = useState<Snapshot | null>(null);
@@ -19,51 +42,68 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="flex min-h-screen text-text-primary bg-canvas">
+    <div className="app">
       <Sidebar page={page} onNav={setPage} />
-      <div className="flex-1 min-w-0">
-        {!snap && !err && (
-          <div className="px-10 py-10 text-text-muted text-sm">Loading snapshot…</div>
-        )}
-        {err && (
-          <div className="px-10 py-10 text-accent-amber text-sm">
-            Could not load /api/snapshot: {err}
-          </div>
-        )}
-        {snap && (
-          <>
-            <LandingHero snap={snap} />
-            {(page === "chart" || page === "trigger") && <TriggerMap snap={snap} />}
-            {page !== "chart" && page !== "trigger" && (
-              <section className="px-10 py-12 text-text-muted text-sm">
-                <div className="text-text-primary text-base font-medium mb-2">
-                  {pageTitle(page)}
-                </div>
-                <p>Page shell not ported yet — coming in a follow-up commit on this branch.</p>
-              </section>
-            )}
-            <footer className="px-10 py-6 border-t border-border text-[10px] tracking-[0.14em] uppercase text-text-dim flex justify-between">
-              <span>Source: {snap.source}</span>
-              <span className="tabular">{new Date(snap.asOf).toLocaleString()}</span>
-            </footer>
-          </>
-        )}
-      </div>
-    </main>
-  );
-}
+      <main className="main">
+        {snap && <Tickertape snap={snap} />}
 
-function pageTitle(id: string) {
-  return (
-    {
-      chart: "Prophet Chart",
-      trigger: "Trigger Map",
-      structure: "Structure Read",
-      signal: "Signal Tape",
-      decision: "Decision Quality",
-      options: "Premium Flow",
-      learning: "Learning Panel",
-      journal: "Trade Journal",
-    }[id] ?? id
+        <div className="page">
+          {!snap && !err && <div className="t-body c-secondary">Loading snapshot…</div>}
+          {err && <div className="t-body c-amber">Could not load /api/snapshot: {err}</div>}
+
+          {snap && page === "chart" && (
+            <>
+              <DecisionSlate verb={biasToVerb(snap.bias.score)} />
+              <ProphetChart />
+              <TriggerMap snap={snap} />
+              <SignalTape />
+              <StructureRead />
+              <LearningPanel />
+            </>
+          )}
+
+          {snap && page === "trigger" && (
+            <>
+              <PageHeader
+                title="Trigger Map"
+                desc="Every armed level on the board, with distance, bias contribution, and status."
+              />
+              <TriggerMap snap={snap} />
+            </>
+          )}
+
+          {snap && page === "structure" && (
+            <>
+              <PageHeader title="Structure Read" desc="The session in three paragraphs and a one-line directive." />
+              <StructureRead />
+            </>
+          )}
+
+          {page === "signal" && (
+            <>
+              <PageHeader title="Signal Tape" desc="The last eight signals, with score, line, and outcome." />
+              <SignalTape />
+            </>
+          )}
+
+          {page === "learning" && (
+            <>
+              <PageHeader title="Learning Panel" desc="What the current session is teaching you." />
+              <LearningPanel />
+            </>
+          )}
+
+          {page === "brief"     && <DailyBrief     />}
+          {page === "foresight" && <Foresight      />}
+          {page === "replay"    && <ReplayLab      />}
+          {page === "options"   && <OptionsCockpit />}
+          {page === "flow"      && <OrderFlow      />}
+          {page === "context"   && <MarketContext  />}
+          {page === "log"       && <SignalLog      />}
+          {page === "analytics" && <Analytics      />}
+          {page === "config"    && <Configuration  />}
+        </div>
+      </main>
+    </div>
   );
 }
