@@ -1,8 +1,8 @@
 "use client";
 // Trigger Map page from e108b48a* in the design bundle. Full version with
-// expandable rows, ARMED/BREACHED counts, and a touch-history detail strip.
+// expandable rows, ARMED/BREACHED counts, and per-row anchor detail.
 import { useState } from "react";
-import type { Snapshot, TriggerStatus } from "@/lib/types";
+import type { Snapshot, Trigger, TriggerStatus } from "@/lib/types";
 
 const STATUS_PILL: Record<TriggerStatus, string> = {
   ARMED: "pill pill-amber",
@@ -94,24 +94,57 @@ export function TriggerMap({ snap }: { snap: Snapshot }) {
             </span>
           </div>
           {expanded === i && (
-            <div style={{
-              padding: "12px 20px 16px",
-              background: "var(--surface-pressed)",
-              borderBottom: i === rows.length - 1 ? 0 : "1px solid var(--border-subtle)",
-              display: "flex", gap: 32, alignItems: "center",
-            }}>
-              <svg width="160" height="32" viewBox="0 0 160 32">
-                <polyline points="0,20 20,18 40,22 60,16 80,12 100,18 120,10 140,14 160,8"
-                  fill="none" stroke="var(--blue)" strokeWidth="1.5"/>
-              </svg>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <span className="t-caption c-tertiary">LAST 3 TOUCHES</span>
-                <span className="t-caption mono c-secondary">14:18:42 · 13:42:11 · 11:08:55</span>
-              </div>
-            </div>
+            <RowDetail row={r} snap={snap} last={i === rows.length - 1} />
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+function RowDetail({ row, snap, last }: { row: Trigger; snap: Snapshot; last: boolean }) {
+  const isUpper = /Upper/i.test(row.line);
+  const isLower = /Lower/i.test(row.line);
+  let anchor: string;
+  if (row.line === "PDH") {
+    anchor = `Yesterday's RTH high (${snap.pivots.structureDay ?? "—"}).`;
+  } else if (row.line === "PDL") {
+    anchor = `Yesterday's RTH low (${snap.pivots.structureDay ?? "—"}).`;
+  } else if (row.line === "Day Open") {
+    anchor = `Today's RTH open print at 08:30 CT (${snap.pivots.signalDay ?? "—"}).`;
+  } else if (isUpper && snap.pivots.high) {
+    const ts = snap.pivots.high.anchorTime
+      ? new Date(snap.pivots.high.anchorTime).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })
+      : "—";
+    anchor = `Anchored at the ${snap.pivots.high.price.toFixed(2)} high pivot ${ts} CT on ${snap.pivots.structureDay ?? "—"}, projected forward at ${snap.pivots.slope.toFixed(2)}/h.`;
+  } else if (isLower && snap.pivots.low) {
+    const ts = snap.pivots.low.anchorTime
+      ? new Date(snap.pivots.low.anchorTime).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })
+      : "—";
+    anchor = `Anchored at the ${snap.pivots.low.price.toFixed(2)} low pivot ${ts} CT on ${snap.pivots.structureDay ?? "—"}, projected forward at ${snap.pivots.slope.toFixed(2)}/h.`;
+  } else {
+    anchor = "Anchor metadata unavailable.";
+  }
+
+  return (
+    <div style={{
+      padding: "14px 20px 16px",
+      background: "var(--surface-pressed)",
+      borderBottom: last ? 0 : "1px solid var(--border-subtle)",
+      display: "flex", gap: 32, alignItems: "flex-start", flexWrap: "wrap",
+    }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, maxWidth: 720 }}>
+        <span className="t-caption c-tertiary">ANCHOR</span>
+        <span className="t-body c-secondary">{anchor}</span>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, marginLeft: "auto" }}>
+        <span className="t-caption c-tertiary">PROJECTED LEVEL</span>
+        <span className="t-body-num c-primary">{row.level.toFixed(2)}</span>
+        <span className="t-caption c-tertiary" style={{ marginTop: 6 }}>DISTANCE</span>
+        <span className="t-body-num" style={{ color: row.dist >= 0 ? "var(--green)" : "var(--red)" }}>
+          {row.dist >= 0 ? "+" : ""}{row.dist.toFixed(2)} ({row.bps >= 0 ? "+" : ""}{row.bps} bps)
+        </span>
+      </div>
     </div>
   );
 }
