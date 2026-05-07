@@ -1,60 +1,36 @@
 "use client";
-// ProphetChart SVG candlestick from d2950c19* in the design bundle. Uses a
-// deterministic seeded random generator so the candles render identically
-// on server/client (avoiding hydration mismatch).
-import { useMemo } from "react";
+// ProphetChart SVG candlestick. Now consumes live OHLC from /api/snapshot
+// (5-minute SPY bars + structure lines computed from prophet_core).
+// Falls back to a friendly empty state if the snapshot has no candles.
+import type { Snapshot } from "@/lib/types";
 
-interface ChartLine {
-  label: string;
-  value: number;
-  color: string;
-  dash?: boolean;
-  opacity?: number;
-  armed?: boolean;
-  width?: number;
+interface Props {
+  snap: Snapshot;
 }
 
-interface Candle { o: number; h: number; l: number; c: number }
+export function ProphetChart({ snap }: Props) {
+  const candles = snap.candles ?? [];
+  const lines = snap.chartLines ?? [];
 
-function genCandles(seed = 42, n = 80): Candle[] {
-  let rnd = seed;
-  const rand = () => { rnd = (rnd * 9301 + 49297) % 233280; return rnd / 233280; };
-  let price = 580.20;
-  const candles: Candle[] = [];
-  for (let i = 0; i < n; i++) {
-    const o = price;
-    const drift = (rand() - 0.48) * 0.6;
-    const c = o + drift;
-    const h = Math.max(o, c) + rand() * 0.35;
-    const l = Math.min(o, c) - rand() * 0.35;
-    candles.push({ o, h, l, c });
-    price = c;
+  if (candles.length === 0) {
+    return (
+      <div className="card" style={{ padding: 16, marginBottom: 16, height: 480, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <span className="t-body c-tertiary">Chart data unavailable.</span>
+      </div>
+    );
   }
-  const last = candles[candles.length - 1];
-  last.c = 582.97;
-  last.h = Math.max(last.h, last.c + 0.05);
-  return candles;
-}
 
-export function ProphetChart() {
-  const candles = useMemo(() => genCandles(7, 80), []);
   const W = 1100;
   const H = 480;
   const padL = 8, padR = 80, padT = 16, padB = 32;
   const innerW = W - padL - padR;
   const innerH = H - padT - padB;
 
-  const lines: ChartLine[] = [
-    { label: "4H SUPPLY", value: 583.40, color: "var(--red)", dash: false, opacity: 0.7 },
-    { label: "PIVOT LOW", value: 581.85, color: "var(--blue)", dash: false, opacity: 0.7 },
-    { label: "OPEN",      value: 582.40, color: "var(--text-secondary)", dash: true,  opacity: 0.5 },
-    { label: "TRIGGER",   value: 583.40, color: "var(--amber)", dash: false, opacity: 1, armed: true, width: 1.5 },
-  ];
-
   const allHighs = candles.map((c) => c.h);
-  const allLows  = candles.map((c) => c.l);
-  const yMin = Math.min(...allLows, ...lines.map((l) => l.value)) - 0.4;
-  const yMax = Math.max(...allHighs, ...lines.map((l) => l.value)) + 0.4;
+  const allLows = candles.map((c) => c.l);
+  const lineValues = lines.map((l) => l.value).filter((v) => Number.isFinite(v));
+  const yMin = Math.min(...allLows, ...lineValues) - 0.4;
+  const yMax = Math.max(...allHighs, ...lineValues) + 0.4;
   const y = (v: number) => padT + ((yMax - v) / (yMax - yMin)) * innerH;
   const candleW = innerW / candles.length;
   const bodyW = Math.max(3, candleW * 0.65);
@@ -63,7 +39,17 @@ export function ProphetChart() {
   const gridLines: number[] = [];
   for (let p = Math.ceil(yMin); p <= Math.floor(yMax); p++) gridLines.push(p);
 
-  const times = ["09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30", "14:00"];
+  // Time axis: ~10 evenly-spaced labels from the candle timestamps.
+  const tickCount = Math.min(10, candles.length);
+  const tickIdx: number[] = [];
+  for (let i = 0; i < tickCount; i++) tickIdx.push(Math.floor((i * (candles.length - 1)) / Math.max(1, tickCount - 1)));
+  const fmtTime = (iso: string) => {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso.slice(11, 16);
+    return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+  };
+
+  const triggerLine = lines.find((l) => l.armed);
 
   return (
     <div className="card" style={{ padding: 16, marginBottom: 16 }}>
@@ -103,17 +89,17 @@ export function ProphetChart() {
             <line key={`hg${p}`} x1={padL} x2={W - padR} y1={y(p)} y2={y(p)}
               stroke="var(--border-subtle)" strokeOpacity="0.3" strokeWidth="1"/>
           ))}
-          {Array.from({ length: Math.floor(candles.length / 6) + 1 }).map((_, i) => (
+          {tickIdx.map((i) => (
             <line key={`vg${i}`}
-              x1={padL + i * 6 * candleW} x2={padL + i * 6 * candleW}
+              x1={padL + i * candleW} x2={padL + i * candleW}
               y1={padT} y2={H - padB}
               stroke="var(--border-subtle)" strokeOpacity="0.3" strokeWidth="1"/>
           ))}
 
           {lines.map((ln, i) => (
-            <g key={`ln${i}`} opacity={ln.opacity}>
+            <g key={`ln${i}`} opacity={ln.armed ? 1 : 0.7}>
               <line x1={padL} x2={W - padR} y1={y(ln.value)} y2={y(ln.value)}
-                stroke={ln.color} strokeWidth={ln.width || 1}
+                stroke={ln.color} strokeWidth={ln.armed ? 1.5 : 1}
                 strokeDasharray={ln.dash ? "4 3" : undefined}/>
             </g>
           ))}
@@ -150,13 +136,15 @@ export function ProphetChart() {
             </g>
           ))}
 
-          <g transform={`translate(${W - padR - 70}, ${y(583.40) - 24})`}>
-            <rect width="56" height="18" fill="var(--amber-muted)" stroke="var(--amber)" strokeOpacity="0.4" rx="3">
-              <animate attributeName="stroke-opacity" values="0.4;0.9;0.4" dur="2.4s" repeatCount="indefinite"/>
-            </rect>
-            <text x="6" y="13" fontFamily="var(--font-ui)" fontSize="10" fontWeight="500"
-              fill="var(--amber)" letterSpacing="0.08em">ARMED</text>
-          </g>
+          {triggerLine && (
+            <g transform={`translate(${W - padR - 70}, ${y(triggerLine.value) - 24})`}>
+              <rect width="56" height="18" fill="var(--amber-muted)" stroke="var(--amber)" strokeOpacity="0.4" rx="3">
+                <animate attributeName="stroke-opacity" values="0.4;0.9;0.4" dur="2.4s" repeatCount="indefinite"/>
+              </rect>
+              <text x="6" y="13" fontFamily="var(--font-ui)" fontSize="10" fontWeight="500"
+                fill="var(--amber)" letterSpacing="0.08em">ARMED</text>
+            </g>
+          )}
 
           <g transform={`translate(${W - padR + 4}, ${y(currentPrice) - 9})`}>
             <rect width="70" height="18" fill="var(--surface-elev)" stroke="var(--border-emphasis)" rx="3"/>
@@ -164,20 +152,15 @@ export function ProphetChart() {
               fill="var(--text-primary)" fontWeight="500">{currentPrice.toFixed(2)}</text>
           </g>
 
-          {times.map((t, i) => (
-            <text key={t}
-              x={padL + (i * 8) * candleW + 4} y={H - padB + 18}
+          {tickIdx.map((i) => (
+            <text key={`t${i}`}
+              x={padL + i * candleW + 4} y={H - padB + 18}
               fontFamily="var(--font-mono)" fontSize="10"
-              fill="var(--text-tertiary)">{t}</text>
+              fill="var(--text-tertiary)">{fmtTime(candles[i].t)}</text>
           ))}
 
           <g transform={`translate(${padL + 4}, ${padT + 8})`}>
-            {[
-              { label: "4H Supply", color: "var(--red)", dash: false },
-              { label: "Pivot Low", color: "var(--blue)", dash: false },
-              { label: "Open", color: "var(--text-secondary)", dash: true },
-              { label: "Live Trigger", color: "var(--amber)", dash: false },
-            ].map((l, i) => (
+            {lines.map((l, i) => (
               <g key={l.label} transform={`translate(${i * 110}, 0)`}>
                 <line x1="0" x2="14" y1="6" y2="6"
                   stroke={l.color} strokeWidth="1.5"
@@ -194,11 +177,11 @@ export function ProphetChart() {
         marginTop: 12, height: 24,
         display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
       }}>
-        <span className="t-caption c-tertiary">RTH 08:30 — 15:00 CT</span>
+        <span className="t-caption c-tertiary">RTH 08:30 — 15:00 CT · {candles.length} bars</span>
         <div style={{ flex: 1, height: 2, background: "var(--surface-pressed)", position: "relative" }}>
           <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: "72%", background: "var(--amber)" }}/>
         </div>
-        <span className="pill pill-amber">AFTERNOON</span>
+        <span className="pill pill-amber">{snap.source.toUpperCase()}</span>
       </div>
     </div>
   );

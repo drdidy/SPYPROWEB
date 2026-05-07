@@ -1,14 +1,24 @@
 "use client";
-// Order Flow — live tape + unusual options activity. From 81ed613d*.
+// Order Flow — live tape + unusual options activity. Pulls aggregate
+// call/put OI + volume + put/call ratio from the live Tastytrade
+// snapshot when available, otherwise displays the seeded design fixture.
 import { useMemo } from "react";
 import { PageHeader } from "../page-header";
+import type { Snapshot } from "@/lib/types";
 
 function seeded(seed: number) {
   let s = seed;
   return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
 }
 
-export function OrderFlow() {
+export function OrderFlow({ snap }: { snap: Snapshot }) {
+  const totals = snap.options?.totals;
+  const liveCall = totals?.callOi ?? null;
+  const livePut  = totals?.putOi  ?? null;
+  const denom = (liveCall ?? 0) + (livePut ?? 0);
+  const callPct = liveCall != null && denom > 0 ? Math.round((liveCall / denom) * 100) : 58;
+  const putPct = 100 - callPct;
+  const liveSourceLabel = snap.options ? "TASTYTRADE" : "MOCK";
   const prints = useMemo(() => {
     const rand = seeded(53);
     return Array.from({ length: 14 }, (_, i) => ({
@@ -34,15 +44,27 @@ export function OrderFlow() {
         desc="Live tape and unusual options activity. Where institutional size is hitting and where premium is concentrating."
       />
       <div className="card" style={{ padding: 16, marginBottom: 16 }}>
-        <div className="t-label c-tertiary" style={{ marginBottom: 8 }}>AGGREGATE FLOW · TODAY</div>
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <span className="t-body-num c-green">CALLS  +$182M</span>
-          <div style={{ flex: 1, height: 8, background: "var(--surface-pressed)", display: "flex" }}>
-            <div style={{ width: "58%", background: "var(--green)" }}/>
-            <div style={{ width: "42%", background: "var(--red)" }}/>
-          </div>
-          <span className="t-body-num c-red">PUTS  -$132M</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <span className="t-label c-tertiary">AGGREGATE FLOW · TODAY</span>
+          <span className={`pill ${snap.options ? "pill-green" : "pill-outline"}`} style={{ height: 18, fontSize: 10 }}>{liveSourceLabel}</span>
         </div>
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <span className="t-body-num c-green">
+            CALLS {liveCall != null ? `OI ${liveCall.toLocaleString()}` : "+$182M"}
+          </span>
+          <div style={{ flex: 1, height: 8, background: "var(--surface-pressed)", display: "flex" }}>
+            <div style={{ width: `${callPct}%`, background: "var(--green)" }}/>
+            <div style={{ width: `${putPct}%`, background: "var(--red)" }}/>
+          </div>
+          <span className="t-body-num c-red">
+            PUTS {livePut != null ? `OI ${livePut.toLocaleString()}` : "-$132M"}
+          </span>
+        </div>
+        {totals?.pcr != null && (
+          <div className="t-caption c-tertiary" style={{ marginTop: 6 }}>
+            P/C Ratio · <span style={{ color: totals.pcr >= 1 ? "var(--red)" : "var(--green)" }}>{totals.pcr.toFixed(2)}</span>
+          </div>
+        )}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 3fr) minmax(0, 2fr)", gap: 16 }}>
         <div className="card">
