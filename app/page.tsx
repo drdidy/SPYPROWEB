@@ -69,7 +69,7 @@ export default function Home() {
               <ProphetChart snap={snap} />
               <TriggerMap snap={snap} />
               <SignalTape snap={snap} />
-              <StructureRead />
+              <StructureRead snap={snap} />
               <LearningPanel />
             </>
           )}
@@ -88,7 +88,7 @@ export default function Home() {
           {snap && page === "structure" && (
             <>
               <PageHeader title="Structure Read" desc="The session in three paragraphs and a one-line directive." />
-              <StructureRead />
+              <StructureRead snap={snap} />
             </>
           )}
 
