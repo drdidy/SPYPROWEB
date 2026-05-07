@@ -12,7 +12,7 @@ from datetime import datetime
 import pandas as pd
 import pytest
 
-from prophet_core import (
+from _lib.prophet_core import (
     DEFAULT_SLOPE_PER_HOUR,
     BiasState,
     DynamicLine,

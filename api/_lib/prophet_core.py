@@ -1778,7 +1778,7 @@ def build_wait_discipline_items(
         contract_copy = f"Strike stays about ${TARGET_OTM_STRIKE_DISTANCE:.0f} below the entry reference."
     elif selected_strikes:
         contract_value = "Two-sided OTM"
-        contract_copy = "Keep the call above and put below the trigger reference."
+        contract_copy = f"Keep the call above and put below the trigger reference."
     else:
         contract_value = "No contract"
         contract_copy = "Contracts appear after SPY and structure data are ready."
