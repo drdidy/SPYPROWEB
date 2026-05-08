@@ -25,6 +25,7 @@ from . import premarket_anchors as pma
 from . import prophet_core as pc
 from . import seed_snapshot
 from . import tastytrade
+from . import unusual_whales
 
 
 @pc.ttl_cache(ttl_seconds=60.0, maxsize=8)
@@ -822,6 +823,11 @@ def build_live_snapshot() -> dict:
 
     options = tastytrade.fetch_options_snapshot(current_price)
 
+    # Unusual Whales enrichment (returns None if key missing or upstream
+    # is unavailable; the snapshot stays valid either way).
+    flow_summary = unusual_whales.fetch_flow_summary("SPY")
+    gex_summary = unusual_whales.fetch_gex_summary("SPY")
+
     market_context = _build_market_context(
         vix=vix,
         vvix=vvix,
@@ -862,6 +868,8 @@ def build_live_snapshot() -> dict:
         "candles": candles,
         "chartLines": chart_lines,
         "options": options,
+        "flow": flow_summary,
+        "gex": gex_summary,
         "signals": signals,
         "pivots": pivots,
         "decision": decision,
