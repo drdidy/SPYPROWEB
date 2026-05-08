@@ -48,22 +48,26 @@ def test_previous_session_date_skips_weekend():
     assert previous_session_date(monday) == date(2026, 5, 8)
 
 
-def test_overnight_window_spans_15h_prev_to_midnight_today():
-    """Overnight anchor window is 15:00 prev-day -> 00:00 today (midnight).
-    Tokyo bars after midnight are still used for direction determination
-    but NOT for anchor scanning."""
+def test_overnight_window_spans_15h_prev_to_3am_today():
+    """Overnight anchor window is 15:00 prev-day -> 03:00 today CT (12 hours)."""
     w = overnight_window(date(2026, 5, 8))
     assert w.start == datetime(2026, 5, 7, 15, 0, tzinfo=CT)
-    assert w.end == datetime(2026, 5, 8, 0, 0, tzinfo=CT)
+    assert w.end == datetime(2026, 5, 8, 3, 0, tzinfo=CT)
 
 
-def test_sydney_and_tokyo_windows_align():
+def test_sydney_and_tokyo_windows_have_one_hour_gap():
+    """Sydney 17:00-20:00, Tokyo 21:00-03:00 — there's a 1h gap
+    (20:00-21:00) where bars are still inside the overnight anchor
+    window but excluded from direction determination."""
     sd = date(2026, 5, 8)
     s = sydney_window(sd)
     t = tokyo_window(sd)
-    assert s.end == t.start  # Sydney 21:00 hands off to Tokyo
-    assert s.start.time() == time(17, 0)
-    assert t.end == datetime(2026, 5, 8, 2, 0, tzinfo=CT)
+    assert s.start == datetime(2026, 5, 7, 17, 0, tzinfo=CT)
+    assert s.end == datetime(2026, 5, 7, 20, 0, tzinfo=CT)
+    assert t.start == datetime(2026, 5, 7, 21, 0, tzinfo=CT)
+    assert t.end == datetime(2026, 5, 8, 3, 0, tzinfo=CT)
+    # Hour-gap between Sydney close and Tokyo open is real.
+    assert (t.start - s.end).total_seconds() == 3600
 
 
 def test_rth_window_is_8_30_to_15():
