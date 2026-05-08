@@ -22,7 +22,7 @@ export default async function Home() {
           changePct: snap.shellState.changePct,
           vix: snap.shellState.vix,
         }}
-        source={source}
+        initialLive={source === "live"}
       />
       <PullQuote />
       <MethodologyTriad />

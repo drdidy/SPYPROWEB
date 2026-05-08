@@ -2,20 +2,37 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { ArrowRight, ArrowDown } from "lucide-react";
-import { decision as mockDecision, shellState as mockShell } from "@/lib/mock-data";
 import { motion } from "framer-motion";
 import type { DecisionState } from "@/lib/types";
+import { useLiveSPY } from "@/lib/use-live-snapshot";
 
 interface HeroProps {
   decision?: DecisionState;
   quote?: { spy: number; change: number; changePct: number; vix: number };
-  source?: "live" | "degraded" | "seed" | "mock" | "error";
+  initialLive?: boolean;
 }
 
-export function HeroSection({ decision: liveDecision, quote, source }: HeroProps = {}) {
-  const decision = liveDecision ?? mockDecision;
-  const t = quote ?? mockShell;
-  const isLive = source === "live" || source === "degraded";
+export function HeroSection({ decision: serverDecision, quote: serverQuote, initialLive }: HeroProps = {}) {
+  // Seed with server-rendered values, then poll /api/snapshot every 30s
+  // so the hero numbers stay fresh without a page reload.
+  const live = useLiveSPY({
+    decision: serverDecision,
+    shell: serverQuote
+      ? {
+          spy: serverQuote.spy,
+          change: serverQuote.change,
+          changePct: serverQuote.changePct,
+          vix: serverQuote.vix,
+          isLive: !!initialLive,
+          sessionLabel: "",
+          sessionCloses: "",
+        }
+      : undefined,
+    source: initialLive ? "live" : undefined,
+  });
+  const decision = live.decision;
+  const t = live.shell;
+  const isLive = live.source === "live";
   return (
     <section className="relative max-w-[1240px] mx-auto px-7 pt-16 pb-20 lg:pt-24 lg:pb-28">
       {/* eyebrow */}
