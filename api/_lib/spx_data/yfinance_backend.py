@@ -89,10 +89,23 @@ class YFinanceFetcher:
     # ---- Sync quote ---------------------------------------------------------
 
     def fetch_sync_quote(self) -> SyncQuote:
-        """Pull the latest 1m bar for ES and SPX and use closes as the spot pair.
+        """Aligned ES + SPX print pair for offset derivation.
 
-        Not perfectly synchronous (the bars may close a few seconds apart) but
-        fine for offset derivation — the basis drifts over hours, not seconds.
+        ES futures trade nearly 24/5; SPX cash (^GSPC) only ticks during
+        US RTH (08:30-15:00 CT). If we just take "last 1m bar" of each,
+        pre-market we'd compare a live ES tick against yesterday's
+        frozen SPX close — the gap would include both the natural basis
+        AND the overnight ES move that hasn't reached SPX yet, giving a
+        nonsense offset (e.g. -62 when the actual basis is +28).
+
+        Fix: pull a few days of 1m bars for both symbols, find the most
+        recent timestamp where BOTH have a tick, use those prices.
+        - During RTH:    last common tick = "now" (live offset).
+        - Pre-market:    last common tick = yesterday's 15:00 CT close.
+        - Weekend/hol.:  last common tick = Friday's 15:00 CT close.
+
+        The captured offset is what brokers use as the basis spread —
+        broker-aligned channel entries fall out automatically.
         """
         try:
             import yfinance as yf
@@ -101,12 +114,27 @@ class YFinanceFetcher:
                 "yfinance not installed. `pip install yfinance` to enable this backend."
             ) from e
 
-        es_hist = yf.Ticker(self.ES_TICKER).history(period="1d", interval="1m")
-        spx_hist = yf.Ticker(self.SPX_TICKER).history(period="1d", interval="1m")
+        # 5-day window covers a long weekend (Fri close + 3 closed days).
+        es_hist = yf.Ticker(self.ES_TICKER).history(period="5d", interval="1m")
+        spx_hist = yf.Ticker(self.SPX_TICKER).history(period="5d", interval="1m")
         if es_hist.empty or spx_hist.empty:
             raise FetcherUnavailable(
-                "yfinance returned no recent quotes for ES or SPX (market closed?)"
+                "yfinance returned no recent quotes for ES or SPX."
             )
+
+        # Most recent timestamp where BOTH have a print.
+        common = es_hist.index.intersection(spx_hist.index)
+        if len(common) > 0:
+            ts = common[-1]
+            es_close = float(es_hist.loc[ts]["Close"])
+            spx_close = float(spx_hist.loc[ts]["Close"])
+            captured = _ts_to_ct(ts)
+            return SyncQuote(
+                spx_spot=spx_close, es_spot=es_close, captured_at=captured
+            )
+
+        # Defensive: no overlap at all (extremely rare). Fall back to the
+        # latest of each so something works rather than crashing.
         es_last = float(es_hist["Close"].iloc[-1])
         spx_last = float(spx_hist["Close"].iloc[-1])
         captured = _ts_to_ct(es_hist.index[-1])

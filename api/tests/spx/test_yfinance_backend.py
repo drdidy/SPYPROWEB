@@ -86,6 +86,45 @@ def test_fetch_sync_quote_uses_latest_1m_close(mock_ticker_cls):
 
 
 @patch("yfinance.Ticker")
+def test_fetch_sync_quote_uses_last_common_tick_when_spx_is_stale(mock_ticker_cls):
+    """Pre-open scenario: ES has live ticks; SPX cash hasn't opened yet.
+
+    Without alignment we'd compare live ES (e.g. 7399) against
+    yesterday's frozen SPX close (7337) and get a nonsense offset
+    of -62. The fix uses the most recent timestamp where BOTH have
+    a tick (= yesterday's RTH close), giving the broker-style
+    settlement-aligned offset.
+    """
+    # ES has ticks through "today 07:30" (pre-open).
+    es_df = pd.DataFrame(
+        {"Close": [7308.5, 7399.0]},  # close yesterday, live this morning
+        index=pd.DatetimeIndex([
+            pd.Timestamp("2026-05-07 20:00", tz="UTC"),  # yesterday's close
+            pd.Timestamp("2026-05-08 12:30", tz="UTC"),  # today pre-open
+        ]),
+    )
+    # SPX only has a print at yesterday's close.
+    spx_df = pd.DataFrame(
+        {"Close": [7337.0]},
+        index=pd.DatetimeIndex([pd.Timestamp("2026-05-07 20:00", tz="UTC")]),
+    )
+
+    def _factory(symbol):
+        m = MagicMock()
+        m.history.return_value = es_df if symbol == "ES=F" else spx_df
+        return m
+
+    mock_ticker_cls.side_effect = _factory
+
+    quote = YFinanceFetcher().fetch_sync_quote()
+    # Settlement-aligned spread: yesterday's SPX close vs ES at the
+    # same moment. NOT live ES vs frozen SPX.
+    assert quote.spx_spot == 7337.0
+    assert quote.es_spot == 7308.5
+    assert quote.offset == pytest.approx(28.5)
+
+
+@patch("yfinance.Ticker")
 def test_fetch_sync_quote_raises_unavailable_on_empty(mock_ticker_cls):
     empty_df = pd.DataFrame({"Close": []})
     m = MagicMock()
