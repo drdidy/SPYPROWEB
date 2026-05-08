@@ -2,12 +2,40 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { loadLiveSnapshot } from "@/lib/snapshot-fetch";
+import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+interface BriefResponse {
+  brief: string;
+  source: "openai" | "engine" | "error";
+  asOf?: string;
+}
+
+async function loadBrief(): Promise<BriefResponse> {
+  try {
+    const h = headers();
+    const host = h.get("x-forwarded-host") || h.get("host");
+    if (!host) return { brief: "", source: "error" };
+    const proto =
+      h.get("x-forwarded-proto") ||
+      (host.startsWith("localhost") ? "http" : "https");
+    const res = await fetch(`${proto}://${host}/api/spy/brief`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return { brief: "", source: "error" };
+    return (await res.json()) as BriefResponse;
+  } catch {
+    return { brief: "", source: "error" };
+  }
+}
+
 export default async function Page() {
-  const { data: snap, source } = await loadLiveSnapshot();
+  const [{ data: snap, source }, brief] = await Promise.all([
+    loadLiveSnapshot(),
+    loadBrief(),
+  ]);
   const high = snap.pivots.find((p) => p.kind === "HIGH");
   const low = snap.pivots.find((p) => p.kind === "LOW");
 
@@ -23,7 +51,7 @@ export default async function Page() {
       <SectionLabel number="01">Today, in one read</SectionLabel>
       <Card>
         <CardHeader
-          eyebrow="What we're doing"
+          eyebrow={brief.source === "openai" ? "Generated brief" : "Engine read"}
           title={
             snap.decision.verdict === "WAIT"
               ? "Waiting"
@@ -34,11 +62,19 @@ export default async function Page() {
           meta={snap.decision.windowET || undefined}
         />
         <CardBody>
-          <p className="text-[15px] text-ink-2 leading-relaxed">
-            {snap.decision.finalExplanation ||
-              snap.bias.explanation ||
-              "Engine is initializing today's read."}
-          </p>
+          {brief.brief ? (
+            <div className="text-[15px] text-ink-2 leading-relaxed space-y-4">
+              {brief.brief.split(/\n\s*\n/).map((para, i) => (
+                <p key={i}>{para}</p>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[15px] text-ink-2 leading-relaxed">
+              {snap.decision.finalExplanation ||
+                snap.bias.explanation ||
+                "Engine is initializing today's read."}
+            </p>
+          )}
         </CardBody>
       </Card>
 
