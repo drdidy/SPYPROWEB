@@ -8,22 +8,27 @@ import { OptionsIntelPanel } from "@/components/dashboard/OptionsIntel";
 import { BiasMeter } from "@/components/dashboard/BiasMeter";
 import { RiskGuardrails } from "@/components/dashboard/RiskGuardrails";
 import { SectionLabel } from "@/components/ui/SectionLabel";
-import {
-  decision,
-  signalQuality,
-  latestSignal,
-  candles,
-  lines,
-  pivots,
-  currentPrice,
-  waitDiscipline,
-  optionsIntel,
-  strikes,
-  biasState,
-  guardrails,
-} from "@/lib/mock-data";
+import { loadLiveSnapshot } from "@/lib/snapshot-fetch";
 
-export default function Page() {
+export const revalidate = 15;
+
+export default async function Page() {
+  const { data: snap, source, error } = await loadLiveSnapshot();
+  const {
+    decision,
+    signal,
+    quality,
+    candles,
+    lines,
+    pivots,
+    currentPrice,
+    bias,
+    guardrails,
+    waitDiscipline,
+    optionsIntel,
+    strikes,
+  } = snap;
+
   return (
     <div className="max-w-[1440px] mx-auto space-y-10 pb-16">
       {/* Editorial header */}
@@ -37,6 +42,7 @@ export default function Page() {
             <span className="font-mono text-[10px] text-ink-3 tracking-[0.20em] uppercase">
               {todayLabel()}
             </span>
+            <SourceBadge source={source} error={error} />
           </div>
           <h1 className="mt-3 text-display font-serif tracking-tight text-ink">
             The trading day,{" "}
@@ -44,17 +50,13 @@ export default function Page() {
           </h1>
         </div>
         <div className="hidden md:flex items-center gap-6 text-right">
-          <Stat label="Bias" value={biasState.bias} highlight={biasState.bias} />
+          <Stat label="Bias" value={bias.bias} highlight={bias.bias} />
           <Stat label="Window" value={decision.windowET} />
-          <Stat label="Slope" value="$0.20/hr" />
+          <Stat label="Last" value={currentPrice.toFixed(2)} />
         </div>
       </header>
 
-      <DecisionSlate
-        decision={decision}
-        signal={latestSignal}
-        quality={signalQuality}
-      />
+      <DecisionSlate decision={decision} signal={signal} quality={quality} />
 
       <section className="space-y-5">
         <SectionLabel number="01">Structure</SectionLabel>
@@ -64,7 +66,7 @@ export default function Page() {
               candles={candles}
               lines={lines}
               pivots={pivots}
-              signal={latestSignal}
+              signal={signal}
               currentPrice={currentPrice}
             />
           </div>
@@ -106,7 +108,7 @@ export default function Page() {
         <SectionLabel number="04">Defense</SectionLabel>
         <div className="grid grid-cols-12 gap-5">
           <div className="col-span-12 xl:col-span-8">
-            <BiasMeter state={biasState} />
+            <BiasMeter state={bias} />
           </div>
           <div className="col-span-12 xl:col-span-4">
             <RiskGuardrails state={guardrails} />
@@ -119,6 +121,33 @@ export default function Page() {
         <span>End of slate</span>
       </footer>
     </div>
+  );
+}
+
+function SourceBadge({
+  source,
+  error,
+}: {
+  source: "live" | "degraded" | "seed" | "mock" | "error";
+  error?: string;
+}) {
+  const live = source === "live";
+  const degraded = source === "degraded";
+  const cls = live
+    ? "bg-bull-tint text-bull-ink shadow-[inset_0_0_0_1px_rgba(14,124,80,0.30)]"
+    : degraded
+      ? "bg-gold-tint text-gold-ink shadow-[inset_0_0_0_1px_rgba(184,130,31,0.30)]"
+      : "bg-paper-2 text-ink-3 shadow-[inset_0_0_0_1px_rgba(20,22,26,0.10)]";
+  return (
+    <span
+      title={error || `Source: ${source}`}
+      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-pill text-[9px] font-mono font-semibold uppercase tracking-[0.12em] ${cls}`}
+    >
+      <span
+        className={`w-1 h-1 rounded-full ${live ? "bg-bull animate-breathe" : degraded ? "bg-gold" : "bg-ink-4"}`}
+      />
+      {source}
+    </span>
   );
 }
 
