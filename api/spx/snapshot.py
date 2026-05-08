@@ -20,10 +20,11 @@ import os
 import sys
 import time
 import traceback
-from datetime import datetime
+from datetime import date, datetime
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 from threading import Lock
+from urllib.parse import parse_qs, urlparse
 from zoneinfo import ZoneInfo
 
 # Ensure api/ is on sys.path so `_lib...` works in Vercel's bundler.
@@ -67,24 +68,49 @@ _cache: dict[str, object] = {"value": None, "expires_at": 0.0}
 _cache_lock = Lock()
 
 
-def _build_payload() -> dict:
+def _build_payload(replay_date: date | None = None) -> dict:
     fetcher = build_default_fetcher()
+    if replay_date is None:
+        as_of = datetime.now(CT)
+    else:
+        # Replay mode: treat 15:00 CT (RTH close) of the chosen day as
+        # "now" so the engine sees the full session's bars but nothing
+        # after. The live SPX/ES offset is still applied — for a v1
+        # backtest this is acceptable (offset drift is small relative
+        # to the channel structure being studied).
+        as_of = datetime(
+            replay_date.year, replay_date.month, replay_date.day, 15, 0, tzinfo=CT
+        )
     snap, meta = build_snapshot_with_provenance(
         fetcher,
-        datetime.now(CT),
+        as_of,
         offset_override=_resolve_offset_override(),
     )
     payload = snap.model_dump(by_alias=True)
-    # Operator-visible provenance: which backend served bars + quote,
-    # the offset value that was actually applied (computed or env
-    # override), and any primary-fetcher error that forced a fallback.
-    # The frontend reads _meta.appliedOffset and _meta.barsSource into
-    # the SPX page diagnostic strip.
     payload["_meta"] = meta
+    payload["replay"] = {
+        "isReplay": replay_date is not None,
+        "date": replay_date.isoformat() if replay_date else None,
+    }
     return payload
 
 
-def _cached_payload() -> dict:
+def _parse_replay_date(path: str) -> date | None:
+    try:
+        qs = parse_qs(urlparse(path).query)
+        raw = (qs.get("date") or [None])[0]
+        if not raw:
+            return None
+        return date.fromisoformat(raw)
+    except Exception:
+        return None
+
+
+def _cached_payload(replay_date: date | None = None) -> dict:
+    # Replay payloads bypass the live cache (the date itself becomes
+    # the cache key and historical data is stable).
+    if replay_date is not None:
+        return _build_payload(replay_date=replay_date)
     now = time.monotonic()
     cached = _cache.get("value")
     if cached is not None and now < float(_cache["expires_at"]):
@@ -102,8 +128,9 @@ def _cached_payload() -> dict:
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802 — Vercel contract
+        replay_date = _parse_replay_date(self.path)
         try:
-            payload = _cached_payload()
+            payload = _cached_payload(replay_date=replay_date)
             status = 200
         except RuntimeError as e:
             # Fetcher returned no bars (e.g. weekend, broker out, both

@@ -52,6 +52,7 @@ export interface RawSnapshot {
   context: { vix: number; dxy: number; vvix: number };
   spark: number[];
   anchor?: AnchorPayload | null;
+  replay?: ReplayBlock | null;
   triggers: Array<{
     line: string;
     kind?: string;
@@ -146,6 +147,23 @@ export interface AnchorPayload {
   anchor2: AnchorGroup | null;
 }
 
+export interface ReplaySession {
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  range: number;
+  netPts: number;
+  netPct: number;
+}
+export interface ReplayBlock {
+  isReplay: boolean;
+  date: string | null;
+  session: ReplaySession | null;
+  verdictOutcome: "WIN" | "LOSS" | "PUSH" | "N_A" | null;
+  verdictPnl: number | null;
+}
+
 export interface OptionsRaw {
   expiration: string;
   atm: number;
@@ -195,6 +213,7 @@ export interface AdaptedSnapshot {
   lines: DynamicLine[];
   pivots: Pivot[];
   anchor: AnchorPayload | null;
+  replay: ReplayBlock | null;
   currentPrice: number;
   bias: BiasState;
   guardrails: RiskGuardrailState;
@@ -698,6 +717,7 @@ export function adaptSnapshot(raw: RawSnapshot): AdaptedSnapshot {
     candles: raw.candles.map((c) => ({ t: c.t, o: c.o, h: c.h, l: c.l, c: c.c, v: 0 })),
     hourlyCandles: (raw.hourlyCandles ?? []).map((c) => ({ t: c.t, o: c.o, h: c.h, l: c.l, c: c.c, v: 0 })),
     anchor: raw.anchor ?? null,
+    replay: raw.replay ?? null,
     lines: raw.triggers.map(mapTriggerToLine),
     pivots: mapPivots(raw),
     currentPrice: raw.quote.last,

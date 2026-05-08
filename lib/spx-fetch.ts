@@ -39,7 +39,9 @@ function resolveBase(): string | null {
   return null;
 }
 
-export async function loadSnapshot(): Promise<LoadedSnapshot> {
+export async function loadSnapshot(
+  replayDate?: string,
+): Promise<LoadedSnapshot> {
   const fetchedAt = new Date().toISOString();
   const base = resolveBase();
   if (!base) {
@@ -50,14 +52,18 @@ export async function loadSnapshot(): Promise<LoadedSnapshot> {
       error: "no request host (build-time render?)",
     };
   }
+  const target =
+    replayDate && /^\d{4}-\d{2}-\d{2}$/.test(replayDate)
+      ? `${base}/api/spx/snapshot?date=${replayDate}`
+      : `${base}/api/spx/snapshot`;
   try {
-    const res = await fetch(`${base}/api/spx/snapshot`, { cache: "no-store" });
+    const res = await fetch(target, { cache: "no-store" });
     if (!res.ok) {
       return {
         snap: mockSnapshot,
         source: "mock",
         fetchedAt,
-        error: `API returned ${res.status} from ${base}/api/spx/snapshot`,
+        error: `API returned ${res.status} from ${target}`,
       };
     }
     const snap = (await res.json()) as SPXSnapshot;

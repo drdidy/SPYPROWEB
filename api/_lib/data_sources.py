@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import math
 import os
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 import pandas as pd
@@ -861,7 +861,56 @@ def _build_decision(
     }
 
 
-def build_live_snapshot() -> dict:
+def _build_replay_block(
+    *,
+    is_replay: bool,
+    signal_day,
+    rth_today: pd.DataFrame,
+    decision: dict,
+) -> dict:
+    """OHLC + verdict-outcome card for backtest mode.
+
+    Scoring rule: LONG wins when close > open, SHORT wins when close <
+    open. WAIT / STAND DOWN / HOLD are scored as N/A. PnL is the signed
+    move from open to close (in SPY pts), oriented by verdict direction.
+    """
+    block: dict = {
+        "isReplay": is_replay,
+        "date": str(signal_day) if signal_day else None,
+        "session": None,
+        "verdictOutcome": None,
+        "verdictPnl": None,
+    }
+    if rth_today is None or rth_today.empty:
+        return block
+    o = float(rth_today.iloc[0]["Open"])
+    h = float(rth_today["High"].max())
+    l = float(rth_today["Low"].min())
+    c = float(rth_today.iloc[-1]["Close"])
+    block["session"] = {
+        "open": round(o, 2),
+        "high": round(h, 2),
+        "low": round(l, 2),
+        "close": round(c, 2),
+        "range": round(h - l, 2),
+        "netPts": round(c - o, 2),
+        "netPct": round(((c - o) / o * 100) if o else 0.0, 3),
+    }
+    verdict = (decision or {}).get("verdict")
+    delta = c - o
+    if verdict == "LONG":
+        block["verdictOutcome"] = "WIN" if delta > 0 else ("LOSS" if delta < 0 else "PUSH")
+        block["verdictPnl"] = round(delta, 2)
+    elif verdict == "SHORT":
+        block["verdictOutcome"] = "WIN" if delta < 0 else ("LOSS" if delta > 0 else "PUSH")
+        block["verdictPnl"] = round(-delta, 2)
+    else:
+        block["verdictOutcome"] = "N_A"
+        block["verdictPnl"] = None
+    return block
+
+
+def build_live_snapshot(replay_date: date | None = None) -> dict:
     df = fetch_spy_hourly("60d")
     if df.empty:
         raise RuntimeError("yfinance returned no SPY bars")
@@ -871,11 +920,22 @@ def build_live_snapshot() -> dict:
         raise RuntimeError("no trading days in SPY frame")
 
     ct = pc.get_central_tz()
-    now_ct = pd.Timestamp.now(tz=ct)
+    now_ct_real = pd.Timestamp.now(tz=ct)
 
-    signal_day = _get_live_signal_day(df, now_ct.to_pydatetime())
-    if signal_day is None:
-        raise RuntimeError("could not resolve signal day")
+    is_replay = replay_date is not None
+    if is_replay:
+        # In replay mode we treat 15:00 CT (RTH close) of the chosen day
+        # as "now" so the engine sees the full session. The engine's
+        # verdict for that day is then scored against the actual close.
+        if replay_date not in days:
+            raise RuntimeError(f"no trading data for {replay_date.isoformat()}")
+        signal_day = replay_date
+        now_ct = pd.Timestamp(replay_date, tz=ct).replace(hour=15, minute=0)
+    else:
+        now_ct = now_ct_real
+        signal_day = _get_live_signal_day(df, now_ct.to_pydatetime())
+        if signal_day is None:
+            raise RuntimeError("could not resolve signal day")
     prior_day = _get_prior_trading_day(df, pd.Timestamp(signal_day).to_pydatetime())
 
     rth_today = pc.filter_rth_session(df, signal_day)
@@ -998,9 +1058,17 @@ def build_live_snapshot() -> dict:
         projection_time=projection_time,
     )
 
+    replay_block = _build_replay_block(
+        is_replay=is_replay,
+        signal_day=signal_day,
+        rth_today=rth_today,
+        decision=decision,
+    ) if is_replay else None
+
     return {
         "asOf": now_ct.isoformat(),
         "source": "live",
+        "replay": replay_block,
         "bias": {
             "label": bias_label,
             "score": bias_score,
@@ -1036,11 +1104,11 @@ def build_live_snapshot() -> dict:
     }
 
 
-def build_snapshot_with_fallback() -> dict:
+def build_snapshot_with_fallback(replay_date: date | None = None) -> dict:
     if os.getenv("SPYPROPHET_FORCE_SEED") == "1":
         return seed_snapshot.build()
     try:
-        return build_live_snapshot()
+        return build_live_snapshot(replay_date=replay_date)
     except Exception as exc:
         seed = seed_snapshot.build()
         seed["source"] = "degraded"
