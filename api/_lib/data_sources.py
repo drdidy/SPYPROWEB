@@ -911,7 +911,14 @@ def _build_replay_block(
 
 
 def build_live_snapshot(replay_date: date | None = None) -> dict:
+<<<<<<< HEAD
+    # In replay mode we need enough history to cover the chosen date
+    # (yfinance's hourly granularity caps at ~730d). For live the
+    # default 60d window keeps the snapshot cheap to refresh.
+    df = fetch_spy_hourly("730d" if replay_date is not None else "60d")
+=======
     df = fetch_spy_hourly("60d")
+>>>>>>> origin/main
     if df.empty:
         raise RuntimeError("yfinance returned no SPY bars")
 
@@ -1110,6 +1117,22 @@ def build_snapshot_with_fallback(replay_date: date | None = None) -> dict:
     try:
         return build_live_snapshot(replay_date=replay_date)
     except Exception as exc:
+        # In replay mode, falling back to today's seed snapshot would be
+        # actively misleading (numbers look "live" but actually reflect
+        # nothing). Return an explicit replay-error payload so the
+        # frontend can surface the reason inline.
+        if replay_date is not None:
+            seed = seed_snapshot.build()
+            seed["source"] = "error"
+            seed["replay"] = {
+                "isReplay": True,
+                "date": replay_date.isoformat(),
+                "session": None,
+                "verdictOutcome": None,
+                "verdictPnl": None,
+                "error": str(exc)[:200],
+            }
+            return seed
         seed = seed_snapshot.build()
         seed["source"] = "degraded"
         seed["error"] = str(exc)[:200]

@@ -162,6 +162,7 @@ export interface ReplayBlock {
   session: ReplaySession | null;
   verdictOutcome: "WIN" | "LOSS" | "PUSH" | "N_A" | null;
   verdictPnl: number | null;
+  error?: string | null;
 }
 
 export interface OptionsRaw {
