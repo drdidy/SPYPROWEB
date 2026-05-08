@@ -6,8 +6,8 @@ const cols = [
     label: "Workspace",
     items: [
       { label: "Decision Slate", href: "/dashboard" },
+      { label: "SPY Channel", href: "/spy" },
       { label: "SPX Channel", href: "/spx" },
-      { label: "Structure Read", href: "/structure" },
       { label: "Foresight", href: "/foresight" },
     ],
   },
