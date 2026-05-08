@@ -14,8 +14,8 @@ export function AnchorSummary({ pivots }: { pivots: Pivot[] }) {
         <div className="hr-rule" />
         {low && <Pivot p={low} />}
         <div className="text-[11px] text-ink-3 leading-snug pt-1">
-          Slope <span className="font-mono text-ink">$0.20/hr</span> defines fan radians.
-          Tradable lines built from these anchors stay valid until invalidation prints.
+          Lines built from these anchors stay valid until the next invalidation
+          print.
         </div>
       </CardBody>
     </Card>
