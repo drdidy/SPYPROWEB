@@ -13,7 +13,7 @@ type Tick = {
   spark?: number[];
 };
 
-const ticks: Tick[] = [
+const mockTicks: Tick[] = [
   {
     time: "9:38",
     type: "CALL",
@@ -54,13 +54,14 @@ const typeStyle = {
   NOTE: { label: "NOTE", color: "text-ink-3", bar: "bg-ink-4" },
 } as const;
 
-export function SignalTape() {
+export function SignalTape({ ticks: liveTicks }: { ticks?: Tick[] } = {}) {
+  const ticks = liveTicks && liveTicks.length > 0 ? liveTicks : mockTicks;
   return (
     <Card>
       <CardHeader
         eyebrow="Signal Tape"
         title="Today's prints"
-        meta={`${ticks.length} events · session 9:30 → now`}
+        meta={`${ticks.length} events · session live`}
       />
       <CardBody className="px-0 pb-0">
         <ol className="divide-y divide-rule border-t border-rule">

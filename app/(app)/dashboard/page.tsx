@@ -27,6 +27,7 @@ export default async function Page() {
     waitDiscipline,
     optionsIntel,
     strikes,
+    signalTicks,
   } = snap;
 
   return (
@@ -92,7 +93,7 @@ export default async function Page() {
         <SectionLabel number="03">Intelligence</SectionLabel>
         <div className="grid grid-cols-12 gap-5">
           <div className="col-span-12 xl:col-span-7">
-            <SignalTape />
+            <SignalTape ticks={signalTicks} />
           </div>
           <div className="col-span-12 xl:col-span-5">
             <OptionsIntelPanel

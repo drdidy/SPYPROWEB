@@ -22,6 +22,7 @@ import {
   strikes as mockStrikes,
   shellState as mockShellState,
 } from "./mock-data";
+import type { SignalTick } from "./snapshot-adapter";
 
 const REVALIDATE_SECONDS = 15;
 
@@ -33,6 +34,8 @@ export interface LoadedLiveSnapshot {
   fetchedAt: string;
   error?: string;
 }
+
+const mockTicks: SignalTick[] = [];
 
 function mockAdapted(): AdaptedSnapshot {
   return {
@@ -50,6 +53,7 @@ function mockAdapted(): AdaptedSnapshot {
     waitDiscipline: mockWaitDiscipline,
     optionsIntel: mockOptionsIntel,
     strikes: mockStrikes,
+    signalTicks: mockTicks,
     shellState: mockShellState,
   };
 }
