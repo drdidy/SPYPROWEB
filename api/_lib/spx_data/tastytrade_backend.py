@@ -51,17 +51,24 @@ from ..spx.time_utils import to_ct
 API_URL = "https://api.tastytrade.com"
 OAUTH_PATH = "/oauth/token"
 QUOTE_PATH = "/market-data/by-type"
+FUTURES_INSTRUMENTS_PATH = "/instruments/futures"
 # Tastytrade's market-data-by-type expects API version negotiation.
 TT_API_VERSION = "20251101"
 
 # Symbols (Tastytrade convention).
-ES_FUTURES_SYMBOL = "/ES"   # continuous front month
+ES_PRODUCT_CODE = "ES"      # /ES product family — used to resolve the
+                            # active front-month contract via
+                            # /instruments/futures.
 SPX_INDEX_SYMBOL = "SPX"
 
 # Network timeouts (seconds). Vercel functions have 10s default for the
 # whole request; keep individual calls well under that.
 OAUTH_TIMEOUT = 6
 QUOTE_TIMEOUT = 4
+FUTURES_TIMEOUT = 4
+
+# Active-contract cache: trading-day-stable, so a couple hours is plenty.
+ACTIVE_CONTRACT_CACHE_SECONDS = 60 * 60 * 2
 
 # Safety margin so we refresh slightly before expiry rather than racing it.
 TOKEN_REFRESH_SAFETY_SECONDS = 60
@@ -79,6 +86,8 @@ class TastytradeFetcher:
     def __init__(self) -> None:
         self._access_token: Optional[str] = None
         self._access_expires_at: float = 0.0
+        self._es_contract_symbol: Optional[str] = None
+        self._es_contract_expires_at: float = 0.0
 
     # ---- Auth ---------------------------------------------------------------
 
@@ -159,10 +168,83 @@ class TastytradeFetcher:
             "Accept-Version": TT_API_VERSION,
         }
 
+    # ---- Active /ES contract resolver ---------------------------------------
+
+    def _resolve_active_es_symbol(self) -> str:
+        """Return the front-month /ES contract symbol (e.g. "/ESM6").
+
+        The market-data-by-type endpoint won't accept the bare product
+        code "/ES" — it requires the actual traded contract. We fetch
+        the active futures list and pick the earliest non-expired
+        contract. Cached per warm function instance.
+        """
+        if (
+            self._es_contract_symbol
+            and time.time() < self._es_contract_expires_at
+        ):
+            return self._es_contract_symbol
+
+        try:
+            res = requests.get(
+                f"{API_URL}{FUTURES_INSTRUMENTS_PATH}",
+                params={"product-code": ES_PRODUCT_CODE},
+                headers=self._auth_headers(),
+                timeout=FUTURES_TIMEOUT,
+            )
+        except requests.RequestException as e:
+            raise FetcherUnavailable(
+                f"Tastytrade futures-list network error: {type(e).__name__}: {e}"
+            ) from e
+
+        if res.status_code != 200:
+            raise FetcherUnavailable(
+                f"Tastytrade futures-list failed: {res.status_code} "
+                f"{res.text[:200]}"
+            )
+
+        try:
+            body = res.json()
+        except ValueError as e:
+            raise FetcherUnavailable(
+                f"Tastytrade futures-list response not JSON: {res.text[:200]}"
+            ) from e
+
+        items = _items(body)
+        # Each item: { symbol: "/ESM6", expires-at: "2026-06-19T...",
+        #              active-month: true, ... }
+        now_utc = datetime.utcnow()
+        candidates: list[tuple[datetime, str]] = []
+        for it in items:
+            sym = it.get("symbol")
+            exp_raw = it.get("expires-at") or it.get("expiration-date")
+            if not isinstance(sym, str) or not isinstance(exp_raw, str):
+                continue
+            try:
+                # Tolerate trailing 'Z' and date-only formats.
+                exp = datetime.fromisoformat(exp_raw.replace("Z", "+00:00"))
+            except ValueError:
+                continue
+            exp_naive = exp.replace(tzinfo=None) if exp.tzinfo else exp
+            if exp_naive <= now_utc:
+                continue
+            candidates.append((exp_naive, sym))
+
+        if not candidates:
+            raise FetcherUnavailable(
+                "Tastytrade futures-list returned no live /ES contract. "
+                f"Got {len(items)} items."
+            )
+
+        candidates.sort(key=lambda t: t[0])
+        front_symbol = candidates[0][1]
+        self._es_contract_symbol = front_symbol
+        self._es_contract_expires_at = time.time() + ACTIVE_CONTRACT_CACHE_SECONDS
+        return front_symbol
+
     # ---- Sync quote ---------------------------------------------------------
 
     def fetch_sync_quote(self) -> SyncQuote:
-        """Pull /ES (futures front month) + SPX (cash index) last prints
+        """Pull /ES (resolved front month) + SPX (cash index) last prints
         via GET /market-data/by-type.
 
         Returns a SyncQuote with .offset = spx - es ready to feed the
@@ -171,15 +253,19 @@ class TastytradeFetcher:
         IMPORTANT: Tastytrade's by-type endpoint expects the symbol-list
         query params named *singular* (`future`, `index`) sent as a
         repeated array. Sending plural `futures`/`indices` (the previous
-        version of this code) silently returned an empty `items` list,
-        which manifested as the "Got symbols: []" error and a permanent
-        fallback to yfinance.
+        version of this code) silently returned an empty `items` list.
+
+        IMPORTANT: The `future` query param needs the actual front-month
+        contract symbol like "/ESM6" — not the product code "/ES".
+        Sending "/ES" returns SPX only with no /ES entry. We resolve the
+        active contract via /instruments/futures first.
         """
+        es_symbol = self._resolve_active_es_symbol()
         try:
             res = requests.get(
                 f"{API_URL}{QUOTE_PATH}",
                 params=[
-                    ("future", ES_FUTURES_SYMBOL),
+                    ("future", es_symbol),
                     ("index", SPX_INDEX_SYMBOL),
                 ],
                 headers=self._auth_headers(),
@@ -202,11 +288,11 @@ class TastytradeFetcher:
                 f"Tastytrade quote response not JSON: {res.text[:200]}"
             ) from e
 
-        es_quote = _find_quote(body, ES_FUTURES_SYMBOL)
+        es_quote = _find_quote(body, es_symbol)
         spx_quote = _find_quote(body, SPX_INDEX_SYMBOL)
         if es_quote is None or spx_quote is None:
             raise FetcherUnavailable(
-                "Tastytrade quote response missing /ES or SPX entry. "
+                f"Tastytrade quote response missing {es_symbol} or SPX entry. "
                 f"Got symbols: {_extracted_symbols(body)}"
             )
 
