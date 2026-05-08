@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { Bell, Search } from "lucide-react";
+import { Bell, Menu, Search } from "lucide-react";
 import { NumberFlash } from "@/components/ui/NumberFlash";
 import { Kbd } from "@/components/ui/Kbd";
 import { useLiveSPY, useLiveSPX } from "@/lib/use-live-snapshot";
@@ -33,7 +33,13 @@ const SPX_SCENARIO_TAG: Record<string, string> = {
   OUTSIDE_PLAY: "OUTSIDE",
 };
 
-export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
+export function TopBar({
+  onOpenPalette,
+  onOpenNav,
+}: {
+  onOpenPalette: () => void;
+  onOpenNav?: () => void;
+}) {
   const spy = useLiveSPY();
   const spxSnapshot = useLiveSPX();
   const decision = spy.decision;
@@ -46,7 +52,16 @@ export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
   ).padStart(2, "0")} CT`;
 
   return (
-    <header className="h-[60px] sticky top-0 z-40 bg-canvas/85 backdrop-blur-md border-b border-rule flex items-center px-5 gap-3">
+    <header className="h-[60px] sticky top-0 z-30 bg-canvas/85 backdrop-blur-md border-b border-rule flex items-center px-3 md:px-5 gap-2 md:gap-3">
+      {/* Hamburger — mobile only; sidebar is permanent at lg+. */}
+      <button
+        type="button"
+        aria-label="Open menu"
+        onClick={onOpenNav}
+        className="lg:hidden w-9 h-9 grid place-items-center rounded-soft text-ink-2 hover:text-ink hover:bg-paper-2/70 transition-colors"
+      >
+        <Menu size={17} />
+      </button>
       {/* Dual symbol chips — SPY first, SPX second */}
       <SymbolChip
         href="/dashboard"
@@ -66,8 +81,8 @@ export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
         accent="violet"
       />
 
-      {/* Quote ribbon */}
-      <div className="flex-1 flex items-center justify-center gap-6 min-w-0">
+      {/* Quote ribbon — hidden on small screens to avoid wrap chaos */}
+      <div className="hidden md:flex flex-1 items-center justify-center gap-4 lg:gap-6 min-w-0">
         <Quote label="SPY">
           <NumberFlash value={t.spy} format={(n) => n.toFixed(2)} />
         </Quote>
@@ -101,17 +116,30 @@ export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
         </div>
       </div>
 
+      {/* Spacer to push search/bell right when quote ribbon hidden */}
+      <div className="flex-1 md:hidden" />
       {/* Search + bell */}
       <button
         onClick={onOpenPalette}
-        className="hidden md:flex items-center gap-2 h-8 px-3 rounded-soft bg-paper shadow-rule hover:shadow-rule-strong text-ink-2 hover:text-ink text-xs transition-all"
+        aria-label="Search"
+        className="md:flex items-center gap-2 h-8 px-3 rounded-soft bg-paper shadow-rule hover:shadow-rule-strong text-ink-2 hover:text-ink text-xs transition-all hidden"
       >
         <Search size={13} className="text-ink-3" />
         <span>Search</span>
         <span className="text-ink-4 hidden lg:inline">levels, signals…</span>
         <Kbd className="ml-2">⌘K</Kbd>
       </button>
-      <button className="w-8 h-8 grid place-items-center rounded-soft hover:bg-paper-2 text-ink-2 transition-colors">
+      <button
+        onClick={onOpenPalette}
+        aria-label="Search"
+        className="md:hidden w-9 h-9 grid place-items-center rounded-soft hover:bg-paper-2 text-ink-2 transition-colors"
+      >
+        <Search size={15} />
+      </button>
+      <button
+        aria-label="Notifications"
+        className="w-9 h-9 grid place-items-center rounded-soft hover:bg-paper-2 text-ink-2 transition-colors"
+      >
         <Bell size={15} />
       </button>
     </header>

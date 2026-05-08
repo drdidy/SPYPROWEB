@@ -10,7 +10,7 @@ import {
   GraduationCap,
   History,
   Settings,
-  ChevronsLeft,
+  X,
   Columns3,
 } from "lucide-react";
 import Link from "next/link";
@@ -51,15 +51,38 @@ const sections = [
   },
 ];
 
-export function Sidebar() {
+export function Sidebar({
+  open = false,
+  onClose,
+}: {
+  open?: boolean;
+  onClose?: () => void;
+} = {}) {
   const pathname = usePathname() || "/";
   return (
-    <aside className="w-[224px] shrink-0 h-screen sticky top-0 bg-paper border-r border-rule flex flex-col">
+    <aside
+      className={cn(
+        // Mobile: fixed off-canvas drawer that slides in.
+        "w-[224px] shrink-0 h-screen bg-paper border-r border-rule flex flex-col",
+        "fixed inset-y-0 left-0 z-40 transform transition-transform duration-200 ease-swift",
+        open ? "translate-x-0" : "-translate-x-full",
+        // Desktop (lg+): permanent sticky sidebar, always visible.
+        "lg:sticky lg:top-0 lg:translate-x-0 lg:transition-none lg:z-auto",
+      )}
+    >
       <Link
         href="/"
         className="h-[60px] flex items-center px-5 border-b border-rule hover:bg-paper-2/40 transition-colors"
       >
         <Wordmark />
+        <button
+          type="button"
+          aria-label="Close menu"
+          onClick={onClose}
+          className="ml-auto w-7 h-7 grid place-items-center rounded-soft text-ink-3 hover:text-ink hover:bg-paper-2/70 transition-colors lg:hidden"
+        >
+          <X size={14} />
+        </button>
       </Link>
 
       <div className="px-4 py-3 border-b border-rule">
@@ -111,12 +134,6 @@ export function Sidebar() {
           <div className="text-xs font-medium text-ink truncate">Trader</div>
           <div className="text-[10px] text-ink-3 truncate font-mono">closed beta</div>
         </div>
-        <button
-          className="w-7 h-7 grid place-items-center rounded-soft text-ink-3 hover:text-ink hover:bg-paper-2/70 transition-colors"
-          aria-label="Collapse sidebar"
-        >
-          <ChevronsLeft size={14} />
-        </button>
       </div>
     </aside>
   );

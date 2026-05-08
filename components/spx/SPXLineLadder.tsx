@@ -41,19 +41,20 @@ export function SPXLineLadder({ lines, price }: { lines: SPXLine[]; price: numbe
           <div className="col-span-2 text-right">Δ Price</div>
           <div className="col-span-1 text-right">State</div>
         </div>
-        <ul className="divide-y divide-rule border-t border-rule">
+        <ul className="divide-y divide-rule border-t border-rule spx-ladder">
           {[...lines]
             .sort(
               (a, b) =>
                 Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice),
             )
-            .map((l) => {
+            .map((l, idx) => {
               const state = lineState(l.distanceFromPrice);
               const m = lineMeta[l.kind];
               return (
                 <li
                   key={l.kind}
-                  className="grid grid-cols-12 items-center px-5 py-3 hover:bg-paper-2/50 transition-colors"
+                  className="grid grid-cols-12 items-center px-5 py-3 hover:bg-paper-2/50 transition-colors spx-ladder-row"
+                  style={{ animationDelay: `${idx * 80}ms` }}
                 >
                   <div className="col-span-4 flex items-center gap-2.5">
                     <span className={`w-1.5 h-4 rounded-sm ${m.dot}`} />
@@ -87,6 +88,29 @@ export function SPXLineLadder({ lines, price }: { lines: SPXLine[]; price: numbe
             })}
         </ul>
       </CardBody>
+      <style jsx>{`
+        @keyframes spx-row-in {
+          from {
+            opacity: 0;
+            transform: translateY(4px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .spx-ladder .spx-ladder-row {
+          opacity: 0;
+          animation: spx-row-in 360ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .spx-ladder .spx-ladder-row {
+            opacity: 1;
+            transform: none;
+            animation: none;
+          }
+        }
+      `}</style>
     </Card>
   );
 }
