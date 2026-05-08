@@ -104,7 +104,10 @@ export default async function Page({ searchParams }: PageProps) {
         </div>
       </header>
 
-      <ReplayBar current={replayDate ?? null} />
+      <ReplayBar
+        current={replayDate ?? null}
+        error={replayDate && source === "mock" ? error : null}
+      />
 
       <SPXChannelHero snap={snap} />
 

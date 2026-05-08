@@ -60,12 +60,15 @@ export default async function Page({ searchParams }: PageProps) {
         </div>
       </header>
 
-      <ReplayBar current={replayDate ?? null} />
+      <ReplayBar
+        current={replayDate ?? null}
+        error={snap.replay?.error ?? (replayDate && source === "error" ? error : null)}
+      />
 
       {/* Hero — anchor framework. */}
       <SPYChannelHero snap={snap} />
 
-      {snap.replay?.isReplay && (
+      {snap.replay?.isReplay && snap.replay.session && (
         <ReplayOutcome replay={snap.replay} verdict={decision.verdict} />
       )}
 

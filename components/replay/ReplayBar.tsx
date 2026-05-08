@@ -11,9 +11,10 @@ import { CalendarDays, X, Loader2 } from "lucide-react";
 
 interface Props {
   current: string | null;
+  error?: string | null;
 }
 
-export function ReplayBar({ current }: Props) {
+export function ReplayBar({ current, error }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -82,6 +83,11 @@ export function ReplayBar({ current }: Props) {
         <span className="inline-flex items-center gap-1 font-mono text-[10px] text-ink-3">
           <Loader2 size={11} className="animate-spin" strokeWidth={2} />
           loading…
+        </span>
+      )}
+      {isReplay && error && !pending && (
+        <span className="font-mono text-[10px] text-bear-ink ml-1">
+          · {error}
         </span>
       )}
     </div>
