@@ -145,7 +145,7 @@ export const biasState: BiasState = {
   la: { value: 581.20, touched: false },
   ld: { value: 580.00, touched: false },
   explanation:
-    "Two-touch reaction at UA-1 (583.84) with falling VIX confirms upside lean. UD-1 untouched — overhead supply not yet stressed.",
+    "Price tested support twice with VIX falling. Upside lean. Overhead resistance hasn't been stressed yet.",
 };
 
 // ---- Latest signal ----
@@ -176,11 +176,11 @@ export const signalQuality: SignalQuality = {
   riskRewardScore: 0.78,
   targetQuality: 0.66,
   strengths: [
-    "Close within 0.05 of trigger line",
-    "Wick rejection ratio 0.62 — strong",
-    "R:R 2.4 above 2.0 floor",
+    "Close right at the line",
+    "Wick rejection looks strong",
+    "R:R well above the floor",
   ],
-  warnings: ["Target line is primary, not secondary — partial follow-through expected"],
+  warnings: ["Target is a near line, so expect partial follow-through, not a runaway"],
   actionLabel: "SELECTIVE_TRADE",
 };
 
@@ -188,7 +188,7 @@ export const signalQuality: SignalQuality = {
 export const guardrails: RiskGuardrailState = {
   chase: {
     status: "OK",
-    detail: "Price within $0.20 of entry — chase budget intact (max $0.30).",
+    detail: "Price still inside the chase budget. Don't pay up.",
   },
   retest: {
     status: "WAITING",
@@ -210,7 +210,7 @@ export const decision: DecisionState = {
   verdict: "WAIT",
   conviction: 76,
   finalExplanation:
-    "B-grade rejection at UA-1 with R:R 2.4. Awaiting next-bar confirmation; structure and chase budget remain healthy.",
+    "Setup formed at one of today's lines. We want one more candle to confirm before clicking. Risk is in budget.",
   windowET: "10:30–11:00 ET",
   updatedAt: "9:42 AM ET",
 };
@@ -228,7 +228,7 @@ export const waitDiscipline: WaitDisciplineItem[] = [
     key: "chase_guard",
     label: "Chase Guard",
     status: "OK",
-    detail: "Entry budget $0.30 above 583.62 — current price 0.20 above.",
+    detail: "Price is still inside the entry budget. Within reason to take it.",
   },
   {
     key: "contract_guard",

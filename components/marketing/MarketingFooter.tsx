@@ -49,7 +49,7 @@ export function MarketingFooter() {
             <Wordmark />
             <p className="mt-5 text-[13px] text-ink-2 leading-relaxed max-w-sm">
               SPY Prophet is a decision workspace for serious retail traders.
-              The lattice is fixed; the discipline is yours.
+              The structure stays the same. What you do with it is on you.
             </p>
             <div className="mt-6 flex items-center gap-2">
               <span className="font-mono text-[10px] text-ink-3 tracking-[0.18em] uppercase">
