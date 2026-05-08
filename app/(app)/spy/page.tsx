@@ -1,6 +1,4 @@
-import { DecisionSlate } from "@/components/dashboard/DecisionSlate";
-import { ChartCard } from "@/components/chart/ChartCard";
-import { AnchorSummary } from "@/components/dashboard/AnchorSummary";
+import { SPYChannelHero } from "@/components/spy/SPYChannelHero";
 import { TriggerMap } from "@/components/dashboard/TriggerMap";
 import { SignalTape } from "@/components/dashboard/SignalTape";
 import { OptionsIntelPanel } from "@/components/dashboard/OptionsIntel";
@@ -16,12 +14,7 @@ export default async function Page() {
   const { data: snap, source, error } = await loadLiveSnapshot();
   const {
     decision,
-    signal,
-    quality,
-    candles,
-    hourlyCandles,
     lines,
-    pivots,
     currentPrice,
     bias,
     guardrails,
@@ -57,8 +50,8 @@ export default async function Page() {
         </div>
       </header>
 
-      {/* Hero — verdict + signal anatomy. Mirrors role of SPXChannelHero. */}
-      <DecisionSlate decision={decision} signal={signal} quality={quality} />
+      {/* Hero — channel-rail diagram + verdict, mirrors SPXChannelHero. */}
+      <SPYChannelHero snap={snap} />
 
       <section className="space-y-5">
         <SectionLabel number="01">Plays</SectionLabel>
@@ -82,26 +75,7 @@ export default async function Page() {
       </section>
 
       <section className="space-y-5">
-        <SectionLabel number="03">Structure</SectionLabel>
-        <div className="grid grid-cols-12 gap-5">
-          <div className="col-span-12 xl:col-span-8">
-            <ChartCard
-              candles={candles}
-              hourlyCandles={hourlyCandles}
-              lines={lines}
-              pivots={pivots}
-              signal={signal ?? undefined}
-              currentPrice={currentPrice}
-            />
-          </div>
-          <div className="col-span-12 xl:col-span-4">
-            <AnchorSummary pivots={pivots} />
-          </div>
-        </div>
-      </section>
-
-      <section className="space-y-5">
-        <SectionLabel number="04">Defense</SectionLabel>
+        <SectionLabel number="03">Tape</SectionLabel>
         <div className="grid grid-cols-12 gap-5">
           <div className="col-span-12 xl:col-span-7">
             <SignalTape ticks={signalTicks} />
