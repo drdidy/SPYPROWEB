@@ -52,22 +52,74 @@ export function ProphetChart({
   const innerW = w - padL - padR;
   const innerH = h - padT - padB;
 
-  const bounds: Bounds = useMemo(() => {
-    const allTimes = candles.map((c) => new Date(c.t).getTime());
-    const xMin = Math.min(...allTimes);
-    const xMax = Math.max(...allTimes) + 4 * 60 * 60 * 1000; // pad 1 bar
-    const allPrices = candles.flatMap((c) => [c.h, c.l]).concat(lines.map((l) => l.currentValue));
-    const yPad = (Math.max(...allPrices) - Math.min(...allPrices)) * 0.08;
+  // Index-based x-positioning. Financial charts that space candles
+  // by raw timestamp cluster the bars during dense sessions and leave
+  // huge empty stretches over weekend / overnight gaps. We slot each
+  // candle into a uniform column and project line / pivot times back
+  // onto the column grid (linear-interpolating between the two
+  // surrounding candle indices, or extrapolating in candle-hour units
+  // when the time falls outside the rendered range).
+  const bounds = useMemo(() => {
+    const allPrices = candles
+      .flatMap((c) => [c.h, c.l])
+      .concat(lines.map((l) => l.currentValue));
+    if (allPrices.length === 0) {
+      return { yMin: 0, yMax: 1, slotW: innerW };
+    }
+    const yPad = (Math.max(...allPrices) - Math.min(...allPrices)) * 0.08 || 1;
+    // Reserve one extra slot on the right so projected lines can extend
+    // past the last candle without crashing into the price axis.
+    const slotCount = Math.max(candles.length + 1, 2);
     return {
-      xMin,
-      xMax,
       yMin: Math.min(...allPrices) - yPad,
       yMax: Math.max(...allPrices) + yPad,
+      slotW: innerW / slotCount,
     };
-  }, [candles, lines]);
+  }, [candles, lines, innerW]);
 
-  const xScale = (t: number) =>
-    padL + ((t - bounds.xMin) / (bounds.xMax - bounds.xMin)) * innerW;
+  // Average ms-per-bar lets us extrapolate lines whose anchor or end
+  // sits outside the rendered range. Hourly bars vs 5m bars differ,
+  // so we derive it from the actual data.
+  const msPerBar = useMemo(() => {
+    if (candles.length < 2) return 60 * 60 * 1000;
+    const first = new Date(candles[0].t).getTime();
+    const last = new Date(candles[candles.length - 1].t).getTime();
+    return (last - first) / (candles.length - 1) || 60 * 60 * 1000;
+  }, [candles]);
+
+  const candleTimes = useMemo(
+    () => candles.map((c) => new Date(c.t).getTime()),
+    [candles],
+  );
+
+  // Map any timestamp to a fractional slot index. Times before the
+  // first candle return negative slot indices (which still render to
+  // the left of the chart, OK for line extrapolation); times after
+  // the last candle extrapolate by msPerBar.
+  const slotForTime = (t: number): number => {
+    if (candleTimes.length === 0) return 0;
+    if (t <= candleTimes[0]) {
+      return -((candleTimes[0] - t) / msPerBar);
+    }
+    if (t >= candleTimes[candleTimes.length - 1]) {
+      return (
+        candleTimes.length - 1 + (t - candleTimes[candleTimes.length - 1]) / msPerBar
+      );
+    }
+    // Binary search for the surrounding indices and interpolate.
+    let lo = 0;
+    let hi = candleTimes.length - 1;
+    while (lo + 1 < hi) {
+      const mid = (lo + hi) >> 1;
+      if (candleTimes[mid] <= t) lo = mid;
+      else hi = mid;
+    }
+    const span = candleTimes[hi] - candleTimes[lo];
+    return span > 0 ? lo + (t - candleTimes[lo]) / span : lo;
+  };
+
+  const xScale = (slotIndex: number) =>
+    padL + (slotIndex + 0.5) * bounds.slotW;
   const yScale = (p: number) =>
     padT + (1 - (p - bounds.yMin) / (bounds.yMax - bounds.yMin)) * innerH;
 
@@ -80,7 +132,11 @@ export function ProphetChart({
     return ticks;
   }, [bounds]);
 
-  const candleWidth = Math.max(2, (innerW / candles.length) * 0.55);
+  const candleWidth = Math.max(2, bounds.slotW * 0.6);
+
+  // Last slot used for projecting lines forward to the right edge of
+  // the rendered area (one slot beyond the last candle).
+  const lastSlot = candles.length;
 
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-auto prophet-chart">
@@ -124,7 +180,7 @@ export function ProphetChart({
 
       {/* candles */}
       {candles.map((c, i) => {
-        const cx = xScale(new Date(c.t).getTime());
+        const cx = xScale(i);
         const isUp = c.c >= c.o;
         const color = isUp ? COLOR.bull : COLOR.bear;
         const yo = yScale(c.o);
@@ -153,11 +209,19 @@ export function ProphetChart({
       {/* primary + secondary lines (draw-in animation) */}
       {lines.map((l, i) => {
         const t0 = new Date(l.anchorTime).getTime();
-        const dt = (bounds.xMax - t0) / 36e5; // hours
-        const startX = xScale(t0);
+        const startSlot = slotForTime(t0);
+        // Project the line to the right edge using the last candle's
+        // timestamp (or the anchor time + one bar when there are no
+        // candles). Slope is per real hour, so we use real time delta.
+        const lastT =
+          candleTimes.length > 0
+            ? candleTimes[candleTimes.length - 1]
+            : t0 + msPerBar;
+        const dt = (lastT - t0) / 36e5; // hours
+        const startX = xScale(startSlot);
         const startY = yScale(l.anchorPrice);
         const endP = l.anchorPrice + l.slopePerHour * dt;
-        const endX = xScale(bounds.xMax);
+        const endX = xScale(lastSlot);
         const endY = yScale(endP);
         const color = LINE_COLOR[l.kind] || COLOR.ink2;
         const isPrim = l.isPrimary;
@@ -215,7 +279,7 @@ export function ProphetChart({
 
       {/* anchor pivots */}
       {pivots.map((p, i) => {
-        const x = xScale(new Date(p.time).getTime());
+        const x = xScale(slotForTime(new Date(p.time).getTime()));
         const y = yScale(p.price);
         const isHigh = p.kind === "HIGH";
         return (
@@ -283,7 +347,7 @@ export function ProphetChart({
       {signal && (
         <g>
           {(() => {
-            const sx = xScale(new Date(signal.rejectionTime).getTime());
+            const sx = xScale(slotForTime(new Date(signal.rejectionTime).getTime()));
             const sy = yScale(signal.rejectionPrice);
             const tip = signal.type === "CALL" ? -1 : 1;
             return (
