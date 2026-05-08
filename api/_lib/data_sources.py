@@ -609,6 +609,8 @@ def _build_decision(
     current_price: float,
     now_ct: pd.Timestamp,
     projection_time: datetime,
+    flow: dict | None = None,
+    gex: dict | None = None,
 ) -> dict:
     """Compute the live Decision Slate payload from real engine state.
 
@@ -697,6 +699,22 @@ def _build_decision(
             )
         else:
             rationale = f"SPY {current_price:.2f}. Waiting on the active triggers; no qualified rejection has printed."
+
+    # Confluence: append UW flow + dealer gamma when they tell a clear story.
+    confluence_bits: list[str] = []
+    if flow and flow.get("lean") in ("BULLISH", "BEARISH"):
+        confluence_bits.append(
+            f"Options flow leaning {str(flow['lean']).lower()} "
+            f"({flow.get('bullishCount', 0)} bull / {flow.get('bearishCount', 0)} bear)"
+        )
+    if gex and gex.get("regime") in ("POSITIVE", "NEGATIVE"):
+        flip = gex.get("flipPoint")
+        gamma_str = f"dealer gamma {str(gex['regime']).lower()}"
+        if isinstance(flip, (int, float)):
+            gamma_str += f" with flip near {flip:.2f}"
+        confluence_bits.append(gamma_str)
+    if confluence_bits:
+        rationale = f"{rationale} {'; '.join(confluence_bits)}."
 
     why = bias_state.explanation
 
@@ -804,9 +822,17 @@ def build_live_snapshot() -> dict:
     raw_signals = pc.detect_rejection_signals(triggers_df, primary_lines, secondary_lines) if not triggers_df.empty else []
     signals = _signals_for_tape(raw_signals, current_price)
 
+    # Unusual Whales enrichment (returns None if key missing or upstream
+    # is unavailable; the snapshot stays valid either way). Fetched
+    # before the decision so flow + dealer gamma can append confluence
+    # to the rationale when the lean is decisive.
+    flow_summary = unusual_whales.fetch_flow_summary("SPY")
+    gex_summary = unusual_whales.fetch_gex_summary("SPY")
+
     decision = _build_decision(
         bias_state, bias_score, primary_lines, raw_signals,
         current_price, now_ct, projection_time,
+        flow=flow_summary, gex=gex_summary,
     )
 
     pivots = {
@@ -822,11 +848,6 @@ def build_live_snapshot() -> dict:
     chart_lines = _chart_lines_from_primary(primary_lines, projection_time, rth_today)
 
     options = tastytrade.fetch_options_snapshot(current_price)
-
-    # Unusual Whales enrichment (returns None if key missing or upstream
-    # is unavailable; the snapshot stays valid either way).
-    flow_summary = unusual_whales.fetch_flow_summary("SPY")
-    gex_summary = unusual_whales.fetch_gex_summary("SPY")
 
     market_context = _build_market_context(
         vix=vix,
