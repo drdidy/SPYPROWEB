@@ -12,6 +12,7 @@ import {
   Settings,
   X,
   Columns3,
+  Rewind,
 } from "lucide-react";
 import Link from "next/link";
 import { Wordmark } from "@/components/brand/Wordmark";
@@ -26,6 +27,7 @@ const sections = [
       { icon: LineChart, label: "Decision Slate", href: "/dashboard" },
       { icon: Activity, label: "SPY Channel", href: "/spy" },
       { icon: Columns3, label: "SPX Channel", href: "/spx" },
+      { icon: Rewind, label: "Replay", href: "/replay" },
       { icon: Eye, label: "Foresight", href: "/foresight" },
     ],
   },
