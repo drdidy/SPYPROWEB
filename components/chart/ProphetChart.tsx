@@ -83,7 +83,7 @@ export function ProphetChart({
   const candleWidth = Math.max(2, (innerW / candles.length) * 0.55);
 
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-auto">
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-auto prophet-chart">
       <defs>
         <linearGradient id="bullGrad" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={COLOR.bull} stopOpacity="0.06" />
@@ -93,6 +93,7 @@ export function ProphetChart({
           <circle cx="1" cy="1" r="0.7" fill={COLOR.ruleStrong} opacity="0.45" />
         </pattern>
       </defs>
+      <style>{chartStyles}</style>
 
       {/* canvas */}
       <rect x="0" y="0" width={w} height={h} fill={COLOR.paper} />
@@ -122,7 +123,7 @@ export function ProphetChart({
       ))}
 
       {/* candles */}
-      {candles.map((c) => {
+      {candles.map((c, i) => {
         const cx = xScale(new Date(c.t).getTime());
         const isUp = c.c >= c.o;
         const color = isUp ? COLOR.bull : COLOR.bear;
@@ -130,8 +131,11 @@ export function ProphetChart({
         const yc = yScale(c.c);
         const yh = yScale(c.h);
         const yl = yScale(c.l);
+        // Stagger fade-in across the candle series. Capped so longer
+        // series still finish in well under a second.
+        const delay = Math.min(i * 12, 720);
         return (
-          <g key={c.t}>
+          <g key={c.t} className="candle" style={{ animationDelay: `${delay}ms` }}>
             <line x1={cx} x2={cx} y1={yh} y2={yl} stroke={color} strokeWidth={0.8} />
             <rect
               x={cx - candleWidth / 2}
@@ -146,8 +150,8 @@ export function ProphetChart({
         );
       })}
 
-      {/* fan lines */}
-      {lines.map((l) => {
+      {/* primary + secondary lines (draw-in animation) */}
+      {lines.map((l, i) => {
         const t0 = new Date(l.anchorTime).getTime();
         const dt = (bounds.xMax - t0) / 36e5; // hours
         const startX = xScale(t0);
@@ -157,6 +161,11 @@ export function ProphetChart({
         const endY = yScale(endP);
         const color = LINE_COLOR[l.kind] || COLOR.ink2;
         const isPrim = l.isPrimary;
+        const length = Math.hypot(endX - startX, endY - startY);
+        // Primary lines lead, secondary follow. Each line plays its own
+        // dasharray-based draw-on; the inline pathLength keeps the
+        // animation duration consistent across long and short lines.
+        const drawDelay = (isPrim ? 200 : 380) + i * 60;
         return (
           <g key={l.name}>
             <line
@@ -166,11 +175,20 @@ export function ProphetChart({
               y2={endY}
               stroke={color}
               strokeWidth={isPrim ? 1.25 : 1}
-              strokeDasharray={isPrim ? "" : "3 4"}
               opacity={isPrim ? 0.85 : 0.55}
+              className={`chart-line ${isPrim ? "is-primary" : "is-secondary"}`}
+              style={{
+                strokeDasharray: length,
+                strokeDashoffset: length,
+                animationDelay: `${drawDelay}ms`,
+              }}
             />
             {/* line label at right */}
-            <g transform={`translate(${padL + innerW + 4}, ${endY})`}>
+            <g
+              transform={`translate(${padL + innerW + 4}, ${endY})`}
+              className="chart-label"
+              style={{ animationDelay: `${drawDelay + 600}ms` }}
+            >
               <rect
                 x={0}
                 y={-7.5}
@@ -196,12 +214,20 @@ export function ProphetChart({
       })}
 
       {/* anchor pivots */}
-      {pivots.map((p) => {
+      {pivots.map((p, i) => {
         const x = xScale(new Date(p.time).getTime());
         const y = yScale(p.price);
         const isHigh = p.kind === "HIGH";
         return (
-          <g key={p.kind + p.time}>
+          <g
+            key={p.kind + p.time}
+            className="chart-pivot"
+            style={{
+              transformOrigin: `${x}px ${y}px`,
+              animationDelay: `${800 + i * 120}ms`,
+            }}
+          >
+            <circle cx={x} cy={y} r={9} fill={COLOR.gold} opacity={0.0} className="chart-pivot-pulse" />
             <circle cx={x} cy={y} r={4.5} fill={COLOR.paper} stroke={COLOR.gold} strokeWidth={1.5} />
             <circle cx={x} cy={y} r={1.8} fill={COLOR.gold} />
             <line
@@ -233,8 +259,12 @@ export function ProphetChart({
         stroke={COLOR.ink}
         strokeWidth={0.8}
         strokeDasharray="1 3"
+        className="chart-current-price-line"
       />
-      <g transform={`translate(${padL + innerW + 4}, ${yScale(currentPrice)})`}>
+      <g
+        transform={`translate(${padL + innerW + 4}, ${yScale(currentPrice)})`}
+        className="chart-current-price-tag"
+      >
         <rect x={0} y={-9} width={62} height={18} rx={3} fill={COLOR.ink} />
         <text
           x={31}
@@ -257,9 +287,13 @@ export function ProphetChart({
             const sy = yScale(signal.rejectionPrice);
             const tip = signal.type === "CALL" ? -1 : 1;
             return (
-              <>
+              <g
+                className="chart-signal"
+                style={{ transformOrigin: `${sx}px ${sy}px` }}
+              >
                 <circle cx={sx} cy={sy} r={6} fill={COLOR.paper} stroke={COLOR.teal} strokeWidth={1.5} />
                 <circle cx={sx} cy={sy} r={2.5} fill={COLOR.teal} />
+                <circle cx={sx} cy={sy} r={6} fill="none" stroke={COLOR.teal} strokeWidth={1.2} className="chart-signal-ping" />
                 <line
                   x1={sx}
                   x2={sx + 22}
@@ -290,7 +324,7 @@ export function ProphetChart({
                     R:R {signal.rr.toFixed(2)} · {signal.entryPrice.toFixed(2)}
                   </text>
                 </g>
-              </>
+              </g>
             );
           })()}
         </g>
@@ -308,6 +342,92 @@ export function ProphetChart({
     </svg>
   );
 }
+
+// CSS animations applied to SVG nodes via inline <style>. Keeps the
+// chart self-contained — no global stylesheet additions, no
+// dependencies. Each keyframe is short and eased so the chart settles
+// into its read state quickly without feeling fidgety.
+const chartStyles = `
+  @keyframes prophet-line-draw {
+    to { stroke-dashoffset: 0; }
+  }
+  @keyframes prophet-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes prophet-pop-in {
+    0%   { opacity: 0; transform: scale(0.6); }
+    70%  { opacity: 1; transform: scale(1.08); }
+    100% { transform: scale(1); }
+  }
+  @keyframes prophet-pulse {
+    0%   { opacity: 0.0; transform: scale(0.6); }
+    50%  { opacity: 0.18; }
+    100% { opacity: 0; transform: scale(2.4); }
+  }
+  @keyframes prophet-breathe {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.55; }
+  }
+  .prophet-chart .candle {
+    opacity: 0;
+    animation: prophet-fade-in 320ms ease-out forwards;
+  }
+  .prophet-chart .chart-line {
+    animation: prophet-line-draw 900ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+  .prophet-chart .chart-line.is-secondary {
+    animation-duration: 1100ms;
+  }
+  .prophet-chart .chart-label {
+    opacity: 0;
+    animation: prophet-fade-in 220ms ease-out forwards;
+  }
+  .prophet-chart .chart-pivot {
+    opacity: 0;
+    animation: prophet-pop-in 520ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+  .prophet-chart .chart-pivot-pulse {
+    transform-origin: center;
+    transform-box: fill-box;
+    animation: prophet-pulse 2400ms ease-out infinite;
+    animation-delay: 1400ms;
+  }
+  .prophet-chart .chart-current-price-line {
+    animation: prophet-breathe 3200ms ease-in-out infinite;
+  }
+  .prophet-chart .chart-current-price-tag {
+    opacity: 0;
+    animation: prophet-fade-in 320ms ease-out 600ms forwards;
+  }
+  .prophet-chart .chart-signal {
+    opacity: 0;
+    animation: prophet-pop-in 460ms cubic-bezier(0.34, 1.56, 0.64, 1) 1100ms forwards;
+  }
+  .prophet-chart .chart-signal-ping {
+    transform-origin: center;
+    transform-box: fill-box;
+    animation: prophet-pulse 2000ms ease-out 1300ms infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .prophet-chart .candle,
+    .prophet-chart .chart-line,
+    .prophet-chart .chart-label,
+    .prophet-chart .chart-pivot,
+    .prophet-chart .chart-current-price-tag,
+    .prophet-chart .chart-signal {
+      opacity: 1 !important;
+      animation: none !important;
+      stroke-dashoffset: 0 !important;
+      transform: none !important;
+    }
+    .prophet-chart .chart-pivot-pulse,
+    .prophet-chart .chart-current-price-line,
+    .prophet-chart .chart-signal-ping {
+      animation: none !important;
+    }
+  }
+`;
 
 function niceStep(raw: number): number {
   const exp = Math.floor(Math.log10(raw));
