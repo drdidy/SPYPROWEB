@@ -4,9 +4,9 @@ import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SPY Prophet — Discipline, before conviction",
+  title: "SPY Prophet · Discipline before conviction",
   description:
-    "Anchor-driven SPY trading workspace. Read the day before the day reads you: anchors, fans, graded signals, and the discipline to wait for a setup that earns the trade.",
+    "Anchor-driven SPY trading workspace. Read the day before the day reads you. Anchors, lines, graded signals, and the discipline to wait for a setup that earns the trade.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

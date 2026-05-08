@@ -25,7 +25,7 @@ export function SPXPlaysSlate({ snap }: { snap: SPXSnapshot }) {
         title={standDown ? "Stand down today" : "Primary & alternate"}
         meta={
           standDown
-            ? "Price is outside the planned play envelope — no trade."
+            ? "Price is outside the planned play envelope. No trade."
             : "Each play names its entry and its exit at construction."
         }
       />

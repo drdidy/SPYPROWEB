@@ -144,7 +144,7 @@ function SourceBadge({
     "bg-paper-2 text-ink-3 shadow-[inset_0_0_0_1px_rgba(20,22,26,0.10)]";
   return (
     <span
-      title={error || (source === "live" ? "Live snapshot from API" : "Mock data — set NEXT_PUBLIC_API_BASE to use live")}
+      title={error || (source === "live" ? "Live snapshot from API" : "Snapshot unavailable. Engine is reconnecting; retry in a moment.")}
       className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-pill text-[9px] font-mono font-semibold uppercase tracking-[0.12em] ${source === "live" ? liveCls : mockCls}`}
     >
       <span

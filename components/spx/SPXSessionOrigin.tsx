@@ -78,10 +78,10 @@ export function SPXSessionOrigin({ snap }: { snap: SPXSnapshot }) {
             </div>
             <div className="text-[13px] text-ink-2 leading-relaxed">
               {ascendingProof
-                ? "Tokyo printed both a higher high and a higher low than Sydney — range is rising. We draw an ascending channel."
+                ? "Tokyo printed a higher high and a higher low than Sydney. Range is rising; we draw an ascending channel."
                 : descendingProof
-                  ? "Tokyo printed both a lower high and a lower low than Sydney — range is falling. We draw a descending channel."
-                  : "Tokyo's range is mixed against Sydney — expansion or contraction. No channel today; stand down."}
+                  ? "Tokyo printed a lower high and a lower low than Sydney. Range is falling; we draw a descending channel."
+                  : "Tokyo's range is mixed against Sydney, so expansion or contraction. No channel today; stand down."}
             </div>
             <div className="mt-4 hr-rule" />
             <div className="mt-3 grid grid-cols-2 gap-3 text-[11px]">
