@@ -24,8 +24,8 @@ const sections = [
     label: "Workspace",
     items: [
       { icon: LineChart, label: "Decision Slate", href: "/dashboard" },
+      { icon: Activity, label: "SPY Channel", href: "/spy" },
       { icon: Columns3, label: "SPX Channel", href: "/spx" },
-      { icon: Layers, label: "Structure Read", href: "/structure" },
       { icon: Eye, label: "Foresight", href: "/foresight" },
     ],
   },
@@ -37,7 +37,7 @@ const sections = [
     label: "Intelligence",
     items: [
       { icon: Globe, label: "Market Context", href: "/context" },
-      { icon: Activity, label: "Order Flow", href: "/flow" },
+      { icon: Layers, label: "Order Flow", href: "/flow" },
       { icon: FileText, label: "Daily Brief", href: "/brief" },
       { icon: GraduationCap, label: "Learning", href: "/learn" },
     ],

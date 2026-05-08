@@ -2,7 +2,7 @@ import { SectionLabel } from "@/components/ui/SectionLabel";
 import {
   LineChart,
   Columns3,
-  Layers,
+  Activity,
   Eye,
   Target,
   FileText,
@@ -15,21 +15,21 @@ const surfaces = [
     icon: LineChart,
     title: "Decision Slate",
     href: "/dashboard",
-    body: "The main read. Verdict, conviction, why it's that way. You can be up to speed in under a minute.",
+    body: "Both engines on one page. SPY verdict next to SPX verdict, in under a minute.",
   },
   {
     n: "02",
+    icon: Activity,
+    title: "SPY Channel",
+    href: "/spy",
+    body: "The deep SPY read. Chart, triggers, options intel, signal tape, and the discipline that keeps you out of the wrong trades.",
+  },
+  {
+    n: "03",
     icon: Columns3,
     title: "SPX Channel",
     href: "/spx",
     body: "Overnight pivots become the day's channel. Sydney and Tokyo set direction; the slope carries through.",
-  },
-  {
-    n: "03",
-    icon: Layers,
-    title: "Structure Read",
-    href: "/structure",
-    body: "What's holding, what's not, where buyers and sellers are showing up.",
   },
   {
     n: "04",

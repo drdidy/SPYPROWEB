@@ -280,8 +280,8 @@ export type NavItem = { label: string; href: string; group: string };
 
 export const navIndex: NavItem[] = [
   { label: "Decision Slate", href: "/dashboard", group: "Workspace" },
+  { label: "SPY Channel", href: "/spy", group: "Workspace" },
   { label: "SPX Channel", href: "/spx", group: "Workspace" },
-  { label: "Structure Read", href: "/structure", group: "Workspace" },
   { label: "Foresight", href: "/foresight", group: "Workspace" },
   { label: "Options Cockpit", href: "/options", group: "Execution" },
   { label: "Market Context", href: "/context", group: "Intelligence" },
