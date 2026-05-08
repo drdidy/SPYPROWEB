@@ -1,11 +1,14 @@
 "use client";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { Bell, Search } from "lucide-react";
 import { NumberFlash } from "@/components/ui/NumberFlash";
 import { Kbd } from "@/components/ui/Kbd";
-import { shellState, decision } from "@/lib/mock-data";
-import { spxSnapshot } from "@/lib/spx-mock-data";
+import { shellState as mockShell, decision as mockDecision } from "@/lib/mock-data";
+import { spxSnapshot as mockSpx } from "@/lib/spx-mock-data";
+import { adaptSnapshot, type RawSnapshot } from "@/lib/snapshot-adapter";
 import { cn } from "@/lib/utils";
+import type { SPXSnapshot } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
 // Action vocabulary palettes — shared between SPY & SPX so the chip stays
@@ -34,8 +37,73 @@ const SPX_SCENARIO_TAG: Record<string, string> = {
   OUTSIDE_PLAY: "OUTSIDE",
 };
 
+// 30s polling — fast enough to feel live, slow enough to keep the
+// upstream broker happy.
+const POLL_MS = 30_000;
+
+function useLiveSPY() {
+  const [data, setData] = useState(() => ({
+    decision: mockDecision,
+    shell: mockShell,
+    isLive: false,
+  }));
+  useEffect(() => {
+    let abort = false;
+    const tick = async () => {
+      try {
+        const res = await fetch("/api/snapshot", { cache: "no-store" });
+        if (!res.ok) return;
+        const raw = (await res.json()) as RawSnapshot;
+        if (abort) return;
+        const adapted = adaptSnapshot(raw);
+        setData({
+          decision: adapted.decision,
+          shell: adapted.shellState,
+          isLive: adapted.source === "live",
+        });
+      } catch {
+        // keep last state; mock fallback is already in place
+      }
+    };
+    tick();
+    const id = setInterval(tick, POLL_MS);
+    return () => {
+      abort = true;
+      clearInterval(id);
+    };
+  }, []);
+  return data;
+}
+
+function useLiveSPX() {
+  const [data, setData] = useState<SPXSnapshot>(mockSpx);
+  useEffect(() => {
+    let abort = false;
+    const tick = async () => {
+      try {
+        const res = await fetch("/api/spx/snapshot", { cache: "no-store" });
+        if (!res.ok) return;
+        const snap = (await res.json()) as SPXSnapshot;
+        if (!abort) setData(snap);
+      } catch {
+        // keep mock
+      }
+    };
+    tick();
+    const id = setInterval(tick, POLL_MS);
+    return () => {
+      abort = true;
+      clearInterval(id);
+    };
+  }, []);
+  return data;
+}
+
 export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
-  const t = shellState;
+  const spy = useLiveSPY();
+  const spxSnapshot = useLiveSPX();
+  const decision = spy.decision;
+  const t = spy.shell;
   const spxVerb = spxSnapshot.confluence.action.replace(/_/g, " ");
   const asOf = new Date(spxSnapshot.asOf);
   const asOfLabel = `${String(asOf.getHours()).padStart(2, "0")}:${String(

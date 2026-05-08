@@ -2,10 +2,20 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { ArrowRight, ArrowDown } from "lucide-react";
-import { decision, shellState } from "@/lib/mock-data";
+import { decision as mockDecision, shellState as mockShell } from "@/lib/mock-data";
 import { motion } from "framer-motion";
+import type { DecisionState } from "@/lib/types";
 
-export function HeroSection() {
+interface HeroProps {
+  decision?: DecisionState;
+  quote?: { spy: number; change: number; changePct: number; vix: number };
+  source?: "live" | "degraded" | "seed" | "mock" | "error";
+}
+
+export function HeroSection({ decision: liveDecision, quote, source }: HeroProps = {}) {
+  const decision = liveDecision ?? mockDecision;
+  const t = quote ?? mockShell;
+  const isLive = source === "live" || source === "degraded";
   return (
     <section className="relative max-w-[1240px] mx-auto px-7 pt-16 pb-20 lg:pt-24 lg:pb-28">
       {/* eyebrow */}
@@ -13,6 +23,15 @@ export function HeroSection() {
         <span className="font-mono text-[10px] text-ink-3 tracking-[0.22em] uppercase">
           A trading workspace · invite only
         </span>
+        {isLive && (
+          <span className="font-mono text-[10px] text-bull-ink tracking-[0.22em] uppercase inline-flex items-center gap-1.5">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full rounded-full bg-bull opacity-50 animate-breathe" />
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-bull" />
+            </span>
+            live
+          </span>
+        )}
       </div>
 
       <motion.h1
@@ -95,13 +114,13 @@ export function HeroSection() {
           </div>
 
           <div className="col-span-12 md:col-span-3 p-6 grid grid-cols-3 md:grid-cols-1 gap-4">
-            <Quote label="SPY" value={shellState.spy.toFixed(2)} />
+            <Quote label="SPY" value={t.spy.toFixed(2)} />
             <Quote
               label="CHG"
-              value={`${shellState.change >= 0 ? "+" : ""}${shellState.change.toFixed(2)}`}
-              tone={shellState.change >= 0 ? "bull" : "bear"}
+              value={`${t.change >= 0 ? "+" : ""}${t.change.toFixed(2)}`}
+              tone={t.change >= 0 ? "bull" : "bear"}
             />
-            <Quote label="VIX" value={shellState.vix.toFixed(2)} />
+            <Quote label="VIX" value={t.vix.toFixed(2)} />
           </div>
         </div>
       </motion.div>
