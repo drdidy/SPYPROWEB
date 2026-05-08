@@ -49,6 +49,7 @@ function emptyAdapted(): AdaptedSnapshot {
     candles: [],
     hourlyCandles: [],
     lines: [],
+    anchor: null,
     pivots: [],
     currentPrice: 0,
     bias: {
