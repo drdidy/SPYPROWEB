@@ -27,7 +27,7 @@ const faqs = [
   },
   {
     q: "What's in the closed beta?",
-    a: "Today's decision, the levels in play, the wait discipline, the day's read, the signal log, and a daily brief. Replay, options cockpit, and analytics come over the next few weeks.",
+    a: "Today's decision, the SPX channel, the levels in play, the structure read, the day's foresight, the options cockpit, the signal log, and a daily brief.",
   },
   {
     q: "Is it advice?",

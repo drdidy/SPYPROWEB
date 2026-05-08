@@ -8,7 +8,7 @@ export function AnchorSummary({ pivots }: { pivots: Pivot[] }) {
   const low = pivots.find((p) => p.kind === "LOW");
   return (
     <Card>
-      <CardHeader eyebrow="Anchors" title="Pivot lattice" meta="primary fan basis" />
+      <CardHeader eyebrow="Anchors" title="Today's pivots" meta="basis for the day's lines" />
       <CardBody className="space-y-4">
         {high && <Pivot p={high} />}
         <div className="hr-rule" />

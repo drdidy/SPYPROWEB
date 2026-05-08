@@ -1,21 +1,16 @@
 "use client";
 import {
   LineChart,
-  Crosshair,
   Layers,
   Eye,
-  Radio,
   Target,
-  Rewind,
   Globe,
   Activity,
   FileText,
   GraduationCap,
   History,
-  BarChart3,
   Settings,
   ChevronsLeft,
-  Circle,
   Columns3,
 } from "lucide-react";
 import Link from "next/link";
@@ -30,18 +25,13 @@ const sections = [
     items: [
       { icon: LineChart, label: "Decision Slate", href: "/dashboard" },
       { icon: Columns3, label: "SPX Channel", href: "/spx" },
-      { icon: Crosshair, label: "Trigger Map", href: "/trigger-map" },
       { icon: Layers, label: "Structure Read", href: "/structure" },
       { icon: Eye, label: "Foresight", href: "/foresight" },
     ],
   },
   {
     label: "Execution",
-    items: [
-      { icon: Radio, label: "Signal Tape", href: "/signals" },
-      { icon: Target, label: "Options Cockpit", href: "/options" },
-      { icon: Rewind, label: "Replay Lab", href: "/replay" },
-    ],
+    items: [{ icon: Target, label: "Options Cockpit", href: "/options" }],
   },
   {
     label: "Intelligence",
@@ -56,7 +46,6 @@ const sections = [
     label: "Journal",
     items: [
       { icon: History, label: "Signal Log", href: "/log" },
-      { icon: BarChart3, label: "Analytics", href: "/analytics" },
       { icon: Settings, label: "Configuration", href: "/settings" },
     ],
   },
@@ -120,7 +109,7 @@ export function Sidebar() {
         </div>
         <div className="flex-1 min-w-0 leading-tight">
           <div className="text-xs font-medium text-ink truncate">Trader</div>
-          <div className="text-[10px] text-ink-3 truncate font-mono">v0.2 · pro</div>
+          <div className="text-[10px] text-ink-3 truncate font-mono">closed beta</div>
         </div>
         <button
           className="w-7 h-7 grid place-items-center rounded-soft text-ink-3 hover:text-ink hover:bg-paper-2/70 transition-colors"

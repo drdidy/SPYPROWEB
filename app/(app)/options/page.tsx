@@ -1,7 +1,6 @@
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { OptionsIntelPanel } from "@/components/dashboard/OptionsIntel";
 import { loadLiveSnapshot } from "@/lib/snapshot-fetch";
 import type { AdaptedSnapshot } from "@/lib/snapshot-adapter";
 
@@ -23,14 +22,7 @@ export default async function Page() {
         source={source}
       />
 
-      <SectionLabel number="01">Chain summary</SectionLabel>
-      <OptionsIntelPanel
-        intel={snap.optionsIntel}
-        strikes={snap.strikes}
-        spy={snap.currentPrice}
-      />
-
-      <SectionLabel number="02">Strike ladder</SectionLabel>
+      <SectionLabel number="01">Strike ladder</SectionLabel>
       <Card>
         <CardHeader
           eyebrow="Tastytrade chain"

@@ -281,17 +281,13 @@ export type NavItem = { label: string; href: string; group: string };
 export const navIndex: NavItem[] = [
   { label: "Decision Slate", href: "/dashboard", group: "Workspace" },
   { label: "SPX Channel", href: "/spx", group: "Workspace" },
-  { label: "Trigger Map", href: "/trigger-map", group: "Workspace" },
   { label: "Structure Read", href: "/structure", group: "Workspace" },
   { label: "Foresight", href: "/foresight", group: "Workspace" },
-  { label: "Signal Tape", href: "/signals", group: "Execution" },
   { label: "Options Cockpit", href: "/options", group: "Execution" },
-  { label: "Replay Lab", href: "/replay", group: "Execution" },
   { label: "Market Context", href: "/context", group: "Intelligence" },
   { label: "Order Flow", href: "/flow", group: "Intelligence" },
   { label: "Daily Brief", href: "/brief", group: "Intelligence" },
   { label: "Learning", href: "/learn", group: "Intelligence" },
   { label: "Signal Log", href: "/log", group: "Journal" },
-  { label: "Analytics", href: "/analytics", group: "Journal" },
   { label: "Configuration", href: "/settings", group: "Journal" },
 ];

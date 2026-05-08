@@ -1,14 +1,11 @@
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import {
   LineChart,
-  Crosshair,
+  Columns3,
   Layers,
   Eye,
-  Radio,
   Target,
-  Rewind,
   FileText,
-  BarChart3,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -22,10 +19,10 @@ const surfaces = [
   },
   {
     n: "02",
-    icon: Crosshair,
-    title: "Trigger Map",
-    href: "/trigger-map",
-    body: "Every line in play, sorted by how close price is to it. The closest ones get armed.",
+    icon: Columns3,
+    title: "SPX Channel",
+    href: "/spx",
+    body: "Overnight pivots become the day's channel. Sydney and Tokyo set direction; the slope carries through.",
   },
   {
     n: "03",
@@ -43,45 +40,24 @@ const surfaces = [
   },
   {
     n: "05",
-    icon: Radio,
-    title: "Signal Tape",
-    href: "/signals",
-    body: "Every CALL and PUT event as it happens, with the reasoning you can read in a sentence.",
-  },
-  {
-    n: "06",
     icon: Target,
     title: "Options Cockpit",
     href: "/options",
     body: "A strike picker that knows where the pain points are and whether dealer flow is leaning with you or against you.",
   },
   {
-    n: "07",
-    icon: Rewind,
-    title: "Replay Lab",
-    href: "/replay",
-    body: "Walk back through any past session with today's rules. The engine re-runs every signal.",
-  },
-  {
-    n: "08",
+    n: "06",
     icon: FileText,
     title: "Daily Brief",
     href: "/brief",
     body: "A pre-open read in plain English. Yesterday's close, what happened overnight, what the day looks like.",
-  },
-  {
-    n: "09",
-    icon: BarChart3,
-    title: "Analytics",
-    href: "/analytics",
-    body: "Win rate by setup, expected R per signal, your equity under discipline against what actually happened.",
   },
 ];
 
 export function SurfacesGrid() {
   return (
     <section id="surfaces" className="max-w-[1240px] mx-auto px-7 py-20 lg:py-28">
-      <SectionLabel number="03">Nine surfaces</SectionLabel>
+      <SectionLabel number="03">Six surfaces</SectionLabel>
 
       <div className="mt-8 grid grid-cols-12 gap-10 mb-12">
         <div className="col-span-12 lg:col-span-7">

@@ -123,7 +123,7 @@ export default async function Page() {
       </section>
 
       <footer className="pt-6 mt-6 border-t border-rule flex items-center justify-between text-[10px] text-ink-3 font-mono uppercase tracking-[0.18em]">
-        <span>Prophet · SPY anchor lattice</span>
+        <span>Prophet · SPY decision</span>
         <span>End of slate</span>
       </footer>
     </div>

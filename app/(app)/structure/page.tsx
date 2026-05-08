@@ -63,26 +63,6 @@ export default async function Page() {
           )}
         </CardBody>
       </Card>
-
-      <SectionLabel number="03">Bias</SectionLabel>
-      <Card>
-        <CardHeader
-          eyebrow="Today's lean"
-          title={
-            snap.bias.bias === "BULLISH"
-              ? "Lean bullish"
-              : snap.bias.bias === "BEARISH"
-                ? "Lean bearish"
-                : "Neutral"
-          }
-          meta={`Strength ${snap.bias.strengthScore}/100`}
-        />
-        <CardBody>
-          <p className="text-[14px] text-ink-2 leading-relaxed">
-            {snap.bias.explanation || "No commentary yet."}
-          </p>
-        </CardBody>
-      </Card>
     </div>
   );
 }

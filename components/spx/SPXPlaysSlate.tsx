@@ -36,7 +36,7 @@ export function SPXPlaysSlate({ snap }: { snap: SPXSnapshot }) {
               No play
             </div>
             <p className="mt-3 text-[13px] text-ink-3 max-w-sm mx-auto leading-relaxed">
-              The lattice doesn't have a clean read here. The discipline is to
+              The channel doesn't have a clean read here. The discipline is to
               wait for price to return to one of the lines we've drawn.
             </p>
           </div>

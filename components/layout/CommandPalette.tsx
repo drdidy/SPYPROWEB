@@ -2,8 +2,8 @@
 import { Command } from "cmdk";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { navIndex, lines } from "@/lib/mock-data";
-import { ArrowRight, Crosshair, Layers } from "lucide-react";
+import { navIndex } from "@/lib/mock-data";
+import { ArrowRight, Layers } from "lucide-react";
 
 export function CommandPalette({
   open,
@@ -80,35 +80,6 @@ export function CommandPalette({
               </Command.Group>
             ))}
 
-            <Command.Group
-              heading="Levels in play"
-              className="mb-2 [&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:eyebrow [&_[cmdk-group-heading]]:text-ink-3"
-            >
-              {lines.slice(0, 4).map((l) => (
-                <Command.Item
-                  key={l.name}
-                  value={`level ${l.name} ${l.kind}`}
-                  onSelect={() => onOpenChange(false)}
-                  className="flex items-center gap-3 px-3 h-9 rounded-soft cursor-pointer text-sm text-ink-2 aria-selected:bg-paper-2 aria-selected:text-ink"
-                >
-                  <Crosshair size={13} className="text-ink-4" />
-                  <span className="font-mono text-ink">{l.name}</span>
-                  <span className="text-ink-3">·</span>
-                  <span className="font-mono text-xs text-ink-3">
-                    {l.currentValue.toFixed(2)}
-                  </span>
-                  <span
-                    className={
-                      "ml-auto text-xs font-mono " +
-                      (l.distanceFromPrice >= 0 ? "text-bull" : "text-bear")
-                    }
-                  >
-                    {l.distanceFromPrice >= 0 ? "+" : ""}
-                    {l.distanceFromPrice.toFixed(2)}
-                  </span>
-                </Command.Item>
-              ))}
-            </Command.Group>
           </Command.List>
           <div className="border-t border-rule px-4 h-9 flex items-center justify-between text-[10px] text-ink-3">
             <span className="flex items-center gap-2">

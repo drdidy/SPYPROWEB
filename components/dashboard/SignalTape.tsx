@@ -13,41 +13,6 @@ type Tick = {
   spark?: number[];
 };
 
-const mockTicks: Tick[] = [
-  {
-    time: "9:38",
-    type: "CALL",
-    line: "UA-1",
-    grade: "B",
-    body: "Hourly close 0.04 above UA-1, wick reject 0.62. Pending confirmation.",
-    spark: [581.2, 582.4, 582.9, 583.1, 583.42, 583.4, 583.55],
-  },
-  {
-    time: "9:32",
-    type: "NOTE",
-    body: "VIX cross under 14.50 — risk-on regime confirmed.",
-    spark: [15.6, 15.1, 14.8, 14.5, 14.4, 14.3, 14.27],
-  },
-  {
-    time: "9:30",
-    type: "NOTE",
-    body: "RTH open at 581.95. Gap-and-go failed, intraday rotation in play.",
-    spark: [580.5, 581.95, 582.2, 581.6, 581.9, 582.1, 582.4],
-  },
-  {
-    time: "9:18",
-    type: "CALL",
-    line: "LA-1",
-    grade: "C",
-    body: "Pre-market touch of LA-1 at 581.20, wick rejection but body inside zone — NO_TRADE.",
-  },
-  {
-    time: "9:02",
-    type: "NOTE",
-    body: "Anchor pivots refreshed: HIGH 585.42 (May 2), LOW 569.18 (Apr 28).",
-  },
-];
-
 const typeStyle = {
   CALL: { label: "CALL", color: "text-bull-ink", bar: "bg-bull" },
   PUT: { label: "PUT", color: "text-bear-ink", bar: "bg-bear" },
@@ -71,7 +36,8 @@ export function SignalTape({ ticks: liveTicks }: { ticks?: Tick[] } = {}) {
             </div>
             <p className="mt-3 text-[13px] text-ink-3 leading-relaxed max-w-md">
               No qualified rejection has printed yet today. Each event posts
-              here as it crosses the wire — entry, line, grade, reasoning.
+              here as it crosses the wire, with entry, line, grade, and
+              reasoning attached.
             </p>
           </div>
         </CardBody>
