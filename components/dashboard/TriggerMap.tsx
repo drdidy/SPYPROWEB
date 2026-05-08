@@ -1,7 +1,6 @@
 "use client";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 import { StatusPill } from "@/components/ui/StatusPill";
-import { Button } from "@/components/ui/Button";
 import type { DynamicLine } from "@/lib/types";
 
 function lineState(distance: number): "armed" | "watching" | "stale" {
@@ -18,6 +17,11 @@ const lineStyle: Record<string, { dot: string; label: string }> = {
   LD: { dot: "bg-bear", label: "Lower Descending" },
   S_ASC: { dot: "bg-bull/60", label: "Secondary Ascending" },
   S_DESC: { dot: "bg-bear/60", label: "Secondary Descending" },
+  ANC_ASC: { dot: "bg-bull", label: "Anchor Ascending" },
+  ANC_DESC: { dot: "bg-bear", label: "Anchor Descending" },
+  PDH: { dot: "bg-violet", label: "Prev Day High" },
+  PDL: { dot: "bg-violet", label: "Prev Day Low" },
+  DAY_OPEN: { dot: "bg-gold", label: "Day Open" },
 };
 
 export function TriggerMap({ lines }: { lines: DynamicLine[] }) {
@@ -26,12 +30,7 @@ export function TriggerMap({ lines }: { lines: DynamicLine[] }) {
       <CardHeader
         eyebrow="Trigger Map"
         title="Levels in play"
-        meta="auto-refresh 5s · sorted by proximity"
-        action={
-          <Button variant="ghost" size="sm">
-            Filter
-          </Button>
-        }
+        meta="sorted by proximity"
       />
       <CardBody className="px-0 pb-0">
         <div className="grid grid-cols-12 px-5 pb-2 eyebrow text-ink-3">

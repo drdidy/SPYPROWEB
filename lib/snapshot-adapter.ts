@@ -53,6 +53,7 @@ export interface RawSnapshot {
   spark: number[];
   triggers: Array<{
     line: string;
+    kind?: string;
     level: number;
     dist: number;
     bps: number;
@@ -256,13 +257,23 @@ function mapDecision(raw: RawSnapshot): DecisionState {
 }
 
 function mapTriggerToLine(t: RawSnapshot["triggers"][number]): DynamicLine {
+  // Engine-supplied kind (UA / UD / LA / LD / ANC_ASC / ANC_DESC /
+  // PDH / PDL / DAY_OPEN). Older payloads omit the field; fall back
+  // to UA so the row still renders something readable.
+  const kind = (t.kind as DynamicLine["kind"]) || "UA";
+  const ascending =
+    kind === "UA" ||
+    kind === "LA" ||
+    kind === "ANC_ASC" ||
+    kind === "PDL" ||
+    kind === "DAY_OPEN";
   return {
     name: t.line,
-    kind: "UA",
+    kind,
     anchorPrice: t.level,
     anchorTime: "",
     slopePerHour: 0,
-    direction: t.dist >= 0 ? "ASCENDING" : "DESCENDING",
+    direction: ascending ? "ASCENDING" : "DESCENDING",
     zoneType: t.status === "ARMED" ? "PRIMARY_TRIGGER" : "SECONDARY_TARGET",
     isPrimary: t.status === "ARMED",
     currentValue: t.level,

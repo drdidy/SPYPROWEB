@@ -184,6 +184,20 @@ def _triggers_from_lines(
             return _anchor_display_label(name)
         return name
 
+    def _kind_for(line: pc.DynamicLine) -> str:
+        """Engine-line classification for the frontend.
+
+        Maps the four canonical pivot lines (UA/UD/LA/LD) directly,
+        and reduces premarket-anchor lines to a generic ANCHOR token
+        with their derived direction so the line-style table can pick
+        a sensible color and label.
+        """
+        if line.name in name_to_label:
+            return line.name
+        if line.name.startswith("ANC_"):
+            return "ANC_ASC" if line.direction == "ascending" else "ANC_DESC"
+        return "UA"
+
     armed_set = {l.name for l in pc.active_entry_lines(primary_lines, current_price, current_dt)}
 
     def _bias_contribution(dist: float, price: float, decay_pct: float = 1.2) -> int:
@@ -210,6 +224,7 @@ def _triggers_from_lines(
             status = "WATCHING"
         rows.append({
             "line": _label_for(line.name),
+            "kind": _kind_for(line),
             "level": round(float(v), 2),
             "dist": round(float(dist), 2),
             "bps": bps,
@@ -225,6 +240,7 @@ def _triggers_from_lines(
             bps = round((dist / current_price) * 10000) if current_price else 0
             rows.append({
                 "line": label,
+                "kind": "PDH" if label == "PDH" else "PDL",
                 "level": round(level, 2),
                 "dist": round(dist, 2),
                 "bps": bps,
@@ -238,6 +254,7 @@ def _triggers_from_lines(
         bps = round((dist / current_price) * 10000) if current_price else 0
         rows.append({
             "line": "Day Open",
+            "kind": "DAY_OPEN",
             "level": round(day_open, 2),
             "dist": round(dist, 2),
             "bps": bps,
