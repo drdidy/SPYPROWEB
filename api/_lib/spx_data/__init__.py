@@ -78,3 +78,44 @@ def build_snapshot_from_fetcher(
         )
     quote = fetcher.fetch_sync_quote()
     return compute_snapshot(bars, quote.offset, as_of, **engine_kwargs)
+
+
+def build_snapshot_with_provenance(
+    fetcher: Fetcher,
+    as_of: datetime,
+    *,
+    lookback_hours: int = 36,
+    **engine_kwargs,
+):
+    """Like build_snapshot_from_fetcher but returns (snapshot, meta).
+
+    The meta dict surfaces operator-visible info: which backend served
+    bars, which served the SPX/ES sync quote, the captured offset, and
+    any error encountered when the primary failed over. Used by the
+    /api/spx/snapshot endpoint to attach `_meta` so an operator can
+    debug "why are these entries off" without server access.
+    """
+    start = as_of - timedelta(hours=lookback_hours)
+    bars = fetcher.fetch_es_bars(start, as_of)
+    bars_count = len(bars)
+    if not bars:
+        raise RuntimeError(
+            f"{fetcher.name} returned no ES bars in [{start}, {as_of}]"
+        )
+    quote = fetcher.fetch_sync_quote()
+    snap = compute_snapshot(bars, quote.offset, as_of, **engine_kwargs)
+    meta = {
+        "fetcher": fetcher.name,
+        "barsSource": getattr(fetcher, "last_bars_source", fetcher.name),
+        "quoteSource": getattr(fetcher, "last_quote_source", fetcher.name),
+        "barsError": getattr(fetcher, "last_bars_error", None),
+        "quoteError": getattr(fetcher, "last_quote_error", None),
+        "barsCount": bars_count,
+        "lookbackHours": lookback_hours,
+        "appliedOffset": round(quote.offset, 4),
+        "spxSpot": round(quote.spx_spot, 2),
+        "esSpot": round(quote.es_spot, 2),
+        "quoteCapturedAt": quote.captured_at.isoformat(),
+        "asOf": as_of.isoformat(),
+    }
+    return snap, meta

@@ -210,10 +210,28 @@ export interface SPXReentryWatch {
   detail: string;
 }
 
+export interface SPXSnapshotMeta {
+  fetcher: string;
+  barsSource: string;
+  quoteSource: string;
+  barsError: string | null;
+  quoteError: string | null;
+  barsCount: number;
+  lookbackHours: number;
+  appliedOffset: number;
+  spxSpot: number;
+  esSpot: number;
+  quoteCapturedAt: string;
+  asOf: string;
+}
+
 export interface SPXSnapshot {
   symbol: "SPX";
   asOf: string; // ISO timestamp
   sessionDateCT: string; // YYYY-MM-DD
+  // Optional operator diagnostic surface: which backend served bars
+  // and quote, the offset that was applied, and any errors.
+  _meta?: SPXSnapshotMeta;
 
   overnight: {
     window: { start: string; end: string };

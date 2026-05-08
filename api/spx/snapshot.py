@@ -31,7 +31,7 @@ _API_ROOT = Path(__file__).resolve().parents[1]
 if str(_API_ROOT) not in sys.path:
     sys.path.insert(0, str(_API_ROOT))
 
-from _lib.spx_data import build_default_fetcher, build_snapshot_from_fetcher  # noqa: E402
+from _lib.spx_data import build_default_fetcher, build_snapshot_with_provenance  # noqa: E402
 
 CT = ZoneInfo("America/Chicago")
 SNAPSHOT_TTL = float(os.environ.get("SPX_SNAPSHOT_TTL", "30"))
@@ -49,8 +49,14 @@ _cache_lock = Lock()
 
 def _build_payload() -> dict:
     fetcher = build_default_fetcher()
-    snap = build_snapshot_from_fetcher(fetcher, datetime.now(CT))
-    return snap.model_dump(by_alias=True)
+    snap, meta = build_snapshot_with_provenance(fetcher, datetime.now(CT))
+    payload = snap.model_dump(by_alias=True)
+    # Operator-visible provenance: which backend served bars + quote,
+    # the captured ES->SPX offset, and any primary-fetcher error that
+    # forced a fallback. The frontend reads _meta.appliedOffset and
+    # _meta.barsSource into the SPX page diagnostic strip.
+    payload["_meta"] = meta
+    return payload
 
 
 def _cached_payload() -> dict:

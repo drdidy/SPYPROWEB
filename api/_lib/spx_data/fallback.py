@@ -7,13 +7,18 @@ Production wiring:
 If the primary raises FetcherUnavailable (or any exception) the
 secondary takes the request. Failure of the secondary propagates.
 
-The fallback is per-call, not sticky — a transient broker hiccup
+The fallback is per-call, not sticky. A transient broker hiccup
 doesn't pin the system to yfinance for the rest of the day.
+
+The composite tracks which backend served each call type so the
+snapshot endpoint can surface provenance and applied offset for
+operator visibility (debugging "why are these entries off").
 """
 from __future__ import annotations
 
 import logging
 from datetime import datetime
+from typing import Optional
 
 from ..spx.candles import Candle
 
@@ -27,26 +32,43 @@ class CompositeFetcher:
         self.primary = primary
         self.secondary = secondary
         self.name = f"{primary.name}->{secondary.name}"
+        # Provenance: who served each call most recently.
+        self.last_bars_source: Optional[str] = None
+        self.last_quote_source: Optional[str] = None
+        self.last_bars_error: Optional[str] = None
+        self.last_quote_error: Optional[str] = None
 
     def fetch_es_bars(self, start: datetime, end: datetime) -> list[Candle]:
         try:
-            return self.primary.fetch_es_bars(start, end)
-        except Exception as e:  # noqa: BLE001 — broad on purpose; we log and fall back
+            bars = self.primary.fetch_es_bars(start, end)
+            self.last_bars_source = self.primary.name
+            self.last_bars_error = None
+            return bars
+        except Exception as e:  # noqa: BLE001
+            self.last_bars_error = f"{self.primary.name}: {type(e).__name__}: {e}"
             log.warning(
                 "%s.fetch_es_bars failed: %s; falling back to %s",
                 self.primary.name, e, self.secondary.name,
             )
-            return self.secondary.fetch_es_bars(start, end)
+            bars = self.secondary.fetch_es_bars(start, end)
+            self.last_bars_source = self.secondary.name
+            return bars
 
     def fetch_sync_quote(self) -> SyncQuote:
         try:
-            return self.primary.fetch_sync_quote()
+            q = self.primary.fetch_sync_quote()
+            self.last_quote_source = self.primary.name
+            self.last_quote_error = None
+            return q
         except Exception as e:  # noqa: BLE001
+            self.last_quote_error = f"{self.primary.name}: {type(e).__name__}: {e}"
             log.warning(
                 "%s.fetch_sync_quote failed: %s; falling back to %s",
                 self.primary.name, e, self.secondary.name,
             )
-            return self.secondary.fetch_sync_quote()
+            q = self.secondary.fetch_sync_quote()
+            self.last_quote_source = self.secondary.name
+            return q
 
     def healthy(self) -> bool:
         return self.primary.healthy() or self.secondary.healthy()
