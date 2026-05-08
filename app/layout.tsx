@@ -1,36 +1,20 @@
-import type { Metadata, Viewport } from "next";
+import type { Metadata } from "next";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SPY Prophet",
-  description: "SPY Prophet trading terminal",
-  applicationName: "SPY Prophet",
-  appleWebApp: {
-    capable: true,
-    title: "SPY Prophet",
-    statusBarStyle: "black-translucent",
-  },
-};
-
-export const viewport: Viewport = {
-  themeColor: "#0b1220",
-  width: "device-width",
-  initialScale: 1,
-  viewportFit: "cover",
+  title: "SPY Prophet — Discipline, before conviction",
+  description:
+    "Anchor-driven SPY trading workspace. Read the day before the day reads you: anchors, fans, graded signals, and the discipline to wait for a setup that earns the trade.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body className="font-sans antialiased">{children}</body>
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
+      <body className="bg-canvas text-ink font-sans antialiased min-h-screen">
+        {children}
+      </body>
     </html>
   );
 }

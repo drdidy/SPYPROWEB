@@ -1,12 +1,126 @@
-export type TriggerStatus = "ARMED" | "WATCHING" | "BREACHED" | "STALE";
+// Domain types modeled on api/prophet_core.py
 
-export interface Trigger {
-  line: string;
-  level: number;
-  dist: number;
-  bps: number;
-  bias: number;
-  status: TriggerStatus;
+export type LineKind = "UA" | "UD" | "LA" | "LD";
+export type Direction = "ASCENDING" | "DESCENDING";
+export type ZoneType = "PRIMARY_TRIGGER" | "SECONDARY_TARGET" | "RETEST";
+
+export type Bias = "BULLISH" | "BEARISH" | "NEUTRAL";
+export type FinalDecision =
+  | "TRADE_ALLOWED"
+  | "WAIT_FOR_CONFIRMATION"
+  | "WAIT_FOR_RETEST"
+  | "SELECTIVE_TRADE"
+  | "NO_TRADE"
+  | "STOP_TRADING";
+export type Verdict = "LONG" | "SHORT" | "WAIT" | "STAND DOWN";
+
+export type Grade = "A+" | "A" | "B" | "C" | "D" | "NO_TRADE";
+
+export type SignalStatus = "PENDING_CONFIRMATION" | "CONFIRMED" | "BREACHED" | "EXPIRED";
+export type GuardStatus = "INTACT" | "BROKEN" | "WAITING" | "MISSED_ENTRY" | "OK";
+
+export interface Pivot {
+  kind: "HIGH" | "LOW";
+  price: number;
+  time: string; // ISO local
+  source: string;
+  candleColor: "GREEN" | "RED" | "DOJI";
+  fallbackUsed: boolean;
+}
+
+export interface DynamicLine {
+  name: string; // e.g. "UA-1", "S_DESC-2"
+  kind: LineKind | "S_ASC" | "S_DESC";
+  anchorPrice: number;
+  anchorTime: string;
+  slopePerHour: number;
+  direction: Direction;
+  zoneType: ZoneType;
+  isPrimary: boolean;
+  currentValue: number; // value at "now"
+  distanceFromPrice: number; // signed dollars
+}
+
+export interface BiasState {
+  bias: Bias;
+  strengthScore: number; // 0..100
+  ua: { value: number; touched: boolean };
+  ud: { value: number; touched: boolean };
+  la: { value: number; touched: boolean };
+  ld: { value: number; touched: boolean };
+  explanation: string;
+}
+
+export interface TradeSignal {
+  id: string;
+  type: "CALL" | "PUT";
+  status: SignalStatus;
+  lineName: string;
+  rejectionTime: string;
+  rejectionPrice: number;
+  ohlc: { o: number; h: number; l: number; c: number };
+  entryPrice: number;
+  stopPrice: number;
+  targetPrice: number;
+  targetLineName: string;
+  rr: number;
+  explanation: string;
+}
+
+export interface SignalQuality {
+  grade: Grade;
+  score: number; // 0..100
+  closeDistance: number;
+  wickRejectionRatio: number;
+  bodyPositionScore: number;
+  riskRewardScore: number;
+  targetQuality: number;
+  warnings: string[];
+  strengths: string[];
+  actionLabel: string;
+}
+
+export interface RiskGuardrailState {
+  chase: { status: GuardStatus; detail: string };
+  retest: { status: GuardStatus; detail: string };
+  structure: { status: GuardStatus; detail: string };
+  daily: { status: GuardStatus; detail: string };
+}
+
+export interface DecisionState {
+  finalDecision: FinalDecision;
+  verdict: Verdict;
+  conviction: number; // 0..100, alias of quality.score
+  finalExplanation: string;
+  windowET: string; // e.g. "10:30–11:00 ET"
+  updatedAt: string; // "9:42 AM"
+}
+
+export interface WaitDisciplineItem {
+  key: "candle_gate" | "chase_guard" | "contract_guard";
+  label: string;
+  status: GuardStatus;
+  detail: string;
+  countdownSec?: number;
+}
+
+export interface OptionsIntel {
+  putCallRatio: number;
+  maxPain: number;
+  callWall: number;
+  putWall: number;
+  highOI: { strike: number; oi: number; type: "CALL" | "PUT" }[];
+  alignment: "ALIGNED" | "MIXED" | "OPPOSED";
+  alignmentNote: string;
+}
+
+export interface SelectedStrikes {
+  underlying: number;
+  callStrike: number;
+  putStrike: number;
+  expiration: string;
+  dteLabel: string;
+  warning?: string;
 }
 
 export interface Candle {
@@ -15,130 +129,135 @@ export interface Candle {
   h: number;
   l: number;
   c: number;
+  v: number;
 }
 
-export interface ChartLine {
-  label: string;
-  value: number;
-  color: string;
-  dash: boolean;
-  armed: boolean;
-}
+// ---------------------------------------------------------------------------
+// SPX Prophet — second symbol surface
+// Modeled on the SPPRO engine: overnight channel + previous-day RTH refs,
+// scenario classifier, primary + alternate plays, confluence score.
+// ---------------------------------------------------------------------------
 
-export interface Snapshot {
-  asOf: string;
-  source: "seed" | "live" | "degraded" | "error";
-  bias: { label: string; score: number; note: string };
-  quote: {
-    last: number;
-    chg: number;
-    chgPct: number;
-    open: number;
-    high: number;
-    low: number;
-    prevClose: number;
-  };
-  context: { vix: number; dxy: number; vvix: number };
-  spark: number[];
-  triggers: Trigger[];
-  candles: Candle[];
-  chartLines: ChartLine[];
-  options: OptionsSnapshot | null;
-  signals: Signal[];
-  pivots: PivotsSnapshot;
-  decision: Decision;
-  marketContext?: MarketContext;
-}
+export type SPXChannelDirection = "ASCENDING" | "DESCENDING" | "NONE";
+export type SPXNoChannelReason = "EXPANSION" | "CONTRACTION";
+export type SPXScenario =
+  | "ABOVE_ASCENDING"
+  | "INSIDE_ASCENDING"
+  | "BELOW_ASCENDING"
+  | "ABOVE_DESCENDING"
+  | "INSIDE_DESCENDING"
+  | "BELOW_DESCENDING"
+  | "OUTSIDE_PLAY"; // scenario 7: stand down
 
-export type MarketTone = "green" | "amber" | "red" | "neutral";
+export type SPXLineKind =
+  | "CHANNEL_CEILING"
+  | "CHANNEL_FLOOR"
+  | "PREV_RTH_HIGH_ASC"
+  | "PREV_RTH_LOW_DESC";
 
-export interface MarketContext {
-  vix: { value: number | null; label: string; tone: MarketTone; copy: string };
-  vvix: { value: number | null };
-  dxy: { value: number | null; chgPct: number | null; tone: MarketTone };
-  tnx: { value: number | null; chgBps: number | null; tone: MarketTone };
-  spyPressure: { label: string; tone: MarketTone; value: number | null };
-  triggerGap: { points: number | null; lineName: string; tone: MarketTone; label: string };
-}
+export type SPXAction = "TAKE" | "SELECTIVE" | "STAND_DOWN";
 
-export type Verb = "LONG" | "SHORT" | "WAIT" | "HOLD" | "EXIT";
-
-export interface Decision {
-  verb: Verb;
-  bias: "BULLISH" | "BEARISH" | "NEUTRAL";
-  biasColor: string;
-  score: number;
-  grade: string;
-  conviction: number;
-  window: string;
-  rationale: string;
-  why: string;
-  rr: number | null;
-  winPct: number | null;
-  edgePct: number | null;
-}
-
-export interface PivotInfo {
-  name: "HIGH_PIVOT" | "LOW_PIVOT";
+export interface SPXAnchor {
   price: number;
-  source: string;
-  anchorTime: string | null;
-  candleStarts?: string;
-  candleCloses?: string;
-  fallbackUsed: boolean;
-  candleColor: string;
-  structureDay: string | null;
-  candle?: { o: number; h: number; l: number; c: number };
+  time: string; // ISO, CT-anchored
 }
 
-export interface PivotsSnapshot {
-  high: PivotInfo | null;
-  low: PivotInfo | null;
-  slope: number;
-  structureDay: string | null;
-  signalDay: string | null;
+export interface SPXSessionRange {
+  high: number;
+  low: number;
+  highTime: string;
+  lowTime: string;
 }
 
-export type SignalDir = "up" | "down" | "neutral";
-export type SignalStatus = "PENDING_CONFIRMATION" | "CONFIRMED";
-
-export interface Signal {
-  id: string;
-  type: "REJECTION";
-  line: string;
-  ts: string;
-  score: number;
-  grade: string;
-  dir: SignalDir;
-  status: SignalStatus;
-  outcome: number | null;
-  entry: number | null;
-  stop: number | null;
-  target: number | null;
-  rr: number | null;
+export interface SPXLine {
+  kind: SPXLineKind;
+  name: string; // e.g. "Channel Ceiling"
+  anchorPrice: number;
+  anchorTime: string;
+  slopePerHour: number; // +1.05 or -1.05
+  currentValue: number; // projected to as-of
+  distanceFromPrice: number; // signed
 }
 
-export interface OptionRow {
+export interface SPXTrade {
+  side: "BUY" | "SELL";
+  entryLine: SPXLineKind;
+  entryPrice: number;
+  exitLine: SPXLineKind;
+  exitPrice: number;
+}
+
+export interface SPXContractSuggestion {
+  type: "CALL" | "PUT";
   strike: number;
-  bid: number;
-  ask: number;
-  iv: number;
-  delta: number;
-  gamma: number;
-  oi: number;
-  volume: number;
+  expiration: string; // ISO date
+  dteLabel: "0DTE" | "1DTE" | string;
+  distanceFromSpot: number; // signed; ~20–25 OTM by spec
 }
 
-export interface OptionsSnapshot {
-  expiration: string;
-  atm: number;
-  calls: OptionRow[];
-  puts: OptionRow[];
-  totals: {
-    callOi: number;
-    putOi: number;
-    callVol: number;
-    putVol: number;
-    pcr: number | null;
+export interface SPXConfluenceFactor {
+  key: "asian" | "london" | "reaction" | "factor4_tbd" | "factor5_tbd";
+  label: string;
+  value: number; // 0..1 normalized
+  weight: number; // 0..1
+  contribution: number; // value * weight
+  note?: string;
+}
+
+export interface SPXReentryWatch {
+  active: boolean;
+  side: "BUY_FROM_ABOVE" | "SELL_FROM_BELOW" | null;
+  detail: string;
+}
+
+export interface SPXSnapshot {
+  symbol: "SPX";
+  asOf: string; // ISO timestamp
+  sessionDateCT: string; // YYYY-MM-DD
+
+  overnight: {
+    window: { start: string; end: string };
+    high: SPXAnchor;
+    low: SPXAnchor;
+  };
+
+  sessions: {
+    sydney: SPXSessionRange;
+    tokyo: SPXSessionRange;
+  };
+
+  channel: {
+    direction: SPXChannelDirection;
+    reason: string;
+    noChannelReason?: SPXNoChannelReason;
+  };
+
+  lines: SPXLine[];
+
+  price: {
+    last: number;
+    change: number;
+    changePct: number;
+  };
+
+  scenario: SPXScenario;
+  scenarioExplanation: string;
+
+  plays: {
+    primary: SPXTrade | null; // null when OUTSIDE_PLAY
+    alternate: SPXTrade | null;
+  };
+
+  contracts: {
+    forPrimary: SPXContractSuggestion | null;
+    forAlternate: SPXContractSuggestion | null;
+  };
+
+  reentryWatch: SPXReentryWatch;
+
+  confluence: {
+    factors: SPXConfluenceFactor[];
+    score: number; // 0..100
+    action: SPXAction;
   };
 }
