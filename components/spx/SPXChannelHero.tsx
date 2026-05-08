@@ -411,7 +411,8 @@ function ChannelDiagram({ snap }: { snap: SPXSnapshot }) {
   const xRTH = xOf(rthOpen);
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full spx-diagram">
+      <style>{spxDiagramStyles}</style>
       {/* horizontal price gridlines */}
       {[0.25, 0.5, 0.75].map((f) => {
         const y = PAD_T + f * (H - PAD_T - PAD_B);
@@ -474,7 +475,7 @@ function ChannelDiagram({ snap }: { snap: SPXSnapshot }) {
       )}
 
       {/* channel band fill */}
-      {bandPath && <path d={bandPath} fill={railFill} />}
+      {bandPath && <path d={bandPath} fill={railFill} className="spx-band" />}
 
       {/* prev-day RTH high asc — dashed violet reference */}
       {prevHighPath && (
@@ -485,37 +486,72 @@ function ChannelDiagram({ snap }: { snap: SPXSnapshot }) {
           strokeDasharray="4 4"
           fill="none"
           opacity={0.85}
+          className="spx-ref-line"
         />
       )}
 
       {/* channel rails */}
       {ceilingPath && (
-        <path d={ceilingPath} stroke={railColor} strokeWidth={1.6} fill="none" />
+        <path
+          d={ceilingPath}
+          stroke={railColor}
+          strokeWidth={1.6}
+          fill="none"
+          className="spx-rail"
+          pathLength={1}
+        />
       )}
       {floorPath && (
-        <path d={floorPath} stroke={railColor} strokeWidth={1.6} fill="none" />
+        <path
+          d={floorPath}
+          stroke={railColor}
+          strokeWidth={1.6}
+          fill="none"
+          className="spx-rail spx-rail-delayed"
+          pathLength={1}
+        />
       )}
 
       {/* anchor dots */}
       {ceiling && snap.channel.direction !== "NONE" && (
-        <circle
-          cx={xOf(new Date(ceiling.anchorTime).getTime())}
-          cy={yOf(ceiling.anchorPrice)}
-          r={3}
-          fill="#fff"
-          stroke={railColor}
-          strokeWidth={1.5}
-        />
+        <g className="spx-anchor">
+          <circle
+            cx={xOf(new Date(ceiling.anchorTime).getTime())}
+            cy={yOf(ceiling.anchorPrice)}
+            r={9}
+            fill={railColor}
+            opacity={0}
+            className="spx-anchor-pulse"
+          />
+          <circle
+            cx={xOf(new Date(ceiling.anchorTime).getTime())}
+            cy={yOf(ceiling.anchorPrice)}
+            r={3}
+            fill="#fff"
+            stroke={railColor}
+            strokeWidth={1.5}
+          />
+        </g>
       )}
       {floor && snap.channel.direction !== "NONE" && (
-        <circle
-          cx={xOf(new Date(floor.anchorTime).getTime())}
-          cy={yOf(floor.anchorPrice)}
-          r={3}
-          fill="#fff"
-          stroke={railColor}
-          strokeWidth={1.5}
-        />
+        <g className="spx-anchor spx-anchor-delayed">
+          <circle
+            cx={xOf(new Date(floor.anchorTime).getTime())}
+            cy={yOf(floor.anchorPrice)}
+            r={9}
+            fill={railColor}
+            opacity={0}
+            className="spx-anchor-pulse"
+          />
+          <circle
+            cx={xOf(new Date(floor.anchorTime).getTime())}
+            cy={yOf(floor.anchorPrice)}
+            r={3}
+            fill="#fff"
+            stroke={railColor}
+            strokeWidth={1.5}
+          />
+        </g>
       )}
 
       {/* current price horizontal */}
@@ -528,9 +564,12 @@ function ChannelDiagram({ snap }: { snap: SPXSnapshot }) {
         strokeWidth={0.6}
         strokeDasharray="1.5 3"
         opacity={0.45}
+        className="spx-price-line"
       />
-      <circle cx={xNow} cy={yPrice} r={4.5} fill="#14161A" />
-      <circle cx={xNow} cy={yPrice} r={8} fill="#14161A" opacity={0.12} />
+      <g className="spx-price-marker">
+        <circle cx={xNow} cy={yPrice} r={4.5} fill="#14161A" />
+        <circle cx={xNow} cy={yPrice} r={8} fill="#14161A" opacity={0.12} className="spx-price-halo" />
+      </g>
 
       {/* labels at right edge */}
       {ceiling && snap.channel.direction !== "NONE" && (
@@ -601,3 +640,88 @@ function ChannelDiagram({ snap }: { snap: SPXSnapshot }) {
     </svg>
   );
 }
+
+const spxDiagramStyles = `
+  @keyframes spx-rail-draw {
+    from { stroke-dashoffset: 1; }
+    to { stroke-dashoffset: 0; }
+  }
+  @keyframes spx-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes spx-pop-in {
+    0%   { opacity: 0; transform: scale(0.6); }
+    70%  { opacity: 1; transform: scale(1.1); }
+    100% { transform: scale(1); }
+  }
+  @keyframes spx-pulse-out {
+    0%   { opacity: 0; transform: scale(0.6); }
+    50%  { opacity: 0.22; }
+    100% { opacity: 0; transform: scale(2.4); }
+  }
+  @keyframes spx-breathe {
+    0%, 100% { opacity: 0.45; }
+    50%      { opacity: 0.18; }
+  }
+  @keyframes spx-halo-pulse {
+    0%   { opacity: 0.12; transform: scale(1); }
+    50%  { opacity: 0.04; transform: scale(1.7); }
+    100% { opacity: 0.12; transform: scale(1); }
+  }
+  .spx-diagram .spx-rail {
+    stroke-dasharray: 1;
+    animation: spx-rail-draw 950ms cubic-bezier(0.22, 1, 0.36, 1) 200ms both;
+  }
+  .spx-diagram .spx-rail-delayed { animation-delay: 380ms; }
+  .spx-diagram .spx-band {
+    opacity: 0;
+    animation: spx-fade-in 600ms ease-out 800ms forwards;
+  }
+  .spx-diagram .spx-ref-line {
+    stroke-dasharray: 4 4, 1;
+    stroke-dashoffset: 1;
+    animation: spx-rail-draw 1100ms cubic-bezier(0.22, 1, 0.36, 1) 600ms both;
+  }
+  .spx-diagram .spx-anchor {
+    transform-origin: center;
+    transform-box: fill-box;
+    opacity: 0;
+    animation: spx-pop-in 480ms cubic-bezier(0.34, 1.56, 0.64, 1) 1000ms forwards;
+  }
+  .spx-diagram .spx-anchor-delayed { animation-delay: 1140ms; }
+  .spx-diagram .spx-anchor-pulse {
+    transform-origin: center;
+    transform-box: fill-box;
+    animation: spx-pulse-out 2400ms ease-out 2000ms infinite;
+  }
+  .spx-diagram .spx-price-line {
+    animation: spx-breathe 3200ms ease-in-out infinite;
+  }
+  .spx-diagram .spx-price-marker {
+    opacity: 0;
+    animation: spx-fade-in 360ms ease-out 1300ms forwards;
+  }
+  .spx-diagram .spx-price-halo {
+    transform-origin: center;
+    transform-box: fill-box;
+    animation: spx-halo-pulse 2800ms ease-in-out 1700ms infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .spx-diagram .spx-rail,
+    .spx-diagram .spx-band,
+    .spx-diagram .spx-ref-line,
+    .spx-diagram .spx-anchor,
+    .spx-diagram .spx-price-marker {
+      opacity: 1 !important;
+      animation: none !important;
+      stroke-dashoffset: 0 !important;
+      transform: none !important;
+    }
+    .spx-diagram .spx-anchor-pulse,
+    .spx-diagram .spx-price-line,
+    .spx-diagram .spx-price-halo {
+      animation: none !important;
+    }
+  }
+`;

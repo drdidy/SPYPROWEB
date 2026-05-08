@@ -47,11 +47,15 @@ export function SPXConfluence({
             <span className="text-ink-4 text-sm">/100</span>
           </span>
         </div>
-        <ul className="divide-y divide-rule">
-          {factors.map((f) => {
+        <ul className="divide-y divide-rule spx-confluence-list">
+          {factors.map((f, idx) => {
             const placeholder = f.key.startsWith("factor");
             return (
-              <li key={f.key} className="px-5 py-3.5">
+              <li
+                key={f.key}
+                className="px-5 py-3.5 spx-confluence-row"
+                style={{ animationDelay: `${idx * 90}ms` }}
+              >
                 <div className="flex items-baseline justify-between mb-1.5">
                   <div className="flex items-baseline gap-2">
                     <span
@@ -82,8 +86,13 @@ export function SPXConfluence({
                 ) : (
                   <div className="h-1 bg-paper-2 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-ink rounded-full"
-                      style={{ width: `${f.value * 100}%` }}
+                      className="h-full bg-ink rounded-full spx-confluence-bar"
+                      style={
+                        {
+                          "--bar-width": `${f.value * 100}%`,
+                          animationDelay: `${idx * 90 + 200}ms`,
+                        } as React.CSSProperties
+                      }
                     />
                   </div>
                 )}
@@ -99,6 +108,33 @@ export function SPXConfluence({
           })}
         </ul>
       </CardBody>
+      <style jsx>{`
+        @keyframes spx-conf-row-in {
+          from { opacity: 0; transform: translateY(4px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes spx-conf-bar-fill {
+          from { width: 0; }
+          to   { width: var(--bar-width, 0%); }
+        }
+        .spx-confluence-list .spx-confluence-row {
+          opacity: 0;
+          animation: spx-conf-row-in 360ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        .spx-confluence-list .spx-confluence-bar {
+          width: 0;
+          animation: spx-conf-bar-fill 700ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .spx-confluence-list .spx-confluence-row,
+          .spx-confluence-list .spx-confluence-bar {
+            opacity: 1;
+            transform: none;
+            animation: none;
+            width: var(--bar-width, 100%);
+          }
+        }
+      `}</style>
     </Card>
   );
 }
