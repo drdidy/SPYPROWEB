@@ -10,7 +10,12 @@ import { RiskGuardrails } from "@/components/dashboard/RiskGuardrails";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { loadLiveSnapshot } from "@/lib/snapshot-fetch";
 
-export const revalidate = 15;
+// Render at request time so we can read the live request host via
+// next/headers and hit /api/snapshot on the same public hostname.
+// Without this Next.js statically generates the page at build time
+// when there's no request to read headers from.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function Page() {
   const { data: snap, source, error } = await loadLiveSnapshot();

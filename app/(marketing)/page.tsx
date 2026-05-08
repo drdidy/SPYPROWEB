@@ -8,7 +8,10 @@ import { FAQ } from "@/components/marketing/FAQ";
 import { WaitlistForm } from "@/components/marketing/WaitlistForm";
 import { loadLiveSnapshot } from "@/lib/snapshot-fetch";
 
-export const revalidate = 30;
+// Render at request time so loadLiveSnapshot() can read the live host
+// header and hit /api/snapshot. (See lib/snapshot-fetch.ts.)
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function Home() {
   const { data: snap, source } = await loadLiveSnapshot();
