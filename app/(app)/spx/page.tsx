@@ -6,7 +6,12 @@ import { SPXSessionOrigin } from "@/components/spx/SPXSessionOrigin";
 import { SPXConfluence } from "@/components/spx/SPXConfluence";
 import { loadSnapshot } from "@/lib/spx-fetch";
 
-export const revalidate = 30;
+// Render at request time so loadSnapshot() can read the live host
+// header and hit /api/spx/snapshot. Without this Next.js statically
+// generates the page at build time when there's no request, and the
+// resulting page caches the mock fallback.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function Page() {
   const { snap, source, error } = await loadSnapshot();

@@ -72,7 +72,7 @@ export default async function Page() {
               candles={candles}
               lines={lines}
               pivots={pivots}
-              signal={signal}
+              signal={signal ?? undefined}
               currentPrice={currentPrice}
             />
           </div>

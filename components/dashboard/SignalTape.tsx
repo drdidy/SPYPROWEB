@@ -55,13 +55,35 @@ const typeStyle = {
 } as const;
 
 export function SignalTape({ ticks: liveTicks }: { ticks?: Tick[] } = {}) {
-  const ticks = liveTicks && liveTicks.length > 0 ? liveTicks : mockTicks;
+  const ticks = liveTicks ?? [];
+  if (ticks.length === 0) {
+    return (
+      <Card>
+        <CardHeader
+          eyebrow="Signal Tape"
+          title="Today's prints"
+          meta="No events yet"
+        />
+        <CardBody>
+          <div className="py-10">
+            <div className="font-serif text-headline text-ink-3 italic font-light">
+              The tape is quiet.
+            </div>
+            <p className="mt-3 text-[13px] text-ink-3 leading-relaxed max-w-md">
+              No qualified rejection has printed yet today. Each event posts
+              here as it crosses the wire — entry, line, grade, reasoning.
+            </p>
+          </div>
+        </CardBody>
+      </Card>
+    );
+  }
   return (
     <Card>
       <CardHeader
         eyebrow="Signal Tape"
         title="Today's prints"
-        meta={`${ticks.length} events · session live`}
+        meta={`${ticks.length} event${ticks.length === 1 ? "" : "s"} · session live`}
       />
       <CardBody className="px-0 pb-0">
         <ol className="divide-y divide-rule border-t border-rule">

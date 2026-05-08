@@ -27,10 +27,9 @@ import type {
   Verdict,
   WaitDisciplineItem,
 } from "./types";
-import {
-  signalQuality as mockQuality,
-  latestSignal as mockSignal,
-} from "./mock-data";
+// No mock-data imports here. The adapter returns nullable shapes for
+// signal/quality/options when the live pipeline doesn't supply them,
+// and the consuming components render empty states.
 
 // ---------------------------------------------------------------------------
 // Raw shape returned by /api/snapshot (subset; see api/_lib/seed_snapshot.py
@@ -109,7 +108,7 @@ interface FlowRaw {
   bearishCount: number;
   premiumNet: number;
   lean: "BULLISH" | "BEARISH" | "BALANCED";
-  topPrints?: Array<{ strike: number | null; side: string; premium: number; ts: string | null }>;
+  topPrints: Array<{ strike: number | null; side: string; premium: number; ts: string | null }>;
 }
 
 interface GexRaw {
@@ -168,8 +167,10 @@ export interface AdaptedSnapshot {
   source: RawSnapshot["source"];
   asOf: string;
   decision: DecisionState;
-  signal: TradeSignal;
-  quality: SignalQuality;
+  // Null when no live qualified signal exists yet today. The
+  // DecisionSlate's signal-anatomy panel renders an empty state.
+  signal: TradeSignal | null;
+  quality: SignalQuality | null;
   candles: Candle[];
   lines: DynamicLine[];
   pivots: Pivot[];
@@ -177,9 +178,19 @@ export interface AdaptedSnapshot {
   bias: BiasState;
   guardrails: RiskGuardrailState;
   waitDiscipline: WaitDisciplineItem[];
-  optionsIntel: OptionsIntel;
-  strikes: SelectedStrikes;
+  // Null when the Tastytrade chain hasn't been fetched (weekend, auth
+  // pending, upstream slow). OptionsIntelPanel renders empty state.
+  optionsIntel: OptionsIntel | null;
+  strikes: SelectedStrikes | null;
   signalTicks: SignalTick[];
+  // Standalone Unusual Whales context (also null until the upstream
+  // returns data). Distinct from the Tastytrade-derived options panel.
+  flow: FlowSummary | null;
+  gex: GexSummary | null;
+  marketContext: MarketContextRaw | null;
+  // Full Tastytrade options chain so the Options Cockpit page can show
+  // a strike ladder beyond the OptionsIntel summary on the dashboard.
+  optionsChain: OptionsRaw | null;
   shellState: {
     spy: number;
     change: number;
@@ -189,6 +200,22 @@ export interface AdaptedSnapshot {
     sessionLabel: string;
     sessionCloses: string;
   };
+}
+
+export interface FlowSummary {
+  ticker: string;
+  bullishCount: number;
+  bearishCount: number;
+  premiumNet: number;
+  lean: "BULLISH" | "BEARISH" | "BALANCED";
+  topPrints: Array<{ strike: number | null; side: string; premium: number; ts: string | null }>;
+}
+
+export interface GexSummary {
+  ticker: string;
+  totalGEX: number;
+  regime: "POSITIVE" | "NEGATIVE" | "FLAT";
+  flipPoint: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -300,9 +327,9 @@ function mapBias(raw: RawSnapshot): BiasState {
   };
 }
 
-function mapLatestSignal(raw: RawSnapshot): TradeSignal {
+function mapLatestSignal(raw: RawSnapshot): TradeSignal | null {
   const s = raw.signals[0];
-  if (!s) return mockSignal;
+  if (!s) return null;
   const lastCandle = raw.candles[raw.candles.length - 1];
   return {
     id: s.id,
@@ -345,22 +372,20 @@ function normalizeScore(raw: RawSnapshot): number {
   return 0;
 }
 
-function mapQuality(raw: RawSnapshot): SignalQuality {
+function mapQuality(raw: RawSnapshot): SignalQuality | null {
+  const s = raw.signals[0];
+  if (!s) return null;
+
   const grade = gradeFrom(raw);
   const score = normalizeScore(raw);
-  const s = raw.signals[0];
-
-  // The legacy quality breakdown (closeDistance / wickRejectionRatio / etc.)
-  // isn't computed by main yet. Synthesize from what we have so the
-  // breakdown rows show real-derived values rather than mock.
   const lastCandle = raw.candles[raw.candles.length - 1];
   const closeDistance =
-    s?.entry && lastCandle ? Math.abs(lastCandle.c - s.entry) : mockQuality.closeDistance;
+    s.entry && lastCandle ? Math.abs(lastCandle.c - s.entry) : 0;
   const wickRange = lastCandle ? lastCandle.h - lastCandle.l || 1 : 1;
   const wickRejectionRatio = lastCandle
     ? Math.min(1, Math.abs(lastCandle.c - lastCandle.o) / wickRange)
-    : mockQuality.wickRejectionRatio;
-  const rr = s?.rr ?? raw.decision.rr ?? mockQuality.riskRewardScore * 3;
+    : 0;
+  const rr = s.rr ?? raw.decision.rr ?? 0;
   const riskRewardScore = Math.max(0, Math.min(1, rr / 3));
   const winPct = raw.decision.winPct ?? null;
   const edgePct = raw.decision.edgePct ?? null;
@@ -371,19 +396,19 @@ function mapQuality(raw: RawSnapshot): SignalQuality {
   if (edgePct !== null) strengths.push(`Edge ${edgePct.toFixed(2)}R`);
   const warnings: string[] = [];
   if (raw.source === "degraded")
-    warnings.push("Live data degraded — check the feed before sizing.");
-  if (s?.status === "PENDING_CONFIRMATION")
-    warnings.push("Waiting for next-bar confirmation");
+    warnings.push("Live data degraded; check the feed before sizing.");
+  if (s.status === "PENDING_CONFIRMATION")
+    warnings.push("Waiting for next-bar confirmation.");
 
   return {
     grade,
     score,
     closeDistance,
     wickRejectionRatio,
-    bodyPositionScore: lastCandle ? Math.min(1, Math.abs(lastCandle.c - lastCandle.l) / wickRange) : mockQuality.bodyPositionScore,
+    bodyPositionScore: lastCandle ? Math.min(1, Math.abs(lastCandle.c - lastCandle.l) / wickRange) : 0,
     riskRewardScore,
     targetQuality: 0.7,
-    strengths: strengths.length ? strengths : mockQuality.strengths,
+    strengths,
     warnings,
     actionLabel: mapFinalDecision(raw.decision.verb),
   };
@@ -408,29 +433,13 @@ function mapShell(raw: RawSnapshot): AdaptedSnapshot["shellState"] {
 
 // ---- Options ---------------------------------------------------------------
 
-function mapOptions(raw: RawSnapshot): { intel: OptionsIntel; strikes: SelectedStrikes } {
+function mapOptions(raw: RawSnapshot): { intel: OptionsIntel | null; strikes: SelectedStrikes | null } {
   const opt = raw.options;
   const last = raw.quote.last;
   if (!opt) {
-    return {
-      intel: {
-        putCallRatio: 0,
-        maxPain: Math.round(last),
-        callWall: Math.round(last + 5),
-        putWall: Math.round(last - 5),
-        highOI: [],
-        alignment: "MIXED",
-        alignmentNote: "Options chain not yet fetched (Tastytrade auth pending or weekend).",
-      },
-      strikes: {
-        underlying: last,
-        callStrike: Math.round(last) + 2,
-        putStrike: Math.round(last) - 2,
-        expiration: "",
-        dteLabel: "0DTE",
-        warning: "Mock strikes until live chain returns.",
-      },
-    };
+    // Honest empty state. The OptionsIntelPanel renders its own
+    // "chain not yet loaded" state instead of synthesized fake numbers.
+    return { intel: null, strikes: null };
   }
 
   const allOI = [
@@ -665,6 +674,10 @@ export function adaptSnapshot(raw: RawSnapshot): AdaptedSnapshot {
     optionsIntel: intel,
     strikes,
     signalTicks: mapSignalTicks(raw),
+    flow: raw.flow ?? null,
+    gex: raw.gex ?? null,
+    marketContext: raw.marketContext ?? null,
+    optionsChain: raw.options ?? null,
     shellState: mapShell(raw),
   };
 }

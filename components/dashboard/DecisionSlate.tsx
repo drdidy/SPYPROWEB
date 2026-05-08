@@ -28,8 +28,8 @@ export function DecisionSlate({
   quality,
 }: {
   decision: DecisionState;
-  signal: TradeSignal;
-  quality: SignalQuality;
+  signal: TradeSignal | null;
+  quality: SignalQuality | null;
 }) {
   const Icon =
     decision.verdict === "LONG"
@@ -119,55 +119,71 @@ export function DecisionSlate({
         {/* vertical rule */}
         <div className="hidden lg:block absolute left-[58.333%] top-7 bottom-7 w-px bg-rule" />
 
-        {/* RIGHT — signal anatomy */}
+        {/* RIGHT — signal anatomy (or empty state when no live signal) */}
         <div className="col-span-12 lg:col-span-5 p-7 pl-7 bg-paper-2/40">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="eyebrow text-ink-3">Latest Signal</span>
-              <div className="mt-2 flex items-center gap-3">
-                <GradeBadge grade={quality.grade} size="lg" />
+          {signal && quality ? (
+            <>
+              <div className="flex items-start justify-between">
                 <div>
-                  <div className="text-xs font-mono text-ink-3">
-                    {signal.type} · {signal.lineName}
-                  </div>
-                  <div className="text-title font-serif text-ink mt-0.5">
-                    Score {quality.score}
+                  <span className="eyebrow text-ink-3">Latest Signal</span>
+                  <div className="mt-2 flex items-center gap-3">
+                    <GradeBadge grade={quality.grade} size="lg" />
+                    <div>
+                      <div className="text-xs font-mono text-ink-3">
+                        {signal.type} · {signal.lineName}
+                      </div>
+                      <div className="text-title font-serif text-ink mt-0.5">
+                        Score {quality.score}
+                      </div>
+                    </div>
                   </div>
                 </div>
+                <span className="font-mono text-[10px] text-ink-4">{signal.id}</span>
               </div>
-            </div>
-            <span className="font-mono text-[10px] text-ink-4">{signal.id}</span>
-          </div>
 
-          <div className="mt-6 grid grid-cols-3 gap-x-4 gap-y-3">
-            <Stat label="Entry" value={signal.entryPrice.toFixed(2)} />
-            <Stat label="Stop" value={signal.stopPrice.toFixed(2)} tone="bear" />
-            <Stat label="Target" value={signal.targetPrice.toFixed(2)} tone="bull" />
-            <Stat label="R:R" value={`1 : ${signal.rr.toFixed(1)}`} />
-            <Stat label="Risk" value={`$${(signal.entryPrice - signal.stopPrice).toFixed(2)}`} />
-            <Stat label="Reward" value={`$${(signal.targetPrice - signal.entryPrice).toFixed(2)}`} />
-          </div>
+              <div className="mt-6 grid grid-cols-3 gap-x-4 gap-y-3">
+                <Stat label="Entry" value={signal.entryPrice.toFixed(2)} />
+                <Stat label="Stop" value={signal.stopPrice.toFixed(2)} tone="bear" />
+                <Stat label="Target" value={signal.targetPrice.toFixed(2)} tone="bull" />
+                <Stat label="R:R" value={`1 : ${signal.rr.toFixed(1)}`} />
+                <Stat label="Risk" value={`$${(signal.entryPrice - signal.stopPrice).toFixed(2)}`} />
+                <Stat label="Reward" value={`$${(signal.targetPrice - signal.entryPrice).toFixed(2)}`} />
+              </div>
 
-          <div className="mt-6 hr-rule" />
+              <div className="mt-6 hr-rule" />
 
-          <div className="mt-4 grid grid-cols-2 gap-x-5 gap-y-2 text-[11px]">
-            <Mini label="Close dist" value={`$${quality.closeDistance.toFixed(2)}`} />
-            <Mini label="Wick reject" value={quality.wickRejectionRatio.toFixed(2)} />
-            <Mini label="Body pos" value={quality.bodyPositionScore.toFixed(2)} />
-            <Mini label="Target qual" value={quality.targetQuality.toFixed(2)} />
-          </div>
+              <div className="mt-4 grid grid-cols-2 gap-x-5 gap-y-2 text-[11px]">
+                <Mini label="Close dist" value={`$${quality.closeDistance.toFixed(2)}`} />
+                <Mini label="Wick reject" value={quality.wickRejectionRatio.toFixed(2)} />
+                <Mini label="Body pos" value={quality.bodyPositionScore.toFixed(2)} />
+                <Mini label="Target qual" value={quality.targetQuality.toFixed(2)} />
+              </div>
 
-          {quality.warnings.length > 0 && (
-            <div className="mt-4 px-3 py-2 rounded-soft bg-gold-tint shadow-rule">
-              <div className="eyebrow text-gold-ink mb-1">Warnings</div>
-              <ul className="text-[11px] text-gold-ink/90 space-y-0.5">
-                {quality.warnings.map((w) => (
-                  <li key={w} className="flex gap-2">
-                    <span className="text-gold-ink/60">·</span>
-                    <span>{w}</span>
-                  </li>
-                ))}
-              </ul>
+              {quality.warnings.length > 0 && (
+                <div className="mt-4 px-3 py-2 rounded-soft bg-gold-tint shadow-rule">
+                  <div className="eyebrow text-gold-ink mb-1">Warnings</div>
+                  <ul className="text-[11px] text-gold-ink/90 space-y-0.5">
+                    {quality.warnings.map((w) => (
+                      <li key={w} className="flex gap-2">
+                        <span className="text-gold-ink/60">·</span>
+                        <span>{w}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="h-full flex flex-col items-start justify-center py-10">
+              <span className="eyebrow text-ink-3">Latest Signal</span>
+              <div className="mt-3 font-serif text-headline text-ink-3 italic font-light">
+                No qualified signal yet.
+              </div>
+              <p className="mt-3 text-[14px] text-ink-3 leading-relaxed max-w-sm">
+                The engine hasn&apos;t found a setup that clears the bar today.
+                The lines are still being watched; this panel populates the
+                moment a candle closes through one with the right structure.
+              </p>
             </div>
           )}
         </div>
