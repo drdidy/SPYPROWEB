@@ -42,13 +42,17 @@ def es_candles_ascending_inside() -> list[Candle]:
     """Two-day series: prev day RTH + Sydney + Tokyo + London + today open.
 
     Tuned so:
-      Overnight high CLOSE: 5870.00 at 23:00 (Tokyo bar — close, not wick)
-      Overnight low  CLOSE: 5850.00 at 17:00 (Sydney first bar)
-      Sydney HH:            5862.10
-      Sydney LL:            5848.20
-      Tokyo  HH:            5872.40 (>5862.10) -> HH
-      Tokyo  LL:            5853.20 (>5848.20) -> HL
-      => ASCENDING channel.
+      Sydney  17:00-20:00 (window EXCLUDES 20:00):
+        HH 5862.10 (in 19:00 bar)
+        LL 5848.20 (in 17:00 bar)
+      Tokyo   21:00-03:00 (window includes 21:00..02:00):
+        HH 5872.40 (>5862.10) -> HH
+        LL 5853.20 (>5848.20) -> HL
+        => ASCENDING channel.
+
+      Overnight anchor window 15:00 prev -> 03:00 today:
+        Highest CLOSE 5870.00 at 23:00 (Tokyo bar)
+        Lowest  CLOSE 5850.00 at 17:00 (Sydney first bar)
 
       Prev RTH high (raw):  5878.50 at 13:00
       Prev RTH low  (raw):  5849.00 at 09:00
@@ -69,24 +73,26 @@ def es_candles_ascending_inside() -> list[Candle]:
     bars.append(_bar(prev_day.replace(hour=15), o=5870.00, c=5860.00))
     bars.append(_bar(prev_day.replace(hour=16), o=5860.00, c=5852.00))
 
-    # Sydney 17:00..20:00.
-    bars.append(_bar(prev_day.replace(hour=17), o=5852.00, c=5850.00, h=5854.00, l=5848.20))
+    # Sydney 17:00..20:00 (window excludes 20:00). HH lives in 19:00 bar.
+    bars.append(_bar(prev_day.replace(hour=17), o=5852.00, c=5850.00, h=5854.00, l=5848.20))  # SYD low
     bars.append(_bar(prev_day.replace(hour=18), o=5850.00, c=5856.00))
-    bars.append(_bar(prev_day.replace(hour=19), o=5856.00, c=5858.00))
-    bars.append(_bar(prev_day.replace(hour=20), o=5858.00, c=5860.00, h=5862.10, l=5857.00))
+    bars.append(_bar(prev_day.replace(hour=19), o=5856.00, c=5858.00, h=5862.10, l=5855.00))  # SYD high
+    # 20:00 bar sits in the gap between Sydney and Tokyo windows. Still
+    # part of overnight anchor scanning; excluded from direction calc.
+    bars.append(_bar(prev_day.replace(hour=20), o=5858.00, c=5860.00))
 
-    # Tokyo 21:00..23:00 (within overnight anchor window).
-    bars.append(_bar(prev_day.replace(hour=21), o=5860.00, c=5855.00, h=5860.50, l=5853.20))
+    # Tokyo 21:00..02:00 (window extends to 03:00 exclusive).
+    bars.append(_bar(prev_day.replace(hour=21), o=5860.00, c=5855.00, h=5860.50, l=5853.20))  # TKY low
     bars.append(_bar(prev_day.replace(hour=22), o=5855.00, c=5865.00))
-    bars.append(_bar(prev_day.replace(hour=23), o=5865.00, c=5870.00, h=5872.40, l=5864.00))
+    bars.append(_bar(prev_day.replace(hour=23), o=5865.00, c=5870.00, h=5872.40, l=5864.00))  # TKY high
 
     today = datetime(2026, 5, 8, tzinfo=CT)
-    # 00:00..01:00 — Tokyo continues but OUTSIDE the overnight anchor window.
+    # 00:00..02:00 — Tokyo's late hours, also inside the anchor window.
     bars.append(_bar(today.replace(hour=0), o=5870.00, c=5868.00))
     bars.append(_bar(today.replace(hour=1), o=5868.00, c=5867.00))
-
-    # London 02:00..07:00 — held inside ascending channel.
     bars.append(_bar(today.replace(hour=2), o=5867.00, c=5866.00))
+
+    # London 03:00..07:00 — past the anchor window, holds inside channel.
     bars.append(_bar(today.replace(hour=3), o=5866.00, c=5867.00))
     bars.append(_bar(today.replace(hour=4), o=5867.00, c=5868.50))
     bars.append(_bar(today.replace(hour=5), o=5868.50, c=5869.00))
