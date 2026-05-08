@@ -47,6 +47,7 @@ function emptyAdapted(): AdaptedSnapshot {
     signal: null,
     quality: null,
     candles: [],
+    hourlyCandles: [],
     lines: [],
     pivots: [],
     currentPrice: 0,

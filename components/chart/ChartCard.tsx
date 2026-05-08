@@ -2,26 +2,60 @@
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ProphetChart } from "./ProphetChart";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Maximize2, Settings } from "lucide-react";
 import type { Candle, DynamicLine, Pivot, TradeSignal } from "@/lib/types";
 
-const timeframes = ["15m", "1h", "4h", "D"] as const;
+type Timeframe = "5m" | "15m" | "1h" | "4h" | "D";
+const timeframes: readonly Timeframe[] = ["5m", "15m", "1h", "4h", "D"] as const;
 
+// Native granularity per series:
+//   candles       = 5-minute intraday bars (last trading day)
+//   hourlyCandles = 1-hour RTH bars (last ~30 trading days)
+// Other timeframes are resampled client-side by grouping the nearest
+// native series. A timeframe is disabled when its source series is
+// empty (e.g. before market open the 5m series may not exist yet).
 export function ChartCard({
   candles,
+  hourlyCandles,
   lines,
   pivots,
   signal,
   currentPrice,
 }: {
   candles: Candle[];
+  hourlyCandles: Candle[];
   lines: DynamicLine[];
   pivots: Pivot[];
   signal?: TradeSignal;
   currentPrice: number;
 }) {
-  const [tf, setTf] = useState<(typeof timeframes)[number]>("1h");
+  const has5m = candles.length > 0;
+  const has1h = hourlyCandles.length > 0;
+  const initial: Timeframe = has1h ? "1h" : has5m ? "5m" : "1h";
+  const [tf, setTf] = useState<Timeframe>(initial);
+
+  const view = useMemo(() => {
+    switch (tf) {
+      case "5m":
+        return candles;
+      case "15m":
+        return resampleByCount(candles, 3);
+      case "1h":
+        return hourlyCandles;
+      case "4h":
+        return resampleByCount(hourlyCandles, 4);
+      case "D":
+        return resampleToDaily(hourlyCandles);
+      default:
+        return hourlyCandles;
+    }
+  }, [tf, candles, hourlyCandles]);
+
+  const isDisabled = (t: Timeframe): boolean => {
+    if (t === "5m" || t === "15m") return !has5m;
+    return !has1h;
+  };
 
   return (
     <Card className="overflow-hidden">
@@ -30,26 +64,33 @@ export function ChartCard({
         title={
           <span className="flex items-baseline gap-3">
             <span>SPY · {tf}</span>
-            <span className="font-mono text-xs text-ink-3 font-normal">{candles.length} bars</span>
+            <span className="font-mono text-xs text-ink-3 font-normal">{view.length} bars</span>
           </span>
         }
         meta="anchor pivots · primary lines · secondary targets"
         action={
           <div className="flex items-center gap-2">
             <div className="inline-flex items-center bg-paper-2 rounded-soft p-0.5 shadow-rule">
-              {timeframes.map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTf(t)}
-                  className={`h-6 px-2.5 rounded-[4px] text-[11px] font-mono font-semibold transition-all ${
-                    tf === t
-                      ? "bg-paper text-ink shadow-rule"
-                      : "text-ink-3 hover:text-ink-2"
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
+              {timeframes.map((t) => {
+                const disabled = isDisabled(t);
+                return (
+                  <button
+                    key={t}
+                    onClick={() => !disabled && setTf(t)}
+                    disabled={disabled}
+                    title={disabled ? "Series not yet available" : undefined}
+                    className={`h-6 px-2.5 rounded-[4px] text-[11px] font-mono font-semibold transition-all ${
+                      tf === t
+                        ? "bg-paper text-ink shadow-rule"
+                        : disabled
+                          ? "text-ink-4 cursor-not-allowed"
+                          : "text-ink-3 hover:text-ink-2"
+                    }`}
+                  >
+                    {t}
+                  </button>
+                );
+              })}
             </div>
             <Button variant="ghost" size="sm" aria-label="Settings">
               <Settings size={14} />
@@ -62,7 +103,7 @@ export function ChartCard({
       />
       <div className="px-3 pt-2 pb-3 bg-paper">
         <ProphetChart
-          candles={candles}
+          candles={view}
           lines={lines}
           pivots={pivots}
           signal={signal}
@@ -103,4 +144,49 @@ function Legend({
       {label}
     </span>
   );
+}
+
+// ---- Resampling --------------------------------------------------------
+// OHLC reductions on a sorted candle series. Open is the first
+// candle's open in the group, close is the last close, high/low are
+// the extremes, volume sums. We never invent candles where the
+// underlying series has gaps; the last group is included even if
+// shorter than `count` so the most recent partial bar still shows.
+
+function resampleByCount(src: Candle[], count: number): Candle[] {
+  if (count <= 1 || src.length === 0) return src;
+  const out: Candle[] = [];
+  for (let i = 0; i < src.length; i += count) {
+    const slice = src.slice(i, i + count);
+    out.push(rollup(slice));
+  }
+  return out;
+}
+
+function resampleToDaily(src: Candle[]): Candle[] {
+  if (src.length === 0) return src;
+  const groups = new Map<string, Candle[]>();
+  for (const c of src) {
+    const day = c.t.slice(0, 10); // YYYY-MM-DD
+    const arr = groups.get(day);
+    if (arr) arr.push(c);
+    else groups.set(day, [c]);
+  }
+  const out: Candle[] = [];
+  for (const arr of groups.values()) out.push(rollup(arr));
+  return out.sort((a, b) => a.t.localeCompare(b.t));
+}
+
+function rollup(slice: Candle[]): Candle {
+  const first = slice[0];
+  const last = slice[slice.length - 1];
+  let h = -Infinity;
+  let l = Infinity;
+  let v = 0;
+  for (const c of slice) {
+    if (c.h > h) h = c.h;
+    if (c.l < l) l = c.l;
+    v += c.v ?? 0;
+  }
+  return { t: first.t, o: first.o, h, l, c: last.c, v };
 }

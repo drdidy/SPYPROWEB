@@ -296,6 +296,37 @@ def _candles_for_chart(rth_today: pd.DataFrame, intraday: pd.DataFrame) -> list[
     return out[-90:]
 
 
+def _hourly_candles_for_chart(df: pd.DataFrame) -> list[dict]:
+    """Last ~30 trading days of hourly RTH bars for the chart's 1h/4h/D
+    timeframes. Filters to the regular trading session and trims the
+    series so the snapshot stays compact."""
+    if df is None or df.empty:
+        return []
+    try:
+        rth = df.between_time(
+            pc.RTH_SESSION_START.strftime("%H:%M"),
+            pc.RTH_SESSION_END.strftime("%H:%M"),
+            inclusive="left",
+        )
+    except Exception:
+        rth = df
+    if rth.empty:
+        rth = df
+    out: list[dict] = []
+    for ts, row in rth.iterrows():
+        try:
+            out.append({
+                "t": pd.Timestamp(ts).isoformat(),
+                "o": round(float(row["Open"]), 2),
+                "h": round(float(row["High"]), 2),
+                "l": round(float(row["Low"]), 2),
+                "c": round(float(row["Close"]), 2),
+            })
+        except Exception:
+            continue
+    return out[-210:]
+
+
 def _anchor_display_label(name: str) -> str:
     """Convert ANC_<role>_<HHMM>_<BAND> to a readable label."""
     if not name.startswith("ANC_"):
@@ -845,6 +876,10 @@ def build_live_snapshot() -> dict:
 
     intraday = fetch_spy_intraday("1d", "5m")
     candles = _candles_for_chart(rth_today, intraday)
+    # Hourly series for the dashboard chart's 1h/4h/D timeframes. Last
+    # ~30 trading days of regular-session hourly bars; the chart resamples
+    # client-side for the longer frames.
+    hourly_candles = _hourly_candles_for_chart(df)
     chart_lines = _chart_lines_from_primary(primary_lines, projection_time, rth_today)
 
     options = tastytrade.fetch_options_snapshot(current_price)
@@ -887,6 +922,7 @@ def build_live_snapshot() -> dict:
         "spark": spark,
         "triggers": triggers,
         "candles": candles,
+        "hourlyCandles": hourly_candles,
         "chartLines": chart_lines,
         "options": options,
         "flow": flow_summary,
