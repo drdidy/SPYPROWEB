@@ -85,15 +85,20 @@ def build_snapshot_with_provenance(
     as_of: datetime,
     *,
     lookback_hours: int = 36,
+    offset_override: float | None = None,
     **engine_kwargs,
 ):
     """Like build_snapshot_from_fetcher but returns (snapshot, meta).
 
-    The meta dict surfaces operator-visible info: which backend served
-    bars, which served the SPX/ES sync quote, the captured offset, and
-    any error encountered when the primary failed over. Used by the
-    /api/spx/snapshot endpoint to attach `_meta` so an operator can
-    debug "why are these entries off" without server access.
+    `offset_override` (when not None) replaces the offset derived from
+    the sync quote. Use this when yfinance's ES=F is showing a
+    different contract than the broker's /ES — set it to the actual
+    broker spread (SPX_cash - /ES_active) and the engine will produce
+    broker-aligned entries even with yfinance bars.
+
+    The meta dict surfaces which backend served bars, which served the
+    SPX/ES sync quote, the offset that was actually applied (computed
+    or override), and any errors encountered.
     """
     start = as_of - timedelta(hours=lookback_hours)
     bars = fetcher.fetch_es_bars(start, as_of)
@@ -103,7 +108,9 @@ def build_snapshot_with_provenance(
             f"{fetcher.name} returned no ES bars in [{start}, {as_of}]"
         )
     quote = fetcher.fetch_sync_quote()
-    snap = compute_snapshot(bars, quote.offset, as_of, **engine_kwargs)
+    computed_offset = quote.offset
+    applied_offset = offset_override if offset_override is not None else computed_offset
+    snap = compute_snapshot(bars, applied_offset, as_of, **engine_kwargs)
     meta = {
         "fetcher": fetcher.name,
         "barsSource": getattr(fetcher, "last_bars_source", fetcher.name),
@@ -112,7 +119,9 @@ def build_snapshot_with_provenance(
         "quoteError": getattr(fetcher, "last_quote_error", None),
         "barsCount": bars_count,
         "lookbackHours": lookback_hours,
-        "appliedOffset": round(quote.offset, 4),
+        "appliedOffset": round(applied_offset, 4),
+        "computedOffset": round(computed_offset, 4),
+        "offsetSource": "env_override" if offset_override is not None else "computed",
         "spxSpot": round(quote.spx_spot, 2),
         "esSpot": round(quote.es_spot, 2),
         "quoteCapturedAt": quote.captured_at.isoformat(),
