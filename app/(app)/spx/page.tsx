@@ -53,6 +53,18 @@ export default async function Page() {
                   {meta.appliedOffset >= 0 ? "+" : ""}
                   {meta.appliedOffset.toFixed(2)}
                 </span>
+                {meta.offsetSource === "env_override" && (
+                  <span className="ml-1 text-[9px] uppercase tracking-[0.10em] text-gold-ink">
+                    (override)
+                  </span>
+                )}
+                {meta.offsetSource === "env_override" &&
+                  typeof meta.computedOffset === "number" && (
+                    <span className="ml-1 text-ink-4">
+                      ↔ live {meta.computedOffset >= 0 ? "+" : ""}
+                      {meta.computedOffset.toFixed(2)}
+                    </span>
+                  )}
               </span>
               <span className="text-ink-4">·</span>
               <span>

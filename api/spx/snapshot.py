@@ -37,6 +37,26 @@ CT = ZoneInfo("America/Chicago")
 SNAPSHOT_TTL = float(os.environ.get("SPX_SNAPSHOT_TTL", "30"))
 
 
+def _resolve_offset_override() -> float | None:
+    """Read SPX_ES_OFFSET_OVERRIDE env var.
+
+    When yfinance's ES=F is showing a different contract than the
+    broker's /ES (typical: ~80-100pt drift from back-month / back-
+    adjusted continuous), the auto-computed offset (yfinance SPX -
+    yfinance ES) doesn't match the broker spread. Setting this env
+    var to the broker's actual SPX_cash - /ES_active spread (e.g.
+    "28.5") forces the engine to apply that value instead of the
+    computed one, producing broker-aligned channel entries.
+    """
+    raw = os.environ.get("SPX_ES_OFFSET_OVERRIDE")
+    if not raw:
+        return None
+    try:
+        return float(raw.strip())
+    except (TypeError, ValueError):
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Module-level cache. Vercel keeps function instances warm between
 # invocations within the same region, so this cache survives across
@@ -49,12 +69,17 @@ _cache_lock = Lock()
 
 def _build_payload() -> dict:
     fetcher = build_default_fetcher()
-    snap, meta = build_snapshot_with_provenance(fetcher, datetime.now(CT))
+    snap, meta = build_snapshot_with_provenance(
+        fetcher,
+        datetime.now(CT),
+        offset_override=_resolve_offset_override(),
+    )
     payload = snap.model_dump(by_alias=True)
     # Operator-visible provenance: which backend served bars + quote,
-    # the captured ES->SPX offset, and any primary-fetcher error that
-    # forced a fallback. The frontend reads _meta.appliedOffset and
-    # _meta.barsSource into the SPX page diagnostic strip.
+    # the offset value that was actually applied (computed or env
+    # override), and any primary-fetcher error that forced a fallback.
+    # The frontend reads _meta.appliedOffset and _meta.barsSource into
+    # the SPX page diagnostic strip.
     payload["_meta"] = meta
     return payload
 

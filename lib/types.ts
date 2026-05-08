@@ -218,7 +218,15 @@ export interface SPXSnapshotMeta {
   quoteError: string | null;
   barsCount: number;
   lookbackHours: number;
+  // Offset actually fed into the engine (= computedOffset, unless
+  // SPX_ES_OFFSET_OVERRIDE is set, in which case = the override).
   appliedOffset: number;
+  // Offset derived from the live quote pair, ignoring any override.
+  // Useful for noticing when yfinance and your broker disagree.
+  computedOffset?: number;
+  // "computed" or "env_override" — tells you whether the displayed
+  // offset is from the live quote or from SPX_ES_OFFSET_OVERRIDE.
+  offsetSource?: "computed" | "env_override";
   spxSpot: number;
   esSpot: number;
   quoteCapturedAt: string;
