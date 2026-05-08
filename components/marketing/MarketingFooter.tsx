@@ -6,9 +6,9 @@ const cols = [
     label: "Workspace",
     items: [
       { label: "Decision Slate", href: "/dashboard" },
-      { label: "Trigger Map", href: "/trigger-map" },
-      { label: "Signal Tape", href: "/signals" },
-      { label: "Replay Lab", href: "/replay" },
+      { label: "SPX Channel", href: "/spx" },
+      { label: "Structure Read", href: "/structure" },
+      { label: "Foresight", href: "/foresight" },
     ],
   },
   {

@@ -23,44 +23,26 @@ export default async function Page() {
       <SectionLabel number="01">Today, in one read</SectionLabel>
       <Card>
         <CardHeader
-          eyebrow="Bias"
-          title={
-            snap.bias.bias === "BULLISH"
-              ? "Lean bullish"
-              : snap.bias.bias === "BEARISH"
-                ? "Lean bearish"
-                : "Neutral"
-          }
-          meta={`Strength ${snap.bias.strengthScore}/100`}
-        />
-        <CardBody>
-          <p className="text-[15px] text-ink-2 leading-relaxed">
-            {snap.bias.explanation || "Engine is initializing today's read."}
-          </p>
-        </CardBody>
-      </Card>
-
-      <SectionLabel number="02">Decision</SectionLabel>
-      <Card>
-        <CardHeader
           eyebrow="What we're doing"
           title={
             snap.decision.verdict === "WAIT"
               ? "Waiting"
               : snap.decision.verdict === "STAND DOWN"
                 ? "Standing down"
-                : `${snap.decision.verdict.toLowerCase()} bias`
+                : `Lean ${snap.decision.verdict.toLowerCase()}`
           }
           meta={snap.decision.windowET || undefined}
         />
         <CardBody>
           <p className="text-[15px] text-ink-2 leading-relaxed">
-            {snap.decision.finalExplanation || "No commentary yet."}
+            {snap.decision.finalExplanation ||
+              snap.bias.explanation ||
+              "Engine is initializing today's read."}
           </p>
         </CardBody>
       </Card>
 
-      <SectionLabel number="03">Anchors carried in</SectionLabel>
+      <SectionLabel number="02">Anchors carried in</SectionLabel>
       <Card>
         <CardBody className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Anchor kind="HIGH" pivot={high} />
@@ -68,7 +50,7 @@ export default async function Page() {
         </CardBody>
       </Card>
 
-      <SectionLabel number="04">First lines to watch</SectionLabel>
+      <SectionLabel number="03">First lines to watch</SectionLabel>
       <Card>
         <CardBody>
           {snap.lines.length === 0 ? (

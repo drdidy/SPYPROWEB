@@ -91,7 +91,7 @@ export default async function Page() {
             highlight={snap.channel.direction}
           />
           <Stat label="Scenario" value={snap.scenario.replace(/_/g, " ")} />
-          <Stat label="Slope" value="±$1.05/hr" />
+          <Stat label="Slope" value="±1.05 pts/hr" />
         </div>
       </header>
 

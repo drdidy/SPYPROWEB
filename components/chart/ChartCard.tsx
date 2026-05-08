@@ -21,7 +21,7 @@ export function ChartCard({
   signal?: TradeSignal;
   currentPrice: number;
 }) {
-  const [tf, setTf] = useState<(typeof timeframes)[number]>("4h");
+  const [tf, setTf] = useState<(typeof timeframes)[number]>("1h");
 
   return (
     <Card className="overflow-hidden">
@@ -33,7 +33,7 @@ export function ChartCard({
             <span className="font-mono text-xs text-ink-3 font-normal">{candles.length} bars</span>
           </span>
         }
-        meta="anchor lattice · primary fan · secondary targets"
+        meta="anchor pivots · primary lines · secondary targets"
         action={
           <div className="flex items-center gap-2">
             <div className="inline-flex items-center bg-paper-2 rounded-soft p-0.5 shadow-rule">
@@ -70,12 +70,11 @@ export function ChartCard({
         />
       </div>
       <div className="px-5 py-2.5 border-t border-rule flex items-center gap-5 text-[11px] text-ink-3">
-        <Legend dot="bg-bull" label="UA / LA · Ascending primary" />
-        <Legend dot="bg-bear" label="UD / LD · Descending primary" />
-        <Legend dot="bg-bull/40" dashed label="S_ASC · Secondary target" />
+        <Legend dot="bg-bull" label="Ascending primary" />
+        <Legend dot="bg-bear" label="Descending primary" />
+        <Legend dot="bg-bull/40" dashed label="Secondary target" />
         <Legend dot="bg-gold" ring label="Anchor pivot" />
         <Legend dot="bg-teal" ring label="Latest signal" />
-        <span className="ml-auto font-mono text-ink-4">slope $0.20/hr</span>
       </div>
     </Card>
   );
