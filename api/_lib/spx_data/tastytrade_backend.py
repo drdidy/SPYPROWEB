@@ -44,9 +44,15 @@ from ..spx.candles import Candle
 from .protocol import FetcherUnavailable, SyncQuote
 from ..spx.time_utils import to_ct
 
-API_URL = "https://api.tastyworks.com"
+# Production base. Earlier code pointed at api.tastyworks.com (legacy
+# host) which silently 200'd with empty payloads on /market-data/by-type,
+# making it look like a "no symbols" issue. The api/_lib/tastytrade.py
+# SPY-options client already uses the correct host.
+API_URL = "https://api.tastytrade.com"
 OAUTH_PATH = "/oauth/token"
 QUOTE_PATH = "/market-data/by-type"
+# Tastytrade's market-data-by-type expects API version negotiation.
+TT_API_VERSION = "20251101"
 
 # Symbols (Tastytrade convention).
 ES_FUTURES_SYMBOL = "/ES"   # continuous front month
@@ -147,7 +153,11 @@ class TastytradeFetcher:
 
     def _auth_headers(self) -> dict[str, str]:
         token = self._ensure_access_token()
-        return {"Authorization": f"Bearer {token}"}
+        return {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+            "Accept-Version": TT_API_VERSION,
+        }
 
     # ---- Sync quote ---------------------------------------------------------
 
@@ -157,11 +167,21 @@ class TastytradeFetcher:
 
         Returns a SyncQuote with .offset = spx - es ready to feed the
         engine.
+
+        IMPORTANT: Tastytrade's by-type endpoint expects the symbol-list
+        query params named *singular* (`future`, `index`) sent as a
+        repeated array. Sending plural `futures`/`indices` (the previous
+        version of this code) silently returned an empty `items` list,
+        which manifested as the "Got symbols: []" error and a permanent
+        fallback to yfinance.
         """
         try:
             res = requests.get(
                 f"{API_URL}{QUOTE_PATH}",
-                params={"futures": ES_FUTURES_SYMBOL, "indices": SPX_INDEX_SYMBOL},
+                params=[
+                    ("future", ES_FUTURES_SYMBOL),
+                    ("index", SPX_INDEX_SYMBOL),
+                ],
                 headers=self._auth_headers(),
                 timeout=QUOTE_TIMEOUT,
             )
