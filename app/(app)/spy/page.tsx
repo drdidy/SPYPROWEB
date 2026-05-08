@@ -5,13 +5,23 @@ import { OptionsIntelPanel } from "@/components/dashboard/OptionsIntel";
 import { BiasMeter } from "@/components/dashboard/BiasMeter";
 import { RiskGuardrails } from "@/components/dashboard/RiskGuardrails";
 import { SectionLabel } from "@/components/ui/SectionLabel";
+import { ReplayBar } from "@/components/replay/ReplayBar";
+import { ReplayOutcome } from "@/components/replay/ReplayOutcome";
 import { loadLiveSnapshot } from "@/lib/snapshot-fetch";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function Page() {
-  const { data: snap, source, error } = await loadLiveSnapshot();
+interface PageProps {
+  searchParams?: { date?: string };
+}
+
+export default async function Page({ searchParams }: PageProps) {
+  const replayDate =
+    searchParams?.date && /^\d{4}-\d{2}-\d{2}$/.test(searchParams.date)
+      ? searchParams.date
+      : undefined;
+  const { data: snap, source, error } = await loadLiveSnapshot(replayDate);
   const {
     decision,
     lines,
@@ -50,8 +60,14 @@ export default async function Page() {
         </div>
       </header>
 
-      {/* Hero — channel-rail diagram + verdict, mirrors SPXChannelHero. */}
+      <ReplayBar current={replayDate ?? null} />
+
+      {/* Hero — anchor framework. */}
       <SPYChannelHero snap={snap} />
+
+      {snap.replay?.isReplay && (
+        <ReplayOutcome replay={snap.replay} verdict={decision.verdict} />
+      )}
 
       <section className="space-y-5">
         <SectionLabel number="01">Plays</SectionLabel>

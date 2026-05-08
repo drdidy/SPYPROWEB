@@ -50,6 +50,7 @@ function emptyAdapted(): AdaptedSnapshot {
     hourlyCandles: [],
     lines: [],
     anchor: null,
+    replay: null,
     pivots: [],
     currentPrice: 0,
     bias: {
@@ -110,7 +111,9 @@ function resolveBase(): string | null {
   return null;
 }
 
-export async function loadLiveSnapshot(): Promise<LoadedLiveSnapshot> {
+export async function loadLiveSnapshot(
+  replayDate?: string,
+): Promise<LoadedLiveSnapshot> {
   const fetchedAt = new Date().toISOString();
   const base = resolveBase();
   if (!base) {
@@ -122,14 +125,19 @@ export async function loadLiveSnapshot(): Promise<LoadedLiveSnapshot> {
     };
   }
 
+  const target =
+    replayDate && /^\d{4}-\d{2}-\d{2}$/.test(replayDate)
+      ? `${base}/api/snapshot?date=${replayDate}`
+      : `${base}/api/snapshot`;
+
   try {
-    const res = await fetch(`${base}/api/snapshot`, { cache: "no-store" });
+    const res = await fetch(target, { cache: "no-store" });
     if (!res.ok) {
       return {
         data: emptyAdapted(),
         source: "error",
         fetchedAt,
-        error: `API returned ${res.status} from ${base}/api/snapshot`,
+        error: `API returned ${res.status} from ${target}`,
       };
     }
     const raw = (await res.json()) as RawSnapshot;
@@ -145,7 +153,7 @@ export async function loadLiveSnapshot(): Promise<LoadedLiveSnapshot> {
       fetchedAt,
       error:
         (e instanceof Error ? `${e.message} ` : "fetch failed ") +
-        `(target=${base}/api/snapshot)`,
+        `(target=${target})`,
     };
   }
 }

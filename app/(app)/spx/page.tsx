@@ -4,6 +4,7 @@ import { SPXPlaysSlate } from "@/components/spx/SPXPlaysSlate";
 import { SPXLineLadder } from "@/components/spx/SPXLineLadder";
 import { SPXSessionOrigin } from "@/components/spx/SPXSessionOrigin";
 import { SPXConfluence } from "@/components/spx/SPXConfluence";
+import { ReplayBar } from "@/components/replay/ReplayBar";
 import { loadSnapshot } from "@/lib/spx-fetch";
 
 // Render at request time so loadSnapshot() can read the live host
@@ -13,8 +14,16 @@ import { loadSnapshot } from "@/lib/spx-fetch";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function Page() {
-  const { snap, source, error } = await loadSnapshot();
+interface PageProps {
+  searchParams?: { date?: string };
+}
+
+export default async function Page({ searchParams }: PageProps) {
+  const replayDate =
+    searchParams?.date && /^\d{4}-\d{2}-\d{2}$/.test(searchParams.date)
+      ? searchParams.date
+      : undefined;
+  const { snap, source, error } = await loadSnapshot(replayDate);
   const meta = snap._meta;
 
   return (
@@ -94,6 +103,8 @@ export default async function Page() {
           <Stat label="Slope" value="±1.05 pts/hr" />
         </div>
       </header>
+
+      <ReplayBar current={replayDate ?? null} />
 
       <SPXChannelHero snap={snap} />
 
