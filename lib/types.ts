@@ -1,6 +1,15 @@
 // Domain types modeled on api/prophet_core.py
 
-export type LineKind = "UA" | "UD" | "LA" | "LD";
+export type LineKind =
+  | "UA"
+  | "UD"
+  | "LA"
+  | "LD"
+  | "ANC_ASC"
+  | "ANC_DESC"
+  | "PDH"
+  | "PDL"
+  | "DAY_OPEN";
 export type Direction = "ASCENDING" | "DESCENDING";
 export type ZoneType = "PRIMARY_TRIGGER" | "SECONDARY_TARGET" | "RETEST";
 

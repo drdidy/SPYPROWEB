@@ -2,22 +2,18 @@ import { DecisionSlate } from "@/components/dashboard/DecisionSlate";
 import { ChartCard } from "@/components/chart/ChartCard";
 import { AnchorSummary } from "@/components/dashboard/AnchorSummary";
 import { TriggerMap } from "@/components/dashboard/TriggerMap";
-import { WaitDiscipline } from "@/components/dashboard/WaitDiscipline";
 import { SignalTape } from "@/components/dashboard/SignalTape";
 import { OptionsIntelPanel } from "@/components/dashboard/OptionsIntel";
 import { BiasMeter } from "@/components/dashboard/BiasMeter";
 import { RiskGuardrails } from "@/components/dashboard/RiskGuardrails";
 import { SectionLabel } from "@/components/ui/SectionLabel";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { loadLiveSnapshot } from "@/lib/snapshot-fetch";
 
-// Render at request time so we can read the live request host via
-// next/headers and hit /api/snapshot on the same public hostname.
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function Page() {
-  const { data: snap, source } = await loadLiveSnapshot();
+  const { data: snap, source, error } = await loadLiveSnapshot();
   const {
     decision,
     signal,
@@ -29,25 +25,64 @@ export default async function Page() {
     currentPrice,
     bias,
     guardrails,
-    waitDiscipline,
     optionsIntel,
     strikes,
     signalTicks,
   } = snap;
 
   return (
-    <div className="max-w-[1440px] mx-auto pb-16 space-y-8">
-      <PageHeader
-        eyebrow="Workspace · 02"
-        title="SPY Channel"
-        lede="The deep read on SPY. Chart, triggers, options intel, signal tape, and the discipline that keeps you out of the wrong trades."
-        source={source}
-      />
+    <div className="max-w-[1440px] mx-auto space-y-10 pb-16">
+      {/* Editorial header — matches /spx */}
+      <header className="flex flex-col gap-3 pt-2 pb-1 md:flex-row md:items-end md:justify-between">
+        <div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="font-mono text-[10px] text-ink-3 tracking-[0.20em] uppercase">
+              SPY · Channel · session today
+            </span>
+            <span className="h-px w-10 bg-rule-strong hidden sm:block" />
+            <span className="font-mono text-[10px] text-ink-3 tracking-[0.20em] uppercase">
+              {todayLabel()}
+            </span>
+            <SourceBadge source={source} error={error} />
+          </div>
+          <h1 className="mt-3 text-display font-serif tracking-tight text-ink">
+            The trading day,{" "}
+            <span className="text-ink-3 italic font-light">read aloud.</span>
+          </h1>
+        </div>
+        <div className="hidden md:flex items-center gap-6 text-right">
+          <Stat label="Bias" value={bias.bias} highlight={bias.bias} />
+          <Stat label="Window" value={decision.windowET || "—"} />
+          <Stat label="Last" value={currentPrice.toFixed(2)} />
+        </div>
+      </header>
 
+      {/* Hero — verdict + signal anatomy. Mirrors role of SPXChannelHero. */}
       <DecisionSlate decision={decision} signal={signal} quality={quality} />
 
       <section className="space-y-5">
-        <SectionLabel number="01">Structure</SectionLabel>
+        <SectionLabel number="01">Plays</SectionLabel>
+        <OptionsIntelPanel
+          intel={optionsIntel}
+          strikes={strikes}
+          spy={currentPrice}
+        />
+      </section>
+
+      <section className="space-y-5">
+        <SectionLabel number="02">Lines</SectionLabel>
+        <div className="grid grid-cols-12 gap-5">
+          <div className="col-span-12 xl:col-span-7">
+            <TriggerMap lines={lines} />
+          </div>
+          <div className="col-span-12 xl:col-span-5">
+            <BiasMeter state={bias} />
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-5">
+        <SectionLabel number="03">Structure</SectionLabel>
         <div className="grid grid-cols-12 gap-5">
           <div className="col-span-12 xl:col-span-8">
             <ChartCard
@@ -66,44 +101,87 @@ export default async function Page() {
       </section>
 
       <section className="space-y-5">
-        <SectionLabel number="02">Execution</SectionLabel>
-        <div className="grid grid-cols-12 gap-5">
-          <div className="col-span-12 xl:col-span-7">
-            <TriggerMap lines={lines} />
-          </div>
-          <div className="col-span-12 xl:col-span-5">
-            <WaitDiscipline items={waitDiscipline} />
-          </div>
-        </div>
-      </section>
-
-      <section className="space-y-5">
-        <SectionLabel number="03">Intelligence</SectionLabel>
+        <SectionLabel number="04">Defense</SectionLabel>
         <div className="grid grid-cols-12 gap-5">
           <div className="col-span-12 xl:col-span-7">
             <SignalTape ticks={signalTicks} />
           </div>
           <div className="col-span-12 xl:col-span-5">
-            <OptionsIntelPanel
-              intel={optionsIntel}
-              strikes={strikes}
-              spy={currentPrice}
-            />
-          </div>
-        </div>
-      </section>
-
-      <section className="space-y-5">
-        <SectionLabel number="04">Defense</SectionLabel>
-        <div className="grid grid-cols-12 gap-5">
-          <div className="col-span-12 xl:col-span-8">
-            <BiasMeter state={bias} />
-          </div>
-          <div className="col-span-12 xl:col-span-4">
             <RiskGuardrails state={guardrails} />
           </div>
         </div>
       </section>
+
+      <footer className="pt-6 mt-6 border-t border-rule flex items-center justify-between text-[10px] text-ink-3 font-mono uppercase tracking-[0.18em]">
+        <span>Prophet · SPY channel</span>
+        <span>End of slate</span>
+      </footer>
+    </div>
+  );
+}
+
+function SourceBadge({
+  source,
+  error,
+}: {
+  source: "live" | "degraded" | "seed" | "mock" | "error";
+  error?: string;
+}) {
+  const live = source === "live";
+  const degraded = source === "degraded";
+  const cls = live
+    ? "bg-bull-tint text-bull-ink shadow-[inset_0_0_0_1px_rgba(14,124,80,0.30)]"
+    : degraded
+      ? "bg-gold-tint text-gold-ink shadow-[inset_0_0_0_1px_rgba(184,130,31,0.30)]"
+      : "bg-paper-2 text-ink-3 shadow-[inset_0_0_0_1px_rgba(20,22,26,0.10)]";
+  return (
+    <span
+      title={error || `Source: ${source}`}
+      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-pill text-[9px] font-mono font-semibold uppercase tracking-[0.12em] ${cls}`}
+    >
+      <span
+        className={`w-1 h-1 rounded-full ${live ? "bg-bull animate-breathe" : degraded ? "bg-gold" : "bg-ink-4"}`}
+      />
+      {source}
+    </span>
+  );
+}
+
+function todayLabel(): string {
+  return new Date()
+    .toLocaleDateString("en-US", {
+      weekday: "long",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    })
+    .toUpperCase();
+}
+
+function Stat({
+  label,
+  value,
+  highlight,
+}: {
+  label: string;
+  value: string;
+  highlight?: string;
+}) {
+  return (
+    <div>
+      <div className="eyebrow text-ink-3 mb-0.5">{label}</div>
+      <div
+        className={`font-mono text-[13px] font-semibold tabular-nums ${
+          highlight === "BULLISH"
+            ? "text-bull-ink"
+            : highlight === "BEARISH"
+              ? "text-bear-ink"
+              : "text-ink"
+        }`}
+        data-num
+      >
+        {value}
+      </div>
     </div>
   );
 }
