@@ -60,6 +60,7 @@ export interface RawSnapshot {
     status: "ARMED" | "WATCHING" | "BREACHED" | "STALE";
   }>;
   candles: Array<{ t: string; o: number; h: number; l: number; c: number }>;
+  hourlyCandles?: Array<{ t: string; o: number; h: number; l: number; c: number }>;
   signals: Array<{
     id: string;
     type: string;
@@ -172,6 +173,7 @@ export interface AdaptedSnapshot {
   signal: TradeSignal | null;
   quality: SignalQuality | null;
   candles: Candle[];
+  hourlyCandles: Candle[];
   lines: DynamicLine[];
   pivots: Pivot[];
   currentPrice: number;
@@ -665,6 +667,7 @@ export function adaptSnapshot(raw: RawSnapshot): AdaptedSnapshot {
     signal: mapLatestSignal(raw),
     quality: mapQuality(raw),
     candles: raw.candles.map((c) => ({ t: c.t, o: c.o, h: c.h, l: c.l, c: c.c, v: 0 })),
+    hourlyCandles: (raw.hourlyCandles ?? []).map((c) => ({ t: c.t, o: c.o, h: c.h, l: c.l, c: c.c, v: 0 })),
     lines: raw.triggers.map(mapTriggerToLine),
     pivots: mapPivots(raw),
     currentPrice: raw.quote.last,

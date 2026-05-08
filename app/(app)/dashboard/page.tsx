@@ -24,6 +24,7 @@ export default async function Page() {
     signal,
     quality,
     candles,
+    hourlyCandles,
     lines,
     pivots,
     currentPrice,
@@ -70,6 +71,7 @@ export default async function Page() {
           <div className="col-span-12 xl:col-span-8">
             <ChartCard
               candles={candles}
+              hourlyCandles={hourlyCandles}
               lines={lines}
               pivots={pivots}
               signal={signal ?? undefined}
