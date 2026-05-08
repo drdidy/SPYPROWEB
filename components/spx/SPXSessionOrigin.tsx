@@ -17,7 +17,7 @@ export function SPXSessionOrigin({ snap }: { snap: SPXSnapshot }) {
       <CardHeader
         eyebrow="Origin"
         title="Why today's channel"
-        meta="Sydney 17:00–21:00 CT · Tokyo 21:00–02:00 CT · Overnight 15:00–02:00 CT"
+        meta="Sydney 17:00–21:00 CT · Tokyo 21:00–24:00 CT · Overnight anchors 15:00–24:00 CT"
       />
       <CardBody className="px-0 pb-0">
         <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-rule">
@@ -31,7 +31,7 @@ export function SPXSessionOrigin({ snap }: { snap: SPXSnapshot }) {
           />
           <SessionPanel
             name="Tokyo"
-            window="21:00–02:00 CT"
+            window="21:00–24:00 CT"
             high={snap.sessions.tokyo.high}
             low={snap.sessions.tokyo.low}
             highTime={snap.sessions.tokyo.highTime}

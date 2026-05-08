@@ -1,17 +1,144 @@
-import { StubPage } from "@/components/layout/StubPage";
-export default function Page() {
+import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { SectionLabel } from "@/components/ui/SectionLabel";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { loadLiveSnapshot } from "@/lib/snapshot-fetch";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+export default async function Page() {
+  const { data: snap, source } = await loadLiveSnapshot();
+  const high = snap.pivots.find((p) => p.kind === "HIGH");
+  const low = snap.pivots.find((p) => p.kind === "LOW");
+
   return (
-    <StubPage
-      number="10"
-      eyebrow="Intelligence"
-      title="Daily Brief"
-      lede="A single-page editorial brief read at the open. Yesterday's close, overnight action, today's anchors and bias — written in plain English so you walk in knowing the day."
-      bullets={[
-        "Yesterday's close and overnight session summary in 60 seconds.",
-        "Today's lattice in narrative form: which anchors are in force, where the read leans.",
-        "Pre-open checklist: levels to watch first, conditions that promote or veto trades.",
-        "End-of-day debrief auto-published at 4:01 PM ET with replay links.",
-      ]}
-    />
+    <div className="max-w-[920px] mx-auto pb-16 space-y-8">
+      <PageHeader
+        eyebrow="Intelligence · 10"
+        title="Daily Brief"
+        lede="The day in plain English. Yesterday's close, what overnight did, where the day looks like it's leaning."
+        source={source}
+      />
+
+      <SectionLabel number="01">Today, in one read</SectionLabel>
+      <Card>
+        <CardHeader
+          eyebrow="Bias"
+          title={
+            snap.bias.bias === "BULLISH"
+              ? "Lean bullish"
+              : snap.bias.bias === "BEARISH"
+                ? "Lean bearish"
+                : "Neutral"
+          }
+          meta={`Strength ${snap.bias.strengthScore}/100`}
+        />
+        <CardBody>
+          <p className="text-[15px] text-ink-2 leading-relaxed">
+            {snap.bias.explanation || "Engine is initializing today's read."}
+          </p>
+        </CardBody>
+      </Card>
+
+      <SectionLabel number="02">Decision</SectionLabel>
+      <Card>
+        <CardHeader
+          eyebrow="What we're doing"
+          title={
+            snap.decision.verdict === "WAIT"
+              ? "Waiting"
+              : snap.decision.verdict === "STAND DOWN"
+                ? "Standing down"
+                : `${snap.decision.verdict.toLowerCase()} bias`
+          }
+          meta={snap.decision.windowET || undefined}
+        />
+        <CardBody>
+          <p className="text-[15px] text-ink-2 leading-relaxed">
+            {snap.decision.finalExplanation || "No commentary yet."}
+          </p>
+        </CardBody>
+      </Card>
+
+      <SectionLabel number="03">Anchors carried in</SectionLabel>
+      <Card>
+        <CardBody className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Anchor kind="HIGH" pivot={high} />
+          <Anchor kind="LOW" pivot={low} />
+        </CardBody>
+      </Card>
+
+      <SectionLabel number="04">First lines to watch</SectionLabel>
+      <Card>
+        <CardBody>
+          {snap.lines.length === 0 ? (
+            <div className="text-[13px] text-ink-3">No lines resolved yet.</div>
+          ) : (
+            <ol className="space-y-3">
+              {[...snap.lines]
+                .sort(
+                  (a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice),
+                )
+                .slice(0, 5)
+                .map((l) => (
+                  <li
+                    key={l.name}
+                    className="flex items-baseline justify-between text-[13px]"
+                  >
+                    <span className="font-mono text-ink">{l.name}</span>
+                    <span className="font-mono tabular-nums text-ink-2">
+                      {l.currentValue.toFixed(2)}{" "}
+                      <span
+                        className={
+                          l.distanceFromPrice >= 0
+                            ? "text-bull-ink"
+                            : "text-bear-ink"
+                        }
+                      >
+                        ({l.distanceFromPrice >= 0 ? "+" : ""}
+                        {l.distanceFromPrice.toFixed(2)})
+                      </span>
+                    </span>
+                  </li>
+                ))}
+            </ol>
+          )}
+        </CardBody>
+      </Card>
+    </div>
+  );
+}
+
+function Anchor({
+  kind,
+  pivot,
+}: {
+  kind: "HIGH" | "LOW";
+  pivot: { price: number; time: string; source: string } | undefined;
+}) {
+  if (!pivot) {
+    return (
+      <div className="px-3 py-2 rounded-soft bg-paper-2">
+        <div className="eyebrow text-ink-3">{kind}</div>
+        <div className="text-[13px] text-ink-3 mt-1">No anchor resolved.</div>
+      </div>
+    );
+  }
+  return (
+    <div className="px-3 py-2 rounded-soft bg-paper-2">
+      <div className="eyebrow text-ink-3">{kind}</div>
+      <div className="font-mono text-xl font-semibold tabular-nums text-ink mt-0.5">
+        {pivot.price.toFixed(2)}
+      </div>
+      <div className="text-[11px] text-ink-3 mt-1">
+        {new Date(pivot.time).toLocaleString("en-US", {
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        })}{" "}
+        · {pivot.source}
+      </div>
+    </div>
   );
 }

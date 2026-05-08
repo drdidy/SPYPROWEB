@@ -14,10 +14,32 @@ export function OptionsIntelPanel({
   strikes,
   spy,
 }: {
-  intel: Intel;
-  strikes: SelectedStrikes;
+  intel: Intel | null;
+  strikes: SelectedStrikes | null;
   spy: number;
 }) {
+  if (!intel || !strikes) {
+    return (
+      <Card>
+        <CardHeader
+          eyebrow="Options Intelligence"
+          title="Dealer & flow"
+          action={<StatusPill variant="stale">PENDING</StatusPill>}
+        />
+        <CardBody className="space-y-3 py-10">
+          <div className="font-serif text-headline text-ink-3 italic font-light">
+            Options chain not yet loaded.
+          </div>
+          <p className="text-[13px] text-ink-3 leading-relaxed max-w-md">
+            Tastytrade returned no chain for the active expiration (likely
+            outside market hours, or the broker auth is still warming up).
+            This panel populates once the chain arrives.
+          </p>
+        </CardBody>
+      </Card>
+    );
+  }
+
   const allStrikes = [
     intel.putWall,
     intel.callWall,

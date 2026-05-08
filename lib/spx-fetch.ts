@@ -1,18 +1,16 @@
 // Server-side fetcher for /api/spx/snapshot.
 //
-// Same-origin: the Python function lives at api/spx/snapshot.py and is
-// served by Vercel under the same hostname as the Next.js app, so no
-// external base URL is needed.
+// Reads the live request host via next/headers (same approach as
+// snapshot-fetch.ts) so it always hits the public URL the user
+// reached us on, never the Deployment-Protected VERCEL_URL.
 //
-// Falls back to lib/spx-mock-data when the API is unreachable so the
-// page still renders in dev / preview without the function deployed.
-// Returns SnapshotSource so the page can render an honest "live" /
-// "mock" badge in the editorial header.
+// The page that calls this MUST be marked `dynamic = 'force-dynamic'`
+// so the fetch happens at request time when headers() works.
+
+import { headers } from "next/headers";
 
 import type { SPXSnapshot } from "./types";
 import { spxSnapshot as mockSnapshot } from "./spx-mock-data";
-
-const REVALIDATE_SECONDS = 30;
 
 export type SnapshotSource = "live" | "mock";
 
@@ -23,25 +21,43 @@ export interface LoadedSnapshot {
   error?: string;
 }
 
+function resolveBase(): string | null {
+  const override = process.env.NEXT_PUBLIC_API_BASE?.trim();
+  if (override) return override;
+  try {
+    const h = headers();
+    const host = h.get("x-forwarded-host") || h.get("host");
+    if (host) {
+      const proto =
+        h.get("x-forwarded-proto") ||
+        (host.startsWith("localhost") ? "http" : "https");
+      return `${proto}://${host}`;
+    }
+  } catch {
+    // headers() throws outside a request scope; fall through to null
+  }
+  return null;
+}
+
 export async function loadSnapshot(): Promise<LoadedSnapshot> {
   const fetchedAt = new Date().toISOString();
-  // Server-side fetch needs an absolute URL. Vercel exposes the runtime
-  // host via VERCEL_URL; locally we rely on PORT or default to 3000.
-  const base =
-    process.env.NEXT_PUBLIC_API_BASE?.trim() ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
-    `http://localhost:${process.env.PORT ?? 3000}`;
-
+  const base = resolveBase();
+  if (!base) {
+    return {
+      snap: mockSnapshot,
+      source: "mock",
+      fetchedAt,
+      error: "no request host (build-time render?)",
+    };
+  }
   try {
-    const res = await fetch(`${base}/api/spx/snapshot`, {
-      next: { revalidate: REVALIDATE_SECONDS },
-    });
+    const res = await fetch(`${base}/api/spx/snapshot`, { cache: "no-store" });
     if (!res.ok) {
       return {
         snap: mockSnapshot,
         source: "mock",
         fetchedAt,
-        error: `API returned ${res.status}`,
+        error: `API returned ${res.status} from ${base}/api/spx/snapshot`,
       };
     }
     const snap = (await res.json()) as SPXSnapshot;

@@ -18,23 +18,10 @@ import {
   adaptSnapshot,
   type AdaptedSnapshot,
   type RawSnapshot,
-  type SignalTick,
 } from "./snapshot-adapter";
-import {
-  decision as mockDecision,
-  latestSignal as mockSignal,
-  signalQuality as mockQuality,
-  candles as mockCandles,
-  lines as mockLines,
-  pivots as mockPivots,
-  currentPrice as mockPrice,
-  biasState as mockBias,
-  guardrails as mockGuardrails,
-  waitDiscipline as mockWaitDiscipline,
-  optionsIntel as mockOptionsIntel,
-  strikes as mockStrikes,
-  shellState as mockShellState,
-} from "./mock-data";
+// Honest "no data" state when the upstream is unreachable. We do NOT
+// fall back to lib/mock-data here — the dashboard surfaces handle
+// nullable fields by rendering empty states.
 
 export type LiveSnapshotSource = "live" | "degraded" | "seed" | "mock" | "error";
 
@@ -45,26 +32,56 @@ export interface LoadedLiveSnapshot {
   error?: string;
 }
 
-const mockTicks: SignalTick[] = [];
-
-function mockAdapted(): AdaptedSnapshot {
+function emptyAdapted(): AdaptedSnapshot {
   return {
-    source: "seed",
+    source: "error",
     asOf: new Date().toISOString(),
-    decision: mockDecision,
-    signal: mockSignal,
-    quality: mockQuality,
-    candles: mockCandles,
-    lines: mockLines,
-    pivots: mockPivots,
-    currentPrice: mockPrice,
-    bias: mockBias,
-    guardrails: mockGuardrails,
-    waitDiscipline: mockWaitDiscipline,
-    optionsIntel: mockOptionsIntel,
-    strikes: mockStrikes,
-    signalTicks: mockTicks,
-    shellState: mockShellState,
+    decision: {
+      finalDecision: "WAIT_FOR_CONFIRMATION",
+      verdict: "WAIT",
+      conviction: 0,
+      finalExplanation: "Live data unavailable. Reconnecting…",
+      windowET: "",
+      updatedAt: "",
+    },
+    signal: null,
+    quality: null,
+    candles: [],
+    lines: [],
+    pivots: [],
+    currentPrice: 0,
+    bias: {
+      bias: "NEUTRAL",
+      strengthScore: 0,
+      ua: { value: 0, touched: false },
+      ud: { value: 0, touched: false },
+      la: { value: 0, touched: false },
+      ld: { value: 0, touched: false },
+      explanation: "",
+    },
+    guardrails: {
+      chase: { status: "OK", detail: "" },
+      retest: { status: "OK", detail: "" },
+      structure: { status: "WAITING", detail: "" },
+      daily: { status: "OK", detail: "" },
+    },
+    waitDiscipline: [],
+    optionsIntel: null,
+    strikes: null,
+    signalTicks: [],
+    flow: null,
+    gex: null,
+    marketContext: null,
+    optionsChain: null,
+    shellState: {
+      spy: 0,
+      change: 0,
+      changePct: 0,
+      vix: 0,
+      isLive: false,
+      sessionLabel: "",
+      sessionCloses: "",
+    },
   };
 }
 
@@ -96,8 +113,8 @@ export async function loadLiveSnapshot(): Promise<LoadedLiveSnapshot> {
   const base = resolveBase();
   if (!base) {
     return {
-      data: mockAdapted(),
-      source: "mock",
+      data: emptyAdapted(),
+      source: "error",
       fetchedAt,
       error: "no request host (build-time render?)",
     };
@@ -107,8 +124,8 @@ export async function loadLiveSnapshot(): Promise<LoadedLiveSnapshot> {
     const res = await fetch(`${base}/api/snapshot`, { cache: "no-store" });
     if (!res.ok) {
       return {
-        data: mockAdapted(),
-        source: "mock",
+        data: emptyAdapted(),
+        source: "error",
         fetchedAt,
         error: `API returned ${res.status} from ${base}/api/snapshot`,
       };
@@ -121,8 +138,8 @@ export async function loadLiveSnapshot(): Promise<LoadedLiveSnapshot> {
     };
   } catch (e) {
     return {
-      data: mockAdapted(),
-      source: "mock",
+      data: emptyAdapted(),
+      source: "error",
       fetchedAt,
       error:
         (e instanceof Error ? `${e.message} ` : "fetch failed ") +
