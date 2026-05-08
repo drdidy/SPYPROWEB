@@ -363,6 +363,85 @@ def _anchor_display_label(name: str) -> str:
     return f"{role.title()} {band_label}"
 
 
+def _anchor_payload_for_ui(
+    primary_lines: list[pc.DynamicLine],
+    current_dt: datetime,
+    slope: float,
+) -> dict | None:
+    """Structured payload for the SPY Channel hero diagram.
+
+    The SPY framework draws three parallel descending lines from each
+    qualifying premarket bearish candle (Upper / Main / Lower at +3.4 /
+    0 / -3.4 from anchor.low, all decaying at the calibrated slope).
+    The hero diagram needs the anchor timestamp + low and each band's
+    anchor price so it can project the lines forward visually.
+    """
+
+    def _group(role_filter, name_prefix_starts_with: str | None = None) -> dict | None:
+        if name_prefix_starts_with is not None:
+            members = [
+                l for l in primary_lines
+                if l.name.startswith(name_prefix_starts_with)
+            ]
+        else:
+            members = [l for l in primary_lines if role_filter(l)]
+        if not members:
+            return None
+        upper = next((l for l in members if l.zone_type == "CALL_ZONE"), None)
+        main = next((l for l in members if l.zone_type == "MAIN"), None)
+        lower = next((l for l in members if l.zone_type == "PUT_ZONE"), None)
+        if main is None:
+            return None
+        anchor_ts = pd.Timestamp(main.anchor_time).isoformat()
+        return {
+            "role": main.name.split("_")[1] if main.name.startswith("ANC_") else "PRIMARY",
+            "anchorTime": anchor_ts,
+            "anchorLow": round(float(main.anchor_price), 2),
+            "bands": {
+                "upper": {
+                    "anchorPrice": round(float(upper.anchor_price), 2) if upper else None,
+                    "currentValue": _line_current_or_none(upper, current_dt),
+                },
+                "main": {
+                    "anchorPrice": round(float(main.anchor_price), 2),
+                    "currentValue": _line_current_or_none(main, current_dt),
+                },
+                "lower": {
+                    "anchorPrice": round(float(lower.anchor_price), 2) if lower else None,
+                    "currentValue": _line_current_or_none(lower, current_dt),
+                },
+            },
+        }
+
+    primary_group = _group(
+        role_filter=lambda l: False,
+        name_prefix_starts_with="ANC_PRIMARY_",
+    )
+    anchor2_group = _group(
+        role_filter=lambda l: False,
+        name_prefix_starts_with="ANC_ANCHOR_2_",
+    )
+
+    if primary_group is None and anchor2_group is None:
+        # No premarket anchors today.
+        return None
+
+    return {
+        "slopePerHour": round(abs(float(slope)), 4),
+        "primary": primary_group,
+        "anchor2": anchor2_group,
+    }
+
+
+def _line_current_or_none(line: pc.DynamicLine | None, current_dt: datetime) -> float | None:
+    if line is None:
+        return None
+    v = line.tradable_value_at(current_dt)
+    if v is None or pd.isna(v):
+        return None
+    return round(float(v), 2)
+
+
 def _chart_lines_from_primary(
     primary_lines: list[pc.DynamicLine],
     current_dt: datetime,
@@ -898,6 +977,11 @@ def build_live_snapshot() -> dict:
     # client-side for the longer frames.
     hourly_candles = _hourly_candles_for_chart(df)
     chart_lines = _chart_lines_from_primary(primary_lines, projection_time, rth_today)
+    # Structured anchor payload for the SPY hero diagram. Carries each
+    # anchor's timestamp + low and its three descending bands (Upper /
+    # Main / Lower) so the frontend can render the parallel-line
+    # signature without reverse-engineering line names.
+    anchor_payload_for_ui = _anchor_payload_for_ui(primary_lines, projection_time, slope)
 
     options = tastytrade.fetch_options_snapshot(current_price)
 
@@ -941,6 +1025,7 @@ def build_live_snapshot() -> dict:
         "candles": candles,
         "hourlyCandles": hourly_candles,
         "chartLines": chart_lines,
+        "anchor": anchor_payload_for_ui,
         "options": options,
         "flow": flow_summary,
         "gex": gex_summary,

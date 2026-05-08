@@ -51,6 +51,7 @@ export interface RawSnapshot {
   };
   context: { vix: number; dxy: number; vvix: number };
   spark: number[];
+  anchor?: AnchorPayload | null;
   triggers: Array<{
     line: string;
     kind?: string;
@@ -129,6 +130,22 @@ interface PivotInfo {
   candleColor: string;
 }
 
+export interface AnchorBand {
+  anchorPrice: number | null;
+  currentValue: number | null;
+}
+export interface AnchorGroup {
+  role: string;
+  anchorTime: string;
+  anchorLow: number;
+  bands: { upper: AnchorBand; main: AnchorBand; lower: AnchorBand };
+}
+export interface AnchorPayload {
+  slopePerHour: number;
+  primary: AnchorGroup | null;
+  anchor2: AnchorGroup | null;
+}
+
 export interface OptionsRaw {
   expiration: string;
   atm: number;
@@ -177,6 +194,7 @@ export interface AdaptedSnapshot {
   hourlyCandles: Candle[];
   lines: DynamicLine[];
   pivots: Pivot[];
+  anchor: AnchorPayload | null;
   currentPrice: number;
   bias: BiasState;
   guardrails: RiskGuardrailState;
@@ -679,6 +697,7 @@ export function adaptSnapshot(raw: RawSnapshot): AdaptedSnapshot {
     quality: mapQuality(raw),
     candles: raw.candles.map((c) => ({ t: c.t, o: c.o, h: c.h, l: c.l, c: c.c, v: 0 })),
     hourlyCandles: (raw.hourlyCandles ?? []).map((c) => ({ t: c.t, o: c.o, h: c.h, l: c.l, c: c.c, v: 0 })),
+    anchor: raw.anchor ?? null,
     lines: raw.triggers.map(mapTriggerToLine),
     pivots: mapPivots(raw),
     currentPrice: raw.quote.last,
