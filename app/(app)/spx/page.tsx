@@ -15,6 +15,7 @@ export const revalidate = 0;
 
 export default async function Page() {
   const { snap, source, error } = await loadSnapshot();
+  const meta = snap._meta;
 
   return (
     <div className="max-w-[1440px] mx-auto space-y-10 pb-16">
@@ -35,6 +36,41 @@ export default async function Page() {
             The corridor,{" "}
             <span className="text-ink-3 italic font-light">read aloud.</span>
           </h1>
+          {meta && (
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-[10px] font-mono text-ink-3 tracking-[0.04em]">
+              <span>
+                Bars <span className="text-ink-2">{meta.barsSource}</span>
+                <span className="text-ink-4 ml-1">({meta.barsCount})</span>
+              </span>
+              <span className="text-ink-4">·</span>
+              <span>
+                Quote <span className="text-ink-2">{meta.quoteSource}</span>
+              </span>
+              <span className="text-ink-4">·</span>
+              <span>
+                Offset{" "}
+                <span className="text-ink-2 tabular-nums">
+                  {meta.appliedOffset >= 0 ? "+" : ""}
+                  {meta.appliedOffset.toFixed(2)}
+                </span>
+              </span>
+              <span className="text-ink-4">·</span>
+              <span>
+                ES <span className="text-ink-2 tabular-nums">{meta.esSpot.toFixed(2)}</span>{" "}
+                / SPX <span className="text-ink-2 tabular-nums">{meta.spxSpot.toFixed(2)}</span>
+              </span>
+              {meta.barsError && (
+                <span className="text-bear-ink">
+                  · bars-fallback: {meta.barsError}
+                </span>
+              )}
+              {meta.quoteError && (
+                <span className="text-bear-ink">
+                  · quote-fallback: {meta.quoteError}
+                </span>
+              )}
+            </div>
+          )}
         </div>
         <div className="hidden md:flex items-center gap-6 text-right">
           <Stat
