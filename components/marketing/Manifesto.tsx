@@ -4,32 +4,32 @@ const tenets = [
   {
     n: "I",
     title: "We trade structure, not stories.",
-    body: "Patterns are narratives we tell ourselves. Structure is what the market just printed. The workspace surfaces the latter and stays quiet about the former.",
+    body: "Patterns are stories we tell ourselves. Structure is what the market just printed. The workspace shows the latter and shuts up about the former.",
   },
   {
     n: "II",
     title: "We hold a high bar.",
-    body: "Most setups don't clear the bar, and that's the point. A high bar means the day is mostly waiting — and waiting, done well, is the trade.",
+    body: "Most setups don't clear it. That's the point. A high bar means most of the day is spent waiting, and waiting, done right, is the trade.",
   },
   {
     n: "III",
     title: "We wait for confirmation.",
-    body: "Intra-bar action lies. Closes don't. The cheapest discipline a trader ever buys is the one that waits for the candle to finish.",
+    body: "Mid-candle action lies. Closes don't. Waiting for the candle to finish is the cheapest discipline a trader will ever buy.",
   },
   {
     n: "IV",
     title: "We do not chase.",
-    body: "If price has moved past the entry, the setup we graded no longer exists. A different trade can be taken later, on its own merits, against its own bar.",
+    body: "If price already moved past the entry, the setup we read no longer exists. Take a different one later if it shows up, on its own merits, against its own bar.",
   },
   {
     n: "V",
     title: "We honor what the market shows us.",
-    body: "When the market invalidates a read, we exit and start over. We do not average into a thesis the tape has already disagreed with.",
+    body: "When the market invalidates the read, we exit. We don't average into a thesis the tape's already telling us is wrong.",
   },
   {
     n: "VI",
     title: "We know when to stop.",
-    body: "Past a small number of decisions per session, edge degrades and emotion compounds. Tomorrow always exists. The discipline is to leave quietly.",
+    body: "Past a few decisions a session, edge falls off and emotion compounds. Tomorrow always exists. The discipline is to leave quietly.",
   },
 ];
 
@@ -50,9 +50,9 @@ export function Manifesto() {
             </span>
           </h2>
           <p className="mt-4 text-[16px] text-ink-2 leading-relaxed">
-            The engine produces signals. The discipline produces traders.
-            These six tenets are baked into the workspace — every one is a
-            visible gate, not a memory test.
+            The engine makes signals. The discipline makes traders. Each of
+            these six is built into the workspace as a gate you can see, not a
+            rule you have to remember.
           </p>
         </div>
 

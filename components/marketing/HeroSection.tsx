@@ -34,9 +34,9 @@ export function HeroSection() {
         className="mt-9 grid grid-cols-12 gap-10 items-end"
       >
         <p className="col-span-12 md:col-span-7 lg:col-span-6 text-[18px] md:text-[20px] text-ink-2 leading-[1.55] max-w-2xl">
-          Prophet reads the day before the day reads you. The same fixed
-          structure every morning, the same questions asked of every move,
-          the same bar held against every decision. A workspace, not a feed.
+          Prophet reads the day before the day reads you. Same setup every
+          morning. Same questions asked of every move. A bar most signals
+          don&apos;t clear. It&apos;s a workspace, not a feed.
         </p>
 
         <div className="col-span-12 md:col-span-5 lg:col-span-6 flex flex-col items-start md:items-end gap-3">
@@ -58,7 +58,7 @@ export function HeroSection() {
         </div>
       </motion.div>
 
-      {/* Live ribbon — preview of the slate */}
+      {/* Live ribbon: preview of the slate */}
       <motion.div
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}

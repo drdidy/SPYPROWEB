@@ -31,10 +31,10 @@ export function WaitlistForm() {
               We open the workspace to a few traders at a time.
             </h2>
             <p className="mt-5 text-[16px] text-ink-2 leading-relaxed max-w-2xl">
-              Leave an email and we'll send an invite when the next cohort
-              opens. We'll also send the weekly Daily Brief — yesterday's
-              close, tomorrow's anchors — so you can read along even before
-              the workspace is yours.
+              Leave your email and we'll send an invite when the next cohort
+              opens. You'll also get the weekly Daily Brief in the meantime:
+              yesterday's close, tomorrow's setup, so you can read along
+              before you're in.
             </p>
           </div>
 

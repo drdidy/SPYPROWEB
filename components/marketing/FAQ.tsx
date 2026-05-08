@@ -7,31 +7,31 @@ import { motion, AnimatePresence } from "framer-motion";
 const faqs = [
   {
     q: "What does Prophet actually do?",
-    a: "Prophet reads the day through a fixed structure and asks the same questions of every move. The result is a workspace where the trader knows, at any moment, what is true now and what would have to change for that to flip — without re-deriving the read each morning.",
+    a: "It reads the day through one fixed structure and asks the same questions of every move. So at any moment you know what's true and what would change it. You don't have to redo the work each morning.",
   },
   {
     q: "Is this a signal service or a workspace?",
-    a: "A workspace. Signals are a small part of it. The deeper value is the routine: the same read, the same projection, the same bar — held every day until reading the day stops feeling like work.",
+    a: "A workspace. Signals are a small piece of it. The real value is the routine. Same read, same lines, same bar, every day. Run it long enough and reading the day stops feeling like work.",
   },
   {
     q: "Which symbols are covered?",
-    a: "SPY and SPX, treated as peers. Each gets its own surface tuned to how it actually trades. The lattice extends to other liquid index instruments cleanly; we'll add them as the workspace's voice on each one becomes unimpeachable.",
+    a: "SPY and SPX, side by side. Each gets its own surface tuned to how it actually trades. We'll add other liquid index instruments when our read on them is as good.",
   },
   {
     q: "How does Prophet decide?",
-    a: "Through a single bar that integrates several factors into one yes-or-no answer. The bar is high — most setups don't clear it. What clears it is rare and well-understood; what doesn't is information saved for later.",
+    a: "One bar pulls several factors into one yes-or-no answer. The bar is high. Most setups don't clear it. The ones that do are rare and easy to read.",
   },
   {
     q: "Will this work in my time zone?",
-    a: "The workspace renders in your local time. The structural read itself is anchored to the cash market's home zone; you don't have to think about the conversion.",
+    a: "The workspace shows your local time. Underneath, the read is anchored to the market's home zone. You don't have to think about it.",
   },
   {
     q: "What's in the closed beta?",
-    a: "The decision-of-the-day surface, the levels in play, the wait discipline, the day's read, signal log, and a daily brief. Replay, options cockpit, and analytics arrive over the following weeks.",
+    a: "Today's decision, the levels in play, the wait discipline, the day's read, the signal log, and a daily brief. Replay, options cockpit, and analytics come over the next few weeks.",
   },
   {
     q: "Is it advice?",
-    a: "No. It is a structured way to think about price. Trading is risky; you are responsible for every order you place and every position you carry.",
+    a: "No. It's a structured way to think about price. Trading carries real risk. Every order you place and every position you carry is on you.",
   },
 ];
 
@@ -48,8 +48,7 @@ export function FAQ() {
             Honest answers.
           </h2>
           <p className="mt-4 text-[15px] text-ink-2 leading-relaxed max-w-sm">
-            We've collected the questions we get most often.
-            If something here doesn't satisfy, write to us.
+            The questions we get most. If yours isn't here, write us.
           </p>
         </div>
 

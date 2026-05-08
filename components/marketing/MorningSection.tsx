@@ -5,32 +5,32 @@ const moments = [
   {
     time: "Pre-open",
     headline: "The brief publishes",
-    body: "Last session's close, overnight action, today's read, today's lean — all in plain English. No charts required to understand it.",
+    body: "Yesterday's close, what overnight did, where the day looks like it's leaning. Plain English. No chart required.",
   },
   {
     time: "Open",
     headline: "The day's bias settles",
-    body: "The structural read resolves to a direction: lean bullish, lean bearish, or neutral, with a strength score that says how strongly to trust it.",
+    body: "By the bell the read settles into bullish, bearish, or neutral, with a number behind it so you know how much to trust it.",
   },
   {
     time: "Mid-morning",
     headline: "The first signal forms",
-    body: "Price tests one of the day's lines. The workspace decides whether the test cleared the bar or not, and shows the reasoning either way.",
+    body: "Price tests one of the day's lines. The workspace says whether the test cleared the bar. Either way, you see why.",
   },
   {
     time: "Mid-day",
     headline: "Discipline holds",
-    body: "Several gates check the setup before any order is placed. Most days, at least one gate waits — and so do we. Patience is structural, not sentimental.",
+    body: "Several gates check the setup before any order goes in. Most days at least one gate is still waiting. We wait too.",
   },
   {
     time: "Afternoon",
     headline: "Decisions accumulate",
-    body: "Each signal — taken or skipped — becomes part of the record. By close, the day has written itself.",
+    body: "Every signal you took, every one you skipped, all of it logged. By the close, the day has basically written itself.",
   },
   {
     time: "Close",
     headline: "Tomorrow drafts itself",
-    body: "Every decision logged with its outcome and its reasoning. The next morning's brief begins from this — no blank page.",
+    body: "Every decision logged with how it played out and why you took it. Tomorrow's brief starts from there. Not a blank page.",
   },
 ];
 
@@ -43,17 +43,16 @@ export function MorningSection() {
         <div className="mt-8 grid grid-cols-12 gap-10">
           <div className="col-span-12 lg:col-span-5">
             <h2 className="font-serif text-display tracking-tight text-ink">
-              The day, narrated.
+              How a day actually goes.
             </h2>
             <p className="mt-4 text-[16px] text-ink-2 leading-relaxed">
-              Prophet doesn't replace your judgment — it gives your judgment a
-              better stage. From pre-open through the closing bell, the
-              workspace tells you what's true now and what would have to change
-              for that to flip.
+              Prophet doesn&apos;t replace your judgment. It gives your judgment
+              a better stage. From pre-open through the closing bell you can see
+              what&apos;s true now and what would change it.
             </p>
 
             <div className="mt-10 surface rounded-card p-6 relative overflow-hidden">
-              {/* Sample card — shape only. Numbers illustrative; mechanics not
+              {/* Sample card: shape only. Numbers illustrative; mechanics not
                   disclosed publicly. */}
               <div className="flex items-center gap-3 mb-4">
                 <span className="w-9 h-9 rounded-soft bg-paper-2 grid place-items-center font-serif text-[16px] text-ink-3 italic">
@@ -67,9 +66,9 @@ export function MorningSection() {
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-3 mb-4">
-                <Stat label="Entry" value="—" />
-                <Stat label="Stop" value="—" tone="bear" />
-                <Stat label="Target" value="—" tone="bull" />
+                <Stat label="Entry" value="···" />
+                <Stat label="Stop" value="···" tone="bear" />
+                <Stat label="Target" value="···" tone="bull" />
               </div>
               <div className="hr-rule mb-3" />
               <div className="flex items-center justify-between text-[12px]">
