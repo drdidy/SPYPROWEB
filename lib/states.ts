@@ -1,11 +1,19 @@
 // Engine state ladder — single source of truth for both SPY and SPX.
-// Order matters: it defines progression from passive (STAND_DOWN) through
-// armed (WAIT, ARMED) into firing (GO) and exit (COOLDOWN). Components
+// Order matters: it defines progression from "engine has not yet run"
+// (PRE_CONFIG) through passive observation (STAND_DOWN, WATCH) into
+// armed (WAIT, ARMED), firing (GO), and exit (COOLDOWN). Components
 // like <StateLadder> render this list left-to-right and treat states
 // before `current` as passed, the matched index as live, and later
 // indices as future.
+//
+// PRE_CONFIG is the first state because it precedes every other state
+// chronologically each session. Before the engine has observed its
+// configuration window for the upcoming RTH, there are no lines, no
+// envelope, no triggers — so the engine cannot honestly be in any
+// post-config state.
 
 export const ENGINE_STATES = [
+  "PRE_CONFIG",
   "STAND_DOWN",
   "WATCH",
   "WAIT",

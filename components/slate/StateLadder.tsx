@@ -20,6 +20,7 @@ interface StateLadderProps {
 }
 
 const STATE_LABEL: Record<EngineState, string> = {
+  PRE_CONFIG: "PRE-CONFIG",
   STAND_DOWN: "STAND DOWN",
   WATCH: "WATCH",
   WAIT: "WAIT",
@@ -28,7 +29,13 @@ const STATE_LABEL: Record<EngineState, string> = {
   COOLDOWN: "COOLDOWN",
 };
 
+const STATE_HINT: Partial<Record<EngineState, string>> = {
+  PRE_CONFIG:
+    "Engine has not yet observed its configuration window. Lines/envelope will be plotted during the next overnight session.",
+};
+
 const CURRENT_TONE: Record<EngineState, string> = {
+  PRE_CONFIG: "text-state-armed",
   STAND_DOWN: "text-state-neutral",
   WATCH: "text-gold-ink",
   WAIT: "text-gold-ink",
@@ -52,15 +59,18 @@ export function StateLadder({ engine, current, className }: StateLadderProps) {
         const isCurrent = i === currentIdx;
         const isPassed = currentIdx >= 0 && i < currentIdx;
         const isFuture = currentIdx >= 0 && i > currentIdx;
+        const hint = STATE_HINT[state];
         return (
           <li
             key={state}
             aria-current={isCurrent ? "step" : undefined}
+            title={isCurrent ? hint : undefined}
             className={cn(
               "px-1.5 py-0.5 rounded-soft transition-colors",
               isCurrent && cn("font-bold", CURRENT_TONE[state]),
               isPassed && "text-state-invalidated line-through opacity-60",
               isFuture && "text-ink-4 opacity-50",
+              isCurrent && hint && "cursor-help",
             )}
           >
             {STATE_LABEL[state]}

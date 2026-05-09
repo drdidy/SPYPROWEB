@@ -19,6 +19,7 @@ interface Props {
 }
 
 const STATE_TONE: Record<EngineState, string> = {
+  PRE_CONFIG: "bg-ink-5",
   STAND_DOWN: "bg-state-neutral",
   WATCH: "bg-gold",
   WAIT: "bg-gold",
