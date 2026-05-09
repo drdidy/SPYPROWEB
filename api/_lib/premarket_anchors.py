@@ -9,8 +9,12 @@ Spec:
   - Anchor candidate: bearish hourly candle in 3:00-7:00 CT whose LOW <
     immediately-prior candle's LOW AND whose immediately-following candle
     closes green.
-  - Primary anchor: candidate with the lowest LOW in 3:00-6:00 CT.
-  - Anchor 2: 7:00 CT candle, only if it qualifies AND its low < primary.low.
+  - Primary anchor: candidate with the lowest LOW in 3:00-6:00 CT. If no
+    bar in that window qualifies, the 7:00 CT candle is promoted to
+    primary if it qualifies (fallback).
+  - Anchor 2: 7:00 CT candle, only if primary already came from the 3-6
+    CT window AND its low < primary.low. (Skipped when 7 AM was promoted
+    to primary as a fallback.)
   - Secondaries: every other bearish candle in 3:00-6:00 CT (whether or
     not it qualifies); shown as backup entry candidates.
   - Lines per anchor: Upper (+3.4 SPY pts), Main (anchor.low),
@@ -145,13 +149,25 @@ def find_premarket_anchors(df: pd.DataFrame, signal_day) -> dict:
         qualified.append((ts, row, next_color))
 
     primary = None
+    primary_from_fallback = False
     primary_pool = [(ts, row, nc) for ts, row, nc in qualified if ts.hour in PREMARKET_ANCHOR_PRIMARY_HOURS]
     if primary_pool:
         primary_ts, primary_row, primary_next = min(primary_pool, key=lambda c: float(c[1]["Low"]))
         primary = _make_anchor("PRIMARY", primary_ts, primary_row, True, primary_next)
+    else:
+        # Fallback: 7 AM gets promoted to primary on days where no 3-6 CT
+        # bar qualifies. Keeps the framework drawable when the only setup
+        # of the morning lands on the extended hour.
+        fallback_pool = [(ts, row, nc) for ts, row, nc in qualified if ts.hour == PREMARKET_ANCHOR_EXTENDED_HOUR]
+        if fallback_pool:
+            primary_ts, primary_row, primary_next = min(fallback_pool, key=lambda c: float(c[1]["Low"]))
+            primary = _make_anchor("PRIMARY", primary_ts, primary_row, True, primary_next)
+            primary_from_fallback = True
 
     anchor2 = None
-    if primary is not None:
+    # Anchor 2 only applies when primary came from the 3-6 CT window.
+    # When 7 AM was promoted to primary, there's no separate anchor 2.
+    if primary is not None and not primary_from_fallback:
         for ts, row, nc in qualified:
             if ts.hour == PREMARKET_ANCHOR_EXTENDED_HOUR and float(row["Low"]) < primary.low:
                 anchor2 = _make_anchor("ANCHOR_2", ts, row, True, nc)
