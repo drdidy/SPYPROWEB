@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { StateLadder } from "@/components/slate/StateLadder";
+import { TimelineStrip } from "@/components/slate/TimelineStrip";
 import { ConvictionMeter } from "@/components/slate/ConvictionMeter";
 import { ScoreTrack } from "@/components/slate/ScoreTrack";
 import { EnvelopeBar } from "@/components/slate/EnvelopeBar";
@@ -61,22 +62,42 @@ export default async function Page() {
         spxState={(spx.currentState as EngineState | undefined) ?? "STAND_DOWN"}
       />
 
-      <SectionLabel number="01">Today's plays</SectionLabel>
+      <SectionLabel>Today's plays</SectionLabel>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <SpyVerdictCard snap={spy} />
         <SpxVerdictCard snap={spx} />
       </div>
 
-      <SectionLabel number="02">The read</SectionLabel>
+      <TimelineRow
+        spyHistory={spy.stateHistory}
+        spxHistory={spx.stateHistory ?? []}
+      />
+
+      <SectionLabel>The read</SectionLabel>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <SpyReadCard snap={spy} />
         <SpxReadCard snap={spx} />
       </div>
+    </div>
+  );
+}
 
-      <footer className="pt-6 mt-6 border-t border-rule flex items-center justify-between text-[10px] text-ink-3 font-mono uppercase tracking-[0.18em]">
-        <span>Prophet · dual-engine slate</span>
-        <span>End of slate</span>
-      </footer>
+// TimelineRow renders one TimelineStrip per engine, side-by-side at lg+
+// and stacked below. Each strip self-hides when its history is empty,
+// so an early-session SPX with no transitions stays out of the way
+// while SPY's timeline appears solo.
+function TimelineRow({
+  spyHistory,
+  spxHistory,
+}: {
+  spyHistory: { ts: string; state: EngineState }[];
+  spxHistory: { ts: string; state: EngineState }[];
+}) {
+  if (spyHistory.length === 0 && spxHistory.length === 0) return null;
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <TimelineStrip engine="SPY" history={spyHistory} />
+      <TimelineStrip engine="SPX" history={spxHistory} />
     </div>
   );
 }
