@@ -159,11 +159,17 @@ function SpyVerdictCard({ snap }: { snap: AdaptedSnapshot }) {
             <span className="font-serif text-display tracking-tight">
               {headline}
             </span>
-            <PriceWithDelta price={currentPrice} change={change} />
+            {/* P1: in PRE_CONFIG no level is being measured — hide
+                the price entirely from the headline. The TopBar still
+                shows the value with the appropriate stale-close
+                suffix. */}
+            {!isPreConfig && (
+              <PriceWithDelta price={currentPrice} change={change} />
+            )}
           </span>
         }
       />
-      <CardBody className="space-y-4">
+      <CardBody className="space-y-4 flex flex-col flex-1">
         <p className="text-[14px] text-ink-2 leading-relaxed">
           {isPreConfig
             ? "Lines plot during the Mon 03:00–07:00 CT configuration window. No active triggers yet."
@@ -297,11 +303,14 @@ function SpxVerdictCard({ snap }: { snap: SPXSnapshot }) {
                 hint="The last print sits outside today's planned play envelope. No qualifying setup until price re-enters the envelope."
               />
             )}
-            <PriceWithDelta price={snap.price.last} change={change} />
+            {/* P1: hide price in headline when PRE_CONFIG. */}
+            {!isPreConfig && (
+              <PriceWithDelta price={snap.price.last} change={change} />
+            )}
           </span>
         }
       />
-      <CardBody className="space-y-4">
+      <CardBody className="space-y-4 flex flex-col flex-1">
         <p className="text-[14px] text-ink-2 leading-relaxed">
           {isPreConfig
             ? "Envelope plots during the Sun 17:00–Mon 02:00 CT configuration window. No envelope yet."
@@ -607,7 +616,10 @@ function CardFooterRow({
   asOfIso: string;
 }) {
   return (
-    <div className="pt-3 border-t border-rule flex items-center justify-between gap-3">
+    // mt-auto pins the footer to the bottom of a flex-col CardBody so
+    // SPY and SPX bottom-align even when their content blocks differ
+    // in height (P2).
+    <div className="mt-auto pt-3 border-t border-rule flex items-center justify-between gap-3">
       {children}
       <AsOfTicker iso={asOfIso} />
     </div>

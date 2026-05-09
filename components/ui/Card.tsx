@@ -21,7 +21,10 @@ export function Card({
   return (
     <div
       className={cn(
-        "rounded-card shadow-card relative",
+        // h-full + flex-col lets the card fill its grid cell vertically,
+        // and CardBody can use flex-1 to push the footer to the bottom
+        // so two adjacent cards bottom-align cleanly (P2 polish).
+        "rounded-card shadow-card relative flex flex-col h-full",
         toneCls,
         interactive &&
           "transition-shadow duration-200 ease-swift hover:shadow-card-hover cursor-pointer",
