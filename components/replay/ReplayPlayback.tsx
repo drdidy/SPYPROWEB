@@ -163,12 +163,15 @@ function SPXPlaybackPanel({
 }
 
 function spxLineProjections(lines: SPXLine[]): LineProjection[] {
+  // Colors map to the four SPX engine line kinds:
+  //   - CHANNEL_CEILING / CHANNEL_FLOOR   solid, rendered emphasized
+  //   - PREV_RTH_HIGH_ASC                 ascending ref above the channel
+  //   - PREV_RTH_LOW_DESC                 descending ref below the channel
   const palette: Record<string, string> = {
     CHANNEL_CEILING: "#B5301E",
     CHANNEL_FLOOR: "#0E7C50",
-    PREV_HIGH: "#7E5BAE",
-    PREV_LOW: "#7E5BAE",
-    PIVOT: "#B8821F",
+    PREV_RTH_HIGH_ASC: "#7E5BAE",
+    PREV_RTH_LOW_DESC: "#7E5BAE",
   };
   return lines.map((l) => {
     const t0Ms = new Date(l.anchorTime).getTime();
