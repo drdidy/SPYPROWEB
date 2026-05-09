@@ -3,6 +3,7 @@ import { useState, FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { ArrowRight, Check } from "lucide-react";
 import { SectionLabel } from "@/components/ui/SectionLabel";
+import { track } from "@/lib/analytics";
 
 export function WaitlistForm() {
   const [email, setEmail] = useState("");
@@ -11,12 +12,17 @@ export function WaitlistForm() {
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!email.includes("@")) return;
+    track({ name: "waitlist_submit_attempt" });
+    if (!email.includes("@")) {
+      track({ name: "waitlist_submit_error", reason: "client_validation" });
+      return;
+    }
     setPending(true);
-    // simulated submission
+    // simulated submission — replaced by /api/waitlist call in g4.
     setTimeout(() => {
       setPending(false);
       setSubmitted(true);
+      track({ name: "waitlist_submit_success" });
     }, 600);
   }
 

@@ -3,6 +3,7 @@ import { SectionLabel } from "@/components/ui/SectionLabel";
 import { useState } from "react";
 import { Plus, Minus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { track } from "@/lib/analytics";
 
 const faqs = [
   {
@@ -57,7 +58,11 @@ export function FAQ() {
             {faqs.map((f, i) => (
               <li key={f.q} className="border-b border-rule last:border-b-0">
                 <button
-                  onClick={() => setOpen(open === i ? null : i)}
+                  onClick={() => {
+                    const willOpen = open !== i;
+                    setOpen(willOpen ? i : null);
+                    if (willOpen) track({ name: "faq_open", question: f.q });
+                  }}
                   className="w-full flex items-start gap-5 py-5 text-left group"
                 >
                   <span className="font-mono text-[10px] text-ink-3 tabular-nums tracking-[0.18em] uppercase pt-1.5">

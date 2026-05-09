@@ -5,6 +5,7 @@ import { ArrowRight, ArrowDown } from "lucide-react";
 import { motion } from "framer-motion";
 import type { DecisionState } from "@/lib/types";
 import { useLiveSPY } from "@/lib/use-live-snapshot";
+import { track } from "@/lib/analytics";
 
 interface HeroProps {
   decision?: DecisionState;
@@ -79,12 +80,30 @@ export function HeroSection({ decision: serverDecision, quote: serverQuote, init
 
         <div className="col-span-12 md:col-span-5 lg:col-span-6 flex flex-col items-start md:items-end gap-3">
           <div className="flex flex-wrap gap-3">
-            <Link href="/dashboard">
+            <Link
+              href="/dashboard"
+              onClick={() =>
+                track({
+                  name: "cta_click",
+                  location: "hero",
+                  label: "read_todays_slate",
+                })
+              }
+            >
               <Button variant="primary" size="lg">
-                Read today's slate <ArrowRight size={15} />
+                Read today&apos;s slate <ArrowRight size={15} />
               </Button>
             </Link>
-            <a href="#waitlist">
+            <a
+              href="#waitlist"
+              onClick={() =>
+                track({
+                  name: "cta_click",
+                  location: "hero",
+                  label: "join_waitlist",
+                })
+              }
+            >
               <Button variant="outline" size="lg">
                 Join the waitlist
               </Button>

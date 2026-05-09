@@ -1,4 +1,6 @@
+"use client";
 import { SectionLabel } from "@/components/ui/SectionLabel";
+import { track } from "@/lib/analytics";
 import {
   LineChart,
   Columns3,
@@ -82,6 +84,7 @@ export function SurfacesGrid() {
             <Link
               key={s.n}
               href={s.href}
+              onClick={() => track({ name: "surface_card_click", surface: s.title })}
               className="col-span-12 md:col-span-6 lg:col-span-4 group"
             >
               <article className="surface rounded-card p-6 h-full transition-all duration-200 ease-swift group-hover:shadow-card-hover">
