@@ -108,11 +108,70 @@ def _build_payload(replay_date: date | None = None) -> dict:
     if used_historical_offset:
         # Distinguish historical-replay offset from a real env override.
         meta["offsetSource"] = "historical_replay"
-    payload["replay"] = {
+    payload["replay"] = _build_spx_replay_block(payload, replay_date)
+    return payload
+
+
+def _build_spx_replay_block(payload: dict, replay_date: date | None) -> dict:
+    """Replay block + verdictOutcome / verdictPnl for SPX.
+
+    The FE track-record component grades each replayed session by
+    reading verdictOutcome (WIN/LOSS/PUSH/N_A). Without this scoring
+    it always reads N_A and the dashboard renders "no graded sessions"
+    for every day — which is what was happening before this fix.
+
+    Grading rule for SPX (engine doesn't emit a verb directly):
+      action == TAKE | SELECTIVE  AND  channel.direction != NONE
+        → engine bet on the channel direction this session.
+        → Compare day's net move to the implied side.
+      action == STAND_DOWN  OR  channel.direction == NONE
+        → N/A.
+    """
+    block: dict = {
         "isReplay": replay_date is not None,
         "date": replay_date.isoformat() if replay_date else None,
+        "session": None,
+        "verdictOutcome": None,
+        "verdictPnl": None,
     }
-    return payload
+    if replay_date is None:
+        return block
+
+    confluence = (payload.get("confluence") or {})
+    channel = (payload.get("channel") or {})
+    price = (payload.get("price") or {})
+    action = confluence.get("action")
+    direction = channel.get("direction")
+    last = price.get("last")
+    change = price.get("change")  # last - prevClose
+
+    # Surface the day's net for the FE soft-recap path even when the
+    # engine didn't grade.
+    if isinstance(last, (int, float)) and isinstance(change, (int, float)):
+        open_proxy = last - change  # prev close as a stand-in for open
+        block["session"] = {
+            "open": round(open_proxy, 2),
+            "close": round(last, 2),
+            "netPts": round(change, 2),
+        }
+
+    is_directional = action in ("TAKE", "SELECTIVE")
+    has_channel = direction in ("ASCENDING", "DESCENDING")
+    if is_directional and has_channel and isinstance(change, (int, float)):
+        bullish_bet = direction == "ASCENDING"
+        if bullish_bet:
+            block["verdictOutcome"] = (
+                "WIN" if change > 0 else ("LOSS" if change < 0 else "PUSH")
+            )
+            block["verdictPnl"] = round(change, 2)
+        else:
+            block["verdictOutcome"] = (
+                "WIN" if change < 0 else ("LOSS" if change > 0 else "PUSH")
+            )
+            block["verdictPnl"] = round(-change, 2)
+    else:
+        block["verdictOutcome"] = "N_A"
+    return block
 
 
 def _parse_replay_date(path: str) -> date | None:
