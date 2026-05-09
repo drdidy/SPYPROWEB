@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useFocusTrap } from "@/lib/use-focus-trap";
 
 export interface TraceEvent {
   ts: string;
@@ -38,6 +39,9 @@ export function DecisionTraceDrawer({
   currentStateLabel,
 }: DecisionTraceDrawerProps) {
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
+
+  useFocusTrap(panelRef, open);
 
   // Esc to close, focus the close button on open for keyboard users.
   useEffect(() => {
@@ -64,11 +68,12 @@ export function DecisionTraceDrawer({
     >
       {/* Scrim */}
       <div className="flex-1 bg-ink/30" aria-hidden />
-      {/* Panel */}
+      {/* Panel — full-screen on mobile (375px target), fixed-width drawer at sm+. */}
       <aside
+        ref={panelRef}
         onClick={stop}
         className={cn(
-          "w-full max-w-md h-full bg-paper border-l border-rule shadow-card",
+          "w-full sm:max-w-md h-full bg-paper sm:border-l border-rule shadow-card",
           "flex flex-col animate-rise",
         )}
       >

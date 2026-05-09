@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Bell, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useFocusTrap } from "@/lib/use-focus-trap";
 
 interface SetAlertButtonProps {
   symbol: "SPY" | "SPX";
@@ -26,6 +27,9 @@ export function SetAlertButton({
   const [open, setOpen] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+
+  useFocusTrap(dialogRef, open);
 
   useEffect(() => {
     if (!open) return;
@@ -66,6 +70,7 @@ export function SetAlertButton({
           className="fixed inset-0 z-50 grid place-items-center bg-ink/30 px-4"
         >
           <div
+            ref={dialogRef}
             onClick={(e) => e.stopPropagation()}
             className="w-full max-w-md bg-paper border border-rule rounded-card shadow-card animate-rise"
           >
