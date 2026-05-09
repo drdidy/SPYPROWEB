@@ -117,8 +117,7 @@ def _build_spx_replay_block(payload: dict, replay_date: date | None) -> dict:
 
     The FE track-record component grades each replayed session by
     reading verdictOutcome (WIN/LOSS/PUSH/N_A). Without scoring it
-    always reads N_A and the dashboard renders "no graded sessions"
-    for every day.
+    always reads N_A and the dashboard renders "no graded sessions".
 
     Grading rule for SPX:
       action == TAKE | SELECTIVE  AND  channel.direction != NONE
@@ -127,10 +126,15 @@ def _build_spx_replay_block(payload: dict, replay_date: date | None) -> dict:
       action == STAND_DOWN  OR  channel.direction == NONE
         → N/A.
 
-    `as_of` for replay is pinned to 09:00 CT in this snapshot path, so
-    the SPXSnapshot's price.change is the overnight gap, not the full
-    day's move. We fetch a daily ^GSPC bar separately to grade the
-    actual session.
+    Critical detail: the engine plots lines from ES=F bars + an
+    offset (SPX_equiv = ES + offset). Grading must walk the same
+    data path — using SPX cash (^GSPC) directly would let a small
+    offset error mark a real ES tag as a miss. We grade against
+    ES=F's day-net (open→close) and apply the snapshot's actual
+    appliedOffset for the displayed open/close levels. The day-net
+    in points is identical whether viewed in ES or SPX (offset is
+    a constant), so the WIN/LOSS classification is unaffected by
+    the offset; the offset only matters for the displayed numbers.
     """
     block: dict = {
         "isReplay": replay_date is not None,
@@ -144,12 +148,15 @@ def _build_spx_replay_block(payload: dict, replay_date: date | None) -> dict:
 
     confluence = (payload.get("confluence") or {})
     channel = (payload.get("channel") or {})
+    meta = payload.get("_meta") or {}
     action = confluence.get("action")
     direction = channel.get("direction")
+    applied_offset = meta.get("appliedOffset")
+    offset = float(applied_offset) if isinstance(applied_offset, (int, float)) else 0.0
 
-    # Fetch the actual day's open/close. Best-effort: failure leaves
-    # session/outcome unset and the FE falls back to a soft recap.
-    day = _spx_session_ohlc(replay_date)
+    # Fetch the actual day's open/close. Best-effort with multiple
+    # fallbacks so a yfinance hiccup doesn't strand grading.
+    day = _spx_session_ohlc(replay_date, offset)
     if day is not None:
         block["session"] = {
             "open": round(day["open"], 2),
@@ -177,8 +184,37 @@ def _build_spx_replay_block(payload: dict, replay_date: date | None) -> dict:
     return block
 
 
-def _spx_session_ohlc(d: date) -> dict | None:
-    """Return {open, close} for ^GSPC on `d`. None on any failure."""
+def _spx_session_ohlc(d: date, offset: float) -> dict | None:
+    """Day's open/close in SPX-equivalent points for `d`.
+
+    Tries ES=F first (the engine's data source) + the supplied offset,
+    then ^GSPC, then SPY*10 — each fallback narrows but maintains
+    direction. Returns {open, close} in SPX-equivalent points, or None
+    if every source fails.
+
+    Single-day yfinance downloads are flaky, so we widen the window
+    to ±3 calendar days and pick the bar matching `d`.
+    """
+    # 1) ES=F + offset — preferred, matches what the engine sees.
+    es = _yf_daily_ohlc("ES=F", d)
+    if es is not None:
+        return {"open": es["open"] + offset, "close": es["close"] + offset}
+
+    # 2) ^GSPC cash index — direct SPX value.
+    gspc = _yf_daily_ohlc("^GSPC", d)
+    if gspc is not None:
+        return gspc
+
+    # 3) SPY × 10 — closest cash proxy when both above fail.
+    spy = _yf_daily_ohlc("SPY", d)
+    if spy is not None:
+        return {"open": spy["open"] * 10, "close": spy["close"] * 10}
+
+    return None
+
+
+def _yf_daily_ohlc(ticker: str, d: date) -> dict | None:
+    """Fetch a single day's open/close. None on failure or no bar for d."""
     try:
         import yfinance as yf  # type: ignore[import-not-found]
     except Exception:
@@ -186,10 +222,12 @@ def _spx_session_ohlc(d: date) -> dict | None:
     try:
         from datetime import timedelta as _td
 
-        start = d.isoformat()
-        end = (d + _td(days=1)).isoformat()
+        # Wider window: yfinance 1-day single-date queries return
+        # empty too often. Pull ±3 days and pick the bar matching d.
+        start = (d - _td(days=3)).isoformat()
+        end = (d + _td(days=4)).isoformat()
         df = yf.download(
-            tickers="^GSPC",
+            tickers=ticker,
             start=start,
             end=end,
             interval="1d",
@@ -202,8 +240,13 @@ def _spx_session_ohlc(d: date) -> dict | None:
             return None
         if hasattr(df.columns, "nlevels") and df.columns.nlevels > 1:
             df.columns = df.columns.get_level_values(0)
-        row = df.iloc[0]
-        return {"open": float(row["Open"]), "close": float(row["Close"])}
+        target = d.isoformat()
+        for ts, row in df.iterrows():
+            iso = ts.date().isoformat() if hasattr(ts, "date") else str(ts)[:10]
+            if iso == target:
+                return {"open": float(row["Open"]), "close": float(row["Close"])}
+        # No exact match for d (likely a non-trading day passed in).
+        return None
     except Exception:
         return None
 
