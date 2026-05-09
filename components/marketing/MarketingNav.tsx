@@ -36,12 +36,15 @@ export function MarketingNav() {
           <Wordmark />
         </Link>
 
-        <nav className="hidden md:flex items-center gap-7 ml-2">
+        <nav
+          aria-label="Marketing site sections"
+          className="hidden md:flex items-center gap-7 ml-2"
+        >
           {links.map((l) => (
             <a
               key={l.href}
               href={l.href}
-              className="text-[13px] text-ink-2 hover:text-ink transition-colors"
+              className="text-[13px] text-ink-2 hover:text-ink transition-colors outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-4 focus-visible:ring-offset-canvas rounded-soft -mx-1 px-1"
             >
               {l.label}
             </a>
