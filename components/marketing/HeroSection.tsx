@@ -74,7 +74,7 @@ export function HeroSection({ decision: serverDecision, quote: serverQuote, init
         <p className="col-span-12 md:col-span-7 lg:col-span-6 text-[18px] md:text-[20px] text-ink-2 leading-[1.55] max-w-2xl">
           Prophet reads the day before the day reads you. Same setup every
           morning. Same questions asked of every move. A bar most signals
-          don&apos;t clear. It&apos;s a workspace, not a feed.
+          don’t clear. It’s a workspace, not a feed.
         </p>
 
         <div className="col-span-12 md:col-span-5 lg:col-span-6 flex flex-col items-start md:items-end gap-3">
