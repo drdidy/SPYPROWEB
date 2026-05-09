@@ -981,15 +981,25 @@ def _build_replay_block(
         "netPts": round(c - o, 2),
         "netPct": round(((c - o) / o * 100) if o else 0.0, 3),
     }
-    verdict = (decision or {}).get("verdict")
+    # The decision dict's directional field is `verb` (set at the
+    # `_build_decision` return — see "verb": verb above). The previous
+    # code read the non-existent key "verdict" and so every session's
+    # outcome silently fell through to N_A, which made the FE
+    # track-record show "no graded sessions · N skip" for every day.
+    # Treat HOLD the same as LONG so a strong-bias day that didn't
+    # qualify for a CALL signal still grades — HOLD is the "stay
+    # long, don't add" verb the engine emits in pre-RTH.
+    verb = (decision or {}).get("verb")
     delta = c - o
-    if verdict == "LONG":
+    if verb in ("LONG", "HOLD"):
         block["verdictOutcome"] = "WIN" if delta > 0 else ("LOSS" if delta < 0 else "PUSH")
         block["verdictPnl"] = round(delta, 2)
-    elif verdict == "SHORT":
+    elif verb == "SHORT":
         block["verdictOutcome"] = "WIN" if delta < 0 else ("LOSS" if delta > 0 else "PUSH")
         block["verdictPnl"] = round(-delta, 2)
     else:
+        # WAIT / STAND DOWN / unknown — engine had no directional read;
+        # outcome is genuinely N/A.
         block["verdictOutcome"] = "N_A"
         block["verdictPnl"] = None
     return block

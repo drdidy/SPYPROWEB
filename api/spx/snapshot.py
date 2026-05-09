@@ -108,11 +108,104 @@ def _build_payload(replay_date: date | None = None) -> dict:
     if used_historical_offset:
         # Distinguish historical-replay offset from a real env override.
         meta["offsetSource"] = "historical_replay"
-    payload["replay"] = {
+    payload["replay"] = _build_spx_replay_block(payload, replay_date)
+    return payload
+
+
+def _build_spx_replay_block(payload: dict, replay_date: date | None) -> dict:
+    """Replay block + verdictOutcome / verdictPnl for SPX.
+
+    The FE track-record component grades each replayed session by
+    reading verdictOutcome (WIN/LOSS/PUSH/N_A). Without scoring it
+    always reads N_A and the dashboard renders "no graded sessions"
+    for every day.
+
+    Grading rule for SPX:
+      action == TAKE | SELECTIVE  AND  channel.direction != NONE
+        → engine bet on the channel direction this session.
+        → Compare day's net open→close to the implied side.
+      action == STAND_DOWN  OR  channel.direction == NONE
+        → N/A.
+
+    `as_of` for replay is pinned to 09:00 CT in this snapshot path, so
+    the SPXSnapshot's price.change is the overnight gap, not the full
+    day's move. We fetch a daily ^GSPC bar separately to grade the
+    actual session.
+    """
+    block: dict = {
         "isReplay": replay_date is not None,
         "date": replay_date.isoformat() if replay_date else None,
+        "session": None,
+        "verdictOutcome": None,
+        "verdictPnl": None,
     }
-    return payload
+    if replay_date is None:
+        return block
+
+    confluence = (payload.get("confluence") or {})
+    channel = (payload.get("channel") or {})
+    action = confluence.get("action")
+    direction = channel.get("direction")
+
+    # Fetch the actual day's open/close. Best-effort: failure leaves
+    # session/outcome unset and the FE falls back to a soft recap.
+    day = _spx_session_ohlc(replay_date)
+    if day is not None:
+        block["session"] = {
+            "open": round(day["open"], 2),
+            "close": round(day["close"], 2),
+            "netPts": round(day["close"] - day["open"], 2),
+        }
+
+    is_directional = action in ("TAKE", "SELECTIVE")
+    has_channel = direction in ("ASCENDING", "DESCENDING")
+    if is_directional and has_channel and day is not None:
+        net = day["close"] - day["open"]
+        bullish_bet = direction == "ASCENDING"
+        if bullish_bet:
+            block["verdictOutcome"] = (
+                "WIN" if net > 0 else ("LOSS" if net < 0 else "PUSH")
+            )
+            block["verdictPnl"] = round(net, 2)
+        else:
+            block["verdictOutcome"] = (
+                "WIN" if net < 0 else ("LOSS" if net > 0 else "PUSH")
+            )
+            block["verdictPnl"] = round(-net, 2)
+    else:
+        block["verdictOutcome"] = "N_A"
+    return block
+
+
+def _spx_session_ohlc(d: date) -> dict | None:
+    """Return {open, close} for ^GSPC on `d`. None on any failure."""
+    try:
+        import yfinance as yf  # type: ignore[import-not-found]
+    except Exception:
+        return None
+    try:
+        from datetime import timedelta as _td
+
+        start = d.isoformat()
+        end = (d + _td(days=1)).isoformat()
+        df = yf.download(
+            tickers="^GSPC",
+            start=start,
+            end=end,
+            interval="1d",
+            progress=False,
+            auto_adjust=False,
+            actions=False,
+            prepost=False,
+        )
+        if df is None or df.empty:
+            return None
+        if hasattr(df.columns, "nlevels") and df.columns.nlevels > 1:
+            df.columns = df.columns.get_level_values(0)
+        row = df.iloc[0]
+        return {"open": float(row["Open"]), "close": float(row["Close"])}
+    except Exception:
+        return None
 
 
 def _parse_replay_date(path: str) -> date | None:

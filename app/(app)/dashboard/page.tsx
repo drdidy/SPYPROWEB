@@ -1,10 +1,8 @@
-import Link from "next/link";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { StateLadder } from "@/components/slate/StateLadder";
 import { TimelineStrip } from "@/components/slate/TimelineStrip";
-import { ConvictionMeter } from "@/components/slate/ConvictionMeter";
-import { ScoreTrack } from "@/components/slate/ScoreTrack";
+import { ConvictionTrack } from "@/components/slate/ConvictionTrack";
 import { EnvelopeBar } from "@/components/slate/EnvelopeBar";
 import { StatusGlyph, type StatusGlyphKind } from "@/components/slate/StatusGlyph";
 import { HelpHint } from "@/components/slate/HelpHint";
@@ -12,8 +10,17 @@ import { AsOfTicker } from "@/components/slate/AsOfTicker";
 import { SetAlertButton } from "@/components/slate/SetAlertButton";
 import { WhyThisStateLink } from "@/components/slate/WhyThisStateLink";
 import { NextEventLine, NextEventCallout } from "@/components/slate/NextEventLine";
+import { Metric } from "@/components/decision-slate/Metric";
+import { LiveCountdown } from "@/components/decision-slate/LiveCountdown";
+import { WhyChips } from "@/components/decision-slate/WhyChips";
+import { LastSignalRecap } from "@/components/decision-slate/LastSignalRecap";
+import { PreConfigBriefing } from "@/components/decision-slate/PreConfigBriefing";
+import { SLATE_COPY } from "@/content/copy";
 import { loadLiveSnapshot } from "@/lib/snapshot-fetch";
 import { loadSnapshot as loadSpxSnapshot } from "@/lib/spx-fetch";
+import { fetchLastSessionRecaps } from "@/lib/last-session-recap";
+import { fetchTrackRecord } from "@/lib/track-record";
+import { getSessionInfo } from "@/lib/sessions";
 import type { AdaptedSnapshot } from "@/lib/snapshot-adapter";
 import type { DynamicLine, SPXSnapshot, SPXLine } from "@/lib/types";
 import {
@@ -21,7 +28,6 @@ import {
   SPY_DISTANCE_PROXIMITY,
   SPX_DISTANCE_PROXIMITY,
 } from "@/lib/states";
-import { ArrowRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -30,8 +36,19 @@ export default async function Page() {
   // Both engines are independent fetches. Run them in parallel — the
   // slate is meant to be read in one glance, so a slow side shouldn't
   // hold up the other.
-  const [{ data: spy, source: spySource, error: spyError }, spxLoaded] =
-    await Promise.all([loadLiveSnapshot(), loadSpxSnapshot()]);
+  const [
+    { data: spy, source: spySource, error: spyError },
+    spxLoaded,
+    recaps,
+    spyTrack,
+    spxTrack,
+  ] = await Promise.all([
+    loadLiveSnapshot(),
+    loadSpxSnapshot(),
+    fetchLastSessionRecaps(),
+    fetchTrackRecord("SPY"),
+    fetchTrackRecord("SPX"),
+  ]);
   const spx = spxLoaded.snap;
   const spxSource = spxLoaded.source;
 
@@ -43,17 +60,39 @@ export default async function Page() {
   void spyError;
   void spxSource;
 
+  const spxState = (spx.currentState as EngineState | undefined) ?? "STAND_DOWN";
+  const bothPreConfig = spy.currentState === "PRE_CONFIG" && spxState === "PRE_CONFIG";
+  const now = new Date();
+  const spySession = getSessionInfo("SPY", now);
+  const spxSession = getSessionInfo("SPX", now);
+
   return (
     <div className="max-w-[1440px] mx-auto pb-16 space-y-8 pt-6">
-      <EngineLadders
-        spyState={spy.currentState}
-        spxState={(spx.currentState as EngineState | undefined) ?? "STAND_DOWN"}
-      />
+      <EngineLadders spyState={spy.currentState} spxState={spxState} />
+
+      {bothPreConfig && (
+        <PreConfigBriefing
+          spy={{
+            label: "SPY",
+            nextSetupISO: spySession.configWindowStart.toISOString(),
+            nextSetupLabel: formatDayHM(spySession.configWindowStart),
+            lastSignal: recaps.spy,
+            trackRecord: spyTrack,
+          }}
+          spx={{
+            label: "SPX",
+            nextSetupISO: spxSession.configWindowStart.toISOString(),
+            nextSetupLabel: formatDayHM(spxSession.configWindowStart),
+            lastSignal: recaps.spx,
+            trackRecord: spxTrack,
+          }}
+        />
+      )}
 
       <SectionLabel>Today's read</SectionLabel>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <SpyVerdictCard snap={spy} />
-        <SpxVerdictCard snap={spx} />
+        <SpyVerdictCard snap={spy} lastSignal={recaps.spy} />
+        <SpxVerdictCard snap={spx} lastSignal={recaps.spx} />
       </div>
 
       <TimelineRow
@@ -68,6 +107,16 @@ export default async function Page() {
       </div>
     </div>
   );
+}
+
+function formatDayHM(d: Date): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(d) + " CT";
 }
 
 // TimelineRow renders one TimelineStrip per engine, side-by-side at lg+
@@ -137,7 +186,13 @@ function LadderRow({
 
 // ---- SPY ----
 
-function SpyVerdictCard({ snap }: { snap: AdaptedSnapshot }) {
+function SpyVerdictCard({
+  snap,
+  lastSignal,
+}: {
+  snap: AdaptedSnapshot;
+  lastSignal: import("@/types/decision-slate").LastSignalSummary | null;
+}) {
   const { decision, signal, quality, currentPrice } = snap;
   const isPreConfig = snap.currentState === "PRE_CONFIG";
   const headline = isPreConfig
@@ -159,11 +214,21 @@ function SpyVerdictCard({ snap }: { snap: AdaptedSnapshot }) {
             <span className="font-serif text-display tracking-tight">
               {headline}
             </span>
-            <PriceWithDelta price={currentPrice} change={change} />
+            {/* P1: in PRE_CONFIG no level is being measured — hide
+                the price entirely from the headline. The TopBar still
+                shows the value with the appropriate stale-close
+                suffix. */}
+            {!isPreConfig && (
+              <PriceWithDelta price={currentPrice} change={change} />
+            )}
           </span>
         }
       />
-      <CardBody className="space-y-4">
+      <CardBody className="space-y-4 flex flex-col flex-1">
+        {/* One-line subtitle defining the middle metric. */}
+        <p className="font-mono text-[11px] text-ink-3 -mt-2">
+          {SLATE_COPY.spySubtitle}
+        </p>
         <p className="text-[14px] text-ink-2 leading-relaxed">
           {isPreConfig
             ? "Lines plot during the Mon 03:00–07:00 CT configuration window. No active triggers yet."
@@ -172,24 +237,42 @@ function SpyVerdictCard({ snap }: { snap: AdaptedSnapshot }) {
               "Engine is initializing."}
         </p>
         <div className="grid grid-cols-3 gap-3 pt-3 border-t border-rule">
-          <MetricCol label="Conviction">
-            {isPreConfig ? (
-              <PendingMetric />
-            ) : (
-              <ConvictionMeter value={decision.conviction} />
+          <Metric
+            label="Conviction"
+            hint={SLATE_COPY.metric.conviction.spy}
+            example={SLATE_COPY.metricExample.conviction}
+          >
+            {!isPreConfig && (
+              <ConvictionTrack
+                value={decision.conviction}
+                max={5}
+                label={`${decision.conviction}/5`}
+              />
             )}
-          </MetricCol>
-          <MetricCol label="Bias">
-            {isPreConfig ? <PendingMetric /> : <BiasValue bias={snap.bias.bias} />}
-          </MetricCol>
-          <MetricCol label="Grade">
-            {isPreConfig ? (
-              <PendingMetric />
-            ) : (
+          </Metric>
+          <Metric
+            label="Bias"
+            hint={SLATE_COPY.metric.bias}
+            example={SLATE_COPY.metricExample.bias}
+          >
+            {!isPreConfig && <BiasValue bias={snap.bias.bias} />}
+          </Metric>
+          <Metric
+            label="Grade"
+            hint={SLATE_COPY.metric.grade}
+            example={SLATE_COPY.metricExample.grade}
+          >
+            {!isPreConfig && (
               <GradeValue grade={signal && quality ? quality.grade : null} />
             )}
-          </MetricCol>
+          </Metric>
         </div>
+        {/* Phase-aware recap: visible only between sessions. */}
+        {(isPreConfig ||
+          snap.currentState === "STAND_DOWN" ||
+          snap.currentState === "COOLDOWN") && (
+          <LastSignalRecap recap={lastSignal} />
+        )}
         {isPreConfig ? (
           <NextEventCallout engine="SPY" />
         ) : (
@@ -198,18 +281,18 @@ function SpyVerdictCard({ snap }: { snap: AdaptedSnapshot }) {
             <InvalidationLine invalidation={snap.invalidation} />
           </>
         )}
+        {/* CTA row: alert button only. The "View SPY Channel" link
+            has been removed per the spec — the channel page didn't
+            have an anchor target to deep-link to. */}
         <div className="flex flex-wrap items-center gap-2 pt-1">
           {!isPreConfig && (
             <SetAlertButton symbol="SPY" level={alertLevel} context={alertContext} />
           )}
-          <Link
-            href="/spy"
-            className="inline-flex items-center gap-1 h-8 px-3 rounded-pill bg-paper-2 text-ink-2 hover:text-ink hover:bg-paper-2/70 font-mono text-[11px] uppercase tracking-[0.10em] transition-colors"
-          >
-            View SPY Channel
-            <ArrowRight size={11} className="text-ink-3" />
-          </Link>
         </div>
+        {/* Top reasons surfaced as chips above the drawer trigger. */}
+        {!isPreConfig && (
+          <WhyChips trace={snap.decisionTrace} className="pt-2" />
+        )}
         <CardFooterRow asOfIso={snap.asOf}>
           <WhyThisStateLink
             engine="SPY"
@@ -237,29 +320,35 @@ function SpyReadCard({ snap }: { snap: AdaptedSnapshot }) {
         plottedAt={snap.asOf}
       />
       <CardBody className="px-0 pb-0">
-        {armed.length === 0 ? (
-          <div className="px-5 py-8 text-[13px] text-ink-3">
-            No primary lines active yet.
-          </div>
-        ) : (
-          <>
-            <ColumnHeaderRow />
-            <ul className="divide-y divide-rule">
-              {armed.map((l) => (
-                <TriggerRow
-                  key={l.name}
-                  label={spyLineLabel(l.name)}
-                  fullName={spyLineFullName(l.name)}
-                  hint={spyLineHint(l.name)}
-                  level={l.currentValue}
-                  distance={l.distanceFromPrice}
-                  proximity={SPY_DISTANCE_PROXIMITY}
-                  glyph="armed"
-                />
-              ))}
-            </ul>
-          </>
-        )}
+        {/* Reserve a stable height so 0→N transitions don't shift the
+            page layout. The min-height matches roughly four trigger
+            rows so the structure section behaves the same whether
+            empty or populated. */}
+        <div className="min-h-[180px] flex flex-col">
+          {armed.length === 0 ? (
+            <div className="px-5 py-8 text-[13px] text-ink-3">
+              {SLATE_COPY.structureEmpty.spy}
+            </div>
+          ) : (
+            <>
+              <ColumnHeaderRow />
+              <ul className="divide-y divide-rule">
+                {armed.map((l) => (
+                  <TriggerRow
+                    key={l.name}
+                    label={spyLineLabel(l.name)}
+                    fullName={spyLineFullName(l.name)}
+                    hint={spyLineHint(l.name)}
+                    level={l.currentValue}
+                    distance={l.distanceFromPrice}
+                    proximity={SPY_DISTANCE_PROXIMITY}
+                    glyph="armed"
+                  />
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
       </CardBody>
     </Card>
   );
@@ -267,7 +356,13 @@ function SpyReadCard({ snap }: { snap: AdaptedSnapshot }) {
 
 // ---- SPX ----
 
-function SpxVerdictCard({ snap }: { snap: SPXSnapshot }) {
+function SpxVerdictCard({
+  snap,
+  lastSignal,
+}: {
+  snap: SPXSnapshot;
+  lastSignal: import("@/types/decision-slate").LastSignalSummary | null;
+}) {
   const action = snap.confluence.action;
   const score = Math.round(snap.confluence.score);
   const change = snap.price.change;
@@ -297,11 +392,17 @@ function SpxVerdictCard({ snap }: { snap: SPXSnapshot }) {
                 hint="The last print sits outside today's planned play envelope. No qualifying setup until price re-enters the envelope."
               />
             )}
-            <PriceWithDelta price={snap.price.last} change={change} />
+            {/* P1: hide price in headline when PRE_CONFIG. */}
+            {!isPreConfig && (
+              <PriceWithDelta price={snap.price.last} change={change} />
+            )}
           </span>
         }
       />
-      <CardBody className="space-y-4">
+      <CardBody className="space-y-4 flex flex-col flex-1">
+        <p className="font-mono text-[11px] text-ink-3 -mt-2">
+          {SLATE_COPY.spxSubtitle}
+        </p>
         <p className="text-[14px] text-ink-2 leading-relaxed">
           {isPreConfig
             ? "Envelope plots during the Sun 17:00–Mon 02:00 CT configuration window. No envelope yet."
@@ -310,33 +411,38 @@ function SpxVerdictCard({ snap }: { snap: SPXSnapshot }) {
               "Channel is initializing."}
         </p>
         <div className="grid grid-cols-3 gap-3 pt-3 border-t border-rule">
-          <MetricCol label="Conviction">
-            {isPreConfig ? (
-              <PendingMetric />
-            ) : (
-              <div className="flex flex-col gap-1.5 w-full">
-                <ScoreTrack value={score} bands={normalizedBands(snap.scoreBands)} />
-                <span className="font-mono text-[10px] text-ink-3 tabular-nums">
-                  {score}/100
-                </span>
-              </div>
+          <Metric
+            label="Conviction"
+            hint={SLATE_COPY.metric.conviction.spx}
+            example={SLATE_COPY.metricExample.convictionSpx}
+          >
+            {!isPreConfig && (
+              <ConvictionTrack
+                value={score}
+                max={100}
+                label={`${score}/100`}
+                bands={normalizedBands(snap.scoreBands)}
+              />
             )}
-          </MetricCol>
-          <MetricCol label="Channel">
-            {isPreConfig ? (
-              <PendingMetric />
-            ) : (
-              <ChannelValue direction={snap.channel.direction} />
-            )}
-          </MetricCol>
-          <MetricCol label="Grade">
-            {isPreConfig ? (
-              <PendingMetric />
-            ) : (
-              <SpxGradeValue action={action} />
-            )}
-          </MetricCol>
+          </Metric>
+          <Metric
+            label="Channel"
+            hint={SLATE_COPY.metric.channel}
+            example={SLATE_COPY.metricExample.channel}
+          >
+            {!isPreConfig && <ChannelValue direction={snap.channel.direction} />}
+          </Metric>
+          <Metric
+            label="Grade"
+            hint={SLATE_COPY.metric.grade}
+            example={SLATE_COPY.metricExample.grade}
+          >
+            {!isPreConfig && <SpxGradeValue action={action} />}
+          </Metric>
         </div>
+        {(isPreConfig || state === "STAND_DOWN" || state === "COOLDOWN") && (
+          <LastSignalRecap recap={lastSignal} />
+        )}
         {isPreConfig ? (
           <NextEventCallout engine="SPX" />
         ) : (
@@ -349,14 +455,10 @@ function SpxVerdictCard({ snap }: { snap: SPXSnapshot }) {
           {!isPreConfig && (
             <SetAlertButton symbol="SPX" level={alertLevel} context={alertContext} />
           )}
-          <Link
-            href="/spx"
-            className="inline-flex items-center gap-1 h-8 px-3 rounded-pill bg-paper-2 text-ink-2 hover:text-ink hover:bg-paper-2/70 font-mono text-[11px] uppercase tracking-[0.10em] transition-colors"
-          >
-            View SPX Channel
-            <ArrowRight size={11} className="text-ink-3" />
-          </Link>
         </div>
+        {!isPreConfig && (
+          <WhyChips trace={snap.decisionTrace ?? []} className="pt-2" />
+        )}
         <CardFooterRow asOfIso={snap.asOf}>
           <WhyThisStateLink
             engine="SPX"
@@ -383,7 +485,7 @@ function SpxReadCard({ snap }: { snap: SPXSnapshot }) {
         count={snap.lines.length}
         plottedAt={snap.asOf}
       />
-      <CardBody className={empty ? "px-5 py-6" : "px-0 pb-0"}>
+      <CardBody className={empty ? "px-5 py-6 min-h-[180px]" : "px-0 pb-0 min-h-[180px]"}>
         {empty ? (
           snap.plannedEnvelope ? (
             <EnvelopeBar
@@ -394,7 +496,7 @@ function SpxReadCard({ snap }: { snap: SPXSnapshot }) {
             />
           ) : (
             <p className="text-[13px] text-ink-3">
-              0 lines active. Channel resolves on the first qualifying overnight pivot.
+              {SLATE_COPY.structureEmpty.spx}
             </p>
           )
         ) : (
@@ -422,21 +524,10 @@ function SpxReadCard({ snap }: { snap: SPXSnapshot }) {
 }
 
 // ---- shared bits ----
-
-function MetricCol({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <div className="eyebrow text-ink-3 mb-1">{label}</div>
-      <div className="min-h-[28px] flex items-end">{children}</div>
-    </div>
-  );
-}
+// MetricCol + PendingMetric were superseded by <Metric /> from
+// components/decision-slate/Metric.tsx — that primitive bakes label,
+// info tooltip, and the faint "e.g. B+" placeholder into a single
+// reusable component used by both engine cards.
 
 function ChannelValue({ direction }: { direction: string }) {
   if (direction === "NONE" || !direction) {
@@ -516,17 +607,6 @@ function PriceWithDelta({ price, change }: { price: number; change: number }) {
 
 // Em-dash placeholder used in the metric grid when the engine is in
 // PRE_CONFIG. Shared tooltip explains why the value is blank.
-function PendingMetric() {
-  return (
-    <span
-      title="Metrics populate after configuration completes."
-      className="font-mono text-[13px] text-state-neutral cursor-help"
-    >
-      —
-    </span>
-  );
-}
-
 // SPX side of the "Grade" column. The engine's confluence action
 // (TAKE / SELECTIVE / STAND_DOWN) maps onto a letter grade so the
 // column rhythm matches SPY. NULL action → "Grade — pending" with
@@ -607,7 +687,10 @@ function CardFooterRow({
   asOfIso: string;
 }) {
   return (
-    <div className="pt-3 border-t border-rule flex items-center justify-between gap-3">
+    // mt-auto pins the footer to the bottom of a flex-col CardBody so
+    // SPY and SPX bottom-align even when their content blocks differ
+    // in height (P2).
+    <div className="mt-auto pt-3 border-t border-rule flex items-center justify-between gap-3">
       {children}
       <AsOfTicker iso={asOfIso} />
     </div>

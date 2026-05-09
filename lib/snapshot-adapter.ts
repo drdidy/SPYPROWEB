@@ -872,6 +872,7 @@ export function applySpxSessionGate(
         weight: "key",
       },
     ],
+    stateHistory: [],
     invalidation: null,
     plannedEnvelope: null,
     lines: [],
@@ -907,6 +908,10 @@ function applySpyPreConfigOverride(
         weight: "key",
       },
     ],
+    // No state transitions are meaningful before the engine has run
+    // its config window. Blank stateHistory so the timeline strip
+    // hides itself for this engine.
+    stateHistory: [],
     invalidation: null,
     lines: [],
   };

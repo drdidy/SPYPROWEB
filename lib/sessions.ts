@@ -450,3 +450,45 @@ export function formatConfigWindow(s: SessionInfo): string {
     }).format(d);
   return `${day} ${hm(s.configWindowStart)}–${hm(s.configWindowEnd)} CT`;
 }
+
+/**
+ * Staleness label for prices that don't trade off-hours (VIX, SPX-cash,
+ * SPY-cash). Returns null when the data is live (engine inside RTH);
+ * otherwise the most honest label given the calendar — `"Fri close"`,
+ * `"after hours"`, `"last close"`, etc. The TopBar appends this after
+ * the value and hides the delta when it's non-null (a delta against
+ * a stale reading is misleading).
+ */
+export function priceStalenessLabel(now: Date = new Date()): string | null {
+  // Use SPY's session as the proxy for "are US equities trading right
+  // now?" — same RTH window, same calendar.
+  const session = getSessionInfo("SPY", now);
+  if (session.phase === "RTH_OPEN") return null;
+
+  if (session.phase === "CLOSED_HOLIDAY") return "last close";
+
+  if (session.phase === "CLOSED_WEEKEND") {
+    // Was the previous trading day a Friday? Most weekends, yes.
+    const prevWeekday = previousTradingWeekdayLabel(now);
+    return prevWeekday ? `${prevWeekday} close` : "last close";
+  }
+
+  // PRE_CONFIG / POST_CONFIG / CONFIG_WINDOW / POST_RTH — between
+  // sessions. "After hours" is the most accurate generic.
+  return session.phase === "POST_RTH" ? "after hours" : "last close";
+}
+
+function previousTradingWeekdayLabel(now: Date): string | null {
+  // Walk back up to 7 calendar days to find the most recent trading
+  // day strictly before `now`'s CT date.
+  const today = chicagoDayKey(now);
+  for (let offset = 1; offset <= 7; offset++) {
+    const candidate = addDays(today, -offset);
+    if (!isTradingDay(candidate)) continue;
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Chicago",
+      weekday: "short",
+    }).format(new Date(Date.UTC(candidate.year, candidate.month - 1, candidate.day, 12, 0)));
+  }
+  return null;
+}
