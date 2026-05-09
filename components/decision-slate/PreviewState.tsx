@@ -1,45 +1,98 @@
+"use client";
+
 // Low-key empty-state teaching panel. Shown only while both engines
 // are in PRE_CONFIG so a brand-new user can see what the slate will
 // look like once the next setup window opens — without crowding the
 // live state when it returns.
 //
-// The preview uses faint mock values, a "Preview" eyebrow, and a
-// reduced-opacity wrapper so it reads as a sample rather than real
-// data. No interaction — these cards are intentionally static.
-//
-// The preview is hidden once either engine leaves PRE_CONFIG.
+// v4 polish:
+//   - Wrapped in a subtly cooler surface tone (paper-cool) so the
+//     section reads as instantly distinct from live cards.
+//   - "Hide preview" toggle. Choice persists in localStorage, so a
+//     returning user who has dismissed the panel doesn't see it
+//     again. A small "Show preview" inline link replaces it.
+//   - Strict 1fr 1fr inner grid (was already, but pinned via CSS
+//     Grid template, not flex) so the SPX preview card can't end
+//     up wider than its SPY counterpart on any width.
 
+import { useEffect, useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { ConvictionTrack } from "@/components/slate/ConvictionTrack";
+
+const STORAGE_KEY = "slate.preview.hidden";
 
 interface Props {
   className?: string;
 }
 
 export function PreviewState({ className }: Props) {
+  const [hidden, setHidden] = useHiddenPref();
+
+  if (hidden) {
+    return (
+      <div className={cn("text-right", className)}>
+        <button
+          type="button"
+          onClick={() => setHidden(false)}
+          className={cn(
+            "inline-flex items-center gap-1.5 text-[11px] font-medium",
+            "text-ink-3 hover:text-ink transition-colors",
+            "outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas rounded-soft px-1",
+          )}
+        >
+          <Eye size={12} aria-hidden />
+          Show preview
+        </button>
+      </div>
+    );
+  }
+
   return (
     <section
       aria-label="Preview of populated cards"
       data-testid="preview-state"
-      className={cn("space-y-3", className)}
+      className={cn(
+        // v4 #6 + #13: cooler surface tone differentiates the preview
+        // from live cards above it. paper-cool is a teal-tinged cream.
+        "rounded-card bg-paper-cool/50 border border-rule px-4 py-4 md:px-5 md:py-5",
+        "space-y-4",
+        className,
+      )}
     >
-      <div className="flex items-baseline gap-3">
-        <h2 className="font-serif text-[18px] text-ink tracking-tight">
+      <header className="flex items-baseline gap-3">
+        <h2 className="font-serif text-h3 text-ink tracking-tight">
           Preview
         </h2>
         <span aria-hidden className="h-px flex-1 bg-rule" />
-        <span className="font-mono text-[10px] tracking-[0.16em] uppercase text-ink-3">
+        {/* v4 #9: multi-word eyebrows render in sentence case. Caps
+            tracking is reserved for single-word eyebrows. */}
+        <span className="text-[11px] tracking-[0.02em] text-ink-3 italic">
           What you'll see at setup
         </span>
-      </div>
+        <button
+          type="button"
+          onClick={() => setHidden(true)}
+          className={cn(
+            "inline-flex items-center gap-1 text-[11px] font-medium",
+            "text-ink-3 hover:text-ink transition-colors",
+            "outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas rounded-soft px-1",
+          )}
+          aria-label="Hide preview section"
+        >
+          <EyeOff size={12} aria-hidden />
+          Hide
+        </button>
+      </header>
       <p className="text-meta text-ink-3 max-w-2xl">
         These are sample values, not live data. Real bias, conviction, grade,
         and active levels populate when the next setup window opens.
       </p>
       <div
-        // Reduced opacity + non-interactive cursor signal "this is a sketch".
-        className="grid grid-cols-1 lg:grid-cols-2 gap-5 opacity-65 select-none"
+        // v4 #14: strict 1fr 1fr grid. Both cards share the same
+        // column width at every >= lg width, no flex slack.
+        className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 opacity-65 select-none [grid-template-columns:1fr_1fr] lg:[grid-template-columns:1fr_1fr]"
         aria-hidden
       >
         <PreviewCard
@@ -50,7 +103,7 @@ export function PreviewState({ className }: Props) {
           subtitle="Bias is the directional lean from the overnight and premarket sessions."
           conviction={3}
           convictionMax={5}
-          convictionLabel="3/5"
+          convictionLabel="3 / 5"
           biasLabel="bullish"
           gradeLabel="B+"
           biasTone="text-bull-ink"
@@ -63,7 +116,7 @@ export function PreviewState({ className }: Props) {
           subtitle="Channel is the overnight envelope. It forms on the first qualifying pivot."
           conviction={73}
           convictionMax={100}
-          convictionLabel="73/100"
+          convictionLabel="73 / 100"
           biasLabel="ascending"
           gradeLabel="A"
           biasTone="text-bull-ink"
@@ -140,7 +193,7 @@ function PreviewCard({
       />
       <CardBody className="space-y-4">
         <p className="text-meta text-ink-3 -mt-2">{subtitle}</p>
-        <div className="grid grid-cols-3 gap-3 pt-3 border-t border-rule">
+        <div className="grid grid-cols-3 gap-4 pt-3 border-t border-rule">
           <PreviewMetric label="Conviction">
             <ConvictionTrack
               value={conviction}
@@ -183,4 +236,29 @@ function PreviewMetric({
       <div className="min-h-[28px] flex items-end">{children}</div>
     </div>
   );
+}
+
+// localStorage-backed pref. SSR-safe: starts as `false` until the
+// effect runs, so the preview is shown by default to first-time
+// visitors. Returning users who have hidden the preview see the
+// collapsed "Show preview" link until they open it again.
+function useHiddenPref(): [boolean, (v: boolean) => void] {
+  const [hidden, setHiddenState] = useState(false);
+  useEffect(() => {
+    try {
+      setHiddenState(window.localStorage.getItem(STORAGE_KEY) === "1");
+    } catch {
+      // localStorage may be unavailable (SSR fallback, private mode) —
+      // default-shown is fine.
+    }
+  }, []);
+  const setHidden = (v: boolean) => {
+    setHiddenState(v);
+    try {
+      window.localStorage.setItem(STORAGE_KEY, v ? "1" : "0");
+    } catch {
+      // ignore — non-critical preference
+    }
+  };
+  return [hidden, setHidden];
 }

@@ -8,6 +8,15 @@ const config: Config = {
         canvas: "#FAF8F3",
         paper: "#FFFFFF",
         "paper-2": "#F4EFE3",
+        // Cooler cream-grey surface used to differentiate "preview /
+        // not-live" sections from the warm live-paper palette. Slight
+        // sage cast keeps it inside the cream family but unambiguously
+        // not the same surface as paper / paper-2.
+        "paper-cool": "#EEF0EB",
+        // Branded tint surface for the Recommended Action hero — a
+        // desaturated gold that picks up the brand chip without
+        // competing with the data cards beneath.
+        "paper-brand": "#FAF1DC",
         sunken: "#EFE9DA",
 
         ink: {

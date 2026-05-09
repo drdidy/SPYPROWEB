@@ -1,11 +1,17 @@
-// State-aware "Recommended next step" rail. Replaces v1's hard-coded
-// three-branch `PrimaryActionRail` with a small dispatcher driven by
-// `lib/recommendations.ts`. The eyebrow now names the engine state
-// driving the recommendation so the user can see *why* the slate is
-// pointing at this surface.
+// State-aware "Recommended next step" rail. v4 restores it as the
+// page hero (first element under the page header), with a branded
+// tint surface so it visually anchors the eye above the engine
+// pipelines.
 //
-// All other actions on the slate are secondary/ghost-button styled —
-// this is the page's #1 action.
+// Anatomy:
+//   eyebrow "Recommended next step"
+//   state context chip ("Both engines · pre-config")
+//   headline = the action sentence
+//   primary button right-aligned (drops below the text on narrow
+//                                  widths via flex-wrap)
+//
+// All state mapping lives in lib/recommendations.ts so this file
+// stays presentational and testable.
 
 import Link from "next/link";
 import {
@@ -23,8 +29,6 @@ import {
 } from "@/lib/recommendations";
 import type { EngineState } from "@/lib/states";
 
-// Icon per recommendation id — kept in the component layer so the
-// pure dispatcher in lib/ stays icon-free (tests don't need React).
 const ICONS: Record<Recommendation["id"], LucideIcon> = {
   "live-spy": Activity,
   "live-spx": Activity,
@@ -45,25 +49,44 @@ export function RecommendedAction({ spyState, spxState, className }: Props) {
 
   return (
     <section
-      aria-label="Recommended next step"
+      aria-labelledby="recommended-action-heading"
       data-testid="recommended-action"
       className={cn(
-        "rounded-card border border-rule bg-paper px-4 py-3 md:px-5 md:py-4",
+        // v4 #6: branded gold tint surface so the hero anchors the
+        // page above the cream-on-cream cards. 1.5px gold border in
+        // the brand color reinforces the "this is the primary
+        // action" reading.
+        "rounded-card bg-paper-brand border border-rule-strong",
+        "shadow-[inset_0_0_0_1px_rgba(184,130,31,0.15)]",
+        "px-5 py-4 md:px-6 md:py-5",
         "flex items-center justify-between gap-4 flex-wrap",
         className,
       )}
     >
       <div className="min-w-0 flex-1">
-        <p className="font-mono text-[10px] tracking-[0.16em] uppercase text-ink-3">
-          Recommended next step
-          <span className="text-ink-4 mx-1.5" aria-hidden>
-            ·
-          </span>
-          <span className="text-ink-2 normal-case font-medium tracking-[0.02em]">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* v4 #9: tracked-caps reserved for one-word eyebrows.
+              Multi-word eyebrows render as plain small-caps text. */}
+          <p
+            id="recommended-action-heading"
+            className="text-[11px] tracking-[0.02em] text-ink-2 font-semibold"
+          >
+            Recommended next step
+          </p>
+          <span aria-hidden className="h-3 w-px bg-rule-strong" />
+          <span
+            data-testid="recommended-action-state"
+            className={cn(
+              "inline-flex items-center px-2 py-0.5 rounded-pill",
+              "bg-paper/70 text-ink-2",
+              "text-[11px] tracking-[0.02em] font-medium",
+              "shadow-[inset_0_0_0_1px_rgba(184,130,31,0.20)]",
+            )}
+          >
             {rec.reason}
           </span>
-        </p>
-        <p className="text-body text-ink-2 mt-1 leading-snug max-w-2xl">
+        </div>
+        <p className="text-body text-ink leading-snug max-w-2xl mt-2 font-medium">
           {rec.description}
         </p>
       </div>
@@ -74,7 +97,7 @@ export function RecommendedAction({ spyState, spxState, className }: Props) {
           "inline-flex items-center gap-2 h-10 px-4 rounded-pill shrink-0",
           "bg-ink text-paper hover:bg-ink-2 transition-colors",
           "font-mono text-[12px] tracking-[0.06em] font-medium",
-          "outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
+          "outline-none focus-visible:ring-2 focus-visible:ring-gold/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
         )}
       >
         <Icon size={14} aria-hidden />

@@ -6,6 +6,137 @@ entries grow newest-first.
 
 ## [Unreleased]
 
+### Decision Slate v4 — bug fixes + hierarchy
+
+Bug-fix + polish pass on top of v2/v3. Two P0 regressions resolved
+plus the structural items called out in the v4 spec. No backend
+changes.
+
+**P0 fixes**
+
+- **SPX "Watched only" duplication.** v3 added a tooltip-anchored
+  "Watched only" pill that swapped the side label, but the recap
+  body string from `lib/last-session-recap.ts` already started with
+  the same phrase ("Watched only — day closed +79.00 pts"), so the
+  user saw the words twice in a row. `LastSignalRecap` now strips
+  the leading "Watched only" prefix from the body whenever the pill
+  takes over, via a permissive regex covering case and separator
+  variants. New `scripts/test-last-signal-recap.ts` (13 cases)
+  guards the regression.
+- **TopBar "ri close" / "VIX 1" clip artifacts.** The inline "·
+  Fri close" suffix on each price was a `xl:inline` text node that
+  clipped to "ri close" at lg-but-not-xl widths because the ribbon
+  has `overflow-hidden`. Same root cause showed up as "VIX 1" —
+  the leading character of an unfinished VIX value. v4 moves
+  staleness off the inline suffix entirely: each price value now
+  carries an `<InfoTooltip>` showing the staleness phrase plus the
+  exact CT timestamp, and stale prices render in italic muted ink
+  so the visual cue is preserved without the clip risk. VIX (and
+  SPY/SPX) render a skeleton bar until the value is loaded so a
+  partially-hydrated price never reads as "1".
+- **TopBar restructured into named clusters** with explicit
+  `<Divider />` hairlines between groups: `[menu] | [Engines: SPY
+  · SPX] | [SPY/SPX/VIX prices] | [next setup · freshness] |
+  [search][bell]`. The "Engines" cluster gets a leading label so
+  the row reads as structured groups, not an unstructured ribbon
+  of metadata.
+
+**P1 — structural polish**
+
+- **Recommended Action restored as page hero.** v3 demoted it
+  below the pipelines; v4 moves it back to the first element under
+  the page header. New `bg-paper-brand` token (`#FAF1DC`) gives
+  the hero a desaturated gold tint that anchors the eye without
+  competing with the data cards beneath. The eyebrow now reads
+  "Recommended next step" + a separator + a state-context chip
+  rendering the dispatcher's `reason` (e.g. "both engines
+  pre-config").
+- **Engine pipelines wrapped in a tinted band.** A `bg-paper-2/30`
+  surface frames the SPY/SPX state pipelines as a single "engine
+  state" zone, so the page reads as four tonally-distinct
+  sections (hero gold, engines warm, briefing plain, preview
+  cool) rather than four near-identical card rows.
+- **StatePipeline duplicate label dropped.** The serif H3 title
+  next to the engine ticker repeated whatever the active step
+  pill in the stepper already said ("Pre-config" rendered twice).
+  v4 drops the title — the active pill is the single source of
+  state-name truth.
+- **Strict 1fr 1fr grid.** Both the engines band and the Preview
+  state lock their 2-col layouts via explicit
+  `[grid-template-columns:1fr_1fr]` so SPX can't end up wider
+  than SPY at any width.
+
+**P2 — copy, a11y, pattern drift**
+
+- **`graded sessions` tooltip.** New jargon helper on the
+  EngineTrackRecord summary line. Defines: "Sessions where the
+  engine took a setup to a confirmed entry and tracked through to
+  exit. Skipped sessions are excluded from the percentage."
+- **`About this page` CTA cleaned up.** Dropped the leading "?"
+  glyph that broke the slate's sentence-case-with-arrow CTA
+  pattern. The cursor-help tooltip remains as the affordance.
+- **Caps-as-eyebrow audit.** Tracked-caps reserved for one-word
+  eyebrows only (`Workspace`, `Preview`, `Last session`). The
+  multi-word eyebrows `Recommended next step` and
+  `What you'll see at setup` move to plain small-text.
+- **BETA chip stronger ochre.** v3 used `bg-gold-soft` (#F4E4C0)
+  + a 0.45 inset border but the cream-on-cream rendering still
+  read as neutral / blueish to viewers. v4 switches to a solid
+  `bg-gold` (#B8821F) fill with `text-gold-tint` text — saturated
+  warm at any monitor calibration.
+- **`Hide preview` toggle** (localStorage-backed) on the
+  PreviewState section. Returning users who dismissed it see a
+  small `Show preview` link in its place.
+- **PreviewState moved to a cooler surface tone.** New
+  `bg-paper-cool` token (`#EEF0EB`, faint sage cream) makes the
+  section instantly read as "not live" without an opacity hack.
+- **Spacing scale.** Outer page rhythm pinned to `gap-6` (24px)
+  between top-level sections; engine-band internal gaps to
+  `gap-3 / gap-4` (12 / 16); Preview internal to `gap-4 / gap-6`
+  (16 / 24). All on the 4 / 8 / 16 / 24 / 48 token grid.
+
+**Backend not-fixed (called out)**
+
+- **SPX track-record showing "no graded sessions"** while SPY
+  shows wins/losses. The FE classifier in `lib/track-record.ts`
+  reads `verdictOutcome` from the SPX replay block as the engine
+  emits it. If `verdictOutcome` is null but `isReplay: true`, the
+  classifier returns `SKIP` — that's the wire contract. Two
+  candidate root causes (both backend):
+    1. yfinance returns empty for ES=F on the dates being graded;
+       the SPX replay path then can't compute open/close →
+       `verdictOutcome: null`. PR #73 widened the fetch window
+       but didn't eliminate the failure mode.
+    2. The SPX engine's qualifying conditions (channel formed,
+       rejection candle, confirmation) genuinely weren't met on
+       those days — in which case `SKIP` is the honest result.
+  A `TODO(backend)` comment in `lib/track-record.ts` names the
+  endpoint to investigate (`api/spx/snapshot.py
+  _build_spx_replay_block`).
+
+**Verification**
+
+- `npx tsc --noEmit` — clean.
+- `npx next build` — clean. `/dashboard` ships at 11.9 kB
+  (113 kB first-load).
+- `scripts/test-last-signal-recap.ts` (new) — 13 cases pass.
+- `scripts/test-countdown.ts` — 11/11 pass.
+- `scripts/test-recommendations.ts` — 16/16 pass.
+- `scripts/test-state-pipeline.ts` — 6/6 invariants intact.
+- `scripts/test-topbar-layout.ts` — 6/6 invariants intact.
+- `scripts/test-sessions.ts` — 10/10 pass.
+
+**Deliverables not shipped**
+
+Same posture as v2: no Storybook (repo isn't configured for it,
+spec said "no new heavy dependencies"); no Chromatic/Playwright
+visual snapshots (no Jest/Vitest/Playwright runner in the repo;
+adding one is a separate infra workstream); no axe-core runtime
+tests (same reason). Static-analysis guards in `scripts/test-*.ts`
+cover the structural invariants.
+
+---
+
 ### Decision Slate v2 — hierarchy, redundancy, live behavior, a11y
 
 A focused polish pass on top of v1, addressing the 15 numbered

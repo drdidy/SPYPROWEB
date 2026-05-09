@@ -29,11 +29,14 @@ export function Wordmark({ collapsed = false }: { collapsed?: boolean }) {
               Prophet
             </div>
           </div>
-          {/* v2 #13: warmer ochre/brown to match the cream palette,
-              with a subtle border so the chip stays readable on
-              cream surfaces. */}
+          {/* v4 #11: stronger ochre presence. v2 used bg-gold-soft
+              + a 0.45 inset border, but the cream-on-cream palette
+              kept reading as a neutral/blueish tile to viewers. v4
+              switches to a saturated brand-gold solid fill with the
+              gold-tint as text — unambiguously warm at any monitor
+              calibration. */}
           <span
-            className="rounded-pill bg-gold-soft text-gold-ink px-1.5 py-px text-[9px] font-mono font-bold tracking-[0.10em] uppercase shadow-[inset_0_0_0_1px_rgba(184,130,31,0.45)]"
+            className="rounded-pill bg-gold text-gold-tint px-1.5 py-px text-[9px] font-mono font-bold tracking-[0.10em] uppercase shadow-[inset_0_0_0_1px_rgba(92,63,11,0.55)]"
             aria-label="Closed beta"
           >
             Beta

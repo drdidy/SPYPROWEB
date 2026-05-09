@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Bell, Menu, Search } from "lucide-react";
 import { NumberFlash } from "@/components/ui/NumberFlash";
 import { Kbd } from "@/components/ui/Kbd";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { useLiveSPY, useLiveSPX } from "@/lib/use-live-snapshot";
 import { cn } from "@/lib/utils";
 import { FreshnessPill } from "@/components/decision-slate/FreshnessPill";
@@ -15,12 +16,25 @@ import {
 import type { EngineState } from "@/lib/states";
 
 // ---------------------------------------------------------------------------
-// TopBar layout — three-zone flex (chips · ribbon · meta) on a single
-// overflow-hidden row. Each zone is shrink-0 + whitespace-nowrap so no
-// segment can flex-grow into another. Hide priority below 1024px:
-//   VIX delta → VIX label → prices → session line → state pills
-// State pills are the slate's most important top-bar surface and survive
-// down to 375px.
+// TopBar layout — five-cluster row separated by 1px vertical dividers.
+//
+//   [menu] | [SPY · SPX state]  | [SPY/SPX/VIX prices] | [next setup · freshness] | [search][bell]
+//
+// Each cluster is shrink-0 + whitespace-nowrap so no segment can
+// flex-grow into another. Hide priority below 1024px:
+//   prices ribbon → next-setup line → engines cluster → state pills
+// State chips and freshness pill survive down to 375px.
+//
+// v4 fixes:
+//   - Inline "· Fri close" suffix removed (it clipped to "ri close"
+//     at lg widths). Staleness is now an InfoTooltip on the price
+//     value, with the exact close timestamp as the tooltip content.
+//   - VIX renders a skeleton bar when the value isn't loaded yet,
+//     instead of "1" (the leading character of an unset number that
+//     was getting clipped).
+//   - The two state chips are wrapped in an "Engines" cluster with
+//     a leading label so the row reads as structured groups, not an
+//     unstructured ribbon of metadata.
 // ---------------------------------------------------------------------------
 
 const verbPalette: Record<string, string> = {
@@ -57,26 +71,18 @@ export function TopBar({
   const spxSnapshot = useLiveSPX();
   const decision = spy.decision;
   const t = spy.shell;
-  // FreshnessPill (right cluster) carries the "Updated HH:MM CT" text
-  // now — single source of truth for staleness.
   const sessionLine = useSessionLine();
   const staleness = useStalenessLabel();
+  const stalenessAt = useStalenessTimestamp();
 
   const spyState = spy.currentState;
   const spxState = (spxSnapshot.currentState as EngineState | undefined) ?? "STAND_DOWN";
 
-  // ---- SPY pill -------------------------------------------------------
-  // In PRE_CONFIG the engine has no conviction and no verb yet — pill
-  // reads just "SPY · PRE-CONFIG" with no sub-label. Otherwise show
-  // verb + conviction.
   const spyVerb = spyState === "PRE_CONFIG" ? "PRE-CONFIG" : decision.verdict;
   const spyTone = verbPalette[spyVerb] ?? verbPalette["STAND DOWN"];
   const spyMeta =
     spyState === "PRE_CONFIG" ? null : `conviction ${decision.conviction}/5`;
 
-  // ---- SPX pill -------------------------------------------------------
-  // PRE_CONFIG drops the OUTSIDE / INSIDE scenario tag. There's no
-  // "outside" of a play that hasn't been plotted yet.
   const rawSpxVerb = spxSnapshot.confluence.action.replace(/_/g, " ");
   const spxVerb = spxState === "PRE_CONFIG" ? "PRE-CONFIG" : rawSpxVerb;
   const spxTone = verbPalette[spxVerb] ?? verbPalette["STAND DOWN"];
@@ -85,16 +91,20 @@ export function TopBar({
       ? null
       : SPX_SCENARIO_TAG[spxSnapshot.scenario] ?? spxSnapshot.scenario;
 
+  // Skeleton condition — value is 0 / NaN / undefined-ish before the
+  // first poll completes. Showing "0.00" or a clipped digit is worse
+  // than showing nothing for half a second.
+  const vixLoaded = Number.isFinite(t.vix) && t.vix > 0;
+  const spyLoaded = Number.isFinite(t.spy) && t.spy > 0;
+  const spxLoaded =
+    Number.isFinite(spxSnapshot.price.last) && spxSnapshot.price.last > 0;
+
   return (
     <header
       className={cn(
         "h-[60px] sticky top-0 z-30 bg-canvas/85 backdrop-blur-md",
         "border-b border-rule",
-        // Single flex row, gap-controlled. overflow-hidden + min-w-0
-        // is the regression guard — without these, a long session line
-        // can push the right cluster off-screen, *visually overlapping*
-        // the prices.
-        "flex items-center gap-3 md:gap-5 px-3 md:px-5 overflow-hidden min-w-0",
+        "flex items-center gap-3 md:gap-4 px-3 md:px-5 overflow-hidden min-w-0",
       )}
       data-testid="topbar"
     >
@@ -107,11 +117,17 @@ export function TopBar({
         <Menu size={17} />
       </button>
 
-      {/* ---- ZONE 1: state pills (always visible, highest priority) -- */}
+      {/* CLUSTER 1: Engines status — the SPY/SPX state chips with a
+          leading "Engines" label so the cluster reads as one
+          structured group rather than two floating chips. */}
       <div
         data-segment="pills"
+        data-cluster="engines"
         className="flex items-center gap-2 shrink-0 whitespace-nowrap"
       >
+        <span className="hidden md:inline font-mono text-[9px] tracking-[0.18em] uppercase text-ink-3">
+          Engines
+        </span>
         <SymbolChip
           href="/dashboard"
           symbol="SPY"
@@ -119,6 +135,9 @@ export function TopBar({
           verbTone={spyTone}
           meta={spyMeta}
         />
+        <span aria-hidden className="text-ink-4 text-[10px]">
+          ·
+        </span>
         <SymbolChip
           href="/spx"
           symbol="SPX"
@@ -129,24 +148,31 @@ export function TopBar({
         />
       </div>
 
-      {/* ---- ZONE 2: quote ribbon (hidden < md, fluid filler) -------- */}
-      {/* flex-1 so it absorbs slack between zone 1 and zone 3 when
-          there's room; min-w-0 + overflow-hidden lets it truncate
-          gracefully rather than push neighbors. */}
-      <div className="hidden md:flex flex-1 items-center justify-center gap-3 lg:gap-5 min-w-0 overflow-hidden">
+      <Divider className="hidden md:block" />
+
+      {/* CLUSTER 2: Quote ribbon — SPY / SPX / VIX. Each value gets a
+          tooltip with the exact close-or-update timestamp so the
+          old inline "· Fri close" suffix isn't needed. flex-1 +
+          min-w-0 lets the ribbon absorb slack and truncate
+          gracefully when there isn't room. */}
+      <div className="hidden md:flex flex-1 items-center justify-center gap-3 lg:gap-4 min-w-0 overflow-hidden">
         <Quote label="SPY" wrapClass="hidden lg:flex">
-          <ValueWithStaleness
+          <ValueWithTooltip
             staleness={staleness}
+            stalenessAt={stalenessAt}
             delta={t.change}
+            loaded={spyLoaded}
             value={
               <NumberFlash value={t.spy} format={(n) => n.toFixed(2)} />
             }
           />
         </Quote>
         <Quote label="SPX" wrapClass="hidden lg:flex">
-          <ValueWithStaleness
+          <ValueWithTooltip
             staleness={staleness}
+            stalenessAt={stalenessAt}
             delta={spxSnapshot.price.change}
+            loaded={spxLoaded}
             value={
               <NumberFlash
                 value={spxSnapshot.price.last}
@@ -156,30 +182,28 @@ export function TopBar({
           />
         </Quote>
         <Quote label="VIX">
-          <ValueWithStaleness
+          <ValueWithTooltip
             staleness={staleness}
+            stalenessAt={stalenessAt}
             delta={t.vixDelta}
-            value={<span data-num>{t.vix.toFixed(2)}</span>}
+            loaded={vixLoaded}
+            value={<span data-num>{vixLoaded ? t.vix.toFixed(2) : "—"}</span>}
           />
         </Quote>
       </div>
 
-      {/* ---- ZONE 3: session + freshness pill (lg+ only). The pill is
-           the single source of truth for "how fresh is the slate?" —
-           it replaces the old "Updated HH:MM CT" text + dot, and the
-           per-card as-of stamps now hide unless their data ts diverges
-           from the global one. */}
+      <Divider className="hidden lg:block" />
+
+      {/* CLUSTER 3: session line + freshness pill (lg+). */}
       <div
         data-segment="meta"
+        data-cluster="session"
         className="hidden lg:flex items-center gap-3 shrink-0 whitespace-nowrap"
       >
         {sessionLine && (
-          <>
-            <span className="font-mono text-[10px] text-ink-3 tabular-nums uppercase tracking-[0.06em]">
-              {sessionLine}
-            </span>
-            <span className="h-3 w-px bg-rule" aria-hidden />
-          </>
+          <span className="font-mono text-[10px] text-ink-3 tabular-nums uppercase tracking-[0.06em]">
+            {sessionLine}
+          </span>
         )}
         <FreshnessPill
           freshnessISO={t.feedHealth.lastTickTs}
@@ -187,8 +211,10 @@ export function TopBar({
         />
       </div>
 
-      {/* ---- search + bell (always visible) ------------------------- */}
+      {/* CLUSTER 4: search + bell. ml-auto keeps them flush right when
+          earlier clusters wrap or hide. */}
       <div className="flex items-center gap-2 shrink-0 ml-auto md:ml-0">
+        <Divider className="hidden md:block" />
         <button
           onClick={onOpenPalette}
           aria-label="Search"
@@ -219,11 +245,15 @@ export function TopBar({
 
 // ---------------------------------------------------------------------------
 
-// v2 #1: simplified to a flat link styled as inline status text.
-// No background fill, no inner ring, no button-y hover lift — the
-// pipeline cards on /dashboard are now the single source of truth
-// for engine state. The chip remains a navigation surface
-// (cross-route shortcut) but reads as a label, not a button.
+function Divider({ className }: { className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={cn("h-4 w-px bg-rule shrink-0", className)}
+    />
+  );
+}
+
 function SymbolChip({
   href,
   symbol,
@@ -234,9 +264,8 @@ function SymbolChip({
   href: string;
   symbol: string;
   verb: string;
-  // verbTone retained in the prop signature for callers but no longer
-  // applied — the v2 chip is intentionally tone-agnostic so engine
-  // state lives in the pipelines, not the header.
+  // Retained for callers; the chip itself stays tone-agnostic so
+  // engine-state hue lives in the dashboard pipelines.
   verbTone?: string;
   meta: string | null;
   accent?: "violet";
@@ -298,26 +327,58 @@ function Quote({
   );
 }
 
-// Quote value + either the staleness suffix or the signed delta —
-// never both. A delta against a non-live reading is misleading, so
-// staleness wins when present.
-function ValueWithStaleness({
+// Quote value + delta (signed change). Staleness moves to a tooltip
+// on the value so it can never get clipped at the right edge of the
+// ribbon (the v3 "ri close" bug). The tooltip carries both the
+// human label ("Fri close") and the precise CT timestamp.
+function ValueWithTooltip({
   staleness,
+  stalenessAt,
   delta,
   value,
+  loaded,
 }: {
   staleness: string | null;
+  stalenessAt: string | null;
   delta: number;
   value: React.ReactNode;
+  loaded: boolean;
 }) {
+  const valueNode = loaded ? (
+    value
+  ) : (
+    // Skeleton placeholder. Width matches a typical 2-decimal price
+    // so the ribbon doesn't reflow on first paint.
+    <span
+      aria-hidden
+      className="inline-block h-3 w-9 rounded-pill bg-paper-2/80 animate-pulse"
+    />
+  );
+
+  // Tooltip body: when stale, show the staleness phrase + CT
+  // timestamp. When live, show "Live · updated <time>".
+  const tooltipBody = staleness
+    ? `Reflects ${staleness}${stalenessAt ? ` (${stalenessAt})` : ""}.`
+    : "Live — last updated moments ago.";
+
   return (
     <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
-      {value}
-      {staleness ? (
-        <span className="hidden xl:inline text-[10px] text-ink-3 italic shrink-0 whitespace-nowrap">
-          · {staleness}
+      <InfoTooltip
+        label={staleness ? "Stale price" : "Live price"}
+        content={tooltipBody}
+      >
+        <span
+          className={cn(
+            "cursor-help",
+            // Visually mark stale prices so the user notices without
+            // needing the tooltip — italic + muted ink.
+            staleness ? "italic text-ink-3" : "text-ink",
+          )}
+        >
+          {valueNode}
         </span>
-      ) : (
+      </InfoTooltip>
+      {!staleness && loaded && (
         <span className="hidden xl:inline-flex shrink-0">
           <DeltaTag value={delta} />
         </span>
@@ -373,3 +434,34 @@ function useStalenessLabel(): string | null {
   return label;
 }
 
+// Renders the precise CT timestamp matching the staleness label, so
+// the tooltip can show "Reflects Fri close (Fri 15:00 CT)" rather
+// than just the human phrase.
+function useStalenessTimestamp(): string | null {
+  const [ts, setTs] = useState<string | null>(null);
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date();
+      const spy = getSessionInfo("SPY", now);
+      // rthClose carries the most recent (or upcoming) RTH close;
+      // when staleness is present, that's the moment the price
+      // reflects. Format in CT for unambiguous reference.
+      try {
+        const formatted = new Intl.DateTimeFormat("en-US", {
+          timeZone: "America/Chicago",
+          weekday: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }).format(spy.rthClose);
+        setTs(`${formatted} CT`);
+      } catch {
+        setTs(null);
+      }
+    };
+    tick();
+    const id = window.setInterval(tick, 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+  return ts;
+}

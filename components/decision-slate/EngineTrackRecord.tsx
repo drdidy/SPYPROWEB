@@ -51,6 +51,8 @@ export function EngineTrackRecord({ record, className }: Props) {
   // v2 copy polish: parens on the W/L breakdown make clear the
   // percentage applies to graded sessions only. "5W 1L" still reads
   // separately so the user can see the underlying counts.
+  // v4 #7: "graded sessions" is jargon — surfaced via tooltip on
+  // the percentage (see the InfoTooltip wrapper below).
   const summary =
     pct == null
       ? SLATE_COPY.trackRecord.noGraded
@@ -97,7 +99,16 @@ export function EngineTrackRecord({ record, className }: Props) {
               label="No graded sessions yet"
               content={`Engine watched the last ${record.sessions.length} session${
                 record.sessions.length === 1 ? "" : "s"
-              } but didn't qualify a setup.`}
+              } but didn't qualify a setup. A graded session is one the engine took to a confirmed entry trigger and tracked through to its exit.`}
+            >
+              <span className="cursor-help">{summary}</span>
+            </InfoTooltip>
+          ) : pct != null ? (
+            // v4 #7: tooltip on the hit-rate so "graded" is
+            // discoverable without a glossary trip.
+            <InfoTooltip
+              label="Graded sessions"
+              content="Sessions where the engine took a setup to a confirmed entry and tracked through to exit. Skipped sessions are excluded from the percentage."
             >
               <span className="cursor-help">{summary}</span>
             </InfoTooltip>

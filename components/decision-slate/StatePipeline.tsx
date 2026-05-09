@@ -68,7 +68,6 @@ export function StatePipeline({
 }: Props) {
   const currentIdx = ENGINE_STATES.indexOf(current);
   const labelTone = engine === "SPX" ? "text-violet" : "text-ink-2";
-  const def = PHASE_DEFINITIONS[current];
 
   return (
     <section
@@ -78,13 +77,12 @@ export function StatePipeline({
         className,
       )}
     >
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-5">
-        {/* Ticker badge — engine identity, accent-tinted. */}
-        <div
-          className={cn(
-            "shrink-0 inline-flex items-center gap-2 self-start",
-          )}
-        >
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
+        {/* v4 #5: drop the serif state-name title that lived next to
+            the ticker. The active pill in the stepper below already
+            names the state — rendering "Pre-config" twice (title +
+            chip) was redundant. The ticker now stands alone. */}
+        <div className="shrink-0 self-start">
           <span
             className={cn(
               "font-mono text-[11px] tracking-[0.18em] uppercase font-bold",
@@ -92,10 +90,6 @@ export function StatePipeline({
             )}
           >
             {engine}
-          </span>
-          <span aria-hidden className="h-3 w-px bg-rule" />
-          <span className="text-h3 font-serif text-ink tracking-tight">
-            {def.label}
           </span>
         </div>
 

@@ -3,14 +3,17 @@
 // COOLDOWN). When no recap is available it returns null so the card
 // doesn't render an empty box.
 //
-// v2 polish:
+// v4 polish:
+//   - The "Watched only" path no longer renders the phrase twice.
+//     v3 swapped the side label to a pill but left the body
+//     ("Watched only — day closed +79.00 pts") untouched, so the
+//     user saw "watched only Watched only — day closed". The body
+//     is now stripped of its leading "Watched only" prefix when
+//     the pill renders.
 //   - "R" gets an InfoTooltip ("Profit/loss in multiples of initial
 //     risk") on its first occurrence per recap. The trigger is the
 //     literal letter R appended to the multiple, so the helping
 //     gloss sits exactly where the unfamiliar token does.
-//   - When the recap is the engine's "Watched only" soft path (no
-//     graded trade), the side label flips to a tooltip-anchored
-//     "Watched only" pill.
 
 import type { LastSignalSummary } from "@/types/decision-slate";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
@@ -21,11 +24,22 @@ interface Props {
   className?: string;
 }
 
+// Match "Watched only" or "watched only", optionally followed by a
+// dash/middot/colon and surrounding whitespace. Captures the rest so
+// we can render it as the body without the duplicated phrase.
+const WATCHED_PREFIX = /^\s*watched only\s*(?:[—–\-·:]\s*)?/i;
+
 export function LastSignalRecap({ recap, className }: Props) {
   if (!recap) return null;
   const sideTone =
     recap.side === "LONG" ? "text-state-bullish" : "text-state-bearish";
-  const isWatched = recap.oneLine.toLowerCase().startsWith("watched only");
+  const isWatched = WATCHED_PREFIX.test(recap.oneLine);
+  // When the pill takes over the "Watched only" branding, the body
+  // should be the remaining sentence only — no second copy of the
+  // phrase.
+  const body = isWatched
+    ? recap.oneLine.replace(WATCHED_PREFIX, "").trim()
+    : recap.oneLine;
   const rValue =
     recap.rMultiple == null
       ? "—"
@@ -48,14 +62,14 @@ export function LastSignalRecap({ recap, className }: Props) {
             label="Watched only"
             content="Engine generated a setup but no graded execution was logged for this session."
           >
-            <span className="text-ink-3 font-semibold lowercase tracking-[0.02em] cursor-help">
+            <span className="text-ink-3 font-semibold tracking-[0.02em] cursor-help">
               Watched only
             </span>
           </InfoTooltip>
         ) : (
           <span className={cn("font-semibold", sideTone)}>{recap.side}</span>
         )}
-        <span className="text-ink-2">{recap.oneLine}</span>
+        <span className="text-ink-2">{body}</span>
         <span className={cn("font-semibold inline-flex items-baseline", rTone)}>
           {rValue}
           <InfoTooltip
@@ -69,3 +83,7 @@ export function LastSignalRecap({ recap, className }: Props) {
     </div>
   );
 }
+
+// Pure helper exported for testing — used by scripts/test-last-signal-recap.ts
+// to assert the duplication can't sneak back in.
+export const __test = { WATCHED_PREFIX };

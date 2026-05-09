@@ -72,34 +72,43 @@ export default async function Page() {
   const spyHardError = spyError != null && spy.shellState.spy === 0;
 
   return (
-    // v2 #15: max content width 1200px with generous gutters at every
-    // breakpoint. The page composes top-to-bottom: compact header →
-    // pipelines (2-col at lg+) → recommended next step → either the
-    // Markets-quiet briefing + preview, or the live "Today's read" +
-    // active levels grids.
-    <div className="max-w-[1200px] mx-auto pb-16 space-y-6 pt-5 md:pt-6 anim-rise">
+    // v4 #15: 4 / 8 / 16 / 24 / 48 spacing scale. Outer rhythm is
+    // gap-6 (24px) between top-level sections. Max content width
+    // 1200px (v2). Composition: compact header → Recommended Action
+    // hero → Engines pipelines → either Markets-quiet briefing +
+    // Preview, or the live "Today's read" + active levels grids.
+    <div className="max-w-[1200px] mx-auto pb-12 space-y-6 pt-6 anim-rise">
       <PageHeader />
 
-      {/* v2 #4: pipelines render as a 2-col grid at lg+ so SPY and SPX
-          sit side-by-side, mirroring the verdict-card layout below. */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-5">
-        <StatePipeline
-          engine="SPY"
-          current={spyState}
-          nextEventISO={spySession.nextSignificantEvent.at.toISOString()}
-          nextEventLabel={spySession.nextSignificantEvent.label}
-          explanation={spyExplanation(spyState, spy)}
-        />
-        <StatePipeline
-          engine="SPX"
-          current={spxState}
-          nextEventISO={spxSession.nextSignificantEvent.at.toISOString()}
-          nextEventLabel={spxSession.nextSignificantEvent.label}
-          explanation={spxExplanation(spxState, spx)}
-        />
-      </div>
-
+      {/* v4 #3: Recommended Action restored as the page hero — first
+          element under the header, branded tint surface, always
+          above the fold. */}
       <RecommendedAction spyState={spyState} spxState={spxState} />
+
+      {/* v4 #6: engines row sits on a slightly stronger surface
+          (paper-2/40) with a subtle wrapper so it reads as a
+          discrete "engine state" zone, not yet-another-card-row. */}
+      <section
+        aria-label="Engine states"
+        className="rounded-card bg-paper-2/30 border border-rule-soft px-3 py-3 md:px-4 md:py-4"
+      >
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4 [grid-template-columns:1fr] lg:[grid-template-columns:1fr_1fr]">
+          <StatePipeline
+            engine="SPY"
+            current={spyState}
+            nextEventISO={spySession.nextSignificantEvent.at.toISOString()}
+            nextEventLabel={spySession.nextSignificantEvent.label}
+            explanation={spyExplanation(spyState, spy)}
+          />
+          <StatePipeline
+            engine="SPX"
+            current={spxState}
+            nextEventISO={spxSession.nextSignificantEvent.at.toISOString()}
+            nextEventLabel={spxSession.nextSignificantEvent.label}
+            explanation={spxExplanation(spxState, spx)}
+          />
+        </div>
+      </section>
 
       {bothPreConfig ? (
         <>
@@ -119,8 +128,7 @@ export default async function Page() {
               trackRecord: spxTrack,
             }}
           />
-          {/* v2 #10: low-key teaching panel, hidden once either engine
-              leaves PRE_CONFIG. */}
+          {/* v4 #13: PreviewState now self-hides via localStorage. */}
           <PreviewState />
         </>
       ) : (
@@ -178,17 +186,18 @@ function PageHeader() {
         content={SLATE_COPY.helpAboutSlate.body}
         placement="bottom"
       >
+        {/* v4 #8: dropped the leading "?" so this affordance matches
+            the rest of the slate's secondary CTAs (sentence case,
+            no leading glyph). The arrow remains as the affordance
+            cue. */}
         <span
           className={cn(
-            "inline-flex items-center gap-1.5 h-7 px-2.5 rounded-pill",
+            "inline-flex items-center gap-1 h-7 px-2.5 rounded-pill",
             "bg-paper-2/60 text-ink-2 hover:text-ink hover:bg-paper-2",
             "border border-rule transition-colors",
-            "text-[11px] tracking-[0.02em] font-medium",
+            "text-[11px] tracking-[0.02em] font-medium cursor-help",
           )}
         >
-          <span aria-hidden className="text-[12px] font-bold">
-            ?
-          </span>
           About this page
         </span>
       </InfoTooltip>
