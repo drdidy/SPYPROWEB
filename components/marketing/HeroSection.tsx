@@ -5,6 +5,7 @@ import { ArrowRight, ArrowDown } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import type { DecisionState } from "@/lib/types";
 import { HeroVerdictCard } from "./HeroVerdictCard";
+import { track } from "@/lib/analytics";
 
 interface HeroProps {
   decision?: DecisionState;
@@ -73,24 +74,32 @@ export function HeroSection({
 
         <div className="col-span-12 md:col-span-5 lg:col-span-6 flex flex-col items-start md:items-end gap-3">
           {/* Single primary CTA — waitlist. The slate preview lives
-              behind a tertiary text link below so visitors don't pick
-              the wrong path during closed beta. */}
-          <a href="#waitlist">
+              behind a tertiary text link below. cta_click is wired
+              to the analytics dispatch so we can see which path
+              visitors take. */}
+          <a
+            href="#waitlist"
+            onClick={() =>
+              track({ name: "cta_click", location: "hero", label: "join_waitlist" })
+            }
+          >
             <Button variant="primary" size="lg">
               Join the waitlist <ArrowRight size={15} />
             </Button>
           </a>
           <Link
             href="/dashboard"
+            onClick={() =>
+              track({
+                name: "cta_click",
+                location: "hero",
+                label: "read_todays_slate",
+              })
+            }
             className="text-[13px] text-ink-2 hover:text-ink underline underline-offset-4 decoration-rule hover:decoration-ink-3 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-gold/40 rounded-soft"
           >
             Read today&apos;s slate →
           </Link>
-          {/* "Closed beta · invite-only" intentionally rendered ONCE
-              now — it lives in the eyebrow at the top of the hero
-              ("A trading workspace · invite only"). The duplicate
-              line that used to sit beneath the buttons has been
-              removed. */}
         </div>
       </motion.div>
 

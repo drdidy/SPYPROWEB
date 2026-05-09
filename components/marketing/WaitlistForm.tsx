@@ -13,6 +13,7 @@ import Script from "next/script";
 import { Button } from "@/components/ui/Button";
 import { ArrowRight, Check, AlertCircle } from "lucide-react";
 import { SectionLabel } from "@/components/ui/SectionLabel";
+import { track } from "@/lib/analytics";
 
 type SubmitState =
   | { kind: "idle" }
@@ -65,11 +66,13 @@ export function WaitlistForm() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (state.kind === "pending") return;
+    track({ name: "waitlist_submit_attempt" });
 
-    // HTML5 validation already ran (the input has type=email +
-    // required); this is a belt-and-braces check.
+    // HTML5 validation already ran (type=email + required); this is
+    // a belt-and-braces check.
     if (!email.includes("@")) {
       setState({ kind: "error", message: "Please enter a valid email." });
+      track({ name: "waitlist_submit_error", reason: "client_validation" });
       return;
     }
 
@@ -91,21 +94,20 @@ export function WaitlistForm() {
         error?: string;
       };
       if (!res.ok || !data.ok) {
-        setState({
-          kind: "error",
-          message:
-            data.error ??
-            "Something went wrong on our side. Please try again in a minute.",
-        });
+        const message =
+          data.error ??
+          "Something went wrong on our side. Please try again in a minute.";
+        setState({ kind: "error", message });
+        track({ name: "waitlist_submit_error", reason: message });
         return;
       }
       setState({ kind: "success" });
+      track({ name: "waitlist_submit_success" });
     } catch {
-      setState({
-        kind: "error",
-        message:
-          "We couldn't reach the server. Please check your connection and try again.",
-      });
+      const message =
+        "We couldn't reach the server. Please check your connection and try again.";
+      setState({ kind: "error", message });
+      track({ name: "waitlist_submit_error", reason: "network" });
     }
   }
 

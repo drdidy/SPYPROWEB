@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Plus, Minus } from "lucide-react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { FAQS as faqs } from "@/content/faqs";
+import { track } from "@/lib/analytics";
 
 export function FAQ() {
   const [open, setOpen] = useState<number | null>(0);
@@ -41,7 +42,11 @@ export function FAQ() {
                     type="button"
                     aria-expanded={isOpen}
                     aria-controls={panelId}
-                    onClick={() => setOpen(isOpen ? null : i)}
+                    onClick={() => {
+                      const willOpen = !isOpen;
+                      setOpen(willOpen ? i : null);
+                      if (willOpen) track({ name: "faq_open", question: f.q });
+                    }}
                     className="w-full flex items-start gap-5 py-5 text-left group outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas rounded-soft -mx-2 px-2"
                   >
                     <span className="font-mono text-[10px] text-ink-3 tabular-nums tracking-[0.18em] uppercase pt-1.5">
