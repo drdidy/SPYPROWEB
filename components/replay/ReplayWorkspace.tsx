@@ -103,15 +103,17 @@ export function ReplayWorkspace({ initialDate }: Props) {
     let abort = false;
     setLoading(true);
     setError(null);
+    // Honor the API's Cache-Control headers — historical dates are stable,
+    // so revisits should hit the browser cache instantly.
     Promise.all([
-      fetch(`/api/snapshot?date=${date}`, { cache: "no-store" })
+      fetch(`/api/snapshot?date=${date}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((j) => (j ? adaptSnapshot(j as RawSnapshot) : null))
         .catch(() => null),
-      fetch(`/api/spx/snapshot?date=${date}`, { cache: "no-store" })
+      fetch(`/api/spx/snapshot?date=${date}`)
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null),
-      fetch(`/api/replay/intraday?date=${date}`, { cache: "no-store" })
+      fetch(`/api/replay/intraday?date=${date}`)
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null),
     ]).then(([s1, s2, s3]) => {

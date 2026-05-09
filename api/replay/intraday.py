@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, time, timedelta
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
@@ -110,8 +111,13 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
             return
 
-        spy = _fetch_intraday_5m("SPY", target)
-        es = _fetch_intraday_5m("ES=F", target)
+        # Fetch SPY and ES=F concurrently — yfinance is I/O-bound, so a
+        # thread pool roughly halves cold-start latency on date pick.
+        with ThreadPoolExecutor(max_workers=2) as ex:
+            f_spy = ex.submit(_fetch_intraday_5m, "SPY", target)
+            f_es = ex.submit(_fetch_intraday_5m, "ES=F", target)
+            spy = f_spy.result()
+            es = f_es.result()
 
         payload: dict = {
             "date": target.isoformat(),
