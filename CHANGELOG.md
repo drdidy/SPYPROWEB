@@ -6,6 +6,90 @@ entries grow newest-first.
 
 ## [Unreleased]
 
+### SPX Channel tab — root cause + permanent fix
+
+Audit of "the correct value can only be found on the replay tab".
+
+**Root cause**
+
+The `5872.00 / TAKE / ASCENDING` value the user kept seeing on
+the SPX Channel tab is the literal mock fixture from
+`lib/spx-mock-data.ts:99`. The page was hitting the silent
+fallback path inside `loadSnapshot()`.
+
+The chain:
+
+  1. `/spx` was a Server Component. Its data fetch ran inside
+     a Vercel function on the server.
+  2. The function did `fetch("${publicHost}/api/spx/snapshot?
+     date=...")` — i.e. a server-to-server HTTP call back into
+     the same project's public URL.
+  3. **Vercel preview deployments enforce Deployment Protection
+     on every public URL.** The user's browser carries a bypass
+     cookie, but a server function does not. The fetch returned
+     401.
+  4. `loadSnapshot()` saw `!res.ok`, fell through to
+     `mockSnapshot`, and the page rendered the mock as if it
+     were a live read. The "mock" badge in the page header was
+     the only honest signal — easy to miss.
+  5. Meanwhile `/replay` worked because it fetches the SAME
+     endpoint **from the browser**, where the user's auth cookie
+     applies.
+
+**Fix 1 — `/spx` data fetch moves to the browser**
+
+Created `<SPXChannelClient />` (`components/spx/SPXChannelClient.tsx`),
+a client component that fetches `/api/spx/snapshot?date=...`
+in `useEffect` exactly the way `/replay` does. The page itself
+(`app/(app)/spx/page.tsx`) is now a thin server-shell that reads
+`searchParams.date` and forwards it as a prop. No more
+server-to-server fetch on this route, no more deployment-
+protection wall, no more silent mock fallback. The user's
+browser is on the auth path that already works for `/replay`.
+
+**Fix 2 — explicit error instead of mock during fetch failure**
+
+`<SPXChannelClient />` does **not** import `lib/spx-mock-data`.
+On a fetch failure it renders `<ErrorState />` with the actual
+HTTP status / error message and a hint to retry. The mock
+fixture can never quietly substitute for a real reading on this
+route again. Enforced by a static-analysis test:
+`scripts/test-spx-replay-routing.ts` asserts the file has no
+`from "…spx-mock-data…"` import.
+
+**Fix 3 — deployment-protection bypass for remaining server fetches**
+
+`/dashboard` and `/spy` still call `loadLiveSnapshot()` and
+`loadSnapshot()` server-side and would hit the same wall on
+preview deployments. Both fetchers now forward the project's
+`VERCEL_AUTOMATION_BYPASS_SECRET` as `x-vercel-protection-bypass`
+on the outbound request. Vercel auto-populates the env var on
+projects with Deployment Protection enabled; on production
+(no protection) the header is absent and the request goes
+through unchanged. No code-path changes for production.
+
+**Verification**
+
+- `scripts/test-spx-replay-routing.ts` extended to 11 invariants
+  (was 7). New assertions: client component is `"use client"`,
+  fetches `/api/spx/snapshot` from the browser, renders
+  `<ErrorState />` instead of mock on failure, never imports
+  `spx-mock-data`, and the bypass header is forwarded by both
+  remaining server-side fetchers.
+- `tsc --noEmit` clean. `next build` clean. `/spx` ships at
+  14.1 kB (152 kB first-load).
+- Every other static-analysis script continues to pass.
+
+**Where to test the fix**
+
+The `/spx` route now matches `/replay` byte-for-byte in its
+fetch behaviour. Any value that shows up correctly in
+`/replay?date=YYYY-MM-DD` will show up identically in
+`/spx?date=YYYY-MM-DD` once this commit lands on the preview
+deployment.
+
+---
+
 ### SPX Channel tab honors replay date
 
 Direct fix for "WHEN I DO A REPLAY, SPX PULLS DATA PROPERLY BUT

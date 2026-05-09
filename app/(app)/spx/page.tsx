@@ -1,252 +1,38 @@
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
-import { SectionLabel } from "@/components/ui/SectionLabel";
-import { SPXChannelHero } from "@/components/spx/SPXChannelHero";
-import { SPXPlaysSlate } from "@/components/spx/SPXPlaysSlate";
-import { SPXLineLadder } from "@/components/spx/SPXLineLadder";
-import { SPXSessionOrigin } from "@/components/spx/SPXSessionOrigin";
-import { SPXConfluence } from "@/components/spx/SPXConfluence";
-import { loadSnapshot } from "@/lib/spx-fetch";
-import { cn } from "@/lib/utils";
+import { SPXChannelClient } from "@/components/spx/SPXChannelClient";
 
-// Render at request time so loadSnapshot() can read the live host
-// header and hit /api/spx/snapshot. Without this Next.js statically
-// generates the page at build time when there's no request, and the
-// resulting page caches the mock fallback.
+// v6 follow-up: this route's data fetch is now done from the
+// browser by <SPXChannelClient />, not from the Server Component.
+//
+// Why the change:
+//   The previous implementation called loadSnapshot() server-side
+//   and silently fell back to the mock fixture (5872.00 / TAKE /
+//   ASCENDING) whenever the server-to-server fetch couldn't reach
+//   /api/spx/snapshot. The most common cause was Vercel preview
+//   deployments enforcing Deployment Protection on the public URL
+//   — the in-function fetch returned 401 without the user's
+//   bypass cookie, and the page rendered the mock as if it were
+//   live data. /replay fetches client-side and worked fine, which
+//   is why the user kept seeing "real data on Replay, mock on the
+//   SPX Channel tab".
+//
+//   Moving the fetch to the browser uses the same auth cookie
+//   path as /replay; the symptom can't recur.
+//
+// `force-dynamic` no longer matters — the page is now mostly
+// a static shell — but kept so the searchParams thread-through
+// works as expected on every nav.
+
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 interface PageProps {
-  // Replay deep-link support: navigating from /replay?date=YYYY-MM-DD
-  // to /spx?date=YYYY-MM-DD renders the historical SPX channel for
-  // that date. Without this thread-through the page silently fell
-  // back to the live snapshot — and on weekends the mock fallback
-  // path inside loadSnapshot caused the user-reported "shows mock
-  // data on the SPX Channel tab" bug.
   searchParams?: { date?: string };
 }
 
-export default async function Page({ searchParams }: PageProps) {
+export default function Page({ searchParams }: PageProps) {
   const replayDate =
     searchParams?.date && /^\d{4}-\d{2}-\d{2}$/.test(searchParams.date)
       ? searchParams.date
       : undefined;
-  const { snap, source, error } = await loadSnapshot(replayDate);
-  const meta = snap._meta;
-
-  return (
-    <div className="max-w-[1440px] mx-auto space-y-10 pb-16">
-      {replayDate && <ReplayBanner date={replayDate} />}
-      {/* Editorial header */}
-      <header className="flex items-end justify-between pt-2 pb-1">
-        <div>
-          <div className="flex items-center gap-3">
-            <span className="font-mono text-[10px] text-ink-3 tracking-[0.20em] uppercase">
-              SPX · Channel · session {snap.sessionDateCT}
-            </span>
-            <span className="h-px w-10 bg-rule-strong" />
-            <span className="font-mono text-[10px] text-ink-3 tracking-[0.20em] uppercase">
-              {dayLabel(snap.sessionDateCT)}
-            </span>
-            <SourceBadge source={source} error={error} />
-          </div>
-          <h1 className="mt-3 text-display font-serif tracking-tight text-ink">
-            The corridor,{" "}
-            <span className="text-ink-3 italic font-light">read aloud.</span>
-          </h1>
-          {meta && (
-            <div className="mt-3 flex flex-wrap items-center gap-3 text-[10px] font-mono text-ink-3 tracking-[0.04em]">
-              <span>
-                Bars <span className="text-ink-2">{meta.barsSource}</span>
-                <span className="text-ink-4 ml-1">({meta.barsCount})</span>
-              </span>
-              <span className="text-ink-4">·</span>
-              <span>
-                Quote <span className="text-ink-2">{meta.quoteSource}</span>
-              </span>
-              <span className="text-ink-4">·</span>
-              <span>
-                Offset{" "}
-                <span className="text-ink-2 tabular-nums">
-                  {meta.appliedOffset >= 0 ? "+" : ""}
-                  {meta.appliedOffset.toFixed(2)}
-                </span>
-                {meta.offsetSource === "env_override" && (
-                  <span className="ml-1 text-[9px] uppercase tracking-[0.10em] text-gold-ink">
-                    (override)
-                  </span>
-                )}
-                {meta.offsetSource === "env_override" &&
-                  typeof meta.computedOffset === "number" && (
-                    <span className="ml-1 text-ink-4">
-                      ↔ live {meta.computedOffset >= 0 ? "+" : ""}
-                      {meta.computedOffset.toFixed(2)}
-                    </span>
-                  )}
-              </span>
-              <span className="text-ink-4">·</span>
-              <span>
-                ES <span className="text-ink-2 tabular-nums">{meta.esSpot.toFixed(2)}</span>{" "}
-                / SPX <span className="text-ink-2 tabular-nums">{meta.spxSpot.toFixed(2)}</span>
-              </span>
-              {meta.barsError && (
-                <span className="text-bear-ink">
-                  · bars-fallback: {meta.barsError}
-                </span>
-              )}
-              {meta.quoteError && (
-                <span className="text-bear-ink">
-                  · quote-fallback: {meta.quoteError}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-        <div className="hidden md:flex items-center gap-6 text-right">
-          <Stat
-            label="Direction"
-            value={snap.channel.direction}
-            highlight={snap.channel.direction}
-          />
-          <Stat label="Scenario" value={snap.scenario.replace(/_/g, " ")} />
-          <Stat label="Slope" value="±1.05 pts/hr" />
-        </div>
-      </header>
-
-      <SPXChannelHero snap={snap} />
-
-      <section className="space-y-5">
-        <SectionLabel number="01">Plays</SectionLabel>
-        <SPXPlaysSlate snap={snap} />
-      </section>
-
-      <section className="space-y-5">
-        <SectionLabel number="02">Lines</SectionLabel>
-        <div className="grid grid-cols-12 gap-5">
-          <div className="col-span-12 xl:col-span-7">
-            <SPXLineLadder lines={snap.lines} price={snap.price.last} />
-          </div>
-          <div className="col-span-12 xl:col-span-5">
-            <SPXConfluence
-              factors={snap.confluence.factors}
-              score={snap.confluence.score}
-              action={snap.confluence.action}
-            />
-          </div>
-        </div>
-      </section>
-
-      <section className="space-y-5">
-        <SectionLabel number="03">Origin</SectionLabel>
-        <SPXSessionOrigin snap={snap} />
-      </section>
-
-      <footer className="pt-6 mt-6 border-t border-rule flex items-center justify-between text-[10px] text-ink-3 font-mono uppercase tracking-[0.18em]">
-        <span>Prophet · SPX channel</span>
-        <span>End of slate</span>
-      </footer>
-    </div>
-  );
-}
-
-function SourceBadge({
-  source,
-  error,
-}: {
-  source: "live" | "mock";
-  error?: string;
-}) {
-  const liveCls =
-    "bg-bull-tint text-bull-ink shadow-[inset_0_0_0_1px_rgba(14,124,80,0.30)]";
-  const mockCls =
-    "bg-paper-2 text-ink-3 shadow-[inset_0_0_0_1px_rgba(20,22,26,0.10)]";
-  return (
-    <span
-      title={error || (source === "live" ? "Live snapshot from API" : "Snapshot unavailable. Engine is reconnecting; retry in a moment.")}
-      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-pill text-[9px] font-mono font-semibold uppercase tracking-[0.12em] ${source === "live" ? liveCls : mockCls}`}
-    >
-      <span
-        className={`w-1 h-1 rounded-full ${source === "live" ? "bg-bull animate-breathe" : "bg-ink-4"}`}
-      />
-      {source}
-    </span>
-  );
-}
-
-function ReplayBanner({ date }: { date: string }) {
-  return (
-    <div
-      role="status"
-      aria-label={`Showing replay for ${date}`}
-      className={cn(
-        "rounded-card bg-gold-tint border border-gold/40",
-        "px-4 py-3 flex items-center justify-between gap-3 flex-wrap",
-        "text-[12px]",
-      )}
-    >
-      <div className="flex items-center gap-2 min-w-0">
-        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-gold-ink font-bold">
-          Replay
-        </span>
-        <span aria-hidden className="h-3 w-px bg-gold/40" />
-        <span className="text-ink-2 font-medium">
-          Showing the historical SPX channel for{" "}
-          <span className="font-mono tabular-nums text-ink">{date}</span>
-        </span>
-      </div>
-      <Link
-        href={`/replay?date=${date}`}
-        className={cn(
-          "inline-flex items-center gap-1 h-7 px-2.5 rounded-pill shrink-0",
-          "bg-paper text-ink-2 hover:text-ink hover:bg-paper-2",
-          "border border-rule transition-colors",
-          "text-[11px] tracking-[0.02em] font-medium",
-          "outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
-        )}
-      >
-        <ArrowLeft size={11} className="text-ink-4" aria-hidden />
-        Back to Replay
-      </Link>
-    </div>
-  );
-}
-
-function dayLabel(isoDate: string): string {
-  const d = new Date(isoDate + "T12:00:00");
-  return d
-    .toLocaleDateString("en-US", {
-      weekday: "long",
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    })
-    .toUpperCase();
-}
-
-function Stat({
-  label,
-  value,
-  highlight,
-}: {
-  label: string;
-  value: string;
-  highlight?: string;
-}) {
-  const tone =
-    highlight === "ASCENDING"
-      ? "text-bull-ink"
-      : highlight === "DESCENDING"
-        ? "text-bear-ink"
-        : "text-ink";
-  return (
-    <div>
-      <div className="eyebrow text-ink-3 mb-0.5">{label}</div>
-      <div
-        className={`font-mono text-[13px] font-semibold tabular-nums ${tone}`}
-        data-num
-      >
-        {value}
-      </div>
-    </div>
-  );
+  return <SPXChannelClient replayDate={replayDate} />;
 }

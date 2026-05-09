@@ -4,6 +4,20 @@
 // snapshot-fetch.ts) so it always hits the public URL the user
 // reached us on, never the Deployment-Protected VERCEL_URL.
 //
+// Deployment protection bypass:
+//   On Vercel preview deployments, every public URL — including
+//   the project's own /api/* — is gated by Deployment Protection.
+//   Server-to-server fetches from inside a Vercel function don't
+//   carry the user's bypass cookie, so they get a 401 and fall
+//   through to the mock fixture (lib/spx-mock-data.ts: 5872.00 /
+//   TAKE / ASCENDING). To make server fetches authenticate
+//   themselves we forward the project's
+//   VERCEL_AUTOMATION_BYPASS_SECRET as the
+//   `x-vercel-protection-bypass` header. The env var is auto-
+//   populated by Vercel when Deployment Protection is on; on
+//   production (no protection) the header is absent and the
+//   request goes through unchanged.
+//
 // The page that calls this MUST be marked `dynamic = 'force-dynamic'`
 // so the fetch happens at request time when headers() works.
 
@@ -40,6 +54,21 @@ function resolveBase(): string | null {
   return null;
 }
 
+/**
+ * Build the headers used for a server-side fetch to the project's
+ * own /api endpoints. Adds the Vercel protection bypass when the
+ * env is present so preview-deployment server fetches don't 401.
+ */
+function buildFetchHeaders(): HeadersInit {
+  const out: Record<string, string> = {};
+  const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  if (bypass) {
+    out["x-vercel-protection-bypass"] = bypass;
+    out["x-vercel-set-bypass-cookie"] = "samesitenone";
+  }
+  return out;
+}
+
 export async function loadSnapshot(
   replayDate?: string,
 ): Promise<LoadedSnapshot> {
@@ -70,7 +99,10 @@ export async function loadSnapshot(
     ? `${base}/api/spx/snapshot?date=${replayDate}`
     : `${base}/api/spx/snapshot`;
   try {
-    const res = await fetch(target, { cache: "no-store" });
+    const res = await fetch(target, {
+      cache: "no-store",
+      headers: buildFetchHeaders(),
+    });
     if (!res.ok) {
       return {
         snap: maybeGate(mockSnapshot),
