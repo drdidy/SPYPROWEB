@@ -62,41 +62,70 @@ function buildSpyRecap(snap: AdaptedSnapshot | null): LastSignalSummary | null {
   if (!snap || !snap.replay || !snap.replay.isReplay) return null;
   const block = snap.replay;
   const verdict = snap.decision.verdict;
+  const session = block.session;
+
+  // Strong recap when the engine actually graded a trade.
   const side: "LONG" | "SHORT" | null =
     verdict === "LONG" ? "LONG" : verdict === "SHORT" ? "SHORT" : null;
-  if (!side) return null;
-  if (!block.verdictOutcome || block.verdictOutcome === "N_A") return null;
-  return shapeRecap(side, block, snap.asOf);
+  if (
+    side &&
+    block.verdictOutcome &&
+    block.verdictOutcome !== "N_A"
+  ) {
+    return shapeRecap(side, block, snap.asOf);
+  }
+
+  // Soft recap: even on a WAIT / STAND_DOWN day, surface what the
+  // engine saw — verdict + how the day moved. Better than "no recap"
+  // when the user did trade off price action.
+  if (session) {
+    return shapeSoftRecap("SPY", verdict, session, snap.asOf);
+  }
+  return null;
 }
 
 function buildSpxRecap(snap: SPXSnapshot | null): LastSignalSummary | null {
   if (!snap) return null;
-  // SPXSnapshot doesn't carry a replay block in the adapter typings
-  // today — narrow via runtime check.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const block = (snap as any).replay as
     | {
         verdictOutcome?: "WIN" | "LOSS" | "PUSH" | "N_A" | null;
         verdictPnl?: number | null;
         isReplay?: boolean;
+        session?: { netPts?: number; close?: number; open?: number } | null;
       }
     | null
     | undefined;
   if (!block || !block.isReplay) return null;
-  if (!block.verdictOutcome || block.verdictOutcome === "N_A") return null;
-  // SPX engine doesn't emit a side; infer from PnL sign as a least-bad
-  // proxy. PUSH days return null since direction is meaningless.
-  const pnl = block.verdictPnl ?? 0;
-  if (pnl === 0) return null;
-  const side: "LONG" | "SHORT" = pnl > 0 ? "LONG" : "SHORT";
-  return shapeRecap(
-    side,
-    {
-      verdictOutcome: block.verdictOutcome,
-      verdictPnl: block.verdictPnl ?? null,
-    },
-    snap.asOf,
-  );
+
+  // Strong recap when there's a directional outcome.
+  if (block.verdictOutcome && block.verdictOutcome !== "N_A") {
+    const pnl = block.verdictPnl ?? 0;
+    if (pnl !== 0) {
+      const side: "LONG" | "SHORT" = pnl > 0 ? "LONG" : "SHORT";
+      return shapeRecap(
+        side,
+        {
+          verdictOutcome: block.verdictOutcome,
+          verdictPnl: block.verdictPnl ?? null,
+        },
+        snap.asOf,
+      );
+    }
+  }
+
+  // Soft recap from the day's net move.
+  if (block.session && typeof block.session.netPts === "number") {
+    const pnl = block.session.netPts;
+    return {
+      side: pnl >= 0 ? "LONG" : "SHORT",
+      triggerAt: snap.asOf,
+      exitAt: snap.asOf,
+      rMultiple: pnl,
+      oneLine: `engine watched · day ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} pts`,
+    };
+  }
+  return null;
 }
 
 function shapeRecap(
@@ -113,6 +142,28 @@ function shapeRecap(
         : `closed ${pnl.toFixed(2)} pts`;
   return {
     side,
+    triggerAt: ts,
+    exitAt: ts,
+    rMultiple: pnl,
+    oneLine,
+  };
+}
+
+// Soft recap surfaces the engine's posture + how the day moved, even
+// when no graded trade occurred. Shown as a secondary "engine watched"
+// line so the user knows what the engine saw without conflating it
+// with a real signal.
+function shapeSoftRecap(
+  _engine: "SPY" | "SPX",
+  verdict: string | undefined,
+  session: { open: number; close: number; netPts: number },
+  ts: string,
+): LastSignalSummary {
+  const pnl = session.netPts;
+  const verdictLabel = verdict ? verdict.toLowerCase().replace(/_/g, " ") : "watched";
+  const oneLine = `engine ${verdictLabel} · day ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} pts (${session.open.toFixed(2)} → ${session.close.toFixed(2)})`;
+  return {
+    side: pnl >= 0 ? "LONG" : "SHORT",
     triggerAt: ts,
     exitAt: ts,
     rMultiple: pnl,
