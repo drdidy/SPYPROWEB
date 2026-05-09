@@ -3,14 +3,16 @@
 // Right-side drawer that explains *why* the engine is in its current
 // state. Renders the decision-trace events from the API in chronological
 // order. Events with weight: "key" render bolder; "info" reads as
-// supporting context. Esc and click-outside dismiss; the close button
-// is keyboard-focusable.
+// supporting context. Esc and click-outside dismiss.
 //
-// Wire-up: cards render a "Why this state? →" link that calls onOpen.
-// The drawer keeps its own open state when used as a self-controlled
-// component, or accepts open/onClose for parent control.
+// Rendered via React portal to document.body so it escapes any
+// stacking-context trap created by ancestors with backdrop-filter
+// (the TopBar uses backdrop-blur, which would otherwise pin a z-50
+// drawer below it). Panel is opaque, backdrop is a separate full-
+// viewport overlay, and the close button has a 32×32 hit target.
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFocusTrap } from "@/lib/use-focus-trap";
@@ -40,8 +42,12 @@ export function DecisionTraceDrawer({
 }: DecisionTraceDrawerProps) {
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
   const panelRef = useRef<HTMLElement | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   useFocusTrap(panelRef, open);
+
+  // Portal target — only available on the client.
+  useEffect(() => setMounted(true), []);
 
   // Esc to close, focus the close button on open for keyboard users.
   useEffect(() => {
@@ -51,33 +57,41 @@ export function DecisionTraceDrawer({
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    // Lock body scroll while the drawer is open.
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
   }, [open, onClose]);
 
   const stop = useCallback((e: React.MouseEvent) => e.stopPropagation(), []);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
+  const node = (
     <div
       role="dialog"
       aria-modal="true"
       aria-label={`Why ${engine} is in this state`}
-      className="fixed inset-0 z-50 flex"
+      className="fixed inset-0 z-[100]"
       onClick={onClose}
     >
-      {/* Scrim */}
-      <div className="flex-1 bg-ink/30" aria-hidden />
-      {/* Panel — full-screen on mobile (375px target), fixed-width drawer at sm+. */}
+      {/* Backdrop — full viewport, registers the modal context. */}
+      <div className="absolute inset-0 bg-black/30" aria-hidden />
+      {/* Panel — full-screen on mobile (≤sm), 28rem drawer at sm+,
+          opaque so any backdrop-filter behind it can't bleed through. */}
       <aside
         ref={panelRef}
         onClick={stop}
         className={cn(
-          "w-full sm:max-w-md h-full bg-paper sm:border-l border-rule shadow-card",
-          "flex flex-col animate-rise",
+          "absolute right-0 top-0 bottom-0 flex flex-col",
+          "w-full sm:w-[28rem] max-w-full bg-paper sm:border-l border-rule shadow-card",
+          "animate-rise",
         )}
       >
-        <header className="flex items-center justify-between px-5 py-4 border-b border-rule">
+        <header className="flex items-start justify-between gap-3 px-5 py-4 border-b border-rule shrink-0">
           <div className="min-w-0">
             <div className="font-mono text-[10px] tracking-[0.16em] uppercase text-ink-3">
               {engine} · decision trace
@@ -91,7 +105,7 @@ export function DecisionTraceDrawer({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="w-8 h-8 grid place-items-center rounded-soft text-ink-3 hover:text-ink hover:bg-paper-2/70 outline-none focus-visible:ring-2 focus-visible:ring-gold/40"
+            className="w-8 h-8 grid place-items-center rounded-soft text-ink-3 hover:text-ink hover:bg-paper-2/70 outline-none focus-visible:ring-2 focus-visible:ring-gold/40 shrink-0"
           >
             <X size={15} />
           </button>
@@ -140,12 +154,14 @@ export function DecisionTraceDrawer({
           )}
         </div>
 
-        <footer className="px-5 py-3 border-t border-rule text-[10px] text-ink-3 font-mono uppercase tracking-[0.18em]">
+        <footer className="px-5 py-3 border-t border-rule text-[10px] text-ink-3 font-mono uppercase tracking-[0.18em] shrink-0">
           {engine} · trust artifact · derived from engine state
         </footer>
       </aside>
     </div>
   );
+
+  return createPortal(node, document.body);
 }
 
 function formatTs(iso: string): string {
