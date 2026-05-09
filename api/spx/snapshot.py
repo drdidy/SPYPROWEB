@@ -77,14 +77,16 @@ def _build_payload(replay_date: date | None = None) -> dict:
     if replay_date is None:
         as_of = datetime.now(CT)
     else:
-        # Replay mode: treat 15:00 CT (RTH close) of the chosen day as
-        # "now" so the engine sees the full session's bars but nothing
-        # after. We also derive the offset *as of that date* so the
-        # channel sits at historically-correct SPX levels; today's live
-        # offset would drift the channel by however much the basis has
-        # moved since the replay date. Env override still wins when set.
+        # Replay mode: pin "now" to 09:00 CT — the moment the first
+        # RTH hour closes and the framework becomes the trader's
+        # entry reference. Channel rails + prev-RTH lines project
+        # to that time, scenario classifies the morning state, and
+        # the playback panel handles "what happened next" forward
+        # from there. Using 15:00 (RTH close) instead would project
+        # lines to end-of-day — correct math but useless for the
+        # entry decision.
         as_of = datetime(
-            replay_date.year, replay_date.month, replay_date.day, 15, 0, tzinfo=CT
+            replay_date.year, replay_date.month, replay_date.day, 9, 0, tzinfo=CT
         )
         if env_override is None:
             try:
