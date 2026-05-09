@@ -30,17 +30,16 @@ const cols = [
       { label: "Contact", href: "/contact" },
       { label: "Careers", href: "/careers" },
       // "Press" intentionally removed per g12 — no published press
-      // exists yet, and the spec says don't leave a placeholder
-      // link. The /press route still exists for direct access.
+      // exists yet. The /press route still exists for direct access.
     ],
   },
   {
     label: "Legal",
     items: [
-      { label: "Terms", href: "#" },
-      { label: "Privacy", href: "#" },
-      { label: "Disclosures", href: "#" },
-      { label: "Risk", href: "#" },
+      { label: "Terms", href: "/terms" },
+      { label: "Privacy", href: "/privacy" },
+      { label: "Disclosures", href: "/disclosures" },
+      { label: "Risk", href: "/risk" },
     ],
   },
 ];
@@ -76,7 +75,7 @@ export function MarketingFooter() {
                   <li key={it.label}>
                     <Link
                       href={it.href}
-                      className="text-[13px] text-ink-2 hover:text-ink transition-colors"
+                      className="text-[13px] text-ink-2 hover:text-ink transition-colors outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper rounded-soft -mx-1 px-1"
                     >
                       {it.label}
                     </Link>

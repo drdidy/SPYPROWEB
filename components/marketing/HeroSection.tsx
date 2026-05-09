@@ -2,9 +2,10 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { ArrowRight, ArrowDown } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import type { DecisionState } from "@/lib/types";
-import { useLiveSPY } from "@/lib/use-live-snapshot";
+import { HeroVerdictCard } from "./HeroVerdictCard";
+import { track } from "@/lib/analytics";
 
 interface HeroProps {
   decision?: DecisionState;
@@ -12,29 +13,23 @@ interface HeroProps {
   initialLive?: boolean;
 }
 
-export function HeroSection({ decision: serverDecision, quote: serverQuote, initialLive }: HeroProps = {}) {
-  // Seed with server-rendered values, then poll /api/snapshot every 30s
-  // so the hero numbers stay fresh without a page reload.
-  const live = useLiveSPY({
-    decision: serverDecision,
-    shell: serverQuote
-      ? {
-          spy: serverQuote.spy,
-          change: serverQuote.change,
-          changePct: serverQuote.changePct,
-          vix: serverQuote.vix,
-          vixDelta: 0,
-          isLive: !!initialLive,
-          sessionLabel: "",
-          sessionCloses: "",
-          feedHealth: { lastTickTs: new Date().toISOString(), source: "server" },
-        }
-      : undefined,
-    source: initialLive ? "live" : undefined,
-  });
-  const decision = live.decision;
-  const t = live.shell;
-  const isLive = live.source === "live";
+export function HeroSection({
+  decision: serverDecision,
+  quote: serverQuote,
+  initialLive,
+}: HeroProps = {}) {
+  const isLive = !!initialLive;
+  // prefers-reduced-motion: zero out the y/opacity tweens so hero
+  // content lands instantly for users who've requested reduced motion.
+  const reduce = useReducedMotion();
+  const fadeUp = (delay = 0) =>
+    reduce
+      ? { initial: false, animate: { opacity: 1, y: 0 } }
+      : {
+          initial: { opacity: 0, y: 14 },
+          animate: { opacity: 1, y: 0 },
+          transition: { duration: 0.7, delay, ease: [0.2, 0.8, 0.2, 1] },
+        };
   return (
     <section className="relative max-w-[1240px] mx-auto px-7 pt-16 pb-20 lg:pt-24 lg:pb-28">
       {/* eyebrow */}
@@ -54,10 +49,12 @@ export function HeroSection({ decision: serverDecision, quote: serverQuote, init
       </div>
 
       <motion.h1
-        initial={{ opacity: 0, y: 14 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, ease: [0.2, 0.8, 0.2, 1] }}
-        className="font-serif text-[64px] md:text-[88px] lg:text-[112px] leading-[0.94] tracking-[-0.035em] text-ink max-w-[14ch]"
+        {...fadeUp(0)}
+        // Fluid type: clamps between 48px (~360px viewport) and 112px
+        // (≥1280px viewport) so the H1 reads cleanly at every spec
+        // breakpoint without breakpoint-jumping.
+        style={{ fontSize: "clamp(48px, 8.5vw, 112px)" }}
+        className="font-serif leading-[0.94] tracking-[-0.035em] text-ink max-w-[14ch]"
       >
         Discipline,{" "}
         <span className="italic font-light text-ink-2">before</span>
@@ -66,89 +63,79 @@ export function HeroSection({ decision: serverDecision, quote: serverQuote, init
       </motion.h1>
 
       <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, delay: 0.15, ease: [0.2, 0.8, 0.2, 1] }}
+        {...fadeUp(0.15)}
         className="mt-9 grid grid-cols-12 gap-10 items-end"
       >
         <p className="col-span-12 md:col-span-7 lg:col-span-6 text-[18px] md:text-[20px] text-ink-2 leading-[1.55] max-w-2xl">
           Prophet reads the day before the day reads you. Same setup every
           morning. Same questions asked of every move. A bar most signals
-          don&apos;t clear. It&apos;s a workspace, not a feed.
+          don’t clear. It’s a workspace, not a feed.
         </p>
 
         <div className="col-span-12 md:col-span-5 lg:col-span-6 flex flex-col items-start md:items-end gap-3">
-          <div className="flex flex-wrap gap-3">
-            <Link href="/dashboard">
-              <Button variant="primary" size="lg">
-                Read today's slate <ArrowRight size={15} />
-              </Button>
-            </Link>
-            <a href="#waitlist">
-              <Button variant="outline" size="lg">
-                Join the waitlist
-              </Button>
-            </a>
-          </div>
-          <p className="text-[12px] text-ink-3 mt-1 font-mono">
-            Closed beta · invite-only
-          </p>
+          {/* Single primary CTA — waitlist. The slate preview lives
+              behind a tertiary text link below. cta_click is wired
+              to the analytics dispatch so we can see which path
+              visitors take. */}
+          <a
+            href="#waitlist"
+            onClick={() =>
+              track({ name: "cta_click", location: "hero", label: "join_waitlist" })
+            }
+          >
+            <Button variant="primary" size="lg">
+              Join the waitlist <ArrowRight size={15} />
+            </Button>
+          </a>
+          <Link
+            href="/dashboard"
+            onClick={() =>
+              track({
+                name: "cta_click",
+                location: "hero",
+                label: "read_todays_slate",
+              })
+            }
+            className="text-[13px] text-ink-2 hover:text-ink underline underline-offset-4 decoration-rule hover:decoration-ink-3 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-gold/40 rounded-soft"
+          >
+            Read today&apos;s slate →
+          </Link>
         </div>
       </motion.div>
 
-      {/* Live ribbon: preview of the slate */}
+      {/* Live verdict card: explicit-state component handles all eight
+          render paths (live/pre-open/closed/weekend/holiday/stale/
+          error/loading) and reserves its own dimensions to avoid CLS. */}
       <motion.div
-        initial={{ opacity: 0, y: 14 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, delay: 0.3, ease: [0.2, 0.8, 0.2, 1] }}
-        className="mt-16 surface rounded-card overflow-hidden"
+        {...fadeUp(0.3)}
+        role="region"
+        aria-label="Live verdict preview"
+        className="mt-16"
       >
-        <div className="grid grid-cols-12">
-          <div className="col-span-12 md:col-span-3 p-6 border-b md:border-b-0 md:border-r border-rule">
-            <div className="eyebrow text-ink-3 mb-2">Live · today's verdict</div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-headline font-serif text-gold-ink">
-                {decision.verdict}
-              </span>
-              <span className="font-mono text-sm text-ink-3 tabular-nums">
-                {decision.conviction}/100
-              </span>
-            </div>
-            <div className="mt-3 h-1 bg-paper-2 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-ink rounded-full"
-                style={{ width: `${decision.conviction}%` }}
-              />
-            </div>
-            <div className="mt-3 text-[11px] text-ink-3 font-mono">
-              {decision.windowET}
-            </div>
-          </div>
-
-          <div className="col-span-12 md:col-span-6 p-6 border-b md:border-b-0 md:border-r border-rule flex flex-col justify-center">
-            <div className="eyebrow text-ink-3 mb-2">Rationale</div>
-            <p className="text-[14px] text-ink-2 leading-relaxed">
-              {decision.finalExplanation}
-            </p>
-          </div>
-
-          <div className="col-span-12 md:col-span-3 p-6 grid grid-cols-3 md:grid-cols-1 gap-4">
-            <Quote label="SPY" value={t.spy.toFixed(2)} />
-            <Quote
-              label="CHG"
-              value={`${t.change >= 0 ? "+" : ""}${t.change.toFixed(2)}`}
-              tone={t.change >= 0 ? "bull" : "bear"}
-            />
-            <Quote label="VIX" value={t.vix.toFixed(2)} />
-          </div>
-        </div>
+        <HeroVerdictCard
+          decision={serverDecision}
+          quote={serverQuote}
+          initialLive={initialLive}
+        />
       </motion.div>
 
-      {/* Trust-layer entry point (g12): the long-form /methodology
-          page is now linked here so visitors who want to understand
-          before signing up have a clear path. The arrow stays as a
-          subtle scroll affordance because the link's target is a
-          full page, not an in-page anchor. */}
+      {/* Persistent compliance footnote sits directly beneath the
+          live verdict card — required surface, not decorative.
+          "Not investment advice" deep-links to /disclosures. */}
+      <p className="mt-4 text-[11px] text-ink-3 font-sans leading-relaxed">
+        Educational workspace.{" "}
+        <Link
+          href="/disclosures"
+          className="underline underline-offset-2 decoration-rule hover:text-ink hover:decoration-ink-3 transition-colors"
+        >
+          Not investment advice
+        </Link>
+        . Markets involve risk.
+      </p>
+
+      {/* Trust-layer entry point: links to the long-form /methodology
+          page (g12). Replaces the static "scroll hint" div with a
+          real, focusable, keyboard-accessible Link. */}
       <Link
         href="/methodology"
         className="hidden lg:inline-flex items-center gap-2 text-[10px] text-ink-3 hover:text-ink font-mono uppercase tracking-[0.18em] mt-12 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-gold/40 rounded-soft -mx-1 px-1"
@@ -160,22 +147,5 @@ export function HeroSection({ decision: serverDecision, quote: serverQuote, init
   );
 }
 
-function Quote({
-  label,
-  value,
-  tone = "ink",
-}: {
-  label: string;
-  value: string;
-  tone?: "ink" | "bull" | "bear";
-}) {
-  const cls = tone === "bull" ? "text-bull-ink" : tone === "bear" ? "text-bear-ink" : "text-ink";
-  return (
-    <div>
-      <div className="eyebrow text-ink-3 mb-1">{label}</div>
-      <div className={`font-mono text-base font-semibold tabular-nums ${cls}`} data-num>
-        {value}
-      </div>
-    </div>
-  );
-}
+// The legacy <Quote> helper moved into HeroVerdictCard alongside its
+// only consumer.

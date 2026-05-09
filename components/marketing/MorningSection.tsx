@@ -46,9 +46,9 @@ export function MorningSection() {
               How a day actually goes.
             </h2>
             <p className="mt-4 text-[16px] text-ink-2 leading-relaxed">
-              Prophet doesn&apos;t replace your judgment. It gives your judgment
+              Prophet doesn’t replace your judgment. It gives your judgment
               a better stage. From pre-open through the closing bell you can see
-              what&apos;s true now and what would change it.
+              what’s true now and what would change it.
             </p>
 
             <div className="mt-10 surface rounded-card p-6 relative overflow-hidden">
