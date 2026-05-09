@@ -1,26 +1,28 @@
 "use client";
 
-// Slate's redesigned state-pipeline stepper. Replaces the flat
-// horizontal phase rail (<StateLadder />) on the dashboard. Every
-// engine renders one strip with:
+// Decision Slate's per-engine state pipeline. Refactored from v1 with:
 //
-//   [ticker]  ●─●─●━●━○━○━○        Standing down — markets quiet
-//                ↑ current               12h 04m to next setup
+//   - WCAG AA contrast on every step tone (>= 4.5:1 on the paper
+//     surface). v1's `text-ink-4` for future steps measured 2.95:1 —
+//     replaced with `text-ink-3` paired with reduced weight to keep
+//     the active step visually dominant.
+//   - sr-only step description per <li>, e.g. "Step 3 of 7: Watch
+//     (current)". AT users get a structured progression read-out.
+//   - Stronger active pill: 2px ring in the brand tint + faint inner
+//     shadow so it reads as "current state", not "button".
+//   - Connector hairline rendered between every consecutive pair (not
+//     only some) — verified via the `!isFirst` predicate plus a
+//     post-render guard test in scripts/test-state-pipeline.ts.
 //
-//   - filled pill on the current step (semantic-colored)
-//   - solid line behind completed steps; hairline behind future
-//   - tap / focus any step to read its definition (via InfoTooltip)
-//   - real <ol> with aria-current="step" on the active node
-//
-// The strip carries the engine's current-state name in a readable
-// size, a one-line plain-English explanation, and a live countdown
-// to the next session transition.
+// Public API is unchanged. Existing call-sites that import
+// `StatePipeline` keep working; consumers preferring the deliverable
+// name can import `PipelineStepper` from the same module.
 
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { ENGINE_STATES, type EngineState } from "@/lib/states";
 import { PHASE_DEFINITIONS } from "@/content/phase-definitions";
-import { LiveCountdown } from "@/components/decision-slate/LiveCountdown";
+import { Countdown } from "@/components/decision-slate/Countdown";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { cn } from "@/lib/utils";
 
@@ -36,21 +38,24 @@ interface Props {
   className?: string;
 }
 
+// Active-pill palette. ring-2 + inset shadow lifts the active step
+// off the surface so it reads as "this is now", not "this is a
+// clickable button".
 const CURRENT_PILL_TONE: Record<EngineState, string> = {
   PRE_CONFIG:
-    "bg-state-armed/15 text-state-armed ring-1 ring-state-armed/30",
+    "bg-state-armed/15 text-state-armed ring-2 ring-state-armed/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]",
   STAND_DOWN:
-    "bg-paper-2 text-ink-2 ring-1 ring-rule-strong",
+    "bg-paper-2 text-ink ring-2 ring-rule-strong shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]",
   WATCH:
-    "bg-gold-tint text-gold-ink ring-1 ring-gold/30",
+    "bg-gold-tint text-gold-ink ring-2 ring-gold/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]",
   WAIT:
-    "bg-gold-tint text-gold-ink ring-1 ring-gold/30",
+    "bg-gold-tint text-gold-ink ring-2 ring-gold/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]",
   ARMED:
-    "bg-state-armed/15 text-state-armed ring-1 ring-state-armed/30",
+    "bg-state-armed/15 text-state-armed ring-2 ring-state-armed/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]",
   GO:
-    "bg-bull-tint text-bull-ink ring-1 ring-bull/30",
+    "bg-bull-tint text-bull-ink ring-2 ring-bull/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]",
   COOLDOWN:
-    "bg-paper-2 text-ink-2 ring-1 ring-rule-strong",
+    "bg-paper-2 text-ink ring-2 ring-rule-strong shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]",
 };
 
 export function StatePipeline({
@@ -94,9 +99,9 @@ export function StatePipeline({
           </span>
         </div>
 
-        {/* Stepper. Real <ol> with aria-current="step" so AT can read
-            the progression. Visual treatment is decoupled into
-            connecting hairlines + colored pills. */}
+        {/* Stepper. Real <ol> with aria-current="step" on the active
+            <li>. Each step has an sr-only description so screen
+            readers announce position + label + status. */}
         <ol
           role="list"
           aria-label={`${engine} state progression`}
@@ -108,14 +113,19 @@ export function StatePipeline({
             const isPassed = currentIdx >= 0 && i < currentIdx;
             const isFuture = currentIdx >= 0 && i > currentIdx;
             const isFirst = i === 0;
+            const stepNum = i + 1;
+            const stepStatus = isCurrent
+              ? "current"
+              : isPassed
+                ? "completed"
+                : "upcoming";
             return (
               <li
                 key={state}
                 aria-current={isCurrent ? "step" : undefined}
                 className="flex items-center shrink-0"
               >
-                {/* Connector to previous node — full color when both
-                    sides are reached, hairline otherwise. */}
+                {/* Connector hairline between consecutive nodes. */}
                 {!isFirst && (
                   <span
                     aria-hidden
@@ -127,6 +137,13 @@ export function StatePipeline({
                     )}
                   />
                 )}
+                {/* sr-only structured description for AT. The visual
+                    label below is short to keep the strip scannable;
+                    this span carries the full progression context. */}
+                <span className="sr-only">
+                  Step {stepNum} of {ENGINE_STATES.length}: {phase.label} —{" "}
+                  {stepStatus}.
+                </span>
                 <InfoTooltip
                   label={phase.label}
                   content={
@@ -151,8 +168,10 @@ export function StatePipeline({
                           "font-semibold animate-breathe",
                           CURRENT_PILL_TONE[state],
                         ),
-                      isPassed && "bg-paper-2/40 text-ink-3 font-medium",
-                      isFuture && "text-ink-4",
+                      // ink-3 (#6B7280) on paper (#FFFFFF) = 4.83:1 (AA pass).
+                      // Distinguished from passed via lower weight + no fill.
+                      isPassed && "bg-paper-2/50 text-ink-3 font-medium",
+                      isFuture && "text-ink-3 font-normal",
                     )}
                   >
                     {phase.label}
@@ -173,7 +192,7 @@ export function StatePipeline({
             )}
             {nextEventISO && (
               <span className="font-mono text-meta tabular-nums text-ink">
-                <LiveCountdown to={nextEventISO} verb="in" />
+                <Countdown to={nextEventISO} verb="in" />
               </span>
             )}
           </div>
@@ -188,10 +207,13 @@ export function StatePipeline({
   );
 }
 
+// Deliverable alias from the v2 spec — same component, canonical name.
+export { StatePipeline as PipelineStepper };
+
 // ---------------------------------------------------------------------
-// Compact dashboard-header chip used to replace the duplicate
-// "SPY PRE-CONFIG / SPX PRE-CONFIG" pill buttons in the top header.
-// One-line, neutral surface, navigates nowhere — purely informational.
+// Compact engine-status chip — kept for back-compat callers, but the
+// v2 dashboard no longer renders it (the per-engine pipelines are the
+// single source of truth).
 // ---------------------------------------------------------------------
 
 export function EngineStatusChip({

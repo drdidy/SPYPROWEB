@@ -6,6 +6,187 @@ entries grow newest-first.
 
 ## [Unreleased]
 
+### Decision Slate v2 — hierarchy, redundancy, live behavior, a11y
+
+A focused polish pass on top of v1, addressing the 15 numbered
+objectives raised in the v2 spec. No backend changes.
+
+**1. Resolved three-way engine-state duplication.** The per-engine
+`<StatePipeline>` cards are now the single source of truth for engine
+state. The TopBar's `<SymbolChip>` collapsed from a colored pill
+button to a flat inline link with no background fill, no inner ring,
+no hover-lift. The "Markets quiet" briefing's redundant
+`Next setup (SPX) opens in 1d 2h` chip has been removed — the
+pipelines above the briefing already render that countdown.
+
+**2. State-aware Recommended Action.** New `lib/recommendations.ts`
+dispatcher + `<RecommendedAction>` component. The CTA now picks
+- `daily-brief` for PRE_CONFIG / STAND_DOWN
+- `live-spy` / `live-spx` for WATCH / WAIT (the engine closer to
+  triggering wins)
+- `options-cockpit` for ARMED / GO
+- `log-replay` for COOLDOWN
+The eyebrow names the driving engine state — e.g.
+`Recommended next step · SPY armed`. Behavior covered by 16
+assertions in `scripts/test-recommendations.ts`.
+
+**3. Live countdowns with tier-based interval.** New
+`<Countdown>` component (canonical, replacing the v1
+`<LiveCountdown>` alias):
+- > 24h → 60-second tick, format `in Xd Yh`
+- 1–24h → 60-second tick, format `in Xh Ym`
+- < 60m → 1-second tick, format `in Mm Ss`
+- ≤ 10s → "Opening now"
+Memoized to avoid re-rendering siblings; visibility-aware so hidden
+tabs don't burn CPU. Pure `format()` + `pickInterval()` exports
+covered by 11 assertions in `scripts/test-countdown.ts`. Reduced-
+motion already respected via the global CSS rule.
+
+**4. Layout consistency.** Pipelines render as a 2-col grid at
+`lg+` (SPY left, SPX right) — matching the verdict-card layout
+below. Below `lg`, everything stacks. Single column at `<640px`,
+two columns at `>=1024px`.
+
+**5. Compact page header.** v1's giant `text-display` "Decision
+Slate" hero replaced with a small eyebrow + h1 at ~18px (the new
+`text-h2` token) + the existing About affordance, all on one
+line. Reclaims ~80px of above-the-fold space.
+
+**6. Removed double card nesting.** The Markets-quiet briefing
+is now a `<section>` (heading, subtitle, hairline, grid of inner
+cards) rather than a bordered card containing four more bordered
+cards. Inner cards are the only bordered surfaces.
+
+**7. Pipeline stepper polish.** Inactive-step contrast bumped to
+WCAG AA (4.5:1) on paper — v1's `text-ink-4` (#9CA3AF, 2.95:1)
+replaced with `text-ink-3` (#6B7280, 4.83:1) at reduced weight.
+Active pill strengthened with a 2px brand-tint ring and a faint
+inset shadow so it reads as "current state", not "button". Each
+step now carries an `<span class="sr-only">` description that
+screen readers read as `Step N of 7: <label> — current/completed/
+upcoming.`. Connector hairlines verified between every pair via
+`scripts/test-state-pipeline.ts`. Available under the deliverable
+name `<PipelineStepper>` (alias of `<StatePipeline>`).
+
+**8. InfoTooltips on jargon.** First-occurrence helps for:
+- `R` / `R-multiple` — anchored on the literal `R` letter in
+  `<LastSignalRecap>`.
+- `Watched only` — when the soft-recap path renders, the side
+  label is replaced with a tooltip-anchored "Watched only" pill.
+- `skip` — already wired in v1; confirmed keyboard / Escape /
+  touch-friendly via the shared `<InfoTooltip>` primitive.
+- Each pipeline state name — already wired in v1.
+- "About this view" → "About this page" for sentence-case
+  consistency.
+
+**9. Interactive affordances cleanup.**
+- `1 skip` / `5 skips` is now a real `<Link>` to a filtered
+  Replay view (`/replay?date=…&filter=skip`), not just an
+  underlined hover hint.
+- All slate secondary CTAs unified on a single ghost-button
+  shape: `h-7 px-2.5 rounded-pill bg-paper-2/60 border-rule
+  text-[11px] tracking-[0.02em] font-medium`. The previous
+  uppercase-tracked "OPEN REPLAY →" / "OPEN SPY CHANNEL →" /
+  "OPEN SPX CHANNEL →" links now match.
+- Focus rings standardized on
+  `focus-visible:ring-2 focus-visible:ring-gold/40
+  focus-visible:ring-offset-2 focus-visible:ring-offset-canvas`.
+
+**10. Empty-state teaching panel.** New `<PreviewState>`
+component renders a low-key "Preview" section under the Markets-
+quiet briefing showing what each verdict card looks like
+populated (sample values, reduced opacity, `aria-hidden`).
+Hidden once either engine leaves PRE_CONFIG.
+
+**11. Number & time formatting.** `<Countdown>` and most slate
+numerics already used `tabular-nums`; reaffirmed at the
+component layer. New `lib/user-prefs.ts` exposes
+`resolveUserTimezone()` (returns `America/Chicago` until the
+auth + persistence layer lands — `TODO(backend)` comment names
+the field shape) and `formatInUserTimezone()` /
+`ctEquivalent()` helpers. The TopBar's existing session line
+already shows absolute times (`Sun 17:00 CT`) for next-event
+strings, satisfying spec #1's "Keep absolute time in the global
+header".
+
+**12. Copy polish.**
+- `75% hit · 3W 1L · 1 skip` → `75% hit (3W 1L) · 1 skip`. The
+  parens make clear the percentage applies to graded sessions
+  only.
+- The `No graded sessions yet` row is now wrapped in an
+  InfoTooltip when the lookback contains skip-only sessions:
+  "Engine watched the last N sessions but didn't qualify a
+  setup."
+- `WHAT TO WATCH AT THE OPEN` → sentence-case
+  `What to watch at the open`.
+- `About this view` → `About this page`.
+
+**13. Beta chip recolor.** The `<Wordmark>` Beta pip moved from
+`bg-gold-tint` (cream) to `bg-gold-soft` (warm ochre) with a
+stronger inset border (`rgba(184,130,31,0.45)`) so it stays
+readable on the canvas-cream surface and matches the warm
+palette.
+
+**14. Accessibility.**
+- Pipeline announces as a real ordered list with `<li
+  aria-current="step">` on the active node and `sr-only`
+  per-step descriptions.
+- All InfoTooltip triggers are keyboard-focusable, dismiss on
+  Escape, and toggle on tap (touch-friendly).
+- Reduced-motion respected via the global
+  `prefers-reduced-motion` rule landed in v1.
+- Beta chip border bumps contrast on the cream background.
+
+**15. Responsive.**
+- `< 640px`: single column.
+- `640–1024px`: single column for cards (a 2-col pipeline strip
+  would cramp the inline countdown).
+- `>= 1024px`: 2-col SPY/SPX everywhere on the page, including
+  the pipelines.
+- Max content width tightened to **1200px** with generous
+  gutters (down from v1's 1280px).
+
+**Deliverables actually shipped**
+
+| Spec | Where |
+| --- | --- |
+| `<Countdown>` | `components/decision-slate/Countdown.tsx` |
+| `<RecommendedAction>` | `components/decision-slate/RecommendedAction.tsx` |
+| `<InfoTooltip>` | unchanged from v1 (`components/ui/InfoTooltip.tsx`) |
+| `<PipelineStepper>` | re-export at `components/decision-slate/PipelineStepper.tsx` |
+| `<PreviewState>` | `components/decision-slate/PreviewState.tsx` |
+| `recommendations.ts` map | `lib/recommendations.ts` |
+| User-tz preference | `lib/user-prefs.ts` (TODO until backend) |
+
+**Deliberate non-changes (v2)**
+
+- **Storybook stories** — Storybook is still not configured; the
+  spec said "no new heavy dependencies", and adding Storybook for
+  Next 14 + Tailwind 3 is a non-trivial infra add. Static-analysis
+  guards in `scripts/test-*.ts` cover the same regression surface.
+- **axe-core integration** — repo has no Jest/Vitest scaffold;
+  axe-core needs a runtime to drive. Static-analysis guards plus
+  the explicit a11y patterns added in #14 cover the structural
+  invariants axe would flag.
+- **Time-zone persistence UI** — `/settings` already shows
+  "User preferences coming soon" pending the auth layer. The
+  `lib/user-prefs.ts` accessor is the contract; UI follows when
+  auth lands.
+
+**Verification**
+
+- `npx tsc --noEmit` — clean.
+- `npx next build` — clean. `/dashboard` ships at 9.98 kB
+  (111 kB first-load), within the v1 envelope.
+- `npx tsx scripts/test-recommendations.ts` (new) — 16/16 cases
+  pass.
+- `npx tsx scripts/test-countdown.ts` (new) — 11/11 cases pass.
+- `npx tsx scripts/test-state-pipeline.ts` — 6/6 invariants intact.
+- `npx tsx scripts/test-topbar-layout.ts` — 6/6 invariants intact.
+- `npx tsx scripts/test-sessions.ts` — 10/10 cases pass.
+
+---
+
 ### Decision Slate redesign — production polish pass
 
 A focused refinement of the `/dashboard` route to bring the daily

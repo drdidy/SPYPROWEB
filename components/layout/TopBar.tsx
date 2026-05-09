@@ -219,48 +219,56 @@ export function TopBar({
 
 // ---------------------------------------------------------------------------
 
+// v2 #1: simplified to a flat link styled as inline status text.
+// No background fill, no inner ring, no button-y hover lift — the
+// pipeline cards on /dashboard are now the single source of truth
+// for engine state. The chip remains a navigation surface
+// (cross-route shortcut) but reads as a label, not a button.
 function SymbolChip({
   href,
   symbol,
   verb,
-  verbTone,
   meta,
   accent,
 }: {
   href: string;
   symbol: string;
   verb: string;
-  verbTone: string;
+  // verbTone retained in the prop signature for callers but no longer
+  // applied — the v2 chip is intentionally tone-agnostic so engine
+  // state lives in the pipelines, not the header.
+  verbTone?: string;
   meta: string | null;
   accent?: "violet";
 }) {
-  const accentClass =
-    accent === "violet" ? "before:bg-violet/55" : "before:bg-ink/30";
+  const symbolTone = accent === "violet" ? "text-violet" : "text-ink-2";
   return (
     <Link
       href={href}
       className={cn(
-        "relative flex items-center gap-2 h-8 pl-3 pr-3 rounded-pill transition-all whitespace-nowrap shrink-0",
-        "before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[2px] before:rounded-full",
-        accentClass,
-        verbTone,
-        "hover:translate-y-[-0.5px] hover:shadow-card",
+        "inline-flex items-center gap-1.5 h-7 px-1.5 rounded-soft whitespace-nowrap shrink-0",
+        "text-ink-2 hover:text-ink transition-colors",
+        "outline-none focus-visible:ring-2 focus-visible:ring-gold/40",
       )}
     >
-      <span className="text-[10px] font-mono font-bold tracking-[0.16em] opacity-70">
+      <span
+        className={cn(
+          "text-[10px] font-mono font-bold tracking-[0.16em]",
+          symbolTone,
+        )}
+      >
         {symbol}
       </span>
-      <span className="opacity-30 text-[10px]">·</span>
-      <span className="text-[11px] font-bold uppercase tracking-[0.12em]">
-        {verb}
+      <span className="text-ink-4 text-[10px]" aria-hidden>
+        ·
+      </span>
+      <span className="text-[11px] tracking-[0.02em] lowercase">
+        {verb.toLowerCase()}
       </span>
       {meta && (
-        <>
-          <span className="opacity-30 text-[10px]">·</span>
-          <span className="text-[10px] font-mono uppercase tracking-[0.06em] opacity-80">
-            {meta}
-          </span>
-        </>
+        <span className="text-[10px] font-mono text-ink-3 lowercase tracking-[0.02em]">
+          · {meta.toLowerCase()}
+        </span>
       )}
     </Link>
   );

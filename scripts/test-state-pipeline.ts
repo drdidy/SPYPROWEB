@@ -47,8 +47,10 @@ const checks: Check[] = [
       /PHASE_DEFINITIONS\[state\]/.test(s),
   },
   {
-    label: "renders a <LiveCountdown> for the next event",
-    test: (s) => /<LiveCountdown\b/.test(s),
+    label: "renders a <Countdown> for the next event",
+    // v2 renamed LiveCountdown → Countdown (LiveCountdown remains a
+    // back-compat alias). Either reference satisfies the invariant.
+    test: (s) => /<Countdown\b/.test(s) || /<LiveCountdown\b/.test(s),
   },
   {
     label: "exports an <EngineStatusChip /> helper",

@@ -29,8 +29,11 @@ export function Wordmark({ collapsed = false }: { collapsed?: boolean }) {
               Prophet
             </div>
           </div>
+          {/* v2 #13: warmer ochre/brown to match the cream palette,
+              with a subtle border so the chip stays readable on
+              cream surfaces. */}
           <span
-            className="rounded-pill bg-gold-tint text-gold-ink px-1.5 py-px text-[9px] font-mono font-bold tracking-[0.10em] uppercase shadow-[inset_0_0_0_1px_rgba(184,130,31,0.20)]"
+            className="rounded-pill bg-gold-soft text-gold-ink px-1.5 py-px text-[9px] font-mono font-bold tracking-[0.10em] uppercase shadow-[inset_0_0_0_1px_rgba(184,130,31,0.45)]"
             aria-label="Closed beta"
           >
             Beta

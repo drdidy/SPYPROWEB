@@ -48,15 +48,29 @@ export function EngineTrackRecord({ record, className }: Props) {
     record.hitRate == null ? null : Math.round(record.hitRate * 100);
   const labelTone = record.engine === "SPX" ? "text-violet" : "text-ink-2";
 
+  // v2 copy polish: parens on the W/L breakdown make clear the
+  // percentage applies to graded sessions only. "5W 1L" still reads
+  // separately so the user can see the underlying counts.
   const summary =
     pct == null
       ? SLATE_COPY.trackRecord.noGraded
-      : `${pct}% hit · ${record.wins}W ${record.losses}L${
+      : `${pct}% hit (${record.wins}W ${record.losses}L${
           record.pushes ? ` ${record.pushes}P` : ""
-        }`;
+        })`;
   const skipText = record.skips
     ? SLATE_COPY.trackRecord.skipLabel(record.skips)
     : null;
+  // Promote the no-graded-but-N-skips case to a discoverable tooltip:
+  // the user otherwise sees "No graded sessions yet" with no
+  // explanation of why every recent session is faint.
+  const summaryNeedsTooltip = pct == null && record.skips > 0;
+
+  // v2 (#9): the skip count is an interactive link to a filtered
+  // Replay view, not just an underlined hint. Falls back to a plain
+  // span when there's no anchor date.
+  const skipFilterHref = record.sessions[0]
+    ? `/replay?date=${record.sessions[0].date}&filter=skip`
+    : "/replay?filter=skip";
 
   return (
     <div
@@ -78,7 +92,18 @@ export function EngineTrackRecord({ record, className }: Props) {
           </span>
         </span>
         <span className="font-mono text-meta tabular-nums text-ink-2">
-          {summary}
+          {summaryNeedsTooltip ? (
+            <InfoTooltip
+              label="No graded sessions yet"
+              content={`Engine watched the last ${record.sessions.length} session${
+                record.sessions.length === 1 ? "" : "s"
+              } but didn't qualify a setup.`}
+            >
+              <span className="cursor-help">{summary}</span>
+            </InfoTooltip>
+          ) : (
+            summary
+          )}
           {skipText && (
             <>
               {" · "}
@@ -86,9 +111,15 @@ export function EngineTrackRecord({ record, className }: Props) {
                 label="Skip"
                 content={SLATE_COPY.trackRecord.skipTooltip}
               >
-                <span className="underline decoration-dotted decoration-ink-4 underline-offset-2 cursor-help">
+                <Link
+                  href={skipFilterHref}
+                  className={cn(
+                    "rounded-soft hover:text-ink transition-colors",
+                    "outline-none focus-visible:ring-2 focus-visible:ring-gold/40",
+                  )}
+                >
                   {skipText}
-                </span>
+                </Link>
               </InfoTooltip>
             </>
           )}
@@ -128,13 +159,16 @@ export function EngineTrackRecord({ record, className }: Props) {
           </p>
         </>
       )}
+      {/* Ghost-button form, same shape + sentence-case as the rest of
+          the slate's secondary actions (v2 #9). */}
       <Link
         href={`/replay${record.sessions[0] ? `?date=${record.sessions[0].date}` : ""}`}
         className={cn(
-          "inline-flex items-center gap-1",
-          "font-mono text-[10px] uppercase tracking-[0.10em]",
-          "text-ink-3 hover:text-ink transition-colors",
-          "outline-none focus-visible:ring-2 focus-visible:ring-gold/40 rounded-soft",
+          "inline-flex items-center gap-1 h-7 px-2.5 rounded-pill",
+          "bg-paper-2/60 text-ink-2 hover:text-ink hover:bg-paper-2",
+          "border border-rule transition-colors",
+          "text-[11px] tracking-[0.02em] font-medium",
+          "outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
         )}
       >
         {SLATE_COPY.trackRecord.verifyCta}

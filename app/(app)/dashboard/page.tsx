@@ -1,6 +1,3 @@
-import Link from "next/link";
-import { ArrowRight, BookOpen, Rewind, Activity } from "lucide-react";
-
 import { CardBody } from "@/components/ui/Card";
 import { TimelineStrip } from "@/components/slate/TimelineStrip";
 import { ConvictionTrack } from "@/components/slate/ConvictionTrack";
@@ -15,6 +12,8 @@ import { LastSignalRecap } from "@/components/decision-slate/LastSignalRecap";
 import { PreConfigBriefing } from "@/components/decision-slate/PreConfigBriefing";
 import { StatePipeline } from "@/components/decision-slate/StatePipeline";
 import { EngineCard } from "@/components/decision-slate/EngineCard";
+import { RecommendedAction } from "@/components/decision-slate/RecommendedAction";
+import { PreviewState } from "@/components/decision-slate/PreviewState";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { SLATE_COPY } from "@/content/copy";
@@ -73,21 +72,17 @@ export default async function Page() {
   const spyHardError = spyError != null && spy.shellState.spy === 0;
 
   return (
-    // max-w 1280px + generous gutters per spec item #12 (desktop:
-    // "max content width ~1280px, generous gutters").
-    <div className="max-w-[1280px] mx-auto pb-16 space-y-6 pt-5 md:pt-6 anim-rise">
+    // v2 #15: max content width 1200px with generous gutters at every
+    // breakpoint. The page composes top-to-bottom: compact header →
+    // pipelines (2-col at lg+) → recommended next step → either the
+    // Markets-quiet briefing + preview, or the live "Today's read" +
+    // active levels grids.
+    <div className="max-w-[1200px] mx-auto pb-16 space-y-6 pt-5 md:pt-6 anim-rise">
       <PageHeader />
 
-      <PrimaryActionRail
-        spyState={spyState}
-        spxState={spxState}
-      />
-
-      {/* Per-engine pipelines — one strip each, stacked. Replaces the
-          flat "EngineLadders" container that read as a single shared
-          rail. The strip itself carries ticker, stepper, current-state
-          name, plain-English explanation, and live countdown. */}
-      <div className="space-y-3">
+      {/* v2 #4: pipelines render as a 2-col grid at lg+ so SPY and SPX
+          sit side-by-side, mirroring the verdict-card layout below. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-5">
         <StatePipeline
           engine="SPY"
           current={spyState}
@@ -104,23 +99,30 @@ export default async function Page() {
         />
       </div>
 
+      <RecommendedAction spyState={spyState} spxState={spxState} />
+
       {bothPreConfig ? (
-        <PreConfigBriefing
-          spy={{
-            label: "SPY",
-            nextSetupISO: spySession.configWindowStart.toISOString(),
-            nextSetupLabel: formatDayHM(spySession.configWindowStart),
-            lastSignal: recaps.spy,
-            trackRecord: spyTrack,
-          }}
-          spx={{
-            label: "SPX",
-            nextSetupISO: spxSession.configWindowStart.toISOString(),
-            nextSetupLabel: formatDayHM(spxSession.configWindowStart),
-            lastSignal: recaps.spx,
-            trackRecord: spxTrack,
-          }}
-        />
+        <>
+          <PreConfigBriefing
+            spy={{
+              label: "SPY",
+              nextSetupISO: spySession.configWindowStart.toISOString(),
+              nextSetupLabel: formatDayHM(spySession.configWindowStart),
+              lastSignal: recaps.spy,
+              trackRecord: spyTrack,
+            }}
+            spx={{
+              label: "SPX",
+              nextSetupISO: spxSession.configWindowStart.toISOString(),
+              nextSetupLabel: formatDayHM(spxSession.configWindowStart),
+              lastSignal: recaps.spx,
+              trackRecord: spxTrack,
+            }}
+          />
+          {/* v2 #10: low-key teaching panel, hidden once either engine
+              leaves PRE_CONFIG. */}
+          <PreviewState />
+        </>
       ) : (
         <>
           <Section title="Today's read">
@@ -155,19 +157,19 @@ export default async function Page() {
 }
 
 // ---------------------------------------------------------------------
-// Page header — title, subtle subtitle, help affordance.
-// Spec item #9: "Add a small ? help affordance in the page header
-// that opens a panel explaining the Decision Slate concept."
+// Page header — v2 #5: small eyebrow + h1 ~24px + About affordance
+// to its right. v1's giant serif "Decision Slate" hero reclaimed
+// ~80px of above-the-fold space for actual data.
 // ---------------------------------------------------------------------
 
 function PageHeader() {
   return (
-    <header className="flex items-end justify-between gap-4 flex-wrap">
-      <div className="min-w-0">
+    <header className="flex items-center justify-between gap-4 flex-wrap">
+      <div className="min-w-0 flex items-baseline gap-3">
         <p className="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-3">
           Workspace
         </p>
-        <h1 className="font-serif text-display tracking-tight text-ink mt-1">
+        <h1 className="font-serif text-h2 text-ink tracking-tight">
           Decision Slate
         </h1>
       </div>
@@ -181,13 +183,13 @@ function PageHeader() {
             "inline-flex items-center gap-1.5 h-7 px-2.5 rounded-pill",
             "bg-paper-2/60 text-ink-2 hover:text-ink hover:bg-paper-2",
             "border border-rule transition-colors",
-            "font-mono text-[11px] tracking-[0.06em]",
+            "text-[11px] tracking-[0.02em] font-medium",
           )}
         >
           <span aria-hidden className="text-[12px] font-bold">
             ?
           </span>
-          About this view
+          About this page
         </span>
       </InfoTooltip>
     </header>
@@ -195,106 +197,9 @@ function PageHeader() {
 }
 
 // ---------------------------------------------------------------------
-// Primary action rail — one big, contextual call-to-action button
-// driven by the engines' combined state. Everything else on the page
-// is secondary chrome. Spec item #8.
+// Per-engine plain-English explanation. Pure functions so we can keep
+// the dashboard's main render flat.
 // ---------------------------------------------------------------------
-
-function PrimaryActionRail({
-  spyState,
-  spxState,
-}: {
-  spyState: EngineState;
-  spxState: EngineState;
-}) {
-  // Decide the page's #1 action.
-  //   ARMED / GO / WAIT / WATCH (live setup) → "Open live slate"
-  //   PRE_CONFIG / STAND_DOWN / COOLDOWN     → "Open daily brief"
-  //                                            (or "Replay last session")
-  // We pick the most active engine's state to drive the choice so a
-  // mid-day SPY GO doesn't get demoted just because SPX has cooled
-  // down.
-  const active: EngineState = mostActive(spyState, spxState);
-  const isLive =
-    active === "ARMED" ||
-    active === "GO" ||
-    active === "WAIT" ||
-    active === "WATCH";
-
-  const primary = isLive
-    ? {
-        href: "/spy",
-        label: "Open live slate",
-        icon: Activity,
-        description:
-          active === "GO"
-            ? "Trigger fired — review entry levels and sizing now."
-            : "Setup is forming. Check the live channel and level proximity.",
-      }
-    : active === "COOLDOWN"
-      ? {
-          href: "/replay",
-          label: "Open replay",
-          icon: Rewind,
-          description: "Trade resolved. Replay the session to grade execution.",
-        }
-      : {
-          href: "/brief",
-          label: "Open daily brief",
-          icon: BookOpen,
-          description:
-            "The brief lays out today's structural levels and what to watch at the open.",
-        };
-  const Icon = primary.icon;
-
-  return (
-    <div
-      className={cn(
-        "rounded-card border border-rule bg-paper px-4 py-3 md:px-5 md:py-4",
-        "flex items-center justify-between gap-4 flex-wrap",
-      )}
-    >
-      <div className="min-w-0 flex-1">
-        <p className="font-mono text-[10px] tracking-[0.16em] uppercase text-ink-3">
-          Recommended next step
-        </p>
-        <p className="text-body text-ink-2 mt-1 leading-snug max-w-2xl">
-          {primary.description}
-        </p>
-      </div>
-      <Link
-        href={primary.href}
-        className={cn(
-          "inline-flex items-center gap-2 h-10 px-4 rounded-pill shrink-0",
-          "bg-ink text-paper hover:bg-ink-2 transition-colors",
-          "font-mono text-[12px] tracking-[0.06em] font-medium",
-          "outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
-        )}
-      >
-        <Icon size={14} aria-hidden />
-        {primary.label}
-        <ArrowRight size={12} className="opacity-70" aria-hidden />
-      </Link>
-    </div>
-  );
-}
-
-function mostActive(a: EngineState, b: EngineState): EngineState {
-  // Highest priority wins → "live" states beat passive ones so the CTA
-  // points at the active workflow.
-  const order: EngineState[] = [
-    "GO",
-    "ARMED",
-    "WAIT",
-    "WATCH",
-    "STAND_DOWN",
-    "COOLDOWN",
-    "PRE_CONFIG",
-  ];
-  const ai = order.indexOf(a);
-  const bi = order.indexOf(b);
-  return ai <= bi ? a : b;
-}
 
 function spyExplanation(state: EngineState, snap: AdaptedSnapshot): string {
   if (state === "PRE_CONFIG") {
@@ -1096,4 +1001,3 @@ function spxLineHint(kind: string): string {
   };
   return m[kind] || "Engine-generated SPX reference line.";
 }
-
