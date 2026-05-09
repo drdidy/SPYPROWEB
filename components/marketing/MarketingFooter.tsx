@@ -23,19 +23,22 @@ const cols = [
   {
     label: "Company",
     items: [
-      { label: "About", href: "#" },
-      { label: "Press", href: "#" },
-      { label: "Contact", href: "#" },
-      { label: "Careers", href: "#" },
+      { label: "About", href: "/about" },
+      { label: "Contact", href: "/contact" },
+      { label: "Careers", href: "/careers" },
+      // Press intentionally retained as a real route — visitors who
+      // click see an honest "no published press yet" page rather than
+      // a dead anchor.
+      { label: "Press", href: "/press" },
     ],
   },
   {
     label: "Legal",
     items: [
-      { label: "Terms", href: "#" },
-      { label: "Privacy", href: "#" },
-      { label: "Disclosures", href: "#" },
-      { label: "Risk", href: "#" },
+      { label: "Terms", href: "/terms" },
+      { label: "Privacy", href: "/privacy" },
+      { label: "Disclosures", href: "/disclosures" },
+      { label: "Risk", href: "/risk" },
     ],
   },
 ];

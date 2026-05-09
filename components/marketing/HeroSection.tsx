@@ -148,6 +148,20 @@ export function HeroSection({ decision: serverDecision, quote: serverQuote, init
         </div>
       </motion.div>
 
+      {/* Persistent compliance footnote sits directly beneath the
+          live verdict card — required surface, not decorative.
+          "Not investment advice" deep-links to /disclosures. */}
+      <p className="mt-4 text-[11px] text-ink-3 font-sans leading-relaxed">
+        Educational workspace.{" "}
+        <Link
+          href="/disclosures"
+          className="underline underline-offset-2 decoration-rule hover:text-ink hover:decoration-ink-3 transition-colors"
+        >
+          Not investment advice
+        </Link>
+        . Markets involve risk.
+      </p>
+
       {/* scroll hint */}
       <div className="hidden lg:flex items-center gap-2 text-[10px] text-ink-3 font-mono uppercase tracking-[0.18em] mt-12">
         <span>Read the methodology</span>
