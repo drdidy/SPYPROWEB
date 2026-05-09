@@ -1,17 +1,19 @@
 "use client";
 
-// Shown only when BOTH engines are in PRE_CONFIG. Replaces the empty
-// "Today's Read" cards with a constructive briefing: last-session
-// recap per engine, next setup window with a live countdown, and quick
-// links to Replay / Daily Brief. Auto-hides as soon as either engine
-// leaves PRE_CONFIG.
+// Shown only when BOTH engines are in PRE_CONFIG. Gives the user
+// real signal of value during the deadest hours: per-engine track
+// record from the past N sessions (so they can see "is the engine
+// any good?"), the previous session's actual recap, and a live
+// countdown to the next setup window.
 
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { LiveCountdown } from "./LiveCountdown";
 import { LastSignalRecap } from "./LastSignalRecap";
+import { EngineTrackRecord } from "./EngineTrackRecord";
 import { SLATE_COPY } from "@/content/copy";
 import type { LastSignalSummary } from "@/types/decision-slate";
+import type { EngineTrackRecord as TrackRecord } from "@/lib/track-record";
 
 interface Engine {
   label: "SPY" | "SPX";
@@ -20,6 +22,8 @@ interface Engine {
   /** Human label e.g. "Mon 03:00 CT". */
   nextSetupLabel: string;
   lastSignal: LastSignalSummary | null;
+  /** Last N sessions' outcomes from replay endpoints. */
+  trackRecord: TrackRecord;
 }
 
 interface Props {
@@ -52,6 +56,14 @@ export function PreConfigBriefing({ spy, spx }: Props) {
       <p className="text-[13px] text-ink-2 leading-relaxed max-w-2xl">
         {SLATE_COPY.preConfig.body}
       </p>
+
+      {/* Per-engine track record: lets the user see at a glance how
+          the engine has been performing across recent sessions. The
+          dots → Replay link is the validation path. */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <EngineTrackRecord record={spy.trackRecord} />
+        <EngineTrackRecord record={spx.trackRecord} />
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <EngineBriefing engine={spy} />
@@ -102,10 +114,8 @@ function EngineBriefing({ engine }: { engine: Engine }) {
         <LastSignalRecap recap={engine.lastSignal} />
       ) : (
         <p className="text-[11px] text-ink-3">
-          No engine signal recorded for the previous session.{" "}
-          <span className="opacity-70">
-            (The recap reflects the engine&apos;s signal outcome, not user trades.)
-          </span>
+          Engine had no graded signal yesterday. Track-record dots above show
+          recent days.
         </p>
       )}
     </div>

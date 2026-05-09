@@ -19,6 +19,7 @@ import { SLATE_COPY } from "@/content/copy";
 import { loadLiveSnapshot } from "@/lib/snapshot-fetch";
 import { loadSnapshot as loadSpxSnapshot } from "@/lib/spx-fetch";
 import { fetchLastSessionRecaps } from "@/lib/last-session-recap";
+import { fetchTrackRecord } from "@/lib/track-record";
 import { getSessionInfo } from "@/lib/sessions";
 import type { AdaptedSnapshot } from "@/lib/snapshot-adapter";
 import type { DynamicLine, SPXSnapshot, SPXLine } from "@/lib/types";
@@ -35,12 +36,19 @@ export default async function Page() {
   // Both engines are independent fetches. Run them in parallel — the
   // slate is meant to be read in one glance, so a slow side shouldn't
   // hold up the other.
-  const [{ data: spy, source: spySource, error: spyError }, spxLoaded, recaps] =
-    await Promise.all([
-      loadLiveSnapshot(),
-      loadSpxSnapshot(),
-      fetchLastSessionRecaps(),
-    ]);
+  const [
+    { data: spy, source: spySource, error: spyError },
+    spxLoaded,
+    recaps,
+    spyTrack,
+    spxTrack,
+  ] = await Promise.all([
+    loadLiveSnapshot(),
+    loadSpxSnapshot(),
+    fetchLastSessionRecaps(),
+    fetchTrackRecord("SPY"),
+    fetchTrackRecord("SPX"),
+  ]);
   const spx = spxLoaded.snap;
   const spxSource = spxLoaded.source;
 
@@ -69,12 +77,14 @@ export default async function Page() {
             nextSetupISO: spySession.configWindowStart.toISOString(),
             nextSetupLabel: formatDayHM(spySession.configWindowStart),
             lastSignal: recaps.spy,
+            trackRecord: spyTrack,
           }}
           spx={{
             label: "SPX",
             nextSetupISO: spxSession.configWindowStart.toISOString(),
             nextSetupLabel: formatDayHM(spxSession.configWindowStart),
             lastSignal: recaps.spx,
+            trackRecord: spxTrack,
           }}
         />
       )}
