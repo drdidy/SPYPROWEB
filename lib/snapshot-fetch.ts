@@ -50,6 +50,7 @@ function emptyAdapted(): AdaptedSnapshot {
     hourlyCandles: [],
     lines: [],
     anchor: null,
+    premarketDiagnostic: null,
     replay: null,
     pivots: [],
     currentPrice: 0,

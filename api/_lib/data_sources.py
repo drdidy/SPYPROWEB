@@ -1068,6 +1068,14 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
         decision=decision,
     ) if is_replay else None
 
+    # Premarket-bar diagnostic — only ship on replay so live payloads
+    # stay lean. Lets operators verify *exactly* which hourly bars the
+    # engine read for the 2-7 CT window and why each did/didn't qualify.
+    premarket_diag = (
+        pma.build_premarket_diagnostic(df, signal_day, anchor_payload)
+        if is_replay else None
+    )
+
     return {
         "asOf": now_ct.isoformat(),
         "source": "live",
@@ -1097,6 +1105,7 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
         "hourlyCandles": hourly_candles,
         "chartLines": chart_lines,
         "anchor": anchor_payload_for_ui,
+        "premarketDiagnostic": premarket_diag,
         "options": options,
         "flow": flow_summary,
         "gex": gex_summary,

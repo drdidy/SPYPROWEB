@@ -24,6 +24,8 @@ import {
   adaptSnapshot,
   type AdaptedSnapshot,
   type AnchorGroup,
+  type PremarketDiagnostic,
+  type PremarketDiagnosticBar,
   type RawSnapshot,
 } from "@/lib/snapshot-adapter";
 import type { SPXSnapshot, SPXLine } from "@/lib/types";
@@ -373,6 +375,10 @@ function SPYPlanCard({ snap }: { snap: AdaptedSnapshot | null }) {
             No qualifying premarket anchor for this date
           </div>
         )}
+
+        {snap?.premarketDiagnostic && (
+          <PremarketDiagnosticPanel diag={snap.premarketDiagnostic} />
+        )}
       </div>
     </Card>
   );
@@ -640,6 +646,92 @@ function BandStat({
         </div>
       )}
     </div>
+  );
+}
+
+function PremarketDiagnosticPanel({ diag }: { diag: PremarketDiagnostic }) {
+  if (!diag.bars || diag.bars.length === 0) return null;
+  return (
+    <details className="mt-1 group">
+      <summary className="cursor-pointer select-none flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.10em] text-ink-3 hover:text-ink transition-colors">
+        <span className="inline-block w-2 transition-transform group-open:rotate-90">
+          ›
+        </span>
+        Premarket bars · what the engine read
+      </summary>
+      <div className="mt-2 overflow-x-auto">
+        <table className="w-full text-[11px] font-mono tabular-nums">
+          <thead>
+            <tr className="text-ink-3">
+              <th className="text-left font-normal pb-1.5 px-2">Time CT</th>
+              <th className="text-right font-normal pb-1.5 px-2">Open</th>
+              <th className="text-right font-normal pb-1.5 px-2">High</th>
+              <th className="text-right font-normal pb-1.5 px-2">Low</th>
+              <th className="text-right font-normal pb-1.5 px-2">Close</th>
+              <th className="text-left font-normal pb-1.5 px-2">Color</th>
+              <th className="text-left font-normal pb-1.5 px-2 w-full">
+                Anchor verdict
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {diag.bars.map((b) => (
+              <DiagnosticRow key={b.t} bar={b} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  );
+}
+
+function DiagnosticRow({ bar }: { bar: PremarketDiagnosticBar }) {
+  const selected = bar.selectedAs !== null;
+  const colorChip =
+    bar.color === "red"
+      ? "bg-bear-tint text-bear-ink"
+      : bar.color === "green"
+        ? "bg-bull-tint text-bull-ink"
+        : "bg-paper-2 text-ink-3";
+  return (
+    <tr
+      className={`border-t border-rule ${
+        selected ? "bg-gold-tint/40" : ""
+      }`}
+    >
+      <td className="px-2 py-1 text-ink-2">
+        {shortTime(bar.t)}
+      </td>
+      <td className="px-2 py-1 text-right text-ink-2">{bar.o.toFixed(2)}</td>
+      <td className="px-2 py-1 text-right text-ink-2">{bar.h.toFixed(2)}</td>
+      <td
+        className={`px-2 py-1 text-right ${
+          selected ? "text-gold-ink font-semibold" : "text-ink"
+        }`}
+      >
+        {bar.l.toFixed(2)}
+      </td>
+      <td className="px-2 py-1 text-right text-ink-2">{bar.c.toFixed(2)}</td>
+      <td className="px-2 py-1">
+        <span
+          className={`inline-block px-1.5 py-0.5 rounded-pill text-[9px] uppercase tracking-[0.10em] ${colorChip}`}
+        >
+          {bar.color}
+        </span>
+      </td>
+      <td className="px-2 py-1 text-ink-3">
+        {selected ? (
+          <span className="text-gold-ink font-semibold">
+            ← {bar.selectedAs === "PRIMARY" ? "primary" : "anchor 2"} ·{" "}
+            {bar.reason}
+          </span>
+        ) : bar.qualified ? (
+          <span className="text-ink-2">qualified · {bar.reason}</span>
+        ) : (
+          <span>{bar.reason}</span>
+        )}
+      </td>
+    </tr>
   );
 }
 
