@@ -6,7 +6,7 @@ import { NumberFlash } from "@/components/ui/NumberFlash";
 import { Kbd } from "@/components/ui/Kbd";
 import { useLiveSPY, useLiveSPX } from "@/lib/use-live-snapshot";
 import { cn } from "@/lib/utils";
-import { FeedHealthBadge } from "@/components/slate/FeedHealthBadge";
+import { FreshnessPill } from "@/components/decision-slate/FreshnessPill";
 import {
   getSessionInfo,
   priceStalenessLabel,
@@ -57,7 +57,8 @@ export function TopBar({
   const spxSnapshot = useLiveSPX();
   const decision = spy.decision;
   const t = spy.shell;
-  const updatedLabel = formatUpdated(spy.shell.feedHealth.lastTickTs);
+  // FreshnessPill (right cluster) carries the "Updated HH:MM CT" text
+  // now — single source of truth for staleness.
   const sessionLine = useSessionLine();
   const staleness = useStalenessLabel();
 
@@ -163,7 +164,11 @@ export function TopBar({
         </Quote>
       </div>
 
-      {/* ---- ZONE 3: session + updated + feed-health (lg+ only) ------ */}
+      {/* ---- ZONE 3: session + freshness pill (lg+ only). The pill is
+           the single source of truth for "how fresh is the slate?" —
+           it replaces the old "Updated HH:MM CT" text + dot, and the
+           per-card as-of stamps now hide unless their data ts diverges
+           from the global one. */}
       <div
         data-segment="meta"
         className="hidden lg:flex items-center gap-3 shrink-0 whitespace-nowrap"
@@ -176,11 +181,8 @@ export function TopBar({
             <span className="h-3 w-px bg-rule" aria-hidden />
           </>
         )}
-        <span className="font-mono text-[10px] text-ink-3 tabular-nums">
-          Updated {updatedLabel}
-        </span>
-        <FeedHealthBadge
-          lastTickTs={t.feedHealth.lastTickTs}
+        <FreshnessPill
+          freshnessISO={t.feedHealth.lastTickTs}
           source={t.feedHealth.source}
         />
       </div>
@@ -363,20 +365,3 @@ function useStalenessLabel(): string | null {
   return label;
 }
 
-function formatUpdated(iso: string): string {
-  if (!iso) return "—";
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return "—";
-    return (
-      new Intl.DateTimeFormat("en-US", {
-        timeZone: "America/Chicago",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      }).format(d) + " CT"
-    );
-  } catch {
-    return "—";
-  }
-}
