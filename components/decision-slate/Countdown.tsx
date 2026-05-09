@@ -126,6 +126,12 @@ function format(diff: number, verb: string, imminentLabel: string): string {
     const m = Math.floor((diff % HOUR) / MIN);
     return `${prefix}${h}h ${m}m`;
   }
+  // v5 #5: under 60s, drop the leading "0m " — "in 30s" reads
+  // cleaner than "in 0m 30s" in the final approach to the event.
+  if (diff < MIN) {
+    const s = Math.floor(diff / SEC);
+    return `${prefix}${s}s`;
+  }
   const m = Math.floor(diff / MIN);
   const s = Math.floor((diff % MIN) / SEC);
   return `${prefix}${m}m ${s}s`;

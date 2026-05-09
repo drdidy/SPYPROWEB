@@ -29,14 +29,22 @@ export function Wordmark({ collapsed = false }: { collapsed?: boolean }) {
               Prophet
             </div>
           </div>
-          {/* v4 #11: stronger ochre presence. v2 used bg-gold-soft
-              + a 0.45 inset border, but the cream-on-cream palette
-              kept reading as a neutral/blueish tile to viewers. v4
-              switches to a saturated brand-gold solid fill with the
-              gold-tint as text — unambiguously warm at any monitor
-              calibration. */}
+          {/* v5 #6: BETA chip rendered with INLINE style to bypass
+              every layer of CSS-var override / Tailwind compile
+              chain that has, across v2/v3/v4, kept the chip
+              reading as blueish on some monitors. The hex values
+              are baked into the markup — no class lookup, no
+              custom property, no theme variable can change them.
+              Saturated brand ochre (#B8821F) fill, cream-paper
+              text (#FFF7E0), brown border (#5C3F0B) for an
+              unambiguously warm appearance on cream surfaces. */}
           <span
-            className="rounded-pill bg-gold text-gold-tint px-1.5 py-px text-[9px] font-mono font-bold tracking-[0.10em] uppercase shadow-[inset_0_0_0_1px_rgba(92,63,11,0.55)]"
+            className="rounded-pill px-1.5 py-px text-[9px] font-mono font-bold tracking-[0.10em] uppercase"
+            style={{
+              backgroundColor: "#B8821F",
+              color: "#FFF7E0",
+              border: "1px solid #5C3F0B",
+            }}
             aria-label="Closed beta"
           >
             Beta

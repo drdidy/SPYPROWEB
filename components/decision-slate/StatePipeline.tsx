@@ -72,12 +72,19 @@ export function StatePipeline({
   return (
     <section
       aria-label={`${engine} engine state pipeline`}
+      // v5 #1: min-w-0 + overflow-hidden on the section is the
+      // overflow guard. Without it, the inner stepper's intrinsic
+      // width (7 step pills + 6 connectors) bullies the parent grid
+      // track wider than its allotted minmax(0, 1fr) column, which
+      // pushes the page past the 1200px container and forces a
+      // horizontal scrollbar (the v4 SPX "Wai…" clip).
       className={cn(
         "rounded-card border border-rule bg-paper px-4 py-3 md:px-5 md:py-4",
+        "min-w-0 overflow-hidden",
         className,
       )}
     >
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4 min-w-0">
         {/* v4 #5: drop the serif state-name title that lived next to
             the ticker. The active pill in the stepper below already
             names the state — rendering "Pre-config" twice (title +
@@ -95,11 +102,15 @@ export function StatePipeline({
 
         {/* Stepper. Real <ol> with aria-current="step" on the active
             <li>. Each step has an sr-only description so screen
-            readers announce position + label + status. */}
+            readers announce position + label + status.
+            v5 #1: overflow-x-hidden (not auto) — the section never
+            scrolls horizontally; instead the stepper switches to a
+            collapsed "current → next" view at <xl widths via the
+            responsive label below. */}
         <ol
           role="list"
           aria-label={`${engine} state progression`}
-          className="flex items-center gap-0 flex-1 min-w-0 overflow-x-auto"
+          className="flex items-center gap-0 flex-1 min-w-0 overflow-hidden"
         >
           {ENGINE_STATES.map((state, i) => {
             const phase = PHASE_DEFINITIONS[state];
@@ -117,14 +128,16 @@ export function StatePipeline({
               <li
                 key={state}
                 aria-current={isCurrent ? "step" : undefined}
-                className="flex items-center shrink-0"
+                className="flex items-center shrink-0 min-w-0"
               >
-                {/* Connector hairline between consecutive nodes. */}
+                {/* Connector hairline. v5 #1: thinner spacing at lg
+                    so seven nodes fit a half-screen card without the
+                    parent grid overflowing. */}
                 {!isFirst && (
                   <span
                     aria-hidden
                     className={cn(
-                      "h-px w-4 md:w-6",
+                      "h-px w-2 md:w-3 xl:w-5",
                       isPassed || isCurrent
                         ? "bg-rule-strong"
                         : "bg-rule",
@@ -152,6 +165,12 @@ export function StatePipeline({
                     </>
                   }
                 >
+                  {/* v5 #1: responsive collapse pattern. Below xl (1280)
+                      non-current steps render as a single-character
+                      glyph (the first letter of their phase label) so
+                      the strip never exceeds its parent grid track.
+                      The current step always shows its full label so
+                      the user can read state without hovering. */}
                   <span
                     className={cn(
                       "inline-flex items-center px-1.5 py-0.5 rounded-pill",
@@ -168,7 +187,13 @@ export function StatePipeline({
                       isFuture && "text-ink-3 font-normal",
                     )}
                   >
-                    {phase.label}
+                    {/* xl+: full label */}
+                    <span className="hidden xl:inline">{phase.label}</span>
+                    {/* <xl: collapsed glyph for non-current steps,
+                        full label for the current step. */}
+                    <span className="xl:hidden">
+                      {isCurrent ? phase.label : phase.label.charAt(0)}
+                    </span>
                   </span>
                 </InfoTooltip>
               </li>
@@ -176,9 +201,12 @@ export function StatePipeline({
           })}
         </ol>
 
-        {/* Right-rail meta column. Stacks below stepper on mobile. */}
+        {/* Right-rail meta column. v5 #1: dropped the 160px min-width
+            reservation so the stepper has more breathing room at lg
+            widths. The text is whitespace-nowrap, so it stays on
+            one line without the hard floor. */}
         {(nextEventISO || nextEventLabel) && (
-          <div className="shrink-0 self-start md:self-center md:text-right md:min-w-[160px] flex flex-col gap-0.5">
+          <div className="shrink-0 self-start md:self-center md:text-right whitespace-nowrap flex flex-col gap-0.5">
             {nextEventLabel && (
               <span className="font-mono text-[10px] tracking-[0.10em] uppercase text-ink-3">
                 {nextEventLabel}

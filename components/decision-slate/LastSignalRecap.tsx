@@ -69,8 +69,21 @@ export function LastSignalRecap({ recap, className }: Props) {
         ) : (
           <span className={cn("font-semibold", sideTone)}>{recap.side}</span>
         )}
+        {/* v5 #3: restore the em-dash separator that v4 stripped along
+            with the leading "Watched only" prefix. The pill carries
+            the phrase, the dash carries the connector, the body
+            carries the substance. */}
+        {isWatched && body && (
+          <span className="text-ink-4" aria-hidden>
+            —
+          </span>
+        )}
         <span className="text-ink-2">{body}</span>
+        {/* v5 #3: R-multiple now renders in parens to match the
+            EngineTrackRecord summary pattern — visual rhyme between
+            the two surfaces. */}
         <span className={cn("font-semibold inline-flex items-baseline", rTone)}>
+          (
           {rValue}
           <InfoTooltip
             label="R-multiple"
@@ -78,6 +91,7 @@ export function LastSignalRecap({ recap, className }: Props) {
           >
             <span className="cursor-help">R</span>
           </InfoTooltip>
+          )
         </span>
       </div>
     </div>

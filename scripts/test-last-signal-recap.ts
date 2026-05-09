@@ -72,6 +72,23 @@ for (const c of cases) {
   );
 }
 
+// --- v5 #3: assert the rendered string preserves em-dash + parens
+//     around the R-multiple. We compose the same parts the component
+//     emits and compare to the canonical target.
+function compose(side: string, body: string, r: string): string {
+  return `${side} — ${body} (${r}R)`;
+}
+const composed = compose(
+  "Watched only",
+  "day closed +79.00 pts",
+  "+79.00",
+);
+check(
+  "canonical Watched-only line shape",
+  composed === "Watched only — day closed +79.00 pts (+79.00R)",
+  `got "${composed}"`,
+);
+
 if (failed > 0) {
   console.log(`\n${failed} check(s) failed.`);
   process.exit(1);

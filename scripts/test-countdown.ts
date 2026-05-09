@@ -45,6 +45,16 @@ check(
   "<1h: Mm Ss form",
   format(5 * MIN + 30 * SEC, "in", "now") === "in 5m 30s",
 );
+// v5 #5: under 60s drops the leading "0m " for cleaner reading
+// in the final approach to the event.
+check(
+  "<60s drops the 0m: just Ns",
+  format(30 * SEC, "in", "now") === "in 30s",
+);
+check(
+  "<60s with empty verb: just Ns",
+  format(45 * SEC, "", "now") === "45s",
+);
 check(
   "empty verb omits prefix",
   format(2 * MIN + 30 * SEC, "", "now") === "2m 30s",

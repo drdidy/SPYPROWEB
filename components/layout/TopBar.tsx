@@ -13,6 +13,7 @@ import {
   priceStalenessLabel,
   renderSessionSegment,
 } from "@/lib/sessions";
+import { formatNumber, isLoadedNumber } from "@/lib/format-number";
 import type { EngineState } from "@/lib/states";
 
 // ---------------------------------------------------------------------------
@@ -91,13 +92,12 @@ export function TopBar({
       ? null
       : SPX_SCENARIO_TAG[spxSnapshot.scenario] ?? spxSnapshot.scenario;
 
-  // Skeleton condition — value is 0 / NaN / undefined-ish before the
-  // first poll completes. Showing "0.00" or a clipped digit is worse
-  // than showing nothing for half a second.
-  const vixLoaded = Number.isFinite(t.vix) && t.vix > 0;
-  const spyLoaded = Number.isFinite(t.spy) && t.spy > 0;
-  const spxLoaded =
-    Number.isFinite(spxSnapshot.price.last) && spxSnapshot.price.last > 0;
+  // v5 #2: routed through isLoadedNumber so the contract for "value
+  // is renderable" lives in one place. 0 is treated as unloaded for
+  // VIX/SPY/SPX since 0 is never a real reading on those tickers.
+  const vixLoaded = isLoadedNumber(t.vix);
+  const spyLoaded = isLoadedNumber(t.spy);
+  const spxLoaded = isLoadedNumber(spxSnapshot.price.last);
 
   return (
     <header
@@ -163,7 +163,7 @@ export function TopBar({
             delta={t.change}
             loaded={spyLoaded}
             value={
-              <NumberFlash value={t.spy} format={(n) => n.toFixed(2)} />
+              <NumberFlash value={t.spy} format={(n) => formatNumber(n)} />
             }
           />
         </Quote>
@@ -176,7 +176,7 @@ export function TopBar({
             value={
               <NumberFlash
                 value={spxSnapshot.price.last}
-                format={(n) => n.toFixed(2)}
+                format={(n) => formatNumber(n)}
               />
             }
           />
@@ -187,7 +187,7 @@ export function TopBar({
             stalenessAt={stalenessAt}
             delta={t.vixDelta}
             loaded={vixLoaded}
-            value={<span data-num>{vixLoaded ? t.vix.toFixed(2) : "—"}</span>}
+            value={<span data-num>{formatNumber(t.vix)}</span>}
           />
         </Quote>
       </div>

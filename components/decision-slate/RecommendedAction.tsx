@@ -52,41 +52,43 @@ export function RecommendedAction({ spyState, spxState, className }: Props) {
       aria-labelledby="recommended-action-heading"
       data-testid="recommended-action"
       className={cn(
-        // v4 #6: branded gold tint surface so the hero anchors the
-        // page above the cream-on-cream cards. 1.5px gold border in
-        // the brand color reinforces the "this is the primary
-        // action" reading.
-        "rounded-card bg-paper-brand border border-rule-strong",
-        "shadow-[inset_0_0_0_1px_rgba(184,130,31,0.15)]",
+        // v5 #10: softer tint than v4. The previous bg-paper-brand
+        // (#FAF1DC) read as "warning state" yellow on calibrated
+        // monitors. paper-2 (the warm cream surface used elsewhere)
+        // anchors the eye via a faint contrast against the canvas
+        // without implying caution. A 1px ink-tinted top stripe via
+        // shadow-inset replaces the gold border so the hero still
+        // reads as "primary surface" rather than "another card".
+        "rounded-card bg-paper-2 border border-rule",
+        "shadow-[inset_0_2px_0_rgba(20,22,26,0.04),0_1px_0_rgba(20,22,26,0.02)]",
         "px-5 py-4 md:px-6 md:py-5",
         "flex items-center justify-between gap-4 flex-wrap",
         className,
       )}
     >
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* v4 #9: tracked-caps reserved for one-word eyebrows.
-              Multi-word eyebrows render as plain small-caps text. */}
+        <div className="flex items-baseline gap-2 flex-wrap">
+          {/* v5 #7: settled rule — section eyebrows use tracked-caps
+              consistently (WORKSPACE / ENGINES / RECOMMENDED NEXT
+              STEP / LAST SESSION / PREVIEW). The state-context line
+              moves down to plain text below. */}
           <p
             id="recommended-action-heading"
-            className="text-[11px] tracking-[0.02em] text-ink-2 font-semibold"
+            className="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-2 font-semibold"
           >
             Recommended next step
           </p>
-          <span aria-hidden className="h-3 w-px bg-rule-strong" />
+          {/* v5 #9: state-context demoted from a chip-styled pill
+              (which looked clickable but wasn't) to plain inline
+              text with a leading middot. */}
           <span
             data-testid="recommended-action-state"
-            className={cn(
-              "inline-flex items-center px-2 py-0.5 rounded-pill",
-              "bg-paper/70 text-ink-2",
-              "text-[11px] tracking-[0.02em] font-medium",
-              "shadow-[inset_0_0_0_1px_rgba(184,130,31,0.20)]",
-            )}
+            className="text-[11px] tracking-[0.02em] text-ink-3 italic"
           >
-            {rec.reason}
+            · {rec.reason}
           </span>
         </div>
-        <p className="text-body text-ink leading-snug max-w-2xl mt-2 font-medium">
+        <p className="text-body text-ink leading-snug max-w-2xl mt-1 font-medium">
           {rec.description}
         </p>
       </div>

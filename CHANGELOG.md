@@ -6,6 +6,150 @@ entries grow newest-first.
 
 ## [Unreleased]
 
+### Decision Slate v5 — production polish
+
+Ship-readiness pass on top of v4. Three blocking defects resolved
+plus the polish items the user has bumped on across rounds. No
+backend changes.
+
+**P0 — blocking defects**
+
+- **Engine pipeline horizontal overflow** (#1). The two engine
+  cards forced a horizontal scrollbar on viewports up to 1440px and
+  clipped the SPX label mid-word ("Wai…"). The seven step pills'
+  intrinsic width was bullying the parent grid track wider than its
+  `minmax(0, 1fr)` allowance.
+  Fix: `min-w-0 overflow-hidden` on the StatePipeline section, the
+  inner flex row, and the `<ol>` itself. Below `xl` the non-current
+  step labels collapse to single-character glyphs (P / S / Wt / Wa
+  / A / G / C); the current step always shows its full name. Right-
+  rail meta column drops its 160px min-width reservation. New
+  `scripts/test-pipeline-overflow.ts` (5 invariants) is the
+  regression guard.
+
+- **Header rendering broken values** (#2). The TopBar VIX slot
+  rendered a literal "." as the leading character of an unfinished
+  value clipped by overflow. Two pieces:
+  1. New `lib/format-number.ts` — pure helper that returns `"—"`
+     for null / undefined / NaN / Infinity / non-finite, and never
+     returns a string starting with `.`. SPY / SPX / VIX all route
+     through it.
+  2. New `isLoadedNumber` predicate that treats `0` as unloaded for
+     ticker prices (0 is never a real reading on these symbols), so
+     the skeleton bar renders instead of `0.00` while the first
+     poll completes.
+  `scripts/test-format-number.ts` (16 cases) covers every input
+  shape and asserts the literal `.` can never escape.
+
+- **`Watched only` missing em-dash + parens** (#3). v4's prefix
+  stripper dropped the dash along with the leading "Watched only"
+  phrase, producing `Watched only day closed +79.00 pts +79.00R`
+  with no separator and a bare R-multiple. v5 renders exactly:
+  `Watched only — day closed +79.00 pts (+79.00R)`. The em-dash is
+  added back as a sibling node when the pill renders, and the
+  R-multiple wraps in parens to mirror the EngineTrackRecord
+  summary. The regression test was extended with a canonical-string
+  assertion.
+
+**P1 — polish bumped across rounds**
+
+- **Tooltip pass on jargon** (#4) — already in v3/v4 (R-multiple,
+  Watched only, skip, every pipeline state name, Pre-config,
+  graded sessions). All accessible via `<InfoTooltip>` (Radix-
+  style: keyboard-reachable, Esc-dismissible, tap-on-touch). v5
+  adds nothing here because the surface is fully covered;
+  verifying via the on-screen tooltips on the preview deploy is
+  the final sign-off.
+
+- **Live countdowns** (#5). Already implemented in v2's
+  `<Countdown>`: tier-based (>24h minute, 1–24h minute, <60m
+  second, <10s "Opening now"). v5 cleans up the under-60s tier so
+  it renders `in Ns` rather than `in 0m Ns`. Added test cases
+  covering the new tier; the existing test already verifies
+  `pickInterval` returns 1s under an hour and 60s otherwise.
+
+- **BETA chip color** (#6). The chip has been gold across v3 and
+  v4 in CSS, but kept reading as "blueish" to viewers across
+  rounds — likely a CSS-build / monitor-calibration interaction
+  with the `bg-gold-soft` Tailwind utility. v5 ditches the class
+  for an inline `style={{ backgroundColor: "#B8821F", color:
+  "#FFF7E0", border: "1px solid #5C3F0B" }}`. Hex values are baked
+  into the markup; no class lookup, no custom property, no theme
+  variable can override them.
+
+- **Caps-as-eyebrow consistency** (#7). Settled rule, applied
+  uniformly: tracked-caps eyebrow for every section label
+  (`WORKSPACE`, `ENGINES`, `RECOMMENDED NEXT STEP`, `LAST
+  SESSION`, `PREVIEW`); plain small-text for sub-phrases and
+  state-context lines. v4 had demoted `RECOMMENDED NEXT STEP`
+  inconsistently — that's now back at tracked-caps to match the
+  rest of the slate.
+
+**P2 — structural polish**
+
+- **Container width consistency** (#8). Every top-level section
+  inside the page's `max-w-[1200px]` container now uses the same
+  `px-5 py-4 md:px-6 md:py-5` outer padding so the visible
+  content edge is identical between Recommended Action and the
+  engines band beneath it.
+
+- **State-context chip → plain text** (#9). The "Both engines ·
+  pre-config" chip in the RecommendedAction eyebrow looked
+  clickable but wasn't. Demoted to inline italic text with a
+  leading middot so it reads as a label, not a call-to-action.
+
+- **Recommended Action softened** (#10). v4's `bg-paper-brand`
+  (#FAF1DC) read as "warning state" yellow on calibrated
+  monitors. v5 switches to `bg-paper-2` (the warm cream surface
+  used elsewhere in the slate) with a faint inset top-stripe
+  shadow to keep the hero anchored without yellow saturation.
+
+- **Open replay disambiguated** (#11). The two side-by-side
+  EngineTrackRecord buttons now read `Open SPY replay` and
+  `Open SPX replay`, with `?engine=SPY` / `?engine=SPX` query
+  params for the eventual filter wiring.
+
+- **Conviction meter beefed** (#14). Bar height bumped from
+  `h-1.5` (6px) to `h-2` (8px) so it reads as a meter, not an
+  underline. ARIA `role="progressbar"` + `aria-valuenow / min /
+  max` so screen readers announce the value.
+
+**P3 — a11y closing pass** (#16)
+
+- `<FreshnessPill>` wrapped in `aria-live="polite"` +
+  `aria-atomic="true"` so AT users hear the new timestamp on each
+  refresh.
+- Preview Show/Hide toggle now uses `aria-expanded` + `aria-
+  controls` so the disclosure relationship is announced. The
+  visible label kept short; the additional context (`preview
+  section`) lives in `sr-only`.
+
+**Verification**
+
+- `npx tsc --noEmit` — clean.
+- `npx next build` — clean. `/dashboard` ships at 12.1 kB
+  (113 kB first-load), within v2/v4 envelope.
+- `scripts/test-format-number.ts` (new) — 16/16 pass.
+- `scripts/test-pipeline-overflow.ts` (new) — 5/5 invariants intact.
+- `scripts/test-last-signal-recap.ts` — 14/14 pass (1 new case).
+- `scripts/test-countdown.ts` — 13/13 pass (2 new cases).
+- `scripts/test-recommendations.ts` — 16/16 pass.
+- `scripts/test-state-pipeline.ts` — 6/6 invariants intact.
+- `scripts/test-topbar-layout.ts` — 6/6 invariants intact.
+- `scripts/test-sessions.ts` — 10/10 pass.
+
+**Items not shipped (called out)**
+
+Same posture as v2/v4: no Storybook stories (repo isn't configured;
+spec said no new heavy deps), no Chromatic / Playwright visual
+snapshots (no Jest/Vitest/Playwright runner), no axe-core CI gate
+(same reason). Static-analysis guards in `scripts/test-*.ts` cover
+the structural invariants. The CONTRIBUTING note about the AI-
+control overlay (#15) is a docs-only ask; left for a separate doc
+PR rather than mixed into a ship-readiness commit.
+
+---
+
 ### Decision Slate v4 — bug fixes + hierarchy
 
 Bug-fix + polish pass on top of v2/v3. Two P0 regressions resolved

@@ -85,14 +85,15 @@ export default async function Page() {
           above the fold. */}
       <RecommendedAction spyState={spyState} spxState={spxState} />
 
-      {/* v4 #6: engines row sits on a slightly stronger surface
-          (paper-2/40) with a subtle wrapper so it reads as a
-          discrete "engine state" zone, not yet-another-card-row. */}
+      {/* v4 #6 + v5 #8: engines row sits on a slightly stronger
+          surface (paper-2/40). Outer padding matches every other
+          top-level section (px-5 / md:px-6) so the visible content
+          edge is identical to the Recommended Action above. */}
       <section
         aria-label="Engine states"
-        className="rounded-card bg-paper-2/30 border border-rule-soft px-3 py-3 md:px-4 md:py-4"
+        className="rounded-card bg-paper-2/30 border border-rule-soft px-5 py-4 md:px-6 md:py-5"
       >
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4 [grid-template-columns:1fr] lg:[grid-template-columns:1fr_1fr]">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4 [grid-template-columns:1fr] lg:[grid-template-columns:1fr_1fr] min-w-0">
           <StatePipeline
             engine="SPY"
             current={spyState}

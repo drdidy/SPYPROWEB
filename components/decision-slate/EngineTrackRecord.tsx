@@ -171,9 +171,11 @@ export function EngineTrackRecord({ record, className }: Props) {
         </>
       )}
       {/* Ghost-button form, same shape + sentence-case as the rest of
-          the slate's secondary actions (v2 #9). */}
+          the slate's secondary actions (v2 #9). v5 #11: button label
+          names the engine so the two side-by-side buttons in the
+          briefing aren't ambiguous duplicates. */}
       <Link
-        href={`/replay${record.sessions[0] ? `?date=${record.sessions[0].date}` : ""}`}
+        href={`/replay${record.sessions[0] ? `?date=${record.sessions[0].date}` : ""}&engine=${record.engine}`}
         className={cn(
           "inline-flex items-center gap-1 h-7 px-2.5 rounded-pill",
           "bg-paper-2/60 text-ink-2 hover:text-ink hover:bg-paper-2",
@@ -182,7 +184,7 @@ export function EngineTrackRecord({ record, className }: Props) {
           "outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
         )}
       >
-        {SLATE_COPY.trackRecord.verifyCta}
+        Open {record.engine} replay
         <ArrowRight size={11} className="text-ink-4" aria-hidden />
       </Link>
     </div>

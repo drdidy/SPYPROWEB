@@ -33,9 +33,14 @@ export function PreviewState({ className }: Props) {
   if (hidden) {
     return (
       <div className={cn("text-right", className)}>
+        {/* v5 #16: aria-expanded so AT announces collapse/expand
+            state. The "Hide / Show preview" pair acts as a
+            disclosure widget controlling the same content. */}
         <button
           type="button"
           onClick={() => setHidden(false)}
+          aria-expanded={false}
+          aria-controls="preview-state-content"
           className={cn(
             "inline-flex items-center gap-1.5 text-[11px] font-medium",
             "text-ink-3 hover:text-ink transition-colors",
@@ -43,7 +48,7 @@ export function PreviewState({ className }: Props) {
           )}
         >
           <Eye size={12} aria-hidden />
-          Show preview
+          Show preview<span className="sr-only"> section</span>
         </button>
       </div>
     );
@@ -51,6 +56,7 @@ export function PreviewState({ className }: Props) {
 
   return (
     <section
+      id="preview-state-content"
       aria-label="Preview of populated cards"
       data-testid="preview-state"
       className={cn(
@@ -71,18 +77,21 @@ export function PreviewState({ className }: Props) {
         <span className="text-[11px] tracking-[0.02em] text-ink-3 italic">
           What you'll see at setup
         </span>
+        {/* v5 #16: aria-expanded mirrors the disclosure relationship
+            with the collapsed Show button. */}
         <button
           type="button"
           onClick={() => setHidden(true)}
+          aria-expanded={true}
+          aria-controls="preview-state-content"
           className={cn(
             "inline-flex items-center gap-1 text-[11px] font-medium",
             "text-ink-3 hover:text-ink transition-colors",
             "outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas rounded-soft px-1",
           )}
-          aria-label="Hide preview section"
         >
           <EyeOff size={12} aria-hidden />
-          Hide
+          Hide<span className="sr-only"> preview section</span>
         </button>
       </header>
       <p className="text-meta text-ink-3 max-w-2xl">
