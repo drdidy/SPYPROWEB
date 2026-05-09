@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { SPXChannelHero } from "@/components/spx/SPXChannelHero";
 import { SPXPlaysSlate } from "@/components/spx/SPXPlaysSlate";
@@ -5,6 +7,7 @@ import { SPXLineLadder } from "@/components/spx/SPXLineLadder";
 import { SPXSessionOrigin } from "@/components/spx/SPXSessionOrigin";
 import { SPXConfluence } from "@/components/spx/SPXConfluence";
 import { loadSnapshot } from "@/lib/spx-fetch";
+import { cn } from "@/lib/utils";
 
 // Render at request time so loadSnapshot() can read the live host
 // header and hit /api/spx/snapshot. Without this Next.js statically
@@ -13,12 +16,27 @@ import { loadSnapshot } from "@/lib/spx-fetch";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function Page() {
-  const { snap, source, error } = await loadSnapshot();
+interface PageProps {
+  // Replay deep-link support: navigating from /replay?date=YYYY-MM-DD
+  // to /spx?date=YYYY-MM-DD renders the historical SPX channel for
+  // that date. Without this thread-through the page silently fell
+  // back to the live snapshot — and on weekends the mock fallback
+  // path inside loadSnapshot caused the user-reported "shows mock
+  // data on the SPX Channel tab" bug.
+  searchParams?: { date?: string };
+}
+
+export default async function Page({ searchParams }: PageProps) {
+  const replayDate =
+    searchParams?.date && /^\d{4}-\d{2}-\d{2}$/.test(searchParams.date)
+      ? searchParams.date
+      : undefined;
+  const { snap, source, error } = await loadSnapshot(replayDate);
   const meta = snap._meta;
 
   return (
     <div className="max-w-[1440px] mx-auto space-y-10 pb-16">
+      {replayDate && <ReplayBanner date={replayDate} />}
       {/* Editorial header */}
       <header className="flex items-end justify-between pt-2 pb-1">
         <div>
@@ -152,6 +170,44 @@ function SourceBadge({
       />
       {source}
     </span>
+  );
+}
+
+function ReplayBanner({ date }: { date: string }) {
+  return (
+    <div
+      role="status"
+      aria-label={`Showing replay for ${date}`}
+      className={cn(
+        "rounded-card bg-gold-tint border border-gold/40",
+        "px-4 py-3 flex items-center justify-between gap-3 flex-wrap",
+        "text-[12px]",
+      )}
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-gold-ink font-bold">
+          Replay
+        </span>
+        <span aria-hidden className="h-3 w-px bg-gold/40" />
+        <span className="text-ink-2 font-medium">
+          Showing the historical SPX channel for{" "}
+          <span className="font-mono tabular-nums text-ink">{date}</span>
+        </span>
+      </div>
+      <Link
+        href={`/replay?date=${date}`}
+        className={cn(
+          "inline-flex items-center gap-1 h-7 px-2.5 rounded-pill shrink-0",
+          "bg-paper text-ink-2 hover:text-ink hover:bg-paper-2",
+          "border border-rule transition-colors",
+          "text-[11px] tracking-[0.02em] font-medium",
+          "outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
+        )}
+      >
+        <ArrowLeft size={11} className="text-ink-4" aria-hidden />
+        Back to Replay
+      </Link>
+    </div>
   );
 }
 

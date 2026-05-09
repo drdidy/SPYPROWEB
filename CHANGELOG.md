@@ -6,6 +6,63 @@ entries grow newest-first.
 
 ## [Unreleased]
 
+### SPX Channel tab honors replay date
+
+Direct fix for "WHEN I DO A REPLAY, SPX PULLS DATA PROPERLY BUT
+SHOWS MOCK DATA ON THE SPX CHANNEL TAB". Two compounding bugs:
+
+**Bug 1: `/spx` ignored `?date=`.** The page called
+`loadSnapshot()` with no arguments, so navigating from
+`/replay?date=2026-05-08` to the SPX Channel tab silently dropped
+the replay date and fetched the LIVE snapshot. On a weekend or
+during an API outage that fell through to the mock fallback —
+hence the user-visible "mock data on the SPX Channel tab".
+
+`app/(app)/spx/page.tsx` now accepts a `searchParams.date`
+prop, validates the YYYY-MM-DD shape, and threads it into
+`loadSnapshot(replayDate)`. When present, a Replay banner
+renders at the top of the page with a "Back to Replay" link.
+
+**Bug 2: the session gate muted historical replays.**
+`applySpxSessionGate(snap)` is the FE's "honest read" guard
+against the mock fallback rendering as live data outside RTH.
+It evaluates against `new Date()`, so a Tuesday-2026-05-05
+replay viewed on Saturday-2026-05-09 would be muted to
+PRE_CONFIG by the gate even though the backend returned a
+complete historical snapshot. The page would then render
+"Awaiting setup" — indistinguishable from the mock state.
+
+`lib/spx-fetch.ts` now skips the gate entirely when a
+`replayDate` is supplied. The backend's replay path is the
+source of truth for historical state; gating it against the
+current calendar was always wrong.
+
+**Replay → SPX Channel deep link.** The `SPXPlanCard` inside
+the replay workspace gains an "Open SPX Channel →" pill button
+that links to `/spx?date=${replayDate}`, so the workflow now
+works end-to-end:
+
+  /replay?date=2026-05-08
+    → click "Open SPX Channel"
+    → /spx?date=2026-05-08
+    → real historical SPX channel renders
+    → banner shows "Replay · Showing the historical SPX channel
+      for 2026-05-08" with a "Back to Replay" link
+
+**Verification**
+
+- `scripts/test-spx-replay-routing.ts` (new) — 7 structural
+  invariants. Asserts: replay URL carries `?date=`, the
+  `isReplay` flag is computed, the gate is conditionally
+  bypassed, the page accepts `searchParams.date`, the page
+  passes `replayDate` to `loadSnapshot`, and the page renders
+  the `<ReplayBanner />` when a date is present.
+- `tsc --noEmit` clean. `next build` clean. `/spx` ships at
+  11.7 kB (150 kB first-load).
+- Every other static-analysis script continues to pass.
+
+---
+
 ### SPX close-anchored offset (P0-4 follow-up)
 
 Direct fix for the user-reported "5872.00 is wrong" SPX read on

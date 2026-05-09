@@ -8,8 +8,10 @@
 // trade-plan summary cards, and the synced playback panel.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
+  ArrowRight,
   CalendarDays,
   Loader2,
   Play,
@@ -240,7 +242,7 @@ export function ReplayWorkspace({ initialDate }: Props) {
         <>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               <SPYPlanCard snap={spy} />
-            <SPXPlanCard snap={spx} />
+            <SPXPlanCard snap={spx} replayDate={date} />
           </div>
 
           <Card className="bg-paper">
@@ -384,7 +386,13 @@ function SPYPlanCard({ snap }: { snap: AdaptedSnapshot | null }) {
   );
 }
 
-function SPXPlanCard({ snap }: { snap: SPXSnapshot | null }) {
+function SPXPlanCard({
+  snap,
+  replayDate,
+}: {
+  snap: SPXSnapshot | null;
+  replayDate: string | null;
+}) {
   if (!snap) {
     return (
       <Card className="bg-paper">
@@ -414,9 +422,24 @@ function SPXPlanCard({ snap }: { snap: SPXSnapshot | null }) {
               {snap.scenario.replace(/_/g, " ").toLowerCase()}
             </h3>
           </div>
-          <StatusPill variant={dirTone}>
-            {snap.channel.direction}
-          </StatusPill>
+          <div className="flex items-center gap-2">
+            {/* Deep link into the full SPX Channel page for this same
+                replay date — fixes the user's "shows mock data on
+                the SPX Channel tab" jump by explicitly carrying the
+                date through the URL. */}
+            {replayDate && (
+              <Link
+                href={`/spx?date=${replayDate}`}
+                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-pill bg-paper-2/70 text-ink-2 hover:text-ink hover:bg-paper-2 border border-rule transition-colors text-[11px] tracking-[0.02em] font-medium outline-none focus-visible:ring-2 focus-visible:ring-gold/40"
+              >
+                Open SPX Channel
+                <ArrowRight size={11} className="text-ink-4" aria-hidden />
+              </Link>
+            )}
+            <StatusPill variant={dirTone}>
+              {snap.channel.direction}
+            </StatusPill>
+          </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           {snap.lines.slice(0, 4).map((l) => (
