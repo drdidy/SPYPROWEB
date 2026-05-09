@@ -298,7 +298,7 @@ def build_premarket_diagnostic(df: pd.DataFrame, signal_day, anchors_payload: di
     return out
 
 
-
+def build_anchor_lines(anchor, slope: float):
     """Three parallel descending lines from a single anchor: Upper/Main/Lower."""
     if anchor is None:
         return []
