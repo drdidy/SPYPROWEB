@@ -1,11 +1,13 @@
 "use client";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { Bell, Menu, Search } from "lucide-react";
 import { NumberFlash } from "@/components/ui/NumberFlash";
 import { Kbd } from "@/components/ui/Kbd";
 import { useLiveSPY, useLiveSPX } from "@/lib/use-live-snapshot";
 import { cn } from "@/lib/utils";
 import { FeedHealthBadge } from "@/components/slate/FeedHealthBadge";
+import { getSessionStatus, sessionLabel } from "@/lib/marketCalendar";
 
 // ---------------------------------------------------------------------------
 // Action vocabulary palettes — shared between SPY & SPX so the chip stays
@@ -47,6 +49,7 @@ export function TopBar({
   const t = spy.shell;
   const spxVerb = spxSnapshot.confluence.action.replace(/_/g, " ");
   const updatedLabel = formatUpdated(spy.shell.feedHealth.lastTickTs);
+  const session = useSessionStatus();
 
   // Conviction is the engine's 1-5 quality scale (see api/_lib/data_sources.py).
   // We label it explicitly so the bare numeral never appears next to a verb.
@@ -112,11 +115,7 @@ export function TopBar({
           wraps onto a second line. Below 1024px we drop session/updated
           before collapsing to the search/bell row. */}
       <div className="hidden xl:flex items-center gap-3 whitespace-nowrap min-w-0 shrink-0">
-        <SessionInfo
-          label={t.sessionLabel}
-          closes={t.sessionCloses}
-          isLive={t.isLive}
-        />
+        <SessionInfo session={session} />
         <span className="h-3 w-px bg-rule" aria-hidden />
         <span className="font-mono text-[10px] text-ink-3 tabular-nums">
           Updated {updatedLabel}
@@ -233,27 +232,44 @@ function DeltaTag({ value }: { value: number }) {
 }
 
 function SessionInfo({
-  label,
-  closes,
-  isLive,
+  session,
 }: {
-  label: string;
-  closes: string;
-  isLive: boolean;
+  session: ReturnType<typeof getSessionStatus> | null;
 }) {
+  if (!session) return null;
+  const { label, detail } = sessionLabel(session);
+  const live = session.state === "RTH_OPEN";
   return (
     <span className="inline-flex items-center gap-2 whitespace-nowrap font-mono text-[10px] text-ink-3 uppercase tracking-[0.12em]">
-      <span className={cn("font-semibold", isLive ? "text-bull-ink" : "text-ink-3")}>{label}</span>
-      {closes && (
+      <span className={cn("font-semibold", live ? "text-bull-ink" : "text-ink-3")}>
+        {label}
+      </span>
+      {detail && (
         <>
           <span className="opacity-50">·</span>
           <span className="tabular-nums normal-case tracking-normal text-ink-3">
-            {closes}
+            {detail}
           </span>
         </>
       )}
     </span>
   );
+}
+
+// Re-evaluate session status every 30s so the countdown stays accurate
+// without burning a render budget. Returns null on first render to
+// keep SSR stable; client picks up the real value on hydration.
+function useSessionStatus() {
+  const [status, setStatus] = useState<ReturnType<typeof getSessionStatus> | null>(
+    null,
+  );
+  useEffect(() => {
+    const tick = () => setStatus(getSessionStatus());
+    tick();
+    const id = window.setInterval(tick, 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+  return status;
 }
 
 function formatUpdated(iso: string): string {
