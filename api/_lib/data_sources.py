@@ -911,14 +911,10 @@ def _build_replay_block(
 
 
 def build_live_snapshot(replay_date: date | None = None) -> dict:
-<<<<<<< HEAD
     # In replay mode we need enough history to cover the chosen date
     # (yfinance's hourly granularity caps at ~730d). For live the
     # default 60d window keeps the snapshot cheap to refresh.
     df = fetch_spy_hourly("730d" if replay_date is not None else "60d")
-=======
-    df = fetch_spy_hourly("60d")
->>>>>>> origin/main
     if df.empty:
         raise RuntimeError("yfinance returned no SPY bars")
 
