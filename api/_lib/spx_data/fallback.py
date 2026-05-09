@@ -37,6 +37,8 @@ class CompositeFetcher:
         self.last_quote_source: Optional[str] = None
         self.last_bars_error: Optional[str] = None
         self.last_quote_error: Optional[str] = None
+        # Mirrored from whichever backend served fetch_sync_quote.
+        self.last_offset_method: Optional[str] = None
 
     def fetch_es_bars(self, start: datetime, end: datetime) -> list[Candle]:
         try:
@@ -59,6 +61,14 @@ class CompositeFetcher:
             q = self.primary.fetch_sync_quote()
             self.last_quote_source = self.primary.name
             self.last_quote_error = None
+            # Surface the underlying sub-algorithm (yfinance reports
+            # close_anchored / intersection_1m / latest_of_each on
+            # `last_offset_method`). The composite mirrors it onto
+            # itself so build_snapshot_with_provenance can read one
+            # field regardless of which backend won.
+            self.last_offset_method = getattr(
+                self.primary, "last_offset_method", None,
+            )
             return q
         except Exception as e:  # noqa: BLE001
             self.last_quote_error = f"{self.primary.name}: {type(e).__name__}: {e}"
@@ -68,6 +78,9 @@ class CompositeFetcher:
             )
             q = self.secondary.fetch_sync_quote()
             self.last_quote_source = self.secondary.name
+            self.last_offset_method = getattr(
+                self.secondary, "last_offset_method", None,
+            )
             return q
 
     def healthy(self) -> bool:

@@ -6,6 +6,99 @@ entries grow newest-first.
 
 ## [Unreleased]
 
+### SPX close-anchored offset (P0-4 follow-up)
+
+Direct fix for the user-reported "5872.00 is wrong" SPX read on
+the dashboard. The yfinance backend's `fetch_sync_quote()`
+algorithm has been upgraded to anchor the offset to the **last
+RTH cash close**, exactly as the trader described:
+
+> Pull ES values from Yahoo Finance, then add the last offset
+> before the close, to give the exact SPX price.
+
+**New algorithm** (`api/_lib/spx_data/yfinance_backend.py
+→ _close_anchored_quote`):
+
+  1. Pull SPX 1d daily history (7d window).
+     `spx_close = last row's Close` — the official cash close.
+  2. Pull ES 1m history (5d window).
+     Find the bar whose **close** lands at the cash-close moment
+     (15:00 CT). Because yfinance's 1m bar at index `t` carries
+     OHLC for `[t, t+1min)`, the bar timestamped `15:00 CT - 1min`
+     is the one whose close prices ES at exactly the SPX close.
+  3. `offset = spx_close - es_at_close`.
+  4. Return `SyncQuote(spx_spot=spx_close, es_spot=es_at_close,
+     captured_at=close_ct)`.
+
+The engine's existing `compute_snapshot` then renders every line
+and `price.last` as `live_ES + offset` — i.e. the displayed SPX
+is the live ES tick plus the basis that was true at the most
+recent cash print. That's the "exact SPX price" the trader
+wants.
+
+**Why the old algorithm was wrong**
+
+The legacy path used the latest common timestamp where SPX 1m
+and ES 1m both had a print. When yfinance's 1m SPX feed gaps —
+which it does intermittently at the close, on holidays, or
+during partial halts — the algorithm could:
+
+  - Pick a non-close common minute (e.g. 14:32 CT instead of
+    15:00 CT), giving an offset that's slightly off from the
+    "official close" basis.
+  - Or fall back to "latest of each" when no overlap exists,
+    pairing live ES against an older SPX print → garbage offset.
+
+The close-anchored path fixes both because daily SPX history is
+the official close and is the most reliable data yfinance
+serves.
+
+**Provenance surfaced to the FE**
+
+A new `offsetMethod` field on `SPXSnapshotMeta` reports which
+sub-algorithm produced the offset:
+
+  - `"close_anchored"`   — preferred (this PR's new default).
+  - `"intersection_1m"`  — fallback (legacy 1m intersection).
+  - `"latest_of_each"`   — defensive (no overlap).
+
+Surfaced in:
+- The Cmd+Shift+D dev overlay as `offset method`.
+- The SPX provenance tooltip body when `close_anchored` —
+  reads `… · basis anchored to last cash close.`
+
+**Verification**
+
+- `api/tests/spx/test_close_anchored_offset.py` (new) — 5/5
+  pytest cases pass. Cover: correct daily-close pickup, correct
+  ES bar selection (strict less-than vs cash close), graceful
+  None on missing daily / missing 1m / no eligible ES bar, and
+  `last_offset_method` propagation.
+- `scripts/test-spx-provenance.ts` extended to 22 cases, all
+  pass. Covers `offsetMethod` propagation through the FE
+  derive helper plus the close-anchored copy in the tooltip.
+- `tsc --noEmit` clean. `next build` clean. `/dashboard` ships
+  at 13.5 kB (115 kB first-load).
+
+**Diagnosing the current production bug**
+
+After this lands, hit Cmd+Shift+D on /dashboard and:
+
+  - `offset method = close_anchored` → algorithm is the new
+    path; the displayed SPX is `live ES + basis at last cash
+    close`. If it's still wrong, the issue is yfinance daily
+    SPX returning a stale value — investigate
+    `^GSPC` history directly.
+  - `offset method = intersection_1m` → close-anchored failed
+    (yfinance daily empty?) and we fell back. Check Vercel
+    logs for the suppressed exception.
+  - `offset method = latest_of_each` → both anchored and
+    intersection failed. yfinance is broken; rely on
+    Tastytrade primary or set `SPX_ES_OFFSET_OVERRIDE` to
+    the broker's actual SPX_cash − /ES spread.
+
+---
+
 ### SPX value provenance (P0-4)
 
 The SPX value rendered on /dashboard is a synthetic: the engine

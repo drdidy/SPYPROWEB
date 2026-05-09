@@ -43,6 +43,7 @@ function makeMeta(over: Partial<import("../lib/types").SPXSnapshotMeta> = {}) {
     appliedOffset: 28.5,
     computedOffset: 28.5,
     offsetSource: "computed" as const,
+    offsetMethod: "close_anchored" as const,
     spxSpot: 5_872.0,
     esSpot: 5_843.5,
     quoteCapturedAt: RTH_NOON_CT.toISOString(),
@@ -140,6 +141,44 @@ check(
 }
 check("null meta → null provenance", deriveProvenance(null) === null);
 check("undefined meta → null provenance", deriveProvenance(undefined) === null);
+
+// --- offsetMethod propagates through derive ---
+{
+  const p = deriveProvenance(makeMeta(), RTH_NOON_CT)!;
+  check(
+    "offsetMethod = close_anchored propagates through derive",
+    p.offsetMethod === "close_anchored",
+    `got ${p.offsetMethod}`,
+  );
+  check(
+    "provenanceDetail mentions close-anchored basis",
+    provenanceDetail(p).includes("anchored to last cash close"),
+  );
+}
+{
+  const p = deriveProvenance(
+    makeMeta({ offsetMethod: "intersection_1m" }),
+    RTH_NOON_CT,
+  )!;
+  check(
+    "offsetMethod = intersection_1m propagates",
+    p.offsetMethod === "intersection_1m",
+  );
+  check(
+    "provenanceDetail omits anchored-note for non-anchored method",
+    !provenanceDetail(p).includes("anchored to last cash close"),
+  );
+}
+{
+  const p = deriveProvenance(
+    makeMeta({ offsetMethod: undefined }),
+    RTH_NOON_CT,
+  )!;
+  check(
+    "missing offsetMethod becomes null",
+    p.offsetMethod === null,
+  );
+}
 
 // --- copy helpers ---
 {

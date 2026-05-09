@@ -122,6 +122,13 @@ def build_snapshot_with_provenance(
         "appliedOffset": round(applied_offset, 4),
         "computedOffset": round(computed_offset, 4),
         "offsetSource": "env_override" if offset_override is not None else "computed",
+        # Sub-algorithm that produced the offset when offsetSource is
+        # "computed". One of: "close_anchored" (preferred — daily SPX
+        # close + ES at cash close), "intersection_1m" (last common
+        # ES + SPX 1m tick), "latest_of_each" (defensive). Useful in
+        # the FE debug overlay to confirm the live SPX is anchored
+        # to the trader's expected basis source.
+        "offsetMethod": getattr(fetcher, "last_offset_method", None),
         "spxSpot": round(quote.spx_spot, 2),
         "esSpot": round(quote.es_spot, 2),
         "quoteCapturedAt": quote.captured_at.isoformat(),

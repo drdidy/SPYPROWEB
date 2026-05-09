@@ -235,7 +235,19 @@ export interface SPXSnapshotMeta {
   computedOffset?: number;
   // "computed" or "env_override" — tells you whether the displayed
   // offset is from the live quote or from SPX_ES_OFFSET_OVERRIDE.
-  offsetSource?: "computed" | "env_override";
+  offsetSource?: "computed" | "env_override" | "historical_replay";
+  // Sub-algorithm that produced the offset when offsetSource is
+  // "computed". One of:
+  //   "close_anchored"   — daily SPX close + ES bar whose close
+  //                        lands at the cash-session close. This
+  //                        is the preferred path because the
+  //                        displayed SPX (= live ES + close offset)
+  //                        is "exact" against the most recent
+  //                        cash print.
+  //   "intersection_1m"  — last common ES + SPX 1m print.
+  //   "latest_of_each"   — defensive: latest tick of each.
+  // Null when the offset was overridden or sourced historically.
+  offsetMethod?: "close_anchored" | "intersection_1m" | "latest_of_each" | null;
   spxSpot: number;
   esSpot: number;
   quoteCapturedAt: string;

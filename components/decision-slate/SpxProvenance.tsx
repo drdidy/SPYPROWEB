@@ -119,6 +119,7 @@ export function SpxDebugOverlay({ provenance, displayedSpx }: OverlayProps) {
         ["basis age", `${Math.round(provenance.basisAgeMs / 1000)}s`],
         ["captured at", provenance.capturedAtISO],
         ["offset source", provenance.offsetSource],
+        ["offset method", provenance.offsetMethod ?? "n/a"],
       ]
     : [["state", "no _meta in snapshot — old shape or mock fallback"]];
 

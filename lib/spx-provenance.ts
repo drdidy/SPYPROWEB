@@ -55,6 +55,12 @@ export interface SpxProvenance {
   capturedAtISO: string;
   /** Where the offset came from. */
   offsetSource: "computed" | "env_override" | "historical_replay";
+  /** Sub-algorithm that produced the offset (yfinance backend). */
+  offsetMethod:
+    | "close_anchored"
+    | "intersection_1m"
+    | "latest_of_each"
+    | null;
   /** Whether the env-override (broker spread) is in play. */
   isOverridden: boolean;
 }
@@ -88,6 +94,7 @@ export function deriveProvenance(
     basisAgeMs: Number.isFinite(basisAgeMs) ? basisAgeMs : Infinity,
     capturedAtISO: meta.quoteCapturedAt,
     offsetSource: meta.offsetSource ?? "computed",
+    offsetMethod: meta.offsetMethod ?? null,
     isOverridden: meta.offsetSource === "env_override",
   };
 }
@@ -151,7 +158,9 @@ export function provenanceDetail(p: SpxProvenance): string {
     ? " · basis is broker-spread override"
     : p.offsetSource === "historical_replay"
       ? " · basis is historical-replay value"
-      : "";
+      : p.offsetMethod === "close_anchored"
+        ? " · basis anchored to last cash close"
+        : "";
   return `SPX = ES (${p.esSpot.toFixed(2)}) + basis (${signed(p.basis)}). Basis captured ${age}${overrideNote}.`;
 }
 
