@@ -10,6 +10,7 @@
 // raw.options. Yahoo Finance feeds the underlying yfinance bars
 // behind raw.candles + raw.quote + raw.context. Unusual Whales
 // integration plugs in here when its endpoint lands.
+import { getSessionInfo, formatConfigWindow } from "./sessions";
 import type {
   BiasState,
   Candle,
@@ -842,17 +843,15 @@ function shortTime(iso: string): string {
  * so the slate never fabricates reasoning over stale or absent data.
  */
 /**
- * Same gate, applied to an SPXSnapshot. We import lazily to avoid
- * pulling sessions into modules that don't need it.
+ * Same gate, applied to an SPXSnapshot. Static import of `./sessions`
+ * — the previous lazy `require()` failed silently in client bundles
+ * on Vercel, leaving SPX un-gated on weekends and showing live-engine
+ * reasoning when it should have read "Awaiting setup".
  */
 export function applySpxSessionGate(
   base: import("./types").SPXSnapshot,
   now: Date = new Date(),
 ): import("./types").SPXSnapshot {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { getSessionInfo, formatConfigWindow } = require("./sessions") as typeof import(
-    "./sessions"
-  );
   const session = getSessionInfo("SPX", now);
   const muted =
     session.phase === "PRE_CONFIG" ||
@@ -883,12 +882,7 @@ function applySpyPreConfigOverride(
   base: AdaptedSnapshot,
   now: Date = new Date(),
 ): AdaptedSnapshot {
-  // Lazy import to avoid pulling sessions into anything that doesn't
-  // need the override.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { getSessionInfo, formatConfigWindow } = require("./sessions") as typeof import(
-    "./sessions"
-  );
+  // Static import (top of file) — see SPX gate note above.
   const session = getSessionInfo("SPY", now);
   const muted =
     session.phase === "PRE_CONFIG" ||
