@@ -3,8 +3,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { StateLadder } from "@/components/slate/StateLadder";
 import { TimelineStrip } from "@/components/slate/TimelineStrip";
-import { ConvictionMeter } from "@/components/slate/ConvictionMeter";
-import { ScoreTrack } from "@/components/slate/ScoreTrack";
+import { ConvictionTrack } from "@/components/slate/ConvictionTrack";
 import { EnvelopeBar } from "@/components/slate/EnvelopeBar";
 import { StatusGlyph, type StatusGlyphKind } from "@/components/slate/StatusGlyph";
 import { HelpHint } from "@/components/slate/HelpHint";
@@ -182,7 +181,11 @@ function SpyVerdictCard({ snap }: { snap: AdaptedSnapshot }) {
             {isPreConfig ? (
               <PendingMetric />
             ) : (
-              <ConvictionMeter value={decision.conviction} />
+              <ConvictionTrack
+                value={decision.conviction}
+                max={5}
+                label={`${decision.conviction}/5`}
+              />
             )}
           </MetricCol>
           <MetricCol label="Bias">
@@ -323,12 +326,12 @@ function SpxVerdictCard({ snap }: { snap: SPXSnapshot }) {
             {isPreConfig ? (
               <PendingMetric />
             ) : (
-              <div className="flex flex-col gap-1.5 w-full">
-                <ScoreTrack value={score} bands={normalizedBands(snap.scoreBands)} />
-                <span className="font-mono text-[10px] text-ink-3 tabular-nums">
-                  {score}/100
-                </span>
-              </div>
+              <ConvictionTrack
+                value={score}
+                max={100}
+                label={`${score}/100`}
+                bands={normalizedBands(snap.scoreBands)}
+              />
             )}
           </MetricCol>
           <MetricCol label="Channel">

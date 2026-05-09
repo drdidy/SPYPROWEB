@@ -95,7 +95,7 @@ export function TopBar({
         // the prices.
         "flex items-center gap-3 md:gap-5 px-3 md:px-5 overflow-hidden min-w-0",
       )}
-      data-testid="top-bar"
+      data-testid="topbar"
     >
       <button
         type="button"
@@ -134,30 +134,32 @@ export function TopBar({
           gracefully rather than push neighbors. */}
       <div className="hidden md:flex flex-1 items-center justify-center gap-3 lg:gap-5 min-w-0 overflow-hidden">
         <Quote label="SPY" wrapClass="hidden lg:flex">
-          <NumberFlash value={t.spy} format={(n) => n.toFixed(2)} />
+          <ValueWithStaleness
+            staleness={staleness}
+            delta={t.change}
+            value={
+              <NumberFlash value={t.spy} format={(n) => n.toFixed(2)} />
+            }
+          />
         </Quote>
         <Quote label="SPX" wrapClass="hidden lg:flex">
-          <NumberFlash
-            value={spxSnapshot.price.last}
-            format={(n) => n.toFixed(2)}
+          <ValueWithStaleness
+            staleness={staleness}
+            delta={spxSnapshot.price.change}
+            value={
+              <NumberFlash
+                value={spxSnapshot.price.last}
+                format={(n) => n.toFixed(2)}
+              />
+            }
           />
         </Quote>
         <Quote label="VIX">
-          <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
-            <span data-num>{t.vix.toFixed(2)}</span>
-            {/* Stale-aware: when staleness is non-null, append "· Fri
-                close" (or whichever) and hide the delta — a delta
-                against a non-live reading is misleading. */}
-            {staleness ? (
-              <span className="hidden xl:inline text-[10px] text-ink-3 italic">
-                · {staleness}
-              </span>
-            ) : (
-              <span className="hidden xl:inline-flex">
-                <DeltaTag value={t.vixDelta} />
-              </span>
-            )}
-          </span>
+          <ValueWithStaleness
+            staleness={staleness}
+            delta={t.vixDelta}
+            value={<span data-num>{t.vix.toFixed(2)}</span>}
+          />
         </Quote>
       </div>
 
@@ -283,6 +285,34 @@ function Quote({
         {children}
       </span>
     </div>
+  );
+}
+
+// Quote value + either the staleness suffix or the signed delta —
+// never both. A delta against a non-live reading is misleading, so
+// staleness wins when present.
+function ValueWithStaleness({
+  staleness,
+  delta,
+  value,
+}: {
+  staleness: string | null;
+  delta: number;
+  value: React.ReactNode;
+}) {
+  return (
+    <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
+      {value}
+      {staleness ? (
+        <span className="hidden xl:inline text-[10px] text-ink-3 italic shrink-0 whitespace-nowrap">
+          · {staleness}
+        </span>
+      ) : (
+        <span className="hidden xl:inline-flex shrink-0">
+          <DeltaTag value={delta} />
+        </span>
+      )}
+    </span>
   );
 }
 
