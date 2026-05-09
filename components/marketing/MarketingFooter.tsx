@@ -14,19 +14,24 @@ const cols = [
   {
     label: "Read",
     items: [
-      { label: "Methodology", href: "#methodology" },
-      { label: "Discipline", href: "#manifesto" },
-      { label: "FAQ", href: "#faq" },
+      // Methodology now points at the long-form /methodology page
+      // (g12) instead of the home-page anchor — the long-form has
+      // the closed-beta cohort note + the engine description.
+      { label: "Methodology", href: "/methodology" },
+      { label: "Discipline", href: "/#manifesto" },
+      { label: "FAQ", href: "/#faq" },
       { label: "Daily Brief", href: "/brief" },
     ],
   },
   {
     label: "Company",
     items: [
-      { label: "About", href: "#" },
-      { label: "Press", href: "#" },
-      { label: "Contact", href: "#" },
-      { label: "Careers", href: "#" },
+      { label: "About", href: "/about" },
+      { label: "Contact", href: "/contact" },
+      { label: "Careers", href: "/careers" },
+      // "Press" intentionally removed per g12 — no published press
+      // exists yet, and the spec says don't leave a placeholder
+      // link. The /press route still exists for direct access.
     ],
   },
   {

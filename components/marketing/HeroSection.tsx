@@ -144,11 +144,18 @@ export function HeroSection({ decision: serverDecision, quote: serverQuote, init
         </div>
       </motion.div>
 
-      {/* scroll hint */}
-      <div className="hidden lg:flex items-center gap-2 text-[10px] text-ink-3 font-mono uppercase tracking-[0.18em] mt-12">
+      {/* Trust-layer entry point (g12): the long-form /methodology
+          page is now linked here so visitors who want to understand
+          before signing up have a clear path. The arrow stays as a
+          subtle scroll affordance because the link's target is a
+          full page, not an in-page anchor. */}
+      <Link
+        href="/methodology"
+        className="hidden lg:inline-flex items-center gap-2 text-[10px] text-ink-3 hover:text-ink font-mono uppercase tracking-[0.18em] mt-12 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-gold/40 rounded-soft -mx-1 px-1"
+      >
         <span>Read the methodology</span>
-        <ArrowDown size={12} className="animate-breathe" />
-      </div>
+        <ArrowDown size={12} className="animate-breathe" aria-hidden />
+      </Link>
     </section>
   );
 }
