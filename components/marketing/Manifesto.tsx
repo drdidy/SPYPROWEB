@@ -37,7 +37,7 @@ export function Manifesto() {
   return (
     <section
       id="manifesto"
-      className="border-y border-rule bg-paper-2/40"
+      className="border-y border-rule bg-paper-2/40 scroll-mt-[88px]"
     >
       <div className="max-w-[1240px] mx-auto px-7 py-20 lg:py-28">
         <SectionLabel number="04">Discipline</SectionLabel>

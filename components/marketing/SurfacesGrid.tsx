@@ -56,7 +56,7 @@ const surfaces = [
 
 export function SurfacesGrid() {
   return (
-    <section id="surfaces" className="max-w-[1240px] mx-auto px-7 py-20 lg:py-28">
+    <section id="surfaces" className="max-w-[1240px] mx-auto px-7 py-20 lg:py-28 scroll-mt-[88px]">
       <SectionLabel number="03">Six surfaces</SectionLabel>
 
       <div className="mt-8 grid grid-cols-12 gap-10 mb-12">

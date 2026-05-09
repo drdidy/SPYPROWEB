@@ -128,7 +128,7 @@ const cards = [
 
 export function MethodologyTriad() {
   return (
-    <section id="methodology" className="max-w-[1240px] mx-auto px-7 py-20 lg:py-28">
+    <section id="methodology" className="max-w-[1240px] mx-auto px-7 py-20 lg:py-28 scroll-mt-[88px]">
       <SectionLabel number="01">The discipline</SectionLabel>
       <div className="mt-8 max-w-3xl">
         <h2 className="font-serif text-display tracking-tight text-ink">
