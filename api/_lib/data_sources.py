@@ -1044,7 +1044,20 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
     # anchor's timestamp + low and its three descending bands (Upper /
     # Main / Lower) so the frontend can render the parallel-line
     # signature without reverse-engineering line names.
-    anchor_payload_for_ui = _anchor_payload_for_ui(primary_lines, projection_time, slope)
+    # Anchor band values are projected to a "display reference" time.
+    # On live, that's the engine's rolling projection (now floored to
+    # the hour). On replay we lock it to 09:00 CT — the moment the
+    # first RTH hour closes and the framework becomes the trader's
+    # entry reference. Otherwise the replay shows lines after 9 hours
+    # of decay, which is correct math but useless for backtesting the
+    # entry decision.
+    if is_replay:
+        anchor_display_time = pd.Timestamp(signal_day, tz=ct).replace(
+            hour=9, minute=0
+        ).to_pydatetime()
+    else:
+        anchor_display_time = projection_time
+    anchor_payload_for_ui = _anchor_payload_for_ui(primary_lines, anchor_display_time, slope)
 
     options = tastytrade.fetch_options_snapshot(current_price)
 
