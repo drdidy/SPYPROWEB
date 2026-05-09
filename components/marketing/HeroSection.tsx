@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { ArrowRight, ArrowDown } from "lucide-react";
 import { motion } from "framer-motion";
 import type { DecisionState } from "@/lib/types";
-import { useLiveSPY } from "@/lib/use-live-snapshot";
+import { HeroVerdictCard } from "./HeroVerdictCard";
 
 interface HeroProps {
   decision?: DecisionState;
@@ -12,29 +12,12 @@ interface HeroProps {
   initialLive?: boolean;
 }
 
-export function HeroSection({ decision: serverDecision, quote: serverQuote, initialLive }: HeroProps = {}) {
-  // Seed with server-rendered values, then poll /api/snapshot every 30s
-  // so the hero numbers stay fresh without a page reload.
-  const live = useLiveSPY({
-    decision: serverDecision,
-    shell: serverQuote
-      ? {
-          spy: serverQuote.spy,
-          change: serverQuote.change,
-          changePct: serverQuote.changePct,
-          vix: serverQuote.vix,
-          vixDelta: 0,
-          isLive: !!initialLive,
-          sessionLabel: "",
-          sessionCloses: "",
-          feedHealth: { lastTickTs: new Date().toISOString(), source: "server" },
-        }
-      : undefined,
-    source: initialLive ? "live" : undefined,
-  });
-  const decision = live.decision;
-  const t = live.shell;
-  const isLive = live.source === "live";
+export function HeroSection({
+  decision: serverDecision,
+  quote: serverQuote,
+  initialLive,
+}: HeroProps = {}) {
+  const isLive = !!initialLive;
   return (
     <section className="relative max-w-[1240px] mx-auto px-7 pt-16 pb-20 lg:pt-24 lg:pb-28">
       {/* eyebrow */}
@@ -96,52 +79,20 @@ export function HeroSection({ decision: serverDecision, quote: serverQuote, init
         </div>
       </motion.div>
 
-      {/* Live ribbon: preview of the slate */}
+      {/* Live verdict card: explicit-state component handles all eight
+          render paths (live/pre-open/closed/weekend/holiday/stale/
+          error/loading) and reserves its own dimensions to avoid CLS. */}
       <motion.div
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, delay: 0.3, ease: [0.2, 0.8, 0.2, 1] }}
-        className="mt-16 surface rounded-card overflow-hidden"
+        className="mt-16"
       >
-        <div className="grid grid-cols-12">
-          <div className="col-span-12 md:col-span-3 p-6 border-b md:border-b-0 md:border-r border-rule">
-            <div className="eyebrow text-ink-3 mb-2">Live · today's verdict</div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-headline font-serif text-gold-ink">
-                {decision.verdict}
-              </span>
-              <span className="font-mono text-sm text-ink-3 tabular-nums">
-                {decision.conviction}/100
-              </span>
-            </div>
-            <div className="mt-3 h-1 bg-paper-2 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-ink rounded-full"
-                style={{ width: `${decision.conviction}%` }}
-              />
-            </div>
-            <div className="mt-3 text-[11px] text-ink-3 font-mono">
-              {decision.windowET}
-            </div>
-          </div>
-
-          <div className="col-span-12 md:col-span-6 p-6 border-b md:border-b-0 md:border-r border-rule flex flex-col justify-center">
-            <div className="eyebrow text-ink-3 mb-2">Rationale</div>
-            <p className="text-[14px] text-ink-2 leading-relaxed">
-              {decision.finalExplanation}
-            </p>
-          </div>
-
-          <div className="col-span-12 md:col-span-3 p-6 grid grid-cols-3 md:grid-cols-1 gap-4">
-            <Quote label="SPY" value={t.spy.toFixed(2)} />
-            <Quote
-              label="CHG"
-              value={`${t.change >= 0 ? "+" : ""}${t.change.toFixed(2)}`}
-              tone={t.change >= 0 ? "bull" : "bear"}
-            />
-            <Quote label="VIX" value={t.vix.toFixed(2)} />
-          </div>
-        </div>
+        <HeroVerdictCard
+          decision={serverDecision}
+          quote={serverQuote}
+          initialLive={initialLive}
+        />
       </motion.div>
 
       {/* scroll hint */}
@@ -153,22 +104,5 @@ export function HeroSection({ decision: serverDecision, quote: serverQuote, init
   );
 }
 
-function Quote({
-  label,
-  value,
-  tone = "ink",
-}: {
-  label: string;
-  value: string;
-  tone?: "ink" | "bull" | "bear";
-}) {
-  const cls = tone === "bull" ? "text-bull-ink" : tone === "bear" ? "text-bear-ink" : "text-ink";
-  return (
-    <div>
-      <div className="eyebrow text-ink-3 mb-1">{label}</div>
-      <div className={`font-mono text-base font-semibold tabular-nums ${cls}`} data-num>
-        {value}
-      </div>
-    </div>
-  );
-}
+// The legacy <Quote> helper moved into HeroVerdictCard alongside its
+// only consumer.
