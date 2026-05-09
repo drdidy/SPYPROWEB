@@ -21,7 +21,7 @@ CENTRAL_TZ_NAME = "America/Chicago"
 # prev-RTH-low desc) use the same magnitude.
 # ---------------------------------------------------------------------------
 
-DEFAULT_SLOPE_PER_HOUR = 1.05
+DEFAULT_SLOPE_PER_HOUR = 1.04
 
 # ---------------------------------------------------------------------------
 # Session windows (Central Time, naive `time` objects — combine with a date
@@ -33,8 +33,9 @@ DEFAULT_SLOPE_PER_HOUR = 1.05
 #   open (02:00) is the session boundary; anchors set after that point
 #   belong to today's session, not the overnight build-up.
 # SYDNEY 17:00 -> 20:00 (3h). Used for direction determination only.
-# TOKYO  21:00 -> 03:00 (6h, crossing midnight). Used for direction
-#   determination; the late portion is also inside the anchor window.
+# TOKYO  21:00 -> 02:00 (5h, crossing midnight). Used for direction
+#   determination; ends at the session boundary so it doesn't reach into
+#   the next day's pre-session.
 # RTH    08:30 -> 15:00 (cash session for SPX).
 # ---------------------------------------------------------------------------
 
@@ -43,7 +44,7 @@ OVERNIGHT_END = time(2, 0)  # 02:00 CT (London open / session boundary)
 SYDNEY_START = time(17, 0)
 SYDNEY_END = time(20, 0)
 TOKYO_START = time(21, 0)
-TOKYO_END = time(3, 0)
+TOKYO_END = time(2, 0)
 RTH_START = time(8, 30)
 RTH_END = time(15, 0)
 

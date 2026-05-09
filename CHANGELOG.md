@@ -6,6 +6,71 @@ entries grow newest-first.
 
 ## [Unreleased]
 
+### SPX engine — Tokyo window 21:00→02:00 CT, slope 1.04/hr
+
+Two trader-rule corrections.
+
+**Tokyo window: `21:00 → 02:00 CT`** (was 21:00 → 03:00 CT). The
+session now ends at the same boundary as the overnight anchor
+window, so Tokyo never reaches into the next day's pre-session.
+This affects direction determination only; anchor extraction is
+already keyed off the overnight window.
+
+  - `api/_lib/spx/constants.py`: `TOKYO_END = time(2, 0)`.
+  - Docstring on `TOKYO` updated from "6h, crossing midnight" to
+    "5h, crossing midnight".
+
+**Slope: `1.04 pts/hr`** (was 1.05). All four lines (channel
+ceiling, channel floor, prev-RTH-high asc, prev-RTH-low desc)
+share the same magnitude per the engine's design. One-place
+update at the source of truth, plus every display string and
+test expected-value swept through.
+
+  - `api/_lib/spx/constants.py`: `DEFAULT_SLOPE_PER_HOUR = 1.04`.
+  - `api/_lib/spx/channel.py`: docstring updated (×4).
+  - `api/tests/spx/test_channel.py`: `test_project_line_arithmetic`
+    expected `5848.20 + 16 * 1.04 = 5864.84` (was 5865.00).
+  - `api/tests/spx/test_reentry.py`: ceiling/floor 1.05 → 1.04 in
+    all three test scenarios; ceiling-at-09:00 now 5882.80 (was
+    5882.90), floor-at-09:00 now 5864.84 (was 5865.00). Bars
+    still cross/don't-cross the same boundaries → behavioural
+    coverage unchanged.
+  - `lib/spx-mock-data.ts`: every `slopePerHour` and projected
+    `currentValue` recomputed for self-consistency at 1.04/hr.
+    Floor 5864.79 (was 5864.95), ceiling 5883.16 (was 5883.27),
+    prev-H 5899.48 (was 5899.68), prev-L 5824.16 (was 5823.93).
+    Distances and the "Mid-channel" scenario explanation
+    refreshed to match.
+  - FE display labels: `SPXChannelClient.tsx`, `SPXChannelHero.tsx`,
+    `SPXLineLadder.tsx` now read `±1.04 pts/hr`.
+  - `lib/types.ts`: `slopePerHour` comment updated to
+    `+1.04 or -1.04`.
+
+**Anchor close-vs-wick rule confirmed (no code change)**
+
+The implementation already matches the trader rule:
+
+  - `ASCENDING`  → `range_high_low_close` (highest close /
+    lowest close).
+  - `DESCENDING` → `range_high_low` (highest wick / lowest
+    wick).
+  - `NONE`       → falls into the close branch as a defensive
+    default; no rails are drawn anyway.
+
+Source: `api/_lib/spx/channel.py:94-100` plus the helpers in
+`api/_lib/spx/candles.py:32-55`. The docstring at the top of
+`overnight_anchors` was already correct; left as-is.
+
+**Verification**
+
+- `pytest tests/spx/{test_channel,test_reentry,test_close_anchored_offset}.py`
+  → 23/23 pass.
+- `tsc --noEmit` clean. `next build` clean. `/spx` ships at
+  14.6 kB (153 kB first-load).
+- All static-analysis FE scripts continue to pass.
+
+---
+
 ### SPX 500 fix — overnight lookback, ValueError handling, surfaced traces
 
 The user-reported "API returned 500 from /api/spx/snapshot" turned

@@ -258,7 +258,7 @@ export function SPXChannelClient({ replayDate }: Props) {
             highlight={snap.channel.direction}
           />
           <Stat label="Scenario" value={snap.scenario.replace(/_/g, " ")} />
-          <Stat label="Slope" value="±1.05 pts/hr" />
+          <Stat label="Slope" value="±1.04 pts/hr" />
         </div>
       </header>
 

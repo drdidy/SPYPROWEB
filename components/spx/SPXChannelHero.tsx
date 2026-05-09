@@ -75,7 +75,7 @@ export function SPXChannelHero({ snap }: { snap: SPXSnapshot }) {
             <div className="flex items-center gap-3">
               <span className="eyebrow text-ink-3">SPX · Channel Slate</span>
               <span className="text-[10px] text-ink-4 font-mono">
-                Slope ±1.05 pts/hr · session {snap.sessionDateCT}
+                Slope ±1.04 pts/hr · session {snap.sessionDateCT}
               </span>
             </div>
             <StatusPill variant={actionToVariant[snap.confluence.action]} pulse>

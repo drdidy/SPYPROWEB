@@ -183,7 +183,7 @@ export interface SPXLine {
   name: string; // e.g. "Channel Ceiling"
   anchorPrice: number;
   anchorTime: string;
-  slopePerHour: number; // +1.05 or -1.05
+  slopePerHour: number; // +1.04 or -1.04
   currentValue: number; // projected to as-of
   distanceFromPrice: number; // signed
 }

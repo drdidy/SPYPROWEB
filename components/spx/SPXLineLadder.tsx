@@ -31,7 +31,7 @@ export function SPXLineLadder({ lines, price }: { lines: SPXLine[]; price: numbe
       <CardHeader
         eyebrow="Line Ladder"
         title="Levels in play"
-        meta={`Last ${price.toFixed(2)} · sorted by proximity · slope 1.05 pts/hr`}
+        meta={`Last ${price.toFixed(2)} · sorted by proximity · slope 1.04 pts/hr`}
       />
       <CardBody className="px-0 pb-0">
         <div className="grid grid-cols-12 px-5 pb-2 eyebrow text-ink-3">
