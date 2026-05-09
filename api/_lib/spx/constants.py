@@ -27,8 +27,11 @@ DEFAULT_SLOPE_PER_HOUR = 1.05
 # Session windows (Central Time, naive `time` objects — combine with a date
 # in time_utils to get tz-aware bounds).
 #
-# OVERNIGHT spans 15:00 prev-day -> 03:00 today CT (12 hours). The anchor
-#   pivots are scanned across this window.
+# OVERNIGHT spans 15:00 prev-day -> 02:00 today CT (11 hours). The anchor
+#   pivots are scanned across this window — the highest and lowest prints
+#   before 02:00 CT become the channel ceiling and floor anchors. London
+#   open (02:00) is the session boundary; anchors set after that point
+#   belong to today's session, not the overnight build-up.
 # SYDNEY 17:00 -> 20:00 (3h). Used for direction determination only.
 # TOKYO  21:00 -> 03:00 (6h, crossing midnight). Used for direction
 #   determination; the late portion is also inside the anchor window.
@@ -36,7 +39,7 @@ DEFAULT_SLOPE_PER_HOUR = 1.05
 # ---------------------------------------------------------------------------
 
 OVERNIGHT_START = time(15, 0)
-OVERNIGHT_END = time(3, 0)  # 03:00 CT (anchor scanning extends to 3am)
+OVERNIGHT_END = time(2, 0)  # 02:00 CT (London open / session boundary)
 SYDNEY_START = time(17, 0)
 SYDNEY_END = time(20, 0)
 TOKYO_START = time(21, 0)
@@ -46,8 +49,8 @@ RTH_END = time(15, 0)
 
 # Session boundary — the moment of day that demarcates "still part of
 # yesterday's trading session" from "this is now today's session."
-# The overnight ANCHOR window can extend past it (now to 03:00 CT)
-# but session-date attribution still flips at London open (02:00 CT).
+# Channel anchors are pinned strictly before this; bars at 02:00 or
+# after belong to the new session.
 SESSION_BOUNDARY = time(2, 0)
 
 # ---------------------------------------------------------------------------
