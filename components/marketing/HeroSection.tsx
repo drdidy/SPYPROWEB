@@ -101,7 +101,10 @@ export function HeroSection({ decision: serverDecision, quote: serverQuote, init
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, delay: 0.3, ease: [0.2, 0.8, 0.2, 1] }}
-        className="mt-16 surface rounded-card overflow-hidden"
+        // min-h reserves the card's space so the value/rationale/quotes
+        // grid hydrating doesn't cause CLS. Mobile (stacked col-span-12)
+        // needs more height than the side-by-side md+ layout.
+        className="mt-16 surface rounded-card overflow-hidden min-h-[224px] md:min-h-[180px]"
       >
         <div className="grid grid-cols-12">
           <div className="col-span-12 md:col-span-3 p-6 border-b md:border-b-0 md:border-r border-rule">
