@@ -95,10 +95,14 @@ const config: Config = {
 
       fontSize: {
         // editorial scale
-        hero: ["96px", { lineHeight: "0.92", letterSpacing: "-0.04em", fontWeight: "300" }],
-        verdict: ["80px", { lineHeight: "0.95", letterSpacing: "-0.035em", fontWeight: "300" }],
-        display: ["44px", { lineHeight: "1.04", letterSpacing: "-0.025em", fontWeight: "400" }],
-        headline: ["28px", { lineHeight: "1.15", letterSpacing: "-0.015em", fontWeight: "500" }],
+        // Fluid display sizes via clamp(min, preferred, max) so these
+        // scale smoothly from 360px → 1920px without breakpoint jumps.
+        // Floor matches the smallest spec breakpoint (360px); ceiling
+        // is the previous fixed value.
+        hero: ["clamp(56px, 7.5vw, 96px)", { lineHeight: "0.92", letterSpacing: "-0.04em", fontWeight: "300" }],
+        verdict: ["clamp(48px, 6vw, 80px)", { lineHeight: "0.95", letterSpacing: "-0.035em", fontWeight: "300" }],
+        display: ["clamp(32px, 4vw, 44px)", { lineHeight: "1.04", letterSpacing: "-0.025em", fontWeight: "400" }],
+        headline: ["clamp(22px, 2.4vw, 28px)", { lineHeight: "1.15", letterSpacing: "-0.015em", fontWeight: "500" }],
         title: ["18px", { lineHeight: "1.25", letterSpacing: "-0.005em", fontWeight: "600" }],
         eyebrow: ["10px", { lineHeight: "1", letterSpacing: "0.16em", fontWeight: "600" }],
         micro: ["10.5px", { lineHeight: "1.25", letterSpacing: "0.02em", fontWeight: "500" }],

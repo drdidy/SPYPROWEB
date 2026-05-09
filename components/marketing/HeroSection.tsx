@@ -57,7 +57,11 @@ export function HeroSection({ decision: serverDecision, quote: serverQuote, init
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, ease: [0.2, 0.8, 0.2, 1] }}
-        className="font-serif text-[64px] md:text-[88px] lg:text-[112px] leading-[0.94] tracking-[-0.035em] text-ink max-w-[14ch]"
+        // Fluid type: clamps between 48px (~360px viewport) and 112px
+        // (≥1280px viewport) so the H1 reads cleanly at every spec
+        // breakpoint without breakpoint-jumping.
+        style={{ fontSize: "clamp(48px, 8.5vw, 112px)" }}
+        className="font-serif leading-[0.94] tracking-[-0.035em] text-ink max-w-[14ch]"
       >
         Discipline,{" "}
         <span className="italic font-light text-ink-2">before</span>

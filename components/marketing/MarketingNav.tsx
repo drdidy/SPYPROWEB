@@ -56,7 +56,13 @@ export function MarketingNav() {
             Sign in
           </Link>
           <a href="#waitlist">
-            <Button variant="primary" size="sm">
+            {/* min-h ensures the tap target meets the 44×44 spec on
+                touch devices even though the visual size stays sm. */}
+            <Button
+              variant="primary"
+              size="sm"
+              className="min-h-[44px] sm:min-h-0"
+            >
               Join the waitlist <ArrowRight size={13} />
             </Button>
           </a>
