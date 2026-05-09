@@ -293,6 +293,21 @@ class handler(BaseHTTPRequestHandler):
             # backends down). 503 so the frontend can fall back to mock.
             payload = {"error": str(e), "kind": "no_bars"}
             status = 503
+        except ValueError as e:
+            # Engine raised on a missing-data invariant. The two
+            # known cases:
+            #   - "No ES candles in overnight window" — the lookback
+            #     window didn't cover the prior session's overnight
+            #     bars (e.g. on a Saturday probe with a too-short
+            #     lookback), or the data feed gapped overnight.
+            # Treat the same as no_bars: 503 so the FE renders a
+            # graceful empty state rather than a hard error.
+            payload = {
+                "error": str(e),
+                "kind": "no_bars",
+                "subkind": "missing_overnight_bars",
+            }
+            status = 503
         except Exception as e:
             payload = {
                 "error": str(e),

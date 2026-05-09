@@ -42,7 +42,15 @@ interface Props {
 type FetchState =
   | { status: "loading" }
   | { status: "ready"; snap: SPXSnapshot }
-  | { status: "error"; message: string };
+  | { status: "no_bars"; message: string }
+  | { status: "error"; message: string; trace?: string };
+
+interface ApiErrorBody {
+  error?: string;
+  kind?: "no_bars" | "engine_error" | string;
+  subkind?: string;
+  trace?: string[];
+}
 
 export function SPXChannelClient({ replayDate }: Props) {
   const [state, setState] = useState<FetchState>({ status: "loading" });
@@ -53,22 +61,40 @@ export function SPXChannelClient({ replayDate }: Props) {
     const url = replayDate
       ? `/api/spx/snapshot?date=${encodeURIComponent(replayDate)}`
       : `/api/spx/snapshot`;
-    fetch(url, { cache: "no-store" })
-      .then(async (r) => {
-        if (!r.ok) {
-          throw new Error(`API returned ${r.status} from ${url}`);
+    (async () => {
+      try {
+        const res = await fetch(url, { cache: "no-store" });
+        if (res.ok) {
+          const json = (await res.json()) as SPXSnapshot;
+          if (!cancelled) setState({ status: "ready", snap: json });
+          return;
         }
-        const json = (await r.json()) as SPXSnapshot;
-        if (!cancelled) setState({ status: "ready", snap: json });
-      })
-      .catch((e: unknown) => {
+        // Try to surface the API's error body. The handler emits
+        // { error, kind, trace? } JSON for both 503 and 500.
+        let body: ApiErrorBody = {};
+        try {
+          body = (await res.json()) as ApiErrorBody;
+        } catch {
+          /* non-JSON body, fall through */
+        }
+        const message =
+          body.error ?? `API returned ${res.status} from ${url}`;
+        const trace = body.trace?.join(" · ");
+        if (cancelled) return;
+        if (res.status === 503 || body.kind === "no_bars") {
+          setState({ status: "no_bars", message });
+        } else {
+          setState({ status: "error", message, trace });
+        }
+      } catch (e: unknown) {
         if (cancelled) return;
         setState({
           status: "error",
           message:
             e instanceof Error ? e.message : "Snapshot fetch failed.",
         });
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -88,11 +114,47 @@ export function SPXChannelClient({ replayDate }: Props) {
     );
   }
 
+  if (state.status === "no_bars") {
+    // 503 from the API. The engine couldn't compute a snapshot for
+    // structural reasons (overnight window empty, weekend, holiday,
+    // data-feed gap). This is the honest "channel is between
+    // sessions" state — render it as such, not as a hard error.
+    return (
+      <div className="max-w-[1440px] mx-auto space-y-6 pb-16 pt-6">
+        {replayDate && <ReplayBanner date={replayDate} />}
+        <div
+          role="status"
+          className="rounded-card border border-rule bg-paper-2/50 px-5 py-6 md:px-6 md:py-8"
+        >
+          <p className="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-3 mb-2">
+            SPX · Channel
+          </p>
+          <h1 className="font-serif text-h2 text-ink tracking-tight">
+            Channel forms after the configuration window
+          </h1>
+          <p className="mt-3 text-body text-ink-2 leading-snug max-w-2xl">
+            The engine plots SPX from ES front-month overnight bars
+            (15:00 prev-day → 02:00 today CT). Outside that window —
+            on weekends, holidays, or when the data feed gaps — there
+            is nothing yet to plot. Check back during the next
+            overnight session, or open <code>/replay</code> to step
+            through a previous day.
+          </p>
+          <p className="mt-3 text-meta text-ink-3 font-mono">
+            {state.message}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (state.status === "error") {
-    // v6 follow-up: explicit error during replay. v5 silently
-    // substituted the mock fixture (5872.00 / TAKE / ASCENDING)
-    // here, which made the failure indistinguishable from a real
-    // engine reading.
+    // Hard error path — engine threw something we don't know how to
+    // recover from. v5 silently substituted the mock fixture
+    // (5872.00 / TAKE / ASCENDING) here, which made the failure
+    // indistinguishable from a real engine reading. v6 surfaces
+    // the API error body inline so the failure mode is diagnosable
+    // from the browser.
     return (
       <div className="max-w-[1440px] mx-auto space-y-6 pb-16 pt-6">
         {replayDate && <ReplayBanner date={replayDate} />}
@@ -104,6 +166,11 @@ export function SPXChannelClient({ replayDate }: Props) {
           }
           message={`${state.message}. The /replay tab uses the same endpoint and may be working — if it is, retry in a moment.`}
         />
+        {state.trace && (
+          <pre className="text-[11px] font-mono text-ink-3 whitespace-pre-wrap rounded-card border border-rule bg-paper-2/40 p-4 max-h-64 overflow-auto">
+            {state.trace}
+          </pre>
+        )}
       </div>
     );
   }

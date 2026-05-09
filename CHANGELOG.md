@@ -6,6 +6,79 @@ entries grow newest-first.
 
 ## [Unreleased]
 
+### SPX 500 fix — overnight lookback, ValueError handling, surfaced traces
+
+The user-reported "API returned 500 from /api/spx/snapshot" turned
+out to be a real backend bug, exposed by my v6 client-side
+refactor (which surfaces real errors instead of silently swapping
+in mock data).
+
+**Real root cause** (read from production runtime logs +
+`https://www.spyprophet.app/api/spx/snapshot` body):
+
+```
+ValueError: No ES candles in overnight window for 2026-05-08
+File "/var/task/api/_lib/spx/channel.py", line 100, in overnight_anchors
+```
+
+The chain:
+
+  1. On Saturday, the SPX session resolves to Friday (the last
+     trading day) via `session_date_ct(now)`.
+  2. The overnight anchor window for Friday is `Thu 15:00 CT →
+     Fri 02:00 CT`.
+  3. The fetcher uses `lookback_hours=36`, i.e. it asks for ES
+     bars from `as_of - 36h`. From Saturday afternoon that's
+     Friday 05:00 CT — Thursday afternoon is OUT OF RANGE.
+  4. `overnight_anchors()` finds zero bars in the window and
+     raises `ValueError`.
+  5. The handler caught `ValueError` only via the generic
+     `Exception` branch → status 500.
+  6. The FE saw `!res.ok` and (post-v5) silently substituted
+     the mock fixture; (post-v6) renders an error toast — which
+     is what the user just reported.
+
+**Fix 1: `lookback_hours` 36 → 120.** A 5-day window covers the
+Saturday probe (~50h back to Thursday) and the Monday-morning
+probe (~84h back to Thursday). Default in
+`build_snapshot_with_provenance` and
+`build_snapshot_from_fetcher`. yfinance's hourly endpoint
+serves 5 days trivially — there's no rate or latency cost.
+
+**Fix 2: handler treats the missing-overnight-bars `ValueError`
+as `no_bars` (503), not `engine_error` (500).** The handler now
+has an explicit `except ValueError` branch that returns
+`{ kind: "no_bars", subkind: "missing_overnight_bars" }` with
+status 503. The FE already knew how to render `no_bars`
+gracefully; the engine just wasn't routing to it.
+
+**Fix 3: FE surfaces the API error body inline.**
+`<SPXChannelClient />` now distinguishes three states:
+
+  - `no_bars` (503) → renders a friendly "Channel forms after
+    the configuration window" panel referencing the actual
+    error message. No more "couldn't load" toast for what is
+    really an honest empty state.
+  - `error` (500 etc.) → renders the existing `<ErrorState />`
+    plus a collapsible `<pre>` block with the API's `trace[]`
+    array, so the underlying exception is visible from the
+    browser without a runtime-logs hop.
+  - `ready` (200) → unchanged.
+
+**Verification**
+
+- Production `/api/spx/snapshot` was returning the
+  `ValueError: No ES candles in overnight window for 2026-05-08`
+  body (confirmed via web fetch). Fix 1 ensures the lookback
+  reaches the missing window; Fix 2 ensures even if a future
+  edge case hits the same invariant, the response is 503 with
+  a graceful FE state, not 500.
+- `tsc --noEmit` clean. `next build` clean. `/spx` ships at
+  14.6 kB (153 kB first-load).
+- All static-analysis scripts continue to pass.
+
+---
+
 ### SPX Channel tab — root cause + permanent fix
 
 Audit of "the correct value can only be found on the replay tab".
