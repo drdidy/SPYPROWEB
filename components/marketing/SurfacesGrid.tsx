@@ -82,7 +82,7 @@ export function SurfacesGrid() {
             <Link
               key={s.n}
               href={s.href}
-              className="col-span-12 md:col-span-6 lg:col-span-4 group"
+              className="col-span-12 md:col-span-6 lg:col-span-4 group outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-4 focus-visible:ring-offset-canvas rounded-card"
             >
               <article className="surface rounded-card p-6 h-full transition-all duration-200 ease-swift group-hover:shadow-card-hover">
                 <div className="flex items-start justify-between mb-5">

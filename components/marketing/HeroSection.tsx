@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { ArrowRight, ArrowDown } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import type { DecisionState } from "@/lib/types";
 import { useLiveSPY } from "@/lib/use-live-snapshot";
 
@@ -35,6 +35,18 @@ export function HeroSection({ decision: serverDecision, quote: serverQuote, init
   const decision = live.decision;
   const t = live.shell;
   const isLive = live.source === "live";
+  // prefers-reduced-motion: zero out the y-offset / opacity tweens so
+  // hero content lands instantly. Visual hierarchy still works without
+  // the slide-in.
+  const reduce = useReducedMotion();
+  const fadeUp = (delay = 0) =>
+    reduce
+      ? { initial: false, animate: { opacity: 1, y: 0 } }
+      : {
+          initial: { opacity: 0, y: 14 },
+          animate: { opacity: 1, y: 0 },
+          transition: { duration: 0.7, delay, ease: [0.2, 0.8, 0.2, 1] },
+        };
   return (
     <section className="relative max-w-[1240px] mx-auto px-7 pt-16 pb-20 lg:pt-24 lg:pb-28">
       {/* eyebrow */}
@@ -54,9 +66,7 @@ export function HeroSection({ decision: serverDecision, quote: serverQuote, init
       </div>
 
       <motion.h1
-        initial={{ opacity: 0, y: 14 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, ease: [0.2, 0.8, 0.2, 1] }}
+        {...fadeUp(0)}
         className="font-serif text-[64px] md:text-[88px] lg:text-[112px] leading-[0.94] tracking-[-0.035em] text-ink max-w-[14ch]"
       >
         Discipline,{" "}
@@ -66,9 +76,7 @@ export function HeroSection({ decision: serverDecision, quote: serverQuote, init
       </motion.h1>
 
       <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, delay: 0.15, ease: [0.2, 0.8, 0.2, 1] }}
+        {...fadeUp(0.15)}
         className="mt-9 grid grid-cols-12 gap-10 items-end"
       >
         <p className="col-span-12 md:col-span-7 lg:col-span-6 text-[18px] md:text-[20px] text-ink-2 leading-[1.55] max-w-2xl">
@@ -98,9 +106,9 @@ export function HeroSection({ decision: serverDecision, quote: serverQuote, init
 
       {/* Live ribbon: preview of the slate */}
       <motion.div
-        initial={{ opacity: 0, y: 14 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, delay: 0.3, ease: [0.2, 0.8, 0.2, 1] }}
+        {...fadeUp(0.3)}
+        role="region"
+        aria-label="Live verdict preview"
         className="mt-16 surface rounded-card overflow-hidden"
       >
         <div className="grid grid-cols-12">
