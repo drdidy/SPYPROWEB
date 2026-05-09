@@ -39,7 +39,7 @@ export function FAQ() {
   const [open, setOpen] = useState<number | null>(0);
 
   return (
-    <section id="faq" className="max-w-[1240px] mx-auto px-7 py-20 lg:py-28">
+    <section id="faq" className="max-w-[1240px] mx-auto px-7 py-20 lg:py-28 scroll-mt-[88px]">
       <SectionLabel number="05">Frequently asked</SectionLabel>
 
       <div className="mt-8 grid grid-cols-12 gap-10">
