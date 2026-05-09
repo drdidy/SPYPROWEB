@@ -47,7 +47,11 @@ export async function loadSnapshot(
   const base = resolveBase();
   if (!base) {
     return {
-      snap: mockSnapshot,
+      // Even the no-host fallback honors the session gate. On
+      // weekends / holidays / pre-config windows the mock's "TAKE
+      // · ASCENDING · 5872.00" was leaking through and rendering as
+      // a fake live read.
+      snap: applySpxSessionGate(mockSnapshot),
       source: "mock",
       fetchedAt,
       error: "no request host (build-time render?)",
@@ -61,7 +65,7 @@ export async function loadSnapshot(
     const res = await fetch(target, { cache: "no-store" });
     if (!res.ok) {
       return {
-        snap: mockSnapshot,
+        snap: applySpxSessionGate(mockSnapshot),
         source: "mock",
         fetchedAt,
         error: `API returned ${res.status} from ${target}`,
@@ -75,7 +79,7 @@ export async function loadSnapshot(
     return { snap: applySpxSessionGate(snap), source: "live", fetchedAt };
   } catch (e) {
     return {
-      snap: mockSnapshot,
+      snap: applySpxSessionGate(mockSnapshot),
       source: "mock",
       fetchedAt,
       error: e instanceof Error ? e.message : "fetch failed",

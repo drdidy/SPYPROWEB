@@ -85,13 +85,25 @@ export function useLiveSPY(initial?: LiveSPYInitial): LiveSPYView {
 }
 
 export function useLiveSPX(initial?: SPXSnapshot): SPXSnapshot {
-  const [snap, setSnap] = useState<SPXSnapshot>(initial ?? mockSpx);
+  // Initial-state fallback: mockSpx has action=TAKE / direction=ASCENDING
+  // / a stale price. Without gating it, a TopBar consumer of this hook
+  // shows "TAKE · 5872.00" on weekends before the first poll completes.
+  // Gate the seed so the very first paint is honest.
+  const [snap, setSnap] = useState<SPXSnapshot>(
+    () => initial ?? applySpxSessionGate(mockSpx),
+  );
   useEffect(() => {
     let abort = false;
     const tick = async () => {
       try {
         const res = await fetch("/api/spx/snapshot", { cache: "no-store" });
-        if (!res.ok) return;
+        if (!res.ok) {
+          // API failed — keep what we have, but ensure it's gated for
+          // the current moment (session phase may have changed since
+          // mount, e.g. a Sunday 17:00 transition).
+          if (!abort) setSnap((s) => applySpxSessionGate(s));
+          return;
+        }
         const next = (await res.json()) as SPXSnapshot;
         if (!abort) setSnap(applySpxSessionGate(next));
       } catch {
