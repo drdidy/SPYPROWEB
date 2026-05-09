@@ -52,6 +52,7 @@ export interface RawSnapshot {
   context: { vix: number; dxy: number; vvix: number };
   spark: number[];
   anchor?: AnchorPayload | null;
+  premarketDiagnostic?: PremarketDiagnostic | null;
   replay?: ReplayBlock | null;
   triggers: Array<{
     line: string;
@@ -147,6 +148,27 @@ export interface AnchorPayload {
   anchor2: AnchorGroup | null;
 }
 
+export interface PremarketDiagnosticBar {
+  t: string;
+  hour: number;
+  o: number;
+  h: number;
+  l: number;
+  c: number;
+  color: "green" | "red" | "doji";
+  qualified: boolean;
+  selectedAs: "PRIMARY" | "ANCHOR_2" | null;
+  reason: string;
+}
+
+export interface PremarketDiagnostic {
+  windowStart: string | null;
+  windowEnd: string | null;
+  selectedPrimary: string | null;
+  selectedAnchor2: string | null;
+  bars: PremarketDiagnosticBar[];
+}
+
 export interface ReplaySession {
   open: number;
   high: number;
@@ -214,6 +236,7 @@ export interface AdaptedSnapshot {
   lines: DynamicLine[];
   pivots: Pivot[];
   anchor: AnchorPayload | null;
+  premarketDiagnostic: PremarketDiagnostic | null;
   replay: ReplayBlock | null;
   currentPrice: number;
   bias: BiasState;
@@ -718,6 +741,7 @@ export function adaptSnapshot(raw: RawSnapshot): AdaptedSnapshot {
     candles: raw.candles.map((c) => ({ t: c.t, o: c.o, h: c.h, l: c.l, c: c.c, v: 0 })),
     hourlyCandles: (raw.hourlyCandles ?? []).map((c) => ({ t: c.t, o: c.o, h: c.h, l: c.l, c: c.c, v: 0 })),
     anchor: raw.anchor ?? null,
+    premarketDiagnostic: raw.premarketDiagnostic ?? null,
     replay: raw.replay ?? null,
     lines: raw.triggers.map(mapTriggerToLine),
     pivots: mapPivots(raw),

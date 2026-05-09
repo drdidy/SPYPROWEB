@@ -189,7 +189,116 @@ def find_premarket_anchors(df: pd.DataFrame, signal_day) -> dict:
     return {"primary": primary, "anchor2": anchor2, "secondaries": secondaries}
 
 
-def build_anchor_lines(anchor, slope: float):
+def build_premarket_diagnostic(df: pd.DataFrame, signal_day, anchors_payload: dict) -> dict:
+    """Per-bar diagnostic for the 2:00-7:00 CT premarket window.
+
+    Returns a list of every hourly bar in the window with O/H/L/C, color,
+    and a qualification verdict. Each bar's `reason` explains exactly
+    why it qualified (or didn't) under the anchor spec, so operators
+    can verify the engine's view of the data without re-running the
+    pipeline locally. Used by /replay's diagnostic panel.
+    """
+    out: dict = {
+        "windowStart": None,
+        "windowEnd": None,
+        "selectedPrimary": None,
+        "selectedAnchor2": None,
+        "bars": [],
+    }
+    if df is None or df.empty:
+        return out
+
+    ct = pc.get_central_tz()
+    if isinstance(signal_day, pd.Timestamp):
+        day_ts = signal_day.tz_convert(ct) if signal_day.tzinfo else signal_day.tz_localize(ct)
+        day_date = day_ts.date()
+    else:
+        day_date = signal_day
+
+    day_start = pd.Timestamp(day_date, tz=ct)
+    ctx_start = day_start.replace(hour=2)
+    ctx_end = day_start.replace(hour=9)
+    ctx = df[(df.index >= ctx_start) & (df.index < ctx_end)].sort_index()
+    out["windowStart"] = ctx_start.isoformat()
+    out["windowEnd"] = ctx_end.isoformat()
+
+    primary = anchors_payload.get("primary")
+    anchor2 = anchors_payload.get("anchor2")
+    out["selectedPrimary"] = primary.timestamp.isoformat() if primary else None
+    out["selectedAnchor2"] = anchor2.timestamp.isoformat() if anchor2 else None
+
+    if ctx.empty:
+        return out
+
+    bars: list[dict] = []
+    for i in range(len(ctx)):
+        ts = ctx.index[i]
+        row = ctx.iloc[i]
+        try:
+            o = float(row["Open"])
+            h = float(row["High"])
+            l = float(row["Low"])
+            c = float(row["Close"])
+        except (KeyError, ValueError, TypeError):
+            continue
+        hour = ts.hour
+        bearish = c < o
+        bullish = c > o
+        in_window = 3 <= hour <= PREMARKET_ANCHOR_EXTENDED_HOUR
+        prior_low = float(ctx.iloc[i - 1]["Low"]) if i > 0 else None
+        next_row = ctx.iloc[i + 1] if (i + 1) < len(ctx) else None
+        next_close = float(next_row["Close"]) if next_row is not None else None
+        next_open = float(next_row["Open"]) if next_row is not None else None
+        next_bullish = (
+            next_row is not None and next_close is not None and next_open is not None
+            and next_close > next_open
+        )
+
+        # Qualification reasoning, in priority order.
+        reasons: list[str] = []
+        qualified = False
+        if not in_window:
+            reasons.append(f"hour {hour} outside 3-7 CT window")
+        elif not bearish:
+            reasons.append("not bearish (close >= open)")
+        elif prior_low is None:
+            reasons.append("first bar of window — no prior low to compare")
+        elif l >= prior_low:
+            reasons.append(f"low {l:.2f} >= prior bar low {prior_low:.2f}")
+        elif next_row is None:
+            reasons.append("no next bar to confirm green")
+        elif not next_bullish:
+            reasons.append("next bar not green (no reversal confirmation)")
+        else:
+            qualified = True
+            reasons.append(
+                f"bearish, low {l:.2f} < prior {prior_low:.2f}, next bar green"
+            )
+
+        role = None
+        if primary and ts == primary.timestamp:
+            role = "PRIMARY"
+        elif anchor2 and ts == anchor2.timestamp:
+            role = "ANCHOR_2"
+
+        bars.append({
+            "t": ts.isoformat(),
+            "hour": int(hour),
+            "o": round(o, 2),
+            "h": round(h, 2),
+            "l": round(l, 2),
+            "c": round(c, 2),
+            "color": "green" if bullish else ("red" if bearish else "doji"),
+            "qualified": qualified,
+            "selectedAs": role,
+            "reason": reasons[0] if reasons else "",
+        })
+
+    out["bars"] = bars
+    return out
+
+
+
     """Three parallel descending lines from a single anchor: Upper/Main/Lower."""
     if anchor is None:
         return []
@@ -363,6 +472,7 @@ __all__ = [
     "PREMARKET_ANCHOR_PRIMARY_HOURS", "PREMARKET_ANCHOR_EXTENDED_HOUR",
     "PremarketAnchor", "AnchorTrigger",
     "find_premarket_anchors", "build_anchor_lines", "build_all_anchor_lines",
+    "build_premarket_diagnostic",
     "is_anchor_buy_trigger", "is_anchor_sell_trigger",
     "detect_anchor_triggers", "anchor_open_zone",
 ]
