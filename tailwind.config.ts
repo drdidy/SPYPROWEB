@@ -104,6 +104,14 @@ const config: Config = {
         display: ["clamp(32px, 4vw, 44px)", { lineHeight: "1.04", letterSpacing: "-0.025em", fontWeight: "400" }],
         headline: ["clamp(22px, 2.4vw, 28px)", { lineHeight: "1.15", letterSpacing: "-0.015em", fontWeight: "500" }],
         title: ["18px", { lineHeight: "1.25", letterSpacing: "-0.005em", fontWeight: "600" }],
+        // Slate refinement (2026-05): explicit type-scale tiers for
+        // body / meta so consumers stop reaching for arbitrary
+        // text-[12px] / text-[13px] / text-[14px] values. Keeps the
+        // editorial scale honest and lets us audit later by grep.
+        h2: ["18px", { lineHeight: "1.25", letterSpacing: "-0.005em", fontWeight: "600" }],
+        h3: ["15px", { lineHeight: "1.3", letterSpacing: "-0.005em", fontWeight: "600" }],
+        body: ["14px", { lineHeight: "1.55", letterSpacing: "0", fontWeight: "400" }],
+        meta: ["12px", { lineHeight: "1.4", letterSpacing: "0.02em", fontWeight: "500" }],
         eyebrow: ["10px", { lineHeight: "1", letterSpacing: "0.16em", fontWeight: "600" }],
         micro: ["10.5px", { lineHeight: "1.25", letterSpacing: "0.02em", fontWeight: "500" }],
       },
@@ -132,6 +140,11 @@ const config: Config = {
 
       keyframes: {
         breathe: { "0%,100%": { opacity: "1" }, "50%": { opacity: "0.55" } },
+        // Slate skeleton shimmer. Single L→R sweep used by <Skeleton />.
+        shimmer: {
+          "0%": { transform: "translateX(-100%)" },
+          "100%": { transform: "translateX(100%)" },
+        },
         flashUp: {
           "0%": { backgroundColor: "rgba(14,124,80,0.18)" },
           "100%": { backgroundColor: "transparent" },
@@ -155,6 +168,7 @@ const config: Config = {
         "flash-down": "flashDown 600ms ease-out",
         rise: "riseUp 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both",
         ticker: "ticker 60s linear infinite",
+        shimmer: "shimmer 1.6s linear infinite",
       },
 
       backgroundImage: {

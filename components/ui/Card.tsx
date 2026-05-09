@@ -43,7 +43,10 @@ export function CardHeader({
   action,
   divider = true,
 }: {
-  eyebrow?: string;
+  // ReactNode (not just string) so callers can pass an inline cluster
+  // of ticker-badge + section descriptor — the standard slate eyebrow
+  // shape used by <EngineCard />. String values keep working unchanged.
+  eyebrow?: ReactNode;
   title: ReactNode;
   meta?: ReactNode;
   action?: ReactNode;

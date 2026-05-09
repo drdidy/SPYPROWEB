@@ -94,6 +94,32 @@
 }
 
 @layer utilities {
+  /* Slate refinement: a screen-reader-only utility. Tailwind ships
+     `sr-only` by default, but we re-declare for explicitness alongside
+     the slate primitives that use it. */
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* Honor reduced-motion preferences for our breathing / shimmer
+     loops. Anything decorative pauses; layout-meaningful animations
+     keep their first frame so nothing snaps. */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-breathe,
+    .animate-shimmer,
+    .animate-ticker {
+      animation: none !important;
+    }
+  }
+
   .grain {
     background-image: radial-gradient(circle at 1px 1px, rgba(20, 22, 26, 0.04) 1px, transparent 0);
     background-size: 24px 24px;

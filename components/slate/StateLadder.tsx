@@ -37,7 +37,7 @@ export function StateLadder({ engine, current, className }: StateLadderProps) {
       role="list"
       aria-label={`${engine} engine phase rail`}
       className={cn(
-        "flex items-center gap-1 font-mono text-[10px] tracking-[0.12em] uppercase",
+        "flex items-center gap-1 text-[11px] tracking-[0.01em]",
         className,
       )}
     >

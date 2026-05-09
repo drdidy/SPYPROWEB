@@ -116,13 +116,16 @@ export function Sidebar({
         ))}
       </nav>
 
+      {/* Beta-status pip moved to the header next to the wordmark
+          (see <Wordmark />). The sidebar avatar slot now reads as
+          plain user identity. */}
       <div className="px-4 py-3 border-t border-rule flex items-center gap-2.5">
         <div className="w-7 h-7 rounded-full bg-gold-tint grid place-items-center text-[11px] font-serif font-semibold text-gold-ink shadow-rule">
           d
         </div>
         <div className="flex-1 min-w-0 leading-tight">
           <div className="text-xs font-medium text-ink truncate">Trader</div>
-          <div className="text-[10px] text-ink-3 truncate font-mono">closed beta</div>
+          <div className="text-[10px] text-ink-3 truncate font-mono">Signed in</div>
         </div>
       </div>
     </aside>

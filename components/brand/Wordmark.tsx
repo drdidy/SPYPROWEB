@@ -1,7 +1,12 @@
+// Brand wordmark. The small "Beta" pip is rendered alongside the
+// logo so the closed-beta status reads as a product fact in the
+// header — replacing the prior "closed beta" line tucked under the
+// user avatar, which was easy to miss.
+
 export function Wordmark({ collapsed = false }: { collapsed?: boolean }) {
   return (
     <div className="flex items-center gap-2.5 select-none">
-      <svg width="24" height="24" viewBox="0 0 24 24" className="shrink-0">
+      <svg width="24" height="24" viewBox="0 0 24 24" className="shrink-0" aria-hidden>
         <defs>
           <linearGradient id="wm-gold" x1="0" y1="0" x2="1" y2="1">
             <stop offset="0%" stopColor="#C7821A" />
@@ -17,11 +22,19 @@ export function Wordmark({ collapsed = false }: { collapsed?: boolean }) {
         <line x1="20.5" y1="12" x2="23.5" y2="12" stroke="url(#wm-gold)" strokeWidth="1.25" strokeLinecap="round" />
       </svg>
       {!collapsed && (
-        <div className="leading-none">
-          <div className="text-[9px] tracking-[0.28em] text-ink-3 mb-0.5">SPY</div>
-          <div className="text-[15px] font-serif font-medium tracking-tight text-ink">
-            Prophet
+        <div className="leading-none flex items-center gap-1.5">
+          <div>
+            <div className="text-[9px] tracking-[0.28em] text-ink-3 mb-0.5">SPY</div>
+            <div className="text-[15px] font-serif font-medium tracking-tight text-ink">
+              Prophet
+            </div>
           </div>
+          <span
+            className="rounded-pill bg-gold-tint text-gold-ink px-1.5 py-px text-[9px] font-mono font-bold tracking-[0.10em] uppercase shadow-[inset_0_0_0_1px_rgba(184,130,31,0.20)]"
+            aria-label="Closed beta"
+          >
+            Beta
+          </span>
         </div>
       )}
     </div>
