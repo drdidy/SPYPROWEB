@@ -6,6 +6,11 @@ import { SurfacesGrid } from "@/components/marketing/SurfacesGrid";
 import { Manifesto } from "@/components/marketing/Manifesto";
 import { FAQ } from "@/components/marketing/FAQ";
 import { WaitlistForm } from "@/components/marketing/WaitlistForm";
+import {
+  OrganizationJsonLd,
+  FAQPageJsonLd,
+} from "@/components/marketing/JsonLd";
+import { FAQS } from "@/content/faqs";
 import { loadLiveSnapshot } from "@/lib/snapshot-fetch";
 
 // Render at request time so loadLiveSnapshot() can read the live host
@@ -17,6 +22,12 @@ export default async function Home() {
   const { data: snap, source } = await loadLiveSnapshot();
   return (
     <>
+      {/* JSON-LD: Organization (site identity) + FAQPage (rich-result
+          eligibility for the six FAQ items below). Both render
+          server-side as <script type="application/ld+json">. */}
+      <OrganizationJsonLd />
+      <FAQPageJsonLd faqs={FAQS} />
+
       <HeroSection
         decision={snap.decision}
         quote={{
