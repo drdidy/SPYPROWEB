@@ -23,9 +23,11 @@ export function HeroSection({ decision: serverDecision, quote: serverQuote, init
           change: serverQuote.change,
           changePct: serverQuote.changePct,
           vix: serverQuote.vix,
+          vixDelta: 0,
           isLive: !!initialLive,
           sessionLabel: "",
           sessionCloses: "",
+          feedHealth: { lastTickTs: new Date().toISOString(), source: "server" },
         }
       : undefined,
     source: initialLive ? "live" : undefined,

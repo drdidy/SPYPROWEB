@@ -137,4 +137,29 @@ def build() -> dict:
             "winPct": None,
             "edgePct": None,
         },
+        # Phase-1 hardening surface — present here so the seed payload
+        # matches the live shape and downstream typings stay non-optional.
+        "currentState": "WAIT",
+        "flipCondition": "Confirmed rejection at UA (583.40) with follow-through volume.",
+        "stateHistory": [
+            {"ts": datetime.now(timezone.utc).isoformat(), "state": "WAIT"},
+        ],
+        "decisionTrace": [
+            {
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "event": "Bias NEUTRAL (0)",
+                "weight": "info",
+            },
+            {
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "event": "SPY 582.86 inside yesterday's RTH range.",
+                "weight": "info",
+            },
+        ],
+        "invalidation": None,
+        "vixDelta": -0.18,
+        "feedHealth": {
+            "lastTickTs": datetime.now(timezone.utc).isoformat(),
+            "source": "seed",
+        },
     }

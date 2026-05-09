@@ -18,7 +18,6 @@ import Link from "next/link";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
-import { shellState } from "@/lib/mock-data";
 
 const sections = [
   {
@@ -86,17 +85,6 @@ export function Sidebar({
           <X size={14} />
         </button>
       </Link>
-
-      <div className="px-4 py-3 border-b border-rule">
-        <div className="flex items-center gap-2 text-[11px]">
-          <span className="relative flex h-1.5 w-1.5">
-            <span className="absolute inline-flex h-full w-full rounded-full bg-bull opacity-50 animate-breathe" />
-            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-bull" />
-          </span>
-          <span className="text-ink-2 font-medium">{shellState.sessionLabel}</span>
-          <span className="text-ink-3 ml-auto font-mono">{shellState.sessionCloses}</span>
-        </div>
-      </div>
 
       <nav className="flex-1 overflow-y-auto py-2">
         {sections.map((s) => (

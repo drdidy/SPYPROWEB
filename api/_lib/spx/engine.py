@@ -85,6 +85,123 @@ def _project_all(lines: list[Line], at: datetime, price: float) -> list[Projecte
 
 
 # ---------------------------------------------------------------------------
+# Phase-1 hardening helpers — engine-state, flip condition, decision trace,
+# invalidation, planned envelope, and score bands. These are pure derivations
+# from the existing scenario / confluence / projected-line surface so they
+# stay in sync without a parallel state machine.
+# ---------------------------------------------------------------------------
+
+
+def _engine_state_from(scenario: str, action: str) -> str:
+    """Project SPX scenario + confluence action onto the shared 6-state ladder."""
+    if scenario == "OUTSIDE_PLAY":
+        return "STAND_DOWN"
+    if action == "TAKE":
+        return "GO"
+    if action == "SELECTIVE":
+        return "ARMED"
+    # Inside-play but score below selective threshold -> still observing.
+    return "WATCH"
+
+
+def _flip_condition_for(scenario: str, projected: list[ProjectedLine]) -> str:
+    """One-sentence description of what would flip the current scenario."""
+    by_kind = {p.kind: p.value for p in projected}
+    ceiling = by_kind.get("CHANNEL_CEILING")
+    floor = by_kind.get("CHANNEL_FLOOR")
+    high_asc = by_kind.get("PREV_RTH_HIGH_ASC")
+    low_desc = by_kind.get("PREV_RTH_LOW_DESC")
+
+    if scenario == "OUTSIDE_PLAY":
+        if high_asc is not None and low_desc is not None:
+            return (
+                f"Re-entry into the planned envelope "
+                f"({low_desc:.2f}–{high_asc:.2f}) reactivates the play."
+            )
+        return "Re-entry into the planned envelope reactivates the play."
+    if scenario.startswith("INSIDE_"):
+        if ceiling is not None and floor is not None:
+            return (
+                f"Confirmed close above {ceiling:.2f} or below {floor:.2f} "
+                f"breaks the channel and flips the read."
+            )
+    if scenario.startswith("ABOVE_") and ceiling is not None:
+        return f"Confirmed close back below {ceiling:.2f} drops price into the channel."
+    if scenario.startswith("BELOW_") and floor is not None:
+        return f"Confirmed close back above {floor:.2f} lifts price into the channel."
+    return "Channel state pending."
+
+
+def _decision_trace(
+    *, as_of_iso: str, scenario: str, scenario_text: str,
+    channel_reason: str, confluence_score: float, action: str,
+) -> list[dict]:
+    """Chronological trace of the events that produced today's verdict."""
+    trace: list[dict] = []
+    trace.append({"ts": as_of_iso, "event": f"Channel: {channel_reason}", "weight": "info"})
+    trace.append({"ts": as_of_iso, "event": f"Scenario {scenario.replace('_', ' ').lower()}", "weight": "key"})
+    trace.append({
+        "ts": as_of_iso,
+        "event": f"Confluence {confluence_score:.0f}/100 → {action.replace('_', ' ').lower()}",
+        "weight": "key" if action == "TAKE" else "info",
+    })
+    if scenario_text:
+        trace.append({"ts": as_of_iso, "event": scenario_text, "weight": "info"})
+    return trace
+
+
+def _state_history(*, as_of_iso: str, current_state: str) -> list[dict]:
+    """Stub: today's state ladder transitions. For now, just the current.
+
+    Phase 2/3 may persist actual transitions per session.
+    """
+    return [{"ts": as_of_iso, "state": current_state}]
+
+
+def _invalidation_for(
+    primary_trade, projected: list[ProjectedLine],
+) -> Optional[dict]:
+    """Invalidation level + suggested stop offset.
+
+    Uses the primary trade's exit line as the "if you're wrong" reference
+    when present; falls back to None when there's no qualified play.
+    """
+    if primary_trade is None:
+        return None
+    by_kind = {p.kind: p.value for p in projected}
+    exit_value = by_kind.get(primary_trade.exit_line)
+    if exit_value is None:
+        return None
+    # Stop offset: 0.5% of the level, floored at 1.0pt — matches the
+    # engine's slope magnitude class without committing to a number
+    # that might mislead users.
+    stop_offset = max(round(exit_value * 0.005, 2), 1.0)
+    return {"level": round(exit_value, 2), "stopOffset": stop_offset}
+
+
+def _planned_envelope_for(projected: list[ProjectedLine]) -> Optional[dict]:
+    """Envelope for outside-play visualization: prev-RTH low → prev-RTH high."""
+    by_kind = {p.kind: p.value for p in projected}
+    low = by_kind.get("PREV_RTH_LOW_DESC")
+    high = by_kind.get("PREV_RTH_HIGH_ASC")
+    if low is None or high is None:
+        return None
+    if low > high:
+        low, high = high, low
+    return {"low": round(low, 2), "high": round(high, 2)}
+
+
+def _score_bands() -> dict:
+    """Static bands matching the confluence thresholds in constants.py."""
+    from .constants import ACTION_SELECTIVE_THRESHOLD, ACTION_TAKE_THRESHOLD
+    return {
+        "standDown": [0.0, float(ACTION_SELECTIVE_THRESHOLD)],
+        "watch": [float(ACTION_SELECTIVE_THRESHOLD), float(ACTION_TAKE_THRESHOLD)],
+        "go": [float(ACTION_TAKE_THRESHOLD), 100.0],
+    }
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -112,15 +229,20 @@ def compute_snapshot(
         SPXConfluenceFactor,
         SPXContractSuggestion,
         SPXContracts,
+        SPXDecisionTraceEntry,
+        SPXInvalidation,
         SPXLine,
         SPXOvernight,
         SPXOvernightWindow,
+        SPXPlannedEnvelope,
         SPXPlays,
         SPXPrice,
         SPXReentryWatch,
+        SPXScoreBands,
         SPXSessionRange as SPXSessionRangeModel,
         SPXSessions,
         SPXSnapshot,
+        SPXStateHistoryEntry,
         SPXTrade,
     )
 
@@ -200,6 +322,23 @@ def compute_snapshot(
     change = last_price - prev_close if prev_close is not None else 0.0
     change_pct = (change / prev_close * 100) if prev_close else 0.0
 
+    # ---- Phase-1 hardening derivations ----
+    as_of_iso = as_of_ct.isoformat()
+    current_state = _engine_state_from(scenario, confluence.action)
+    flip_condition = _flip_condition_for(scenario, projected)
+    decision_trace = _decision_trace(
+        as_of_iso=as_of_iso,
+        scenario=scenario,
+        scenario_text=scenario_text,
+        channel_reason=channel.reason,
+        confluence_score=confluence.score,
+        action=confluence.action,
+    )
+    state_history = _state_history(as_of_iso=as_of_iso, current_state=current_state)
+    invalidation = _invalidation_for(plays.primary, projected)
+    planned_envelope = _planned_envelope_for(projected)
+    score_bands = _score_bands()
+
     # ---- Build the Pydantic model (camelCase aliases) ----
 
     overnight_w = overnight_window(session)
@@ -246,6 +385,31 @@ def compute_snapshot(
             ) for f in confluence.factors],
             score=confluence.score,
             action=confluence.action,
+        ),
+        currentState=current_state,
+        flipCondition=flip_condition,
+        stateHistory=[
+            SPXStateHistoryEntry(ts=e["ts"], state=e["state"])
+            for e in state_history
+        ],
+        decisionTrace=[
+            SPXDecisionTraceEntry(
+                ts=e["ts"], event=e["event"], weight=e.get("weight"),
+            )
+            for e in decision_trace
+        ],
+        invalidation=(
+            SPXInvalidation(level=invalidation["level"], stopOffset=invalidation["stopOffset"])
+            if invalidation else None
+        ),
+        plannedEnvelope=(
+            SPXPlannedEnvelope(low=planned_envelope["low"], high=planned_envelope["high"])
+            if planned_envelope else None
+        ),
+        scoreBands=SPXScoreBands(
+            standDown=score_bands["standDown"],
+            watch=score_bands["watch"],
+            go=score_bands["go"],
         ),
     )
     return snapshot

@@ -75,6 +75,15 @@ const config: Config = {
           confirmed: "#0E7C50",
           breached: "#B5301E",
           stale: "#9CA3AF",
+
+          // Phase-1 hardening: semantic state palette. Use these for
+          // delta values, ladders, and trigger chips. The neutral token
+          // is the rule for "+0.00" / unknown / no-change — never bull green.
+          bullish: "#0E7C50",
+          bearish: "#B5301E",
+          neutral: "#6B7280",
+          triggered: "#0A7589",
+          invalidated: "#9CA3AF",
         },
       },
 

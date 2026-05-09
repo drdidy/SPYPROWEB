@@ -11,6 +11,7 @@ import { headers } from "next/headers";
 
 import type { SPXSnapshot } from "./types";
 import { spxSnapshot as mockSnapshot } from "./spx-mock-data";
+import { applySpxSessionGate } from "./snapshot-adapter";
 
 export type SnapshotSource = "live" | "mock";
 
@@ -67,7 +68,11 @@ export async function loadSnapshot(
       };
     }
     const snap = (await res.json()) as SPXSnapshot;
-    return { snap, source: "live", fetchedAt };
+    // Force PRE_CONFIG / blank reasoning when the session calendar
+    // says SPX hasn't observed its configuration window yet. The
+    // backend doesn't know about NYSE holidays + overnight windows;
+    // the frontend gates the rendering honestly.
+    return { snap: applySpxSessionGate(snap), source: "live", fetchedAt };
   } catch (e) {
     return {
       snap: mockSnapshot,

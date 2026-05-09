@@ -621,6 +621,91 @@ def _pivot_source(
     return out
 
 
+# ---------------------------------------------------------------------------
+# Phase-1 hardening: decision-trace surface for SPY.
+# These derivations live next to the bias/decision builder so they update
+# whenever the engine re-runs. All are best-effort — empty/null when the
+# underlying data isn't available.
+# ---------------------------------------------------------------------------
+
+
+def _spy_engine_state(decision_verb: str, conviction: int) -> str:
+    """Project the SPY decision verb onto the shared 6-state ladder."""
+    v = (decision_verb or "").upper()
+    if v in ("STAND DOWN", "STAND_DOWN"):
+        return "STAND_DOWN"
+    if v == "LONG" or v == "SHORT":
+        return "GO"
+    if v == "HOLD":
+        return "COOLDOWN"
+    if v == "WAIT":
+        # Differentiate WATCH (low conviction, no near trigger) from
+        # ARMED (conviction near firing). Conviction is 1..5.
+        return "ARMED" if conviction >= 3 else "WAIT"
+    return "WATCH"
+
+
+def _spy_flip_condition(
+    *,
+    decision_verb: str,
+    closest_line_label: str | None,
+    closest_line_value: float | None,
+) -> str:
+    v = (decision_verb or "").upper()
+    if closest_line_label and closest_line_value is not None:
+        if v in ("WAIT",):
+            return (
+                f"Confirmed rejection at {closest_line_label} "
+                f"({closest_line_value:.2f}) with follow-through volume."
+            )
+        if v == "LONG":
+            return f"Loss of {closest_line_label} ({closest_line_value:.2f}) invalidates the long."
+        if v == "SHORT":
+            return f"Reclaim of {closest_line_label} ({closest_line_value:.2f}) invalidates the short."
+    if v in ("STAND DOWN", "STAND_DOWN"):
+        return "Engine resumes when a primary line gets within striking distance."
+    return "First qualified rejection on a primary line flips the read."
+
+
+def _spy_decision_trace(
+    *,
+    as_of_iso: str,
+    bias_label: str,
+    bias_score: int,
+    rationale: str,
+    active_signal,
+) -> list[dict]:
+    trace: list[dict] = [{"ts": as_of_iso, "event": f"Bias {bias_label} ({bias_score:+d})", "weight": "info"}]
+    if rationale:
+        trace.append({"ts": as_of_iso, "event": rationale, "weight": "info"})
+    if active_signal is not None:
+        status = getattr(active_signal, "status", "PENDING")
+        line = pc.compact_line_name(getattr(active_signal, "line_name", "—"))
+        trace.append({
+            "ts": as_of_iso,
+            "event": f"Signal {status.lower()} on {line}",
+            "weight": "key",
+        })
+    return trace
+
+
+def _spy_invalidation(active_signal) -> dict | None:
+    """Use the active signal's stop as the invalidation reference."""
+    if active_signal is None:
+        return None
+    try:
+        entry = float(getattr(active_signal, "entry_price"))
+        stop = float(getattr(active_signal, "stop_price"))
+    except (AttributeError, TypeError, ValueError):
+        return None
+    if pd.isna(entry) or pd.isna(stop):
+        return None
+    return {
+        "level": round(entry, 2),
+        "stopOffset": round(abs(entry - stop), 2),
+    }
+
+
 def _classify_vix(vix: float) -> dict:
     if pd.isna(vix) or vix <= 0:
         return {"value": None, "label": "—", "tone": "neutral", "copy": "VIX unavailable"}
@@ -986,11 +1071,18 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
     chg = current_price - prev_close if not pd.isna(prev_close) else 0.0
     chg_pct = (chg / prev_close * 100) if prev_close else 0.0
 
-    vix = fetch_last_close("^VIX")
+    vix_last, vix_prev = fetch_last_and_prev("^VIX")
+    vix = vix_last
     vvix = fetch_last_close("^VVIX")
     dxy_last, dxy_prev = fetch_last_and_prev("DX-Y.NYB")
     tnx_last, tnx_prev = fetch_last_and_prev("^TNX")
     dxy = dxy_last
+    # VIX delta vs prior close (top-bar shows it next to the VIX value).
+    vix_delta = (
+        round(float(vix - vix_prev), 2)
+        if not pd.isna(vix) and not pd.isna(vix_prev)
+        else 0.0
+    )
 
     bias_label, bias_score = _bias_label_and_score(bias_state, current_price)
 
@@ -1089,6 +1181,52 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
         if is_replay else None
     )
 
+    # Phase-1 hardening: decision-trace surface for the SPY engine.
+    as_of_iso = now_ct.isoformat()
+    decision_verb = decision.get("verb", "WAIT")
+    decision_conviction = int(decision.get("conviction", 0) or 0)
+    current_state = _spy_engine_state(decision_verb, decision_conviction)
+    # Recompute closest line + active signal at this scope (the values
+    # inside _build_decision aren't returned — recomputing keeps this
+    # additive without refactoring the decision builder).
+    closest_for_flip = pc.get_closest_primary_line(primary_lines, projection_time, current_price)
+    if closest_for_flip is not None:
+        closest_label_for_flip = pc.compact_line_name(closest_for_flip.name)
+        cv = closest_for_flip.tradable_value_at(projection_time)
+        closest_value_for_flip = round(float(cv), 2) if cv is not None and not pd.isna(cv) else None
+    else:
+        closest_label_for_flip, closest_value_for_flip = None, None
+
+    active_signal_for_trace: pc.TradeSignal | None = None
+    for s in sorted(raw_signals, key=lambda x: pd.Timestamp(x.rejection_time), reverse=True):
+        if s.status == "CONFIRMED":
+            active_signal_for_trace = s
+            break
+    if active_signal_for_trace is None:
+        for s in sorted(raw_signals, key=lambda x: pd.Timestamp(x.rejection_time), reverse=True):
+            if s.status == "PENDING_CONFIRMATION":
+                active_signal_for_trace = s
+                break
+
+    flip_condition = _spy_flip_condition(
+        decision_verb=decision_verb,
+        closest_line_label=closest_label_for_flip,
+        closest_line_value=closest_value_for_flip,
+    )
+    state_history_payload = [{"ts": as_of_iso, "state": current_state}]
+    decision_trace_payload = _spy_decision_trace(
+        as_of_iso=as_of_iso,
+        bias_label=bias_label,
+        bias_score=int(bias_score),
+        rationale=decision.get("rationale", "") or "",
+        active_signal=active_signal_for_trace,
+    )
+    invalidation_payload = _spy_invalidation(active_signal_for_trace)
+    feed_health_payload = {
+        "lastTickTs": as_of_iso,
+        "source": "yfinance",
+    }
+
     return {
         "asOf": now_ct.isoformat(),
         "source": "live",
@@ -1098,6 +1236,13 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
             "score": bias_score,
             "note": _bias_note(bias_state, vix),
         },
+        "currentState": current_state,
+        "flipCondition": flip_condition,
+        "stateHistory": state_history_payload,
+        "decisionTrace": decision_trace_payload,
+        "invalidation": invalidation_payload,
+        "vixDelta": vix_delta,
+        "feedHealth": feed_health_payload,
         "quote": {
             "last": round(current_price, 2),
             "chg": round(chg, 2),

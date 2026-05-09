@@ -37,6 +37,10 @@ SPXLineKind = Literal[
 SPXAction = Literal["TAKE", "SELECTIVE", "STAND_DOWN"]
 SPXSide = Literal["BUY", "SELL"]
 SPXContractType = Literal["CALL", "PUT"]
+SPXEngineState = Literal[
+    "STAND_DOWN", "WATCH", "WAIT", "ARMED", "GO", "COOLDOWN",
+]
+SPXTraceWeight = Literal["info", "key"]
 SPXReentrySide = Literal["BUY_FROM_ABOVE", "SELL_FROM_BELOW"]
 SPXConfluenceKey = Literal[
     "asian",
@@ -164,6 +168,44 @@ class SPXConfluence(BaseModel):
     action: SPXAction
 
 
+# ---------------------------------------------------------------------------
+# Phase-1 hardening: decision-trace surface. These fields exist on both SPY
+# and SPX snapshots; the dashboard renders them in the Top Bar / cards /
+# trace timeline. All optional so older clients keep working.
+# ---------------------------------------------------------------------------
+
+
+class SPXStateHistoryEntry(BaseModel):
+    ts: str  # ISO timestamp
+    state: SPXEngineState
+
+
+class SPXDecisionTraceEntry(BaseModel):
+    ts: str
+    event: str
+    weight: Optional[SPXTraceWeight] = None
+
+
+class SPXInvalidation(BaseModel):
+    level: float
+    stop_offset: float = Field(..., alias="stopOffset")
+
+    model_config = {"populate_by_name": True}
+
+
+class SPXPlannedEnvelope(BaseModel):
+    low: float
+    high: float
+
+
+class SPXScoreBands(BaseModel):
+    stand_down: List[float] = Field(..., alias="standDown")
+    watch: List[float]
+    go: List[float]
+
+    model_config = {"populate_by_name": True}
+
+
 class SPXSnapshot(BaseModel):
     symbol: Literal["SPX"] = "SPX"
     as_of: str = Field(..., alias="asOf")
@@ -182,5 +224,22 @@ class SPXSnapshot(BaseModel):
     contracts: SPXContracts
     reentry_watch: SPXReentryWatch = Field(..., alias="reentryWatch")
     confluence: SPXConfluence
+
+    # Phase-1 hardening: decision-trace surface (optional for compat).
+    current_state: Optional[SPXEngineState] = Field(
+        default=None, alias="currentState",
+    )
+    flip_condition: Optional[str] = Field(default=None, alias="flipCondition")
+    state_history: List[SPXStateHistoryEntry] = Field(
+        default_factory=list, alias="stateHistory",
+    )
+    decision_trace: List[SPXDecisionTraceEntry] = Field(
+        default_factory=list, alias="decisionTrace",
+    )
+    invalidation: Optional[SPXInvalidation] = None
+    planned_envelope: Optional[SPXPlannedEnvelope] = Field(
+        default=None, alias="plannedEnvelope",
+    )
+    score_bands: Optional[SPXScoreBands] = Field(default=None, alias="scoreBands")
 
     model_config = {"populate_by_name": True}

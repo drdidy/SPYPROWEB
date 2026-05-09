@@ -105,6 +105,16 @@ export interface RawSnapshot {
   marketContext?: MarketContextRaw;
   flow?: FlowRaw | null;
   gex?: GexRaw | null;
+
+  // Phase-1 hardening: decision-trace surface. All optional so older
+  // payloads (cached responses, pre-rollout clients) stay valid.
+  currentState?: import("./states").EngineState;
+  flipCondition?: string;
+  stateHistory?: Array<{ ts: string; state: import("./states").EngineState }>;
+  decisionTrace?: Array<{ ts: string; event: string; weight?: "info" | "key" }>;
+  invalidation?: { level: number; stopOffset: number } | null;
+  vixDelta?: number;
+  feedHealth?: { lastTickTs: string; source: string };
 }
 
 interface FlowRaw {
@@ -260,10 +270,20 @@ export interface AdaptedSnapshot {
     change: number;
     changePct: number;
     vix: number;
+    vixDelta: number;
     isLive: boolean;
     sessionLabel: string;
     sessionCloses: string;
+    feedHealth: { lastTickTs: string; source: string };
   };
+  // Phase-1 hardening: decision-trace surface (optional fields preserved
+  // as nullable on the adapted shape so consumers can render placeholders
+  // when the upstream payload predates the rollout).
+  currentState: import("./states").EngineState;
+  flipCondition: string;
+  stateHistory: Array<{ ts: string; state: import("./states").EngineState }>;
+  decisionTrace: Array<{ ts: string; event: string; weight?: "info" | "key" }>;
+  invalidation: { level: number; stopOffset: number } | null;
 }
 
 export interface FlowSummary {
@@ -494,6 +514,7 @@ function mapShell(raw: RawSnapshot): AdaptedSnapshot["shellState"] {
     change: raw.quote.chg,
     changePct: raw.quote.chgPct,
     vix: raw.context.vix,
+    vixDelta: typeof raw.vixDelta === "number" ? raw.vixDelta : 0,
     isLive: raw.source === "live",
     sessionLabel:
       raw.source === "live"
@@ -501,8 +522,82 @@ function mapShell(raw: RawSnapshot): AdaptedSnapshot["shellState"] {
         : raw.source === "degraded"
           ? "DEGRADED"
           : "PRE-OPEN",
-    sessionCloses: "",
+    sessionCloses: computeSessionCloses(raw.asOf, raw.source),
+    feedHealth: raw.feedHealth ?? { lastTickTs: raw.asOf, source: "unknown" },
   };
+}
+
+// Best-effort RTH countdown — produces "closes in 2h 14m" while the
+// session is open, or empty string otherwise. Server-side time is
+// authoritative; consumers refresh client-side via <Countdown> as
+// needed.
+function computeSessionCloses(asOfIso: string, source: RawSnapshot["source"]): string {
+  if (source !== "live") return "";
+  try {
+    const now = new Date(asOfIso);
+    // RTH close is 15:00 CT = 21:00 UTC (or 20:00 during DST).
+    // Use the date's local tz interpretation and target 15:00 in
+    // America/Chicago via locale formatting math. Cheaper: rely on
+    // the API setting asOf in CT-anchored ISO with offset, and parse
+    // the tz from there. We compute by converting both to UTC ms.
+    const closeUtcMs = rthCloseUtcMs(now);
+    const remaining = closeUtcMs - now.getTime();
+    if (remaining <= 0) return "";
+    const totalMin = Math.floor(remaining / 60000);
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    return h > 0 ? `closes in ${h}h ${m}m` : `closes in ${m}m`;
+  } catch {
+    return "";
+  }
+}
+
+function rthCloseUtcMs(asOf: Date): number {
+  // 15:00 America/Chicago. Express as a wall-clock target by formatting
+  // the current "today" through the Chicago locale.
+  const ctDateStr = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(asOf);
+  // ctDateStr is YYYY-MM-DD already.
+  // Determine the Chicago UTC offset right now (DST aware): build a
+  // synthetic 15:00 in CT, parse in UTC, diff.
+  const target = new Date(`${ctDateStr}T15:00:00`);
+  // Convert that wall time to actual UTC by computing the offset Chicago
+  // currently has. We compare what the same wall time looks like when
+  // formatted back through Chicago.
+  const offsetMin = chicagoOffsetMinutes(asOf);
+  return target.getTime() - offsetMin * 60_000;
+}
+
+function chicagoOffsetMinutes(d: Date): number {
+  // Quick DST detect: compare the formatted Chicago time to the same
+  // moment formatted as UTC. Returns minutes Chicago is behind UTC
+  // (positive number, e.g. 300 in CST or 300 — wait we want the offset
+  // that, when subtracted from the wall time, yields UTC).
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    hour: "2-digit",
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const parts = dtf.formatToParts(d);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+  const ctMs = Date.UTC(
+    get("year"),
+    get("month") - 1,
+    get("day"),
+    get("hour"),
+    get("minute"),
+    get("second"),
+  );
+  return Math.round((ctMs - d.getTime()) / 60_000);
 }
 
 // ---- Options ---------------------------------------------------------------
@@ -717,6 +812,15 @@ function mapSignalTicks(raw: RawSnapshot): SignalTick[] {
   return ticks;
 }
 
+function deriveCurrentState(verb: string): import("./states").EngineState {
+  const v = (verb || "").toUpperCase();
+  if (v === "STAND DOWN" || v === "STAND_DOWN") return "STAND_DOWN";
+  if (v === "LONG" || v === "SHORT") return "GO";
+  if (v === "HOLD") return "COOLDOWN";
+  if (v === "WAIT") return "WAIT";
+  return "WATCH";
+}
+
 function shortTime(iso: string): string {
   try {
     const d = new Date(iso);
@@ -730,12 +834,100 @@ function shortTime(iso: string): string {
 // Public adapter
 // ---------------------------------------------------------------------------
 
-export function adaptSnapshot(raw: RawSnapshot): AdaptedSnapshot {
-  const { intel, strikes } = mapOptions(raw);
+/**
+ * Apply the per-engine session calendar on top of whatever the API
+ * said. When the session phase is one in which the engine cannot
+ * honestly be in a post-config state (PRE_CONFIG / CLOSED_*), force
+ * currentState to PRE_CONFIG and blank the structure / trace surfaces
+ * so the slate never fabricates reasoning over stale or absent data.
+ */
+/**
+ * Same gate, applied to an SPXSnapshot. We import lazily to avoid
+ * pulling sessions into modules that don't need it.
+ */
+export function applySpxSessionGate(
+  base: import("./types").SPXSnapshot,
+  now: Date = new Date(),
+): import("./types").SPXSnapshot {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { getSessionInfo, formatConfigWindow } = require("./sessions") as typeof import(
+    "./sessions"
+  );
+  const session = getSessionInfo("SPX", now);
+  const muted =
+    session.phase === "PRE_CONFIG" ||
+    session.phase === "CLOSED_WEEKEND" ||
+    session.phase === "CLOSED_HOLIDAY";
+  if (!muted) return base;
+
+  const window = formatConfigWindow(session);
   return {
+    ...base,
+    currentState: "PRE_CONFIG",
+    flipCondition: `Engine activates after ${window} configuration window.`,
+    decisionTrace: [
+      {
+        ts: base.asOf,
+        event: "Awaiting configuration window — no envelope plotted yet",
+        weight: "key",
+      },
+    ],
+    invalidation: null,
+    plannedEnvelope: null,
+    lines: [],
+  };
+}
+
+function applySpyPreConfigOverride(
+  base: AdaptedSnapshot,
+  now: Date = new Date(),
+): AdaptedSnapshot {
+  // Lazy import to avoid pulling sessions into anything that doesn't
+  // need the override.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { getSessionInfo, formatConfigWindow } = require("./sessions") as typeof import(
+    "./sessions"
+  );
+  const session = getSessionInfo("SPY", now);
+  const muted =
+    session.phase === "PRE_CONFIG" ||
+    session.phase === "CLOSED_WEEKEND" ||
+    session.phase === "CLOSED_HOLIDAY";
+  if (!muted) return base;
+
+  const window = formatConfigWindow(session);
+  return {
+    ...base,
+    currentState: "PRE_CONFIG",
+    flipCondition: `Engine activates after ${window} configuration window.`,
+    decisionTrace: [
+      {
+        ts: base.asOf,
+        event: "Awaiting configuration window — no lines plotted yet",
+        weight: "key",
+      },
+    ],
+    invalidation: null,
+    lines: [],
+  };
+}
+
+export function adaptSnapshot(
+  raw: RawSnapshot,
+  now: Date = new Date(),
+): AdaptedSnapshot {
+  const { intel, strikes } = mapOptions(raw);
+  const adapted: AdaptedSnapshot = {
     source: raw.source,
     asOf: raw.asOf,
     decision: mapDecision(raw),
+    currentState: (raw.currentState ?? deriveCurrentState(raw.decision.verb)) as import(
+      "./states"
+    ).EngineState,
+    flipCondition: raw.flipCondition ?? "",
+    stateHistory: raw.stateHistory ?? [],
+    decisionTrace: raw.decisionTrace ?? [],
+    invalidation: raw.invalidation ?? null,
     signal: mapLatestSignal(raw),
     quality: mapQuality(raw),
     candles: raw.candles.map((c) => ({ t: c.t, o: c.o, h: c.h, l: c.l, c: c.c, v: 0 })),
@@ -758,4 +950,5 @@ export function adaptSnapshot(raw: RawSnapshot): AdaptedSnapshot {
     optionsChain: raw.options ?? null,
     shellState: mapShell(raw),
   };
+  return applySpyPreConfigOverride(adapted, now);
 }
