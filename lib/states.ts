@@ -22,3 +22,9 @@ export function isEngineState(value: unknown): value is EngineState {
     (ENGINE_STATES as readonly string[]).includes(value)
   );
 }
+
+// Distance proximity thresholds used by the structure list to color
+// "near" rows in state.armed. SPY is in dollars (a 50-cent move counts
+// as in-range), SPX in points (5 points). Tune as the engines mature.
+export const SPY_DISTANCE_PROXIMITY = 0.5;
+export const SPX_DISTANCE_PROXIMITY = 5.0;
