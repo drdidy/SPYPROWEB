@@ -112,16 +112,16 @@ function EngineLadders({
   spxState: EngineState;
 }) {
   return (
-    <div className="rounded-card border border-rule bg-paper-2/40 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
-      <div className="flex items-center gap-2 min-w-0">
-        <span className="font-mono text-[10px] tracking-[0.16em] text-ink-3 uppercase">
+    <div className="rounded-card border border-rule bg-paper-2/40 px-4 py-3 flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-6">
+      <div className="flex items-center gap-2 min-w-0 overflow-x-auto">
+        <span className="font-mono text-[10px] tracking-[0.16em] text-ink-3 uppercase shrink-0">
           SPY
         </span>
         <StateLadder engine="SPY" current={spyState} />
       </div>
-      <div className="hidden sm:block h-3 w-px bg-rule" aria-hidden />
-      <div className="flex items-center gap-2 min-w-0">
-        <span className="font-mono text-[10px] tracking-[0.16em] text-violet uppercase">
+      <div className="hidden lg:block h-3 w-px bg-rule" aria-hidden />
+      <div className="flex items-center gap-2 min-w-0 overflow-x-auto">
+        <span className="font-mono text-[10px] tracking-[0.16em] text-violet uppercase shrink-0">
           SPX
         </span>
         <StateLadder engine="SPX" current={spxState} />

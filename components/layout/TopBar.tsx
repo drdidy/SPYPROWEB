@@ -94,7 +94,12 @@ export function TopBar({
         <Quote label="VIX">
           <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
             <span data-num>{t.vix.toFixed(2)}</span>
-            <DeltaTag value={t.vixDelta} />
+            {/* Delta drops first when the row gets cramped (≤ lg). VIX
+                value remains. Below md (≤ 768) the whole quote ribbon
+                is hidden so chips + search/bell stay readable. */}
+            <span className="hidden xl:inline-flex">
+              <DeltaTag value={t.vixDelta} />
+            </span>
           </span>
         </Quote>
       </div>
