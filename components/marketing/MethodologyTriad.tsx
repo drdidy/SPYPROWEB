@@ -17,7 +17,7 @@ const COL = {
 
 function ReadVis() {
   return (
-    <svg viewBox="0 0 200 120" className="w-full">
+    <svg viewBox="0 0 200 120" className="w-full" aria-hidden="true" focusable="false">
       <defs>
         <pattern id="read-dots" width="14" height="14" patternUnits="userSpaceOnUse">
           <circle cx="1" cy="1" r="0.6" fill={COL.rule} />
@@ -44,7 +44,7 @@ function ReadVis() {
 
 function ProjectVis() {
   return (
-    <svg viewBox="0 0 200 120" className="w-full">
+    <svg viewBox="0 0 200 120" className="w-full" aria-hidden="true" focusable="false">
       <rect width="200" height="120" fill={COL.paper2} opacity={0.4} />
       <circle cx="36" cy="92" r="4" fill="#fff" stroke={COL.gold} strokeWidth="1.5" />
       <circle cx="36" cy="92" r="1.5" fill={COL.gold} />
@@ -68,7 +68,7 @@ function DecideVis() {
     { h: 100, fill: COL.bull },
   ];
   return (
-    <svg viewBox="0 0 200 120" className="w-full">
+    <svg viewBox="0 0 200 120" className="w-full" aria-hidden="true" focusable="false">
       <line x1="14" y1="100" x2="190" y2="100" stroke={COL.rule} strokeWidth={1} />
       {bars.map((b, i) => {
         const x = 22 + i * 28;
@@ -128,7 +128,7 @@ const cards = [
 
 export function MethodologyTriad() {
   return (
-    <section id="methodology" className="max-w-[1240px] mx-auto px-7 py-20 lg:py-28">
+    <section id="methodology" className="max-w-[1240px] mx-auto px-7 py-20 lg:py-28 scroll-mt-[88px]">
       <SectionLabel number="01">The discipline</SectionLabel>
       <div className="mt-8 max-w-3xl">
         <h2 className="font-serif text-display tracking-tight text-ink">
