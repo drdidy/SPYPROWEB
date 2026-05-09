@@ -33,6 +33,7 @@ if str(_API_ROOT) not in sys.path:
     sys.path.insert(0, str(_API_ROOT))
 
 from _lib.spx_data import build_default_fetcher, build_snapshot_with_provenance  # noqa: E402
+from _lib.spx_data.historical_offset import historical_offset_for_date  # noqa: E402
 
 CT = ZoneInfo("America/Chicago")
 SNAPSHOT_TTL = float(os.environ.get("SPX_SNAPSHOT_TTL", "30"))
@@ -70,24 +71,41 @@ _cache_lock = Lock()
 
 def _build_payload(replay_date: date | None = None) -> dict:
     fetcher = build_default_fetcher()
+    env_override = _resolve_offset_override()
+    offset_override = env_override
+    used_historical_offset = False
     if replay_date is None:
         as_of = datetime.now(CT)
     else:
         # Replay mode: treat 15:00 CT (RTH close) of the chosen day as
         # "now" so the engine sees the full session's bars but nothing
-        # after. The live SPX/ES offset is still applied — for a v1
-        # backtest this is acceptable (offset drift is small relative
-        # to the channel structure being studied).
+        # after. We also derive the offset *as of that date* so the
+        # channel sits at historically-correct SPX levels; today's live
+        # offset would drift the channel by however much the basis has
+        # moved since the replay date. Env override still wins when set.
         as_of = datetime(
             replay_date.year, replay_date.month, replay_date.day, 15, 0, tzinfo=CT
         )
+        if env_override is None:
+            try:
+                hist_quote = historical_offset_for_date(replay_date)
+                offset_override = hist_quote.offset
+                used_historical_offset = True
+            except Exception:
+                # Couldn't derive historical offset; fall through to the
+                # live offset. The frontend's _meta surface still shows
+                # which offset was actually applied.
+                offset_override = None
     snap, meta = build_snapshot_with_provenance(
         fetcher,
         as_of,
-        offset_override=_resolve_offset_override(),
+        offset_override=offset_override,
     )
     payload = snap.model_dump(by_alias=True)
     payload["_meta"] = meta
+    if used_historical_offset:
+        # Distinguish historical-replay offset from a real env override.
+        meta["offsetSource"] = "historical_replay"
     payload["replay"] = {
         "isReplay": replay_date is not None,
         "date": replay_date.isoformat() if replay_date else None,
