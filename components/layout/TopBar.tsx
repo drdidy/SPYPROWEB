@@ -5,6 +5,7 @@ import { NumberFlash } from "@/components/ui/NumberFlash";
 import { Kbd } from "@/components/ui/Kbd";
 import { useLiveSPY, useLiveSPX } from "@/lib/use-live-snapshot";
 import { cn } from "@/lib/utils";
+import { FeedHealthBadge } from "@/components/slate/FeedHealthBadge";
 
 // ---------------------------------------------------------------------------
 // Action vocabulary palettes — shared between SPY & SPX so the chip stays
@@ -44,12 +45,12 @@ export function TopBar({
   const spxSnapshot = useLiveSPX();
   const decision = spy.decision;
   const t = spy.shell;
-  const isLive = spy.source === "live";
   const spxVerb = spxSnapshot.confluence.action.replace(/_/g, " ");
-  const asOf = new Date(spxSnapshot.asOf);
-  const asOfLabel = `${String(asOf.getHours()).padStart(2, "0")}:${String(
-    asOf.getMinutes(),
-  ).padStart(2, "0")} CT`;
+  const updatedLabel = formatUpdated(spy.shell.feedHealth.lastTickTs);
+
+  // Conviction is the engine's 1-5 quality scale (see api/_lib/data_sources.py).
+  // We label it explicitly so the bare numeral never appears next to a verb.
+  const spyMeta = `conviction ${decision.conviction}/5`;
 
   return (
     <header className="h-[60px] sticky top-0 z-30 bg-canvas/85 backdrop-blur-md border-b border-rule flex items-center px-3 md:px-5 gap-2 md:gap-3">
@@ -68,21 +69,19 @@ export function TopBar({
         symbol="SPY"
         verb={decision.verdict}
         verbTone={verbPalette[decision.verdict]}
-        score={decision.conviction}
-        meta={decision.windowET}
+        meta={spyMeta}
       />
       <SymbolChip
         href="/spx"
         symbol="SPX"
         verb={spxVerb}
         verbTone={verbPalette[spxVerb] ?? verbPalette["STAND DOWN"]}
-        score={Math.round(spxSnapshot.confluence.score)}
-        meta={SPX_SCENARIO_TAG[spxSnapshot.scenario]}
+        meta={SPX_SCENARIO_TAG[spxSnapshot.scenario] ?? spxSnapshot.scenario}
         accent="violet"
       />
 
       {/* Quote ribbon — hidden on small screens to avoid wrap chaos */}
-      <div className="hidden md:flex flex-1 items-center justify-center gap-4 lg:gap-6 min-w-0">
+      <div className="hidden md:flex flex-1 items-center justify-center gap-3 lg:gap-5 min-w-0">
         <Quote label="SPY">
           <NumberFlash value={t.spy} format={(n) => n.toFixed(2)} />
         </Quote>
@@ -93,31 +92,36 @@ export function TopBar({
           />
         </Quote>
         <Quote label="VIX">
-          <span data-num>{t.vix.toFixed(2)}</span>
+          <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
+            <span data-num>{t.vix.toFixed(2)}</span>
+            <DeltaTag value={t.vixDelta} />
+          </span>
         </Quote>
-        <div className="flex items-center gap-1.5">
-          <span className="relative flex h-1.5 w-1.5">
-            {isLive && (
-              <span className="absolute inline-flex h-full w-full rounded-full bg-bull opacity-50 animate-breathe" />
-            )}
-            <span
-              className={cn(
-                "relative inline-flex rounded-full h-1.5 w-1.5",
-                isLive ? "bg-bull" : "bg-ink-4",
-              )}
-            />
-          </span>
-          <span className="eyebrow text-ink-2">
-            {isLive ? "LIVE" : "CLOSED"}
-          </span>
-          <span className="text-[10px] text-ink-4 font-mono tabular-nums ml-1">
-            · as of {asOfLabel}
-          </span>
-        </div>
       </div>
 
       {/* Spacer to push search/bell right when quote ribbon hidden */}
       <div className="flex-1 md:hidden" />
+
+      {/* Right cluster: session info + updated stamp + feed health.
+          The whole group is white-space: nowrap so the timestamp never
+          wraps onto a second line. Below 1024px we drop session/updated
+          before collapsing to the search/bell row. */}
+      <div className="hidden xl:flex items-center gap-3 whitespace-nowrap min-w-0 shrink-0">
+        <SessionInfo
+          label={t.sessionLabel}
+          closes={t.sessionCloses}
+          isLive={t.isLive}
+        />
+        <span className="h-3 w-px bg-rule" aria-hidden />
+        <span className="font-mono text-[10px] text-ink-3 tabular-nums">
+          Updated {updatedLabel}
+        </span>
+        <FeedHealthBadge
+          lastTickTs={t.feedHealth.lastTickTs}
+          source={t.feedHealth.source}
+        />
+      </div>
+
       {/* Search + bell */}
       <button
         onClick={onOpenPalette}
@@ -146,12 +150,13 @@ export function TopBar({
   );
 }
 
+// ---------------------------------------------------------------------------
+
 function SymbolChip({
   href,
   symbol,
   verb,
   verbTone,
-  score,
   meta,
   accent,
 }: {
@@ -159,7 +164,6 @@ function SymbolChip({
   symbol: string;
   verb: string;
   verbTone: string;
-  score: number;
   meta: string;
   accent?: "violet";
 }) {
@@ -169,7 +173,7 @@ function SymbolChip({
     <Link
       href={href}
       className={cn(
-        "relative flex items-center gap-2 h-8 pl-3 pr-3 rounded-pill transition-all",
+        "relative flex items-center gap-2 h-8 pl-3 pr-3 rounded-pill transition-all whitespace-nowrap",
         "before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[2px] before:rounded-full",
         accentClass,
         verbTone,
@@ -182,10 +186,6 @@ function SymbolChip({
       <span className="opacity-30 text-[10px]">·</span>
       <span className="text-[11px] font-bold uppercase tracking-[0.12em]">
         {verb}
-      </span>
-      <span className="opacity-30 text-[10px]">·</span>
-      <span className="text-[11px] font-mono font-semibold tabular-nums">
-        {score}
       </span>
       <span className="opacity-30 text-[10px]">·</span>
       <span className="text-[10px] font-mono uppercase tracking-[0.06em] opacity-80">
@@ -203,11 +203,66 @@ function Quote({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-baseline gap-2">
+    <div className="flex items-baseline gap-2 whitespace-nowrap">
       <span className="eyebrow text-ink-3">{label}</span>
       <span className="text-[13px] font-mono font-semibold text-ink tabular-nums">
         {children}
       </span>
     </div>
   );
+}
+
+// Signed delta with semantic palette. Zero / unknown renders neutral —
+// "+0.00" must NOT use bull green per the Phase-1 token rule.
+function DeltaTag({ value }: { value: number }) {
+  const tone =
+    value > 0 ? "text-state-bullish" : value < 0 ? "text-state-bearish" : "text-state-neutral";
+  const sign = value > 0 ? "+" : value < 0 ? "−" : "";
+  const mag = Math.abs(value).toFixed(2);
+  return (
+    <span className={cn("text-[11px] font-mono font-semibold tabular-nums", tone)} data-num>
+      {sign}
+      {mag}
+    </span>
+  );
+}
+
+function SessionInfo({
+  label,
+  closes,
+  isLive,
+}: {
+  label: string;
+  closes: string;
+  isLive: boolean;
+}) {
+  return (
+    <span className="inline-flex items-center gap-2 whitespace-nowrap font-mono text-[10px] text-ink-3 uppercase tracking-[0.12em]">
+      <span className={cn("font-semibold", isLive ? "text-bull-ink" : "text-ink-3")}>{label}</span>
+      {closes && (
+        <>
+          <span className="opacity-50">·</span>
+          <span className="tabular-nums normal-case tracking-normal text-ink-3">
+            {closes}
+          </span>
+        </>
+      )}
+    </span>
+  );
+}
+
+function formatUpdated(iso: string): string {
+  if (!iso) return "—";
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "—";
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Chicago",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(d) + " CT";
+  } catch {
+    return "—";
+  }
 }

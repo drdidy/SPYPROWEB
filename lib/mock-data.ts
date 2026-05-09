@@ -270,9 +270,11 @@ export const shellState = {
   change: 1.84,
   changePct: 0.32,
   vix: 14.27,
+  vixDelta: -0.18,
   isLive: true,
   sessionLabel: "RTH OPEN",
-  sessionCloses: "closes 2h 14m",
+  sessionCloses: "closes in 2h 14m",
+  feedHealth: { lastTickTs: new Date().toISOString(), source: "seed" },
 };
 
 // ---- Nav ----

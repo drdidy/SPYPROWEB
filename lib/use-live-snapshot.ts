@@ -22,12 +22,16 @@ export interface LiveSPYView {
   decision: DecisionState;
   shell: AdaptedSnapshot["shellState"];
   source: AdaptedSnapshot["source"];
+  currentState: AdaptedSnapshot["currentState"];
+  flipCondition: AdaptedSnapshot["flipCondition"];
 }
 
 export interface LiveSPYInitial {
   decision?: DecisionState;
   shell?: AdaptedSnapshot["shellState"];
   source?: AdaptedSnapshot["source"];
+  currentState?: AdaptedSnapshot["currentState"];
+  flipCondition?: AdaptedSnapshot["flipCondition"];
 }
 
 export function useLiveSPY(initial?: LiveSPYInitial): LiveSPYView {
@@ -38,11 +42,15 @@ export function useLiveSPY(initial?: LiveSPYInitial): LiveSPYView {
       change: mockShell.change,
       changePct: mockShell.changePct,
       vix: mockShell.vix,
+      vixDelta: 0,
       isLive: false,
       sessionLabel: mockShell.sessionLabel,
       sessionCloses: mockShell.sessionCloses,
+      feedHealth: { lastTickTs: new Date().toISOString(), source: "seed" },
     },
     source: initial?.source ?? "seed",
+    currentState: initial?.currentState ?? "WAIT",
+    flipCondition: initial?.flipCondition ?? "",
   }));
 
   useEffect(() => {
@@ -58,6 +66,8 @@ export function useLiveSPY(initial?: LiveSPYInitial): LiveSPYView {
           decision: adapted.decision,
           shell: adapted.shellState,
           source: adapted.source,
+          currentState: adapted.currentState,
+          flipCondition: adapted.flipCondition,
         });
       } catch {
         // keep last good state

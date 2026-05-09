@@ -295,4 +295,19 @@ export interface SPXSnapshot {
     score: number; // 0..100
     action: SPXAction;
   };
+
+  // Phase-1 hardening: decision-trace surface (mirrors the SPY shape
+  // and the Pydantic schema in api/_lib/spx/schema.py). Optional so
+  // older payloads continue to typecheck.
+  currentState?: import("./states").EngineState;
+  flipCondition?: string;
+  stateHistory?: Array<{ ts: string; state: import("./states").EngineState }>;
+  decisionTrace?: Array<{ ts: string; event: string; weight?: "info" | "key" }>;
+  invalidation?: { level: number; stopOffset: number } | null;
+  plannedEnvelope?: { low: number; high: number } | null;
+  scoreBands?: {
+    standDown: [number, number];
+    watch: [number, number];
+    go: [number, number];
+  };
 }

@@ -82,10 +82,17 @@ function emptyAdapted(): AdaptedSnapshot {
       change: 0,
       changePct: 0,
       vix: 0,
+      vixDelta: 0,
       isLive: false,
       sessionLabel: "",
       sessionCloses: "",
+      feedHealth: { lastTickTs: new Date().toISOString(), source: "empty" },
     },
+    currentState: "STAND_DOWN" as const,
+    flipCondition: "",
+    stateHistory: [],
+    decisionTrace: [],
+    invalidation: null,
   };
 }
 
