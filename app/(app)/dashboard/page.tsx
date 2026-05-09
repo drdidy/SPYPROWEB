@@ -8,7 +8,6 @@ import { ScoreTrack } from "@/components/slate/ScoreTrack";
 import { EnvelopeBar } from "@/components/slate/EnvelopeBar";
 import { StatusGlyph, type StatusGlyphKind } from "@/components/slate/StatusGlyph";
 import { HelpHint } from "@/components/slate/HelpHint";
-import { SessionCountdown } from "@/components/slate/SessionCountdown";
 import { AsOfTicker } from "@/components/slate/AsOfTicker";
 import { SetAlertButton } from "@/components/slate/SetAlertButton";
 import { WhyThisStateLink } from "@/components/slate/WhyThisStateLink";
@@ -36,33 +35,21 @@ export default async function Page() {
   const spxSource = spxLoaded.source;
 
   return (
-    <div className="max-w-[1440px] mx-auto pb-16 space-y-10">
-      <header className="flex flex-col gap-3 pt-2 pb-1 md:flex-row md:items-end md:justify-between">
-        <div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="font-mono text-[10px] text-ink-3 tracking-[0.20em] uppercase">
-              Decision Slate · session today
-            </span>
-            <span className="h-px w-10 bg-rule-strong hidden sm:block" />
-            <span className="font-mono text-[10px] text-ink-3 tracking-[0.20em] uppercase">
-              {todayLabel()}
-            </span>
-            <SourceBadge label="SPY" source={spySource} error={spyError} />
-            <SourceBadge label="SPX" source={spxSource === "live" ? "live" : "mock"} />
-          </div>
-          <h1 className="mt-3 text-display font-serif tracking-tight text-ink">
-            The trading day,{" "}
-            <span className="text-ink-3 italic font-light">read aloud.</span>
-          </h1>
-        </div>
-      </header>
+    <div className="max-w-[1440px] mx-auto pb-16 space-y-8 pt-6">
+      {/* Source badges live above the ladder as a thin diagnostic strip
+          — the marketing headline + eyebrow were costing too much above-
+          the-fold space. */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <SourceBadge label="SPY" source={spySource} error={spyError} />
+        <SourceBadge label="SPX" source={spxSource === "live" ? "live" : "mock"} />
+      </div>
 
       <EngineLadders
         spyState={spy.currentState}
         spxState={(spx.currentState as EngineState | undefined) ?? "STAND_DOWN"}
       />
 
-      <SectionLabel>Today's plays</SectionLabel>
+      <SectionLabel>Today's read</SectionLabel>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <SpyVerdictCard snap={spy} />
         <SpxVerdictCard snap={spx} />
@@ -102,8 +89,10 @@ function TimelineRow({
   );
 }
 
-// State ladders sit immediately under the page header and above the
-// "Today's plays" section. Compact: one row per engine, mono labels.
+// State ladders sit immediately under the page header. Two stacked
+// rows (SPY on top, SPX below) so they read as parallel ladders at
+// a glance. A thin hairline separates them; both share the same
+// bordered container so the pairing is visually contained.
 function EngineLadders({
   spyState,
   spxState,
@@ -112,20 +101,29 @@ function EngineLadders({
   spxState: EngineState;
 }) {
   return (
-    <div className="rounded-card border border-rule bg-paper-2/40 px-4 py-3 flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-6">
-      <div className="flex items-center gap-2 min-w-0 overflow-x-auto">
-        <span className="font-mono text-[10px] tracking-[0.16em] text-ink-3 uppercase shrink-0">
-          SPY
-        </span>
-        <StateLadder engine="SPY" current={spyState} />
-      </div>
-      <div className="hidden lg:block h-3 w-px bg-rule" aria-hidden />
-      <div className="flex items-center gap-2 min-w-0 overflow-x-auto">
-        <span className="font-mono text-[10px] tracking-[0.16em] text-violet uppercase shrink-0">
-          SPX
-        </span>
-        <StateLadder engine="SPX" current={spxState} />
-      </div>
+    <div className="rounded-card border border-rule bg-paper-2/40 divide-y divide-rule">
+      <LadderRow engine="SPY" state={spyState} />
+      <LadderRow engine="SPX" state={spxState} />
+    </div>
+  );
+}
+
+function LadderRow({
+  engine,
+  state,
+}: {
+  engine: "SPY" | "SPX";
+  state: EngineState;
+}) {
+  const labelClass = engine === "SPX" ? "text-violet" : "text-ink-3";
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 overflow-x-auto">
+      <span
+        className={`font-mono text-[10px] tracking-[0.16em] uppercase shrink-0 w-9 ${labelClass}`}
+      >
+        {engine}
+      </span>
+      <StateLadder engine={engine} current={state} />
     </div>
   );
 }
@@ -157,7 +155,6 @@ function SpyVerdictCard({ snap }: { snap: AdaptedSnapshot }) {
         }
       />
       <CardBody className="space-y-4">
-        <SessionCountdown />
         <p className="text-[14px] text-ink-2 leading-relaxed">
           {decision.finalExplanation || snap.bias.explanation || "Engine is initializing."}
         </p>
@@ -266,7 +263,7 @@ function SpxVerdictCard({ snap }: { snap: SPXSnapshot }) {
             {isOutside && (
               <HelpHint
                 label="Outside play"
-                hint="Price has left the planned envelope between the prev-RTH high and low. The engine stands down until price re-enters."
+                hint="The last print sits outside today's planned play envelope. No qualifying setup until price re-enters the envelope."
               />
             )}
             <span className="font-mono text-sm text-ink-3 tabular-nums">
@@ -276,7 +273,6 @@ function SpxVerdictCard({ snap }: { snap: SPXSnapshot }) {
         }
       />
       <CardBody className="space-y-4">
-        <SessionCountdown />
         <p className="text-[14px] text-ink-2 leading-relaxed">
           {snap.scenarioExplanation || snap.channel.reason || "Channel is initializing."}
         </p>
@@ -290,9 +286,7 @@ function SpxVerdictCard({ snap }: { snap: SPXSnapshot }) {
             </div>
           </MetricCol>
           <MetricCol label="Channel">
-            <span className="font-mono text-[13px] font-semibold text-ink tabular-nums" data-num>
-              {snap.channel.direction}
-            </span>
+            <ChannelValue direction={snap.channel.direction} />
           </MetricCol>
           <MetricCol label="Δ today">
             <DeltaCell value={change} />
@@ -393,6 +387,24 @@ function MetricCol({
   );
 }
 
+function ChannelValue({ direction }: { direction: string }) {
+  if (direction === "NONE" || !direction) {
+    return (
+      <span
+        title="Channel forms after the first qualifying overnight pivot."
+        className="text-[12px] text-state-neutral italic cursor-help"
+      >
+        not yet formed
+      </span>
+    );
+  }
+  return (
+    <span className="font-mono text-[13px] font-semibold text-ink tabular-nums" data-num>
+      {direction}
+    </span>
+  );
+}
+
 function BiasValue({ bias }: { bias: string }) {
   const tone =
     bias === "BULLISH"
@@ -428,21 +440,24 @@ function GradeValue({ grade }: { grade: string | null }) {
   );
 }
 
-// Signed change cell for the SPX "Δ today" metric. Neutral grey when
-// |value| == 0 — never bull green.
+// Signed change cell for the SPX "Δ today" metric. When zero, render
+// just "0.00" in neutral — no leading sign, never bull green. When
+// non-zero, render with explicit sign and semantic color.
 function DeltaCell({ value }: { value: number }) {
   const isZero = Math.abs(value) < 0.005;
-  const tone = isZero
-    ? "text-state-neutral"
-    : value > 0
-      ? "text-state-bullish"
-      : "text-state-bearish";
-  const sign = isZero ? "" : value > 0 ? "+" : "−";
-  const mag = Math.abs(value).toFixed(2);
+  if (isZero) {
+    return (
+      <span className="font-mono text-[13px] font-semibold tabular-nums text-state-neutral" data-num>
+        0.00
+      </span>
+    );
+  }
+  const tone = value > 0 ? "text-state-bullish" : "text-state-bearish";
+  const sign = value > 0 ? "+" : "−";
   return (
     <span className={`font-mono text-[13px] font-semibold tabular-nums ${tone}`} data-num>
       {sign}
-      {mag}
+      {Math.abs(value).toFixed(2)}
     </span>
   );
 }
@@ -637,17 +652,6 @@ function SourceBadge({
       {label} {source}
     </span>
   );
-}
-
-function todayLabel(): string {
-  return new Date()
-    .toLocaleDateString("en-US", {
-      weekday: "long",
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    })
-    .toUpperCase();
 }
 
 function formatHM(iso: string): string {

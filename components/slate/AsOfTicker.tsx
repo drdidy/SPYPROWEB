@@ -1,8 +1,8 @@
 "use client";
 
-// Tiny "as of HH:MM:SS" stamp that ticks every second from a server-
-// supplied seed. Card footers use it so users can see the page is
-// alive even when the underlying snapshot is unchanged.
+// "as of HH:MM CT" stamp. Minute precision (no seconds) — the snapshot
+// itself doesn't update per-second, so a ticking second column was
+// just visual jitter. Re-evaluates every 30s.
 
 import { useEffect, useState } from "react";
 
@@ -14,10 +14,9 @@ interface Props {
 export function AsOfTicker({ iso, className }: Props) {
   const [now, setNow] = useState(() => new Date(iso).getTime() || Date.now());
   useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 1_000);
+    const id = window.setInterval(() => setNow(Date.now()), 30_000);
     return () => window.clearInterval(id);
   }, []);
-  const label = formatHMS(now);
   return (
     <span
       className={
@@ -25,18 +24,17 @@ export function AsOfTicker({ iso, className }: Props) {
       }
       suppressHydrationWarning
     >
-      as of {label} CT
+      as of {formatHM(now)} CT
     </span>
   );
 }
 
-function formatHMS(ms: number): string {
+function formatHM(ms: number): string {
   try {
     return new Intl.DateTimeFormat("en-US", {
       timeZone: "America/Chicago",
       hour: "2-digit",
       minute: "2-digit",
-      second: "2-digit",
       hour12: false,
     }).format(new Date(ms));
   } catch {

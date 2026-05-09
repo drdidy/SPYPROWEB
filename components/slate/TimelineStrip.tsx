@@ -44,7 +44,7 @@ export function TimelineStrip({ engine, history, className }: Props) {
         </span>
         <span className="h-px flex-1 bg-rule" aria-hidden />
         <span className="font-mono text-[10px] text-ink-3 tabular-nums">
-          {history.length} transition{history.length === 1 ? "" : "s"}
+          {history.length === 1 ? "1 entry" : `${history.length} transitions`}
         </span>
       </div>
       <ol

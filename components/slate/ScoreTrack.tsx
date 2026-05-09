@@ -60,9 +60,12 @@ export function ScoreTrack({
           className="h-full bg-bull/15"
         />
       </div>
-      {/* Marker: 2px-wide line at current value. */}
+      {/* Marker: 2px-wide line at current value. Clamp the visual
+          position to 2-98% so the marker never disappears off either
+          edge when the score sits at 0 or 100 — the numeric value
+          rendered alongside still shows the true figure. */}
       <div
-        style={{ left: `calc(${v}% - 1px)` }}
+        style={{ left: `calc(${Math.min(98, Math.max(2, v))}% - 1px)` }}
         aria-hidden
         className="absolute top-[-2px] bottom-[-2px] w-[2px] rounded-full bg-ink"
       />
