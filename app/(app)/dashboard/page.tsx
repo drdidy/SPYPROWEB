@@ -2,10 +2,12 @@ import Link from "next/link";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { StateLadder } from "@/components/slate/StateLadder";
 import { loadLiveSnapshot } from "@/lib/snapshot-fetch";
 import { loadSnapshot as loadSpxSnapshot } from "@/lib/spx-fetch";
 import type { AdaptedSnapshot } from "@/lib/snapshot-adapter";
 import type { SPXSnapshot } from "@/lib/types";
+import type { EngineState } from "@/lib/states";
 import { ArrowRight, Crosshair } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +44,11 @@ export default async function Page() {
         </div>
       </header>
 
+      <EngineLadders
+        spyState={spy.currentState}
+        spxState={(spx.currentState as EngineState | undefined) ?? "STAND_DOWN"}
+      />
+
       <SectionLabel number="01">Today's plays</SectionLabel>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <SpyVerdictCard snap={spy} />
@@ -58,6 +65,34 @@ export default async function Page() {
         <span>Prophet · dual-engine slate</span>
         <span>End of slate</span>
       </footer>
+    </div>
+  );
+}
+
+// State ladders sit immediately under the page header and above the
+// "Today's plays" section. Compact: one row per engine, mono labels.
+function EngineLadders({
+  spyState,
+  spxState,
+}: {
+  spyState: EngineState;
+  spxState: EngineState;
+}) {
+  return (
+    <div className="rounded-card border border-rule bg-paper-2/40 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="font-mono text-[10px] tracking-[0.16em] text-ink-3 uppercase">
+          SPY
+        </span>
+        <StateLadder engine="SPY" current={spyState} />
+      </div>
+      <div className="hidden sm:block h-3 w-px bg-rule" aria-hidden />
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="font-mono text-[10px] tracking-[0.16em] text-violet uppercase">
+          SPX
+        </span>
+        <StateLadder engine="SPX" current={spxState} />
+      </div>
     </div>
   );
 }
