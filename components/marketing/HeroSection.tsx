@@ -133,11 +133,16 @@ export function HeroSection({
         . Markets involve risk.
       </p>
 
-      {/* scroll hint */}
-      <div className="hidden lg:flex items-center gap-2 text-[10px] text-ink-3 font-mono uppercase tracking-[0.18em] mt-12">
+      {/* Trust-layer entry point: links to the long-form /methodology
+          page (g12). Replaces the static "scroll hint" div with a
+          real, focusable, keyboard-accessible Link. */}
+      <Link
+        href="/methodology"
+        className="hidden lg:inline-flex items-center gap-2 text-[10px] text-ink-3 hover:text-ink font-mono uppercase tracking-[0.18em] mt-12 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-gold/40 rounded-soft -mx-1 px-1"
+      >
         <span>Read the methodology</span>
-        <ArrowDown size={12} className="animate-breathe" />
-      </div>
+        <ArrowDown size={12} className="animate-breathe" aria-hidden />
+      </Link>
     </section>
   );
 }

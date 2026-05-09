@@ -14,9 +14,12 @@ const cols = [
   {
     label: "Read",
     items: [
-      { label: "Methodology", href: "#methodology" },
-      { label: "Discipline", href: "#manifesto" },
-      { label: "FAQ", href: "#faq" },
+      // Methodology now points at the long-form /methodology page
+      // (g12) instead of the home-page anchor — the long-form has
+      // the closed-beta cohort note + the engine description.
+      { label: "Methodology", href: "/methodology" },
+      { label: "Discipline", href: "/#manifesto" },
+      { label: "FAQ", href: "/#faq" },
       { label: "Daily Brief", href: "/brief" },
     ],
   },
@@ -26,10 +29,8 @@ const cols = [
       { label: "About", href: "/about" },
       { label: "Contact", href: "/contact" },
       { label: "Careers", href: "/careers" },
-      // Press intentionally retained as a real route — visitors who
-      // click see an honest "no published press yet" page rather than
-      // a dead anchor.
-      { label: "Press", href: "/press" },
+      // "Press" intentionally removed per g12 — no published press
+      // exists yet. The /press route still exists for direct access.
     ],
   },
   {
