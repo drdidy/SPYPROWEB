@@ -7,7 +7,7 @@ import { Kbd } from "@/components/ui/Kbd";
 import { useLiveSPY, useLiveSPX } from "@/lib/use-live-snapshot";
 import { cn } from "@/lib/utils";
 import { FeedHealthBadge } from "@/components/slate/FeedHealthBadge";
-import { getSessionStatus, sessionLabel } from "@/lib/marketCalendar";
+import { getSessionInfo, renderSessionSegment } from "@/lib/sessions";
 
 // ---------------------------------------------------------------------------
 // Action vocabulary palettes — shared between SPY & SPX so the chip stays
@@ -49,7 +49,7 @@ export function TopBar({
   const t = spy.shell;
   const spxVerb = spxSnapshot.confluence.action.replace(/_/g, " ");
   const updatedLabel = formatUpdated(spy.shell.feedHealth.lastTickTs);
-  const session = useSessionStatus();
+  const sessionLine = useSessionLine();
 
   // Conviction is the engine's 1-5 quality scale (see api/_lib/data_sources.py).
   // We label it explicitly so the bare numeral never appears next to a verb.
@@ -114,9 +114,20 @@ export function TopBar({
           The whole group is white-space: nowrap so the timestamp never
           wraps onto a second line. Below 1024px we drop session/updated
           before collapsing to the search/bell row. */}
-      <div className="hidden xl:flex items-center gap-3 whitespace-nowrap min-w-0 shrink-0">
-        <SessionInfo session={session} />
-        <span className="h-3 w-px bg-rule" aria-hidden />
+      {/* Right cluster: session segment + updated stamp + feed health.
+          Engine-aware single line — when both engines are closed the
+          string reads "SPX setup opens Sun 17:00 CT" or whichever is
+          next. shrink-0 + whitespace-nowrap prevents overlap with the
+          quote ribbon at every breakpoint we render at (lg+). */}
+      <div className="hidden lg:flex items-center gap-3 whitespace-nowrap shrink-0">
+        {sessionLine && (
+          <>
+            <span className="font-mono text-[10px] text-ink-3 tabular-nums uppercase tracking-[0.06em]">
+              {sessionLine}
+            </span>
+            <span className="h-3 w-px bg-rule" aria-hidden />
+          </>
+        )}
         <span className="font-mono text-[10px] text-ink-3 tabular-nums">
           Updated {updatedLabel}
         </span>
@@ -231,45 +242,24 @@ function DeltaTag({ value }: { value: number }) {
   );
 }
 
-function SessionInfo({
-  session,
-}: {
-  session: ReturnType<typeof getSessionStatus> | null;
-}) {
-  if (!session) return null;
-  const { label, detail } = sessionLabel(session);
-  const live = session.state === "RTH_OPEN";
-  return (
-    <span className="inline-flex items-center gap-2 whitespace-nowrap font-mono text-[10px] text-ink-3 uppercase tracking-[0.12em]">
-      <span className={cn("font-semibold", live ? "text-bull-ink" : "text-ink-3")}>
-        {label}
-      </span>
-      {detail && (
-        <>
-          <span className="opacity-50">·</span>
-          <span className="tabular-nums normal-case tracking-normal text-ink-3">
-            {detail}
-          </span>
-        </>
-      )}
-    </span>
-  );
-}
-
-// Re-evaluate session status every 30s so the countdown stays accurate
-// without burning a render budget. Returns null on first render to
-// keep SSR stable; client picks up the real value on hydration.
-function useSessionStatus() {
-  const [status, setStatus] = useState<ReturnType<typeof getSessionStatus> | null>(
-    null,
-  );
+// Single engine-aware session line. Re-evaluates every 30s so the
+// countdown / next-event text stays accurate without burning a
+// render budget. Returns null on first render so SSR is stable;
+// the client picks it up on hydration.
+function useSessionLine(): string | null {
+  const [line, setLine] = useState<string | null>(null);
   useEffect(() => {
-    const tick = () => setStatus(getSessionStatus());
+    const tick = () => {
+      const now = new Date();
+      const spy = getSessionInfo("SPY", now);
+      const spx = getSessionInfo("SPX", now);
+      setLine(renderSessionSegment(spy, spx, now));
+    };
     tick();
     const id = window.setInterval(tick, 30_000);
     return () => window.clearInterval(id);
   }, []);
-  return status;
+  return line;
 }
 
 function formatUpdated(iso: string): string {

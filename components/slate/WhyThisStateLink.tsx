@@ -32,11 +32,14 @@ export function WhyThisStateLink({
         onClick={() => setOpen(true)}
         className={
           className ??
-          "inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3 hover:text-ink transition-colors outline-none focus-visible:ring-2 focus-visible:ring-gold/40 rounded-soft px-1 -mx-1"
+          // Discoverable button affordance — thin border, padded hit
+          // target, hover state. The trust artifact of the slate
+          // shouldn't read as plain mono text.
+          "inline-flex items-center gap-1.5 h-7 px-2.5 rounded-pill border border-rule bg-paper hover:bg-paper-2/70 hover:border-rule-strong text-ink-2 hover:text-ink font-mono text-[10px] uppercase tracking-[0.14em] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-gold/40"
         }
       >
         Why this state?
-        <ArrowRight size={11} className="text-ink-4" />
+        <ArrowRight size={11} className="text-ink-3" />
       </button>
       <DecisionTraceDrawer
         engine={engine}

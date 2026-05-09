@@ -834,9 +834,90 @@ function shortTime(iso: string): string {
 // Public adapter
 // ---------------------------------------------------------------------------
 
-export function adaptSnapshot(raw: RawSnapshot): AdaptedSnapshot {
-  const { intel, strikes } = mapOptions(raw);
+/**
+ * Apply the per-engine session calendar on top of whatever the API
+ * said. When the session phase is one in which the engine cannot
+ * honestly be in a post-config state (PRE_CONFIG / CLOSED_*), force
+ * currentState to PRE_CONFIG and blank the structure / trace surfaces
+ * so the slate never fabricates reasoning over stale or absent data.
+ */
+/**
+ * Same gate, applied to an SPXSnapshot. We import lazily to avoid
+ * pulling sessions into modules that don't need it.
+ */
+export function applySpxSessionGate(
+  base: import("./types").SPXSnapshot,
+  now: Date = new Date(),
+): import("./types").SPXSnapshot {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { getSessionInfo, formatConfigWindow } = require("./sessions") as typeof import(
+    "./sessions"
+  );
+  const session = getSessionInfo("SPX", now);
+  const muted =
+    session.phase === "PRE_CONFIG" ||
+    session.phase === "CLOSED_WEEKEND" ||
+    session.phase === "CLOSED_HOLIDAY";
+  if (!muted) return base;
+
+  const window = formatConfigWindow(session);
   return {
+    ...base,
+    currentState: "PRE_CONFIG",
+    flipCondition: `Engine activates after ${window} configuration window.`,
+    decisionTrace: [
+      {
+        ts: base.asOf,
+        event: "Awaiting configuration window — no envelope plotted yet",
+        weight: "key",
+      },
+    ],
+    invalidation: null,
+    plannedEnvelope: null,
+    lines: [],
+  };
+}
+
+function applySpyPreConfigOverride(
+  base: AdaptedSnapshot,
+  now: Date = new Date(),
+): AdaptedSnapshot {
+  // Lazy import to avoid pulling sessions into anything that doesn't
+  // need the override.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { getSessionInfo, formatConfigWindow } = require("./sessions") as typeof import(
+    "./sessions"
+  );
+  const session = getSessionInfo("SPY", now);
+  const muted =
+    session.phase === "PRE_CONFIG" ||
+    session.phase === "CLOSED_WEEKEND" ||
+    session.phase === "CLOSED_HOLIDAY";
+  if (!muted) return base;
+
+  const window = formatConfigWindow(session);
+  return {
+    ...base,
+    currentState: "PRE_CONFIG",
+    flipCondition: `Engine activates after ${window} configuration window.`,
+    decisionTrace: [
+      {
+        ts: base.asOf,
+        event: "Awaiting configuration window — no lines plotted yet",
+        weight: "key",
+      },
+    ],
+    invalidation: null,
+    lines: [],
+  };
+}
+
+export function adaptSnapshot(
+  raw: RawSnapshot,
+  now: Date = new Date(),
+): AdaptedSnapshot {
+  const { intel, strikes } = mapOptions(raw);
+  const adapted: AdaptedSnapshot = {
     source: raw.source,
     asOf: raw.asOf,
     decision: mapDecision(raw),
@@ -869,4 +950,5 @@ export function adaptSnapshot(raw: RawSnapshot): AdaptedSnapshot {
     optionsChain: raw.options ?? null,
     shellState: mapShell(raw),
   };
+  return applySpyPreConfigOverride(adapted, now);
 }

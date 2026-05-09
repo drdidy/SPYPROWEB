@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from "react";
 
-import { adaptSnapshot, type RawSnapshot, type AdaptedSnapshot } from "./snapshot-adapter";
+import { adaptSnapshot, applySpxSessionGate, type RawSnapshot, type AdaptedSnapshot } from "./snapshot-adapter";
 import {
   decision as mockDecision,
   shellState as mockShell,
@@ -93,7 +93,7 @@ export function useLiveSPX(initial?: SPXSnapshot): SPXSnapshot {
         const res = await fetch("/api/spx/snapshot", { cache: "no-store" });
         if (!res.ok) return;
         const next = (await res.json()) as SPXSnapshot;
-        if (!abort) setSnap(next);
+        if (!abort) setSnap(applySpxSessionGate(next));
       } catch {
         // keep last good
       }

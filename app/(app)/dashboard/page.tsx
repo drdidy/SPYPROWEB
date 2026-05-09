@@ -11,6 +11,7 @@ import { HelpHint } from "@/components/slate/HelpHint";
 import { AsOfTicker } from "@/components/slate/AsOfTicker";
 import { SetAlertButton } from "@/components/slate/SetAlertButton";
 import { WhyThisStateLink } from "@/components/slate/WhyThisStateLink";
+import { NextEventLine, NextEventCallout } from "@/components/slate/NextEventLine";
 import { loadLiveSnapshot } from "@/lib/snapshot-fetch";
 import { loadSnapshot as loadSpxSnapshot } from "@/lib/spx-fetch";
 import type { AdaptedSnapshot } from "@/lib/snapshot-adapter";
@@ -34,16 +35,16 @@ export default async function Page() {
   const spx = spxLoaded.snap;
   const spxSource = spxLoaded.source;
 
+  // Source badges intentionally not rendered here — feed health lives
+  // in the TopBar and any error/seed mode degrades the FeedHealthBadge
+  // dot. The State Ladder sits directly under the top bar with the
+  // page's standard top spacing.
+  void spySource;
+  void spyError;
+  void spxSource;
+
   return (
     <div className="max-w-[1440px] mx-auto pb-16 space-y-8 pt-6">
-      {/* Source badges live above the ladder as a thin diagnostic strip
-          — the marketing headline + eyebrow were costing too much above-
-          the-fold space. */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <SourceBadge label="SPY" source={spySource} error={spyError} />
-        <SourceBadge label="SPX" source={spxSource === "live" ? "live" : "mock"} />
-      </div>
-
       <EngineLadders
         spyState={spy.currentState}
         spxState={(spx.currentState as EngineState | undefined) ?? "STAND_DOWN"}
@@ -117,13 +118,19 @@ function LadderRow({
 }) {
   const labelClass = engine === "SPX" ? "text-violet" : "text-ink-3";
   return (
-    <div className="flex items-center gap-3 px-4 py-3 overflow-x-auto">
-      <span
-        className={`font-mono text-[10px] tracking-[0.16em] uppercase shrink-0 w-9 ${labelClass}`}
-      >
-        {engine}
-      </span>
-      <StateLadder engine={engine} current={state} />
+    <div className="flex flex-col gap-1 px-4 py-3">
+      <div className="flex items-center gap-3 overflow-x-auto">
+        <span
+          className={`font-mono text-[10px] tracking-[0.16em] uppercase shrink-0 w-9 ${labelClass}`}
+        >
+          {engine}
+        </span>
+        <StateLadder engine={engine} current={state} />
+      </div>
+      {/* Per-engine countdown line — re-evaluates every 30s. */}
+      <div className="pl-12">
+        <NextEventLine engine={engine} />
+      </div>
     </div>
   );
 }
@@ -132,12 +139,16 @@ function LadderRow({
 
 function SpyVerdictCard({ snap }: { snap: AdaptedSnapshot }) {
   const { decision, signal, quality, currentPrice } = snap;
-  const headline = spyHeadline(snap.currentState, decision.verdict);
+  const isPreConfig = snap.currentState === "PRE_CONFIG";
+  const headline = isPreConfig
+    ? "Awaiting setup"
+    : spyHeadline(snap.currentState, decision.verdict);
   const closestLine = nearestLine(snap.lines);
   const alertLevel = closestLine ? closestLine.currentValue : currentPrice;
   const alertContext = closestLine
     ? `Track ${snap.currentState === "STAND_DOWN" ? "the closest primary line" : "this trigger"} (${closestLine.name}) at ${closestLine.currentValue.toFixed(2)}.`
     : undefined;
+  const change = decision.conviction != null ? snap.shellState.change : 0;
 
   return (
     <Card className="overflow-hidden">
@@ -148,31 +159,49 @@ function SpyVerdictCard({ snap }: { snap: AdaptedSnapshot }) {
             <span className="font-serif text-display tracking-tight">
               {headline}
             </span>
-            <span className="font-mono text-sm text-ink-3 tabular-nums">
-              {currentPrice.toFixed(2)}
-            </span>
+            <PriceWithDelta price={currentPrice} change={change} />
           </span>
         }
       />
       <CardBody className="space-y-4">
         <p className="text-[14px] text-ink-2 leading-relaxed">
-          {decision.finalExplanation || snap.bias.explanation || "Engine is initializing."}
+          {isPreConfig
+            ? "Lines plot during the Mon 03:00–07:00 CT configuration window. No active triggers yet."
+            : decision.finalExplanation ||
+              snap.bias.explanation ||
+              "Engine is initializing."}
         </p>
         <div className="grid grid-cols-3 gap-3 pt-3 border-t border-rule">
           <MetricCol label="Conviction">
-            <ConvictionMeter value={decision.conviction} />
+            {isPreConfig ? (
+              <PendingMetric />
+            ) : (
+              <ConvictionMeter value={decision.conviction} />
+            )}
           </MetricCol>
           <MetricCol label="Bias">
-            <BiasValue bias={snap.bias.bias} />
+            {isPreConfig ? <PendingMetric /> : <BiasValue bias={snap.bias.bias} />}
           </MetricCol>
           <MetricCol label="Grade">
-            <GradeValue grade={signal && quality ? quality.grade : null} />
+            {isPreConfig ? (
+              <PendingMetric />
+            ) : (
+              <GradeValue grade={signal && quality ? quality.grade : null} />
+            )}
           </MetricCol>
         </div>
-        <FlipsLine condition={snap.flipCondition} />
-        <InvalidationLine invalidation={snap.invalidation} />
+        {isPreConfig ? (
+          <NextEventCallout engine="SPY" />
+        ) : (
+          <>
+            <FlipsLine condition={snap.flipCondition} />
+            <InvalidationLine invalidation={snap.invalidation} />
+          </>
+        )}
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          <SetAlertButton symbol="SPY" level={alertLevel} context={alertContext} />
+          {!isPreConfig && (
+            <SetAlertButton symbol="SPY" level={alertLevel} context={alertContext} />
+          )}
           <Link
             href="/spy"
             className="inline-flex items-center gap-1 h-8 px-3 rounded-pill bg-paper-2 text-ink-2 hover:text-ink hover:bg-paper-2/70 font-mono text-[11px] uppercase tracking-[0.10em] transition-colors"
@@ -242,7 +271,9 @@ function SpxVerdictCard({ snap }: { snap: SPXSnapshot }) {
   const action = snap.confluence.action;
   const score = Math.round(snap.confluence.score);
   const change = snap.price.change;
-  const headline = spxHeadline((snap.currentState as EngineState | undefined) ?? "STAND_DOWN", action);
+  const state = (snap.currentState as EngineState | undefined) ?? "STAND_DOWN";
+  const isPreConfig = state === "PRE_CONFIG";
+  const headline = isPreConfig ? "Awaiting setup" : spxHeadline(state, action);
   const isOutside = snap.scenario === "OUTSIDE_PLAY";
 
   const closestLine = nearestSpxLine(snap.lines);
@@ -260,42 +291,64 @@ function SpxVerdictCard({ snap }: { snap: SPXSnapshot }) {
             <span className="font-serif text-display tracking-tight">
               {headline}
             </span>
-            {isOutside && (
+            {!isPreConfig && isOutside && (
               <HelpHint
                 label="Outside play"
                 hint="The last print sits outside today's planned play envelope. No qualifying setup until price re-enters the envelope."
               />
             )}
-            <span className="font-mono text-sm text-ink-3 tabular-nums">
-              {snap.price.last.toFixed(2)}
-            </span>
+            <PriceWithDelta price={snap.price.last} change={change} />
           </span>
         }
       />
       <CardBody className="space-y-4">
         <p className="text-[14px] text-ink-2 leading-relaxed">
-          {snap.scenarioExplanation || snap.channel.reason || "Channel is initializing."}
+          {isPreConfig
+            ? "Envelope plots during the Sun 17:00–Mon 02:00 CT configuration window. No envelope yet."
+            : snap.scenarioExplanation ||
+              snap.channel.reason ||
+              "Channel is initializing."}
         </p>
         <div className="grid grid-cols-3 gap-3 pt-3 border-t border-rule">
-          <MetricCol label="Score">
-            <div className="flex flex-col gap-1.5 w-full">
-              <ScoreTrack value={score} bands={normalizedBands(snap.scoreBands)} />
-              <span className="font-mono text-[10px] text-ink-3 tabular-nums">
-                {score}/100
-              </span>
-            </div>
+          <MetricCol label="Conviction">
+            {isPreConfig ? (
+              <PendingMetric />
+            ) : (
+              <div className="flex flex-col gap-1.5 w-full">
+                <ScoreTrack value={score} bands={normalizedBands(snap.scoreBands)} />
+                <span className="font-mono text-[10px] text-ink-3 tabular-nums">
+                  {score}/100
+                </span>
+              </div>
+            )}
           </MetricCol>
           <MetricCol label="Channel">
-            <ChannelValue direction={snap.channel.direction} />
+            {isPreConfig ? (
+              <PendingMetric />
+            ) : (
+              <ChannelValue direction={snap.channel.direction} />
+            )}
           </MetricCol>
-          <MetricCol label="Δ today">
-            <DeltaCell value={change} />
+          <MetricCol label="Grade">
+            {isPreConfig ? (
+              <PendingMetric />
+            ) : (
+              <SpxGradeValue action={action} />
+            )}
           </MetricCol>
         </div>
-        <FlipsLine condition={snap.flipCondition} />
-        <InvalidationLine invalidation={snap.invalidation ?? null} />
+        {isPreConfig ? (
+          <NextEventCallout engine="SPX" />
+        ) : (
+          <>
+            <FlipsLine condition={snap.flipCondition} />
+            <InvalidationLine invalidation={snap.invalidation ?? null} />
+          </>
+        )}
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          <SetAlertButton symbol="SPX" level={alertLevel} context={alertContext} />
+          {!isPreConfig && (
+            <SetAlertButton symbol="SPX" level={alertLevel} context={alertContext} />
+          )}
           <Link
             href="/spx"
             className="inline-flex items-center gap-1 h-8 px-3 rounded-pill bg-paper-2 text-ink-2 hover:text-ink hover:bg-paper-2/70 font-mono text-[11px] uppercase tracking-[0.10em] transition-colors"
@@ -309,9 +362,7 @@ function SpxVerdictCard({ snap }: { snap: SPXSnapshot }) {
             engine="SPX"
             trace={snap.decisionTrace ?? []}
             flipCondition={snap.flipCondition}
-            currentStateLabel={
-              (snap.currentState as string | undefined)?.replace(/_/g, " ")
-            }
+            currentStateLabel={state.replace(/_/g, " ")}
           />
         </CardFooterRow>
       </CardBody>
@@ -440,24 +491,77 @@ function GradeValue({ grade }: { grade: string | null }) {
   );
 }
 
-// Signed change cell for the SPX "Δ today" metric. When zero, render
-// just "0.00" in neutral — no leading sign, never bull green. When
-// non-zero, render with explicit sign and semantic color.
-function DeltaCell({ value }: { value: number }) {
-  const isZero = Math.abs(value) < 0.005;
-  if (isZero) {
+// Headline price + signed delta. The delta moved here from the
+// SPX metric grid — it's a price attribute, not a metric. Hidden
+// when zero (never `+0.00`).
+function PriceWithDelta({ price, change }: { price: number; change: number }) {
+  const isZero = Math.abs(change) < 0.005;
+  return (
+    <span className="inline-flex items-baseline gap-2 whitespace-nowrap">
+      <span className="font-mono text-sm text-ink-3 tabular-nums">
+        {price.toFixed(2)}
+      </span>
+      {!isZero && (
+        <span
+          className={`font-mono text-[11px] tabular-nums ${change > 0 ? "text-state-bullish" : "text-state-bearish"}`}
+          data-num
+        >
+          {change > 0 ? "+" : "−"}
+          {Math.abs(change).toFixed(2)}
+        </span>
+      )}
+    </span>
+  );
+}
+
+// Em-dash placeholder used in the metric grid when the engine is in
+// PRE_CONFIG. Shared tooltip explains why the value is blank.
+function PendingMetric() {
+  return (
+    <span
+      title="Metrics populate after configuration completes."
+      className="font-mono text-[13px] text-state-neutral cursor-help"
+    >
+      —
+    </span>
+  );
+}
+
+// SPX side of the "Grade" column. The engine's confluence action
+// (TAKE / SELECTIVE / STAND_DOWN) maps onto a letter grade so the
+// column rhythm matches SPY. NULL action → "Grade — pending" with
+// the same tooltip the SPY side uses.
+function SpxGradeValue({ action }: { action: string }) {
+  const grade =
+    action === "TAKE"
+      ? "A"
+      : action === "SELECTIVE"
+        ? "B"
+        : action === "STAND_DOWN"
+          ? "C"
+          : null;
+  if (!grade) {
     return (
-      <span className="font-mono text-[13px] font-semibold tabular-nums text-state-neutral" data-num>
-        0.00
+      <span
+        title="Grade is assigned post-trigger."
+        className="font-mono text-[12px] text-ink-3"
+      >
+        Grade — pending
       </span>
     );
   }
-  const tone = value > 0 ? "text-state-bullish" : "text-state-bearish";
-  const sign = value > 0 ? "+" : "−";
+  const tone =
+    grade === "A"
+      ? "text-state-bullish"
+      : grade === "B"
+        ? "text-gold-ink"
+        : "text-state-neutral";
   return (
-    <span className={`font-mono text-[13px] font-semibold tabular-nums ${tone}`} data-num>
-      {sign}
-      {Math.abs(value).toFixed(2)}
+    <span
+      className={`font-mono text-[13px] font-semibold tabular-nums ${tone}`}
+      data-num
+    >
+      {grade}
     </span>
   );
 }
