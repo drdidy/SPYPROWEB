@@ -138,7 +138,7 @@ export function MethodologyTriad() {
           </span>
         </h2>
         <p className="mt-4 text-[16px] text-ink-2 leading-relaxed max-w-2xl">
-          Prophet doesn&apos;t promise new signals. It promises the same routine
+          Prophet doesn’t promise new signals. It promises the same routine
           every morning. Same read, same lines, same bar. Run it long enough
           and reading the day stops feeling like work.
         </p>
