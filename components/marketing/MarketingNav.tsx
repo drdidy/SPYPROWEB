@@ -36,12 +36,15 @@ export function MarketingNav() {
           <Wordmark />
         </Link>
 
-        <nav className="hidden md:flex items-center gap-7 ml-2">
+        <nav
+          aria-label="Marketing site sections"
+          className="hidden md:flex items-center gap-7 ml-2"
+        >
           {links.map((l) => (
             <a
               key={l.href}
               href={l.href}
-              className="text-[13px] text-ink-2 hover:text-ink transition-colors"
+              className="text-[13px] text-ink-2 hover:text-ink transition-colors outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-4 focus-visible:ring-offset-canvas rounded-soft -mx-1 px-1"
             >
               {l.label}
             </a>
@@ -49,14 +52,21 @@ export function MarketingNav() {
         </nav>
 
         <div className="ml-auto flex items-center gap-3">
-          <Link
-            href="/dashboard"
-            className="text-[13px] text-ink-2 hover:text-ink transition-colors hidden sm:inline"
-          >
-            Sign in
-          </Link>
+          {/* "Sign in" link removed for logged-out visitors — there's
+              no auth wall on /dashboard yet, so showing a Sign in
+              link is misleading.
+              TODO(auth): once /dashboard is gated by a real auth
+              check, re-render this link conditional on
+              !session?.user. Until then, the only path into the
+              workspace from the marketing site is the waitlist. */}
           <a href="#waitlist">
-            <Button variant="primary" size="sm">
+            {/* min-h ensures the tap target meets the 44×44 spec on
+                touch devices even though the visual size stays sm. */}
+            <Button
+              variant="primary"
+              size="sm"
+              className="min-h-[44px] sm:min-h-0"
+            >
               Join the waitlist <ArrowRight size={13} />
             </Button>
           </a>

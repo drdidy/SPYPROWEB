@@ -56,7 +56,7 @@ const surfaces = [
 
 export function SurfacesGrid() {
   return (
-    <section id="surfaces" className="max-w-[1240px] mx-auto px-7 py-20 lg:py-28">
+    <section id="surfaces" className="max-w-[1240px] mx-auto px-7 py-20 lg:py-28 scroll-mt-[88px]">
       <SectionLabel number="03">Six surfaces</SectionLabel>
 
       <div className="mt-8 grid grid-cols-12 gap-10 mb-12">
@@ -82,7 +82,7 @@ export function SurfacesGrid() {
             <Link
               key={s.n}
               href={s.href}
-              className="col-span-12 md:col-span-6 lg:col-span-4 group"
+              className="col-span-12 md:col-span-6 lg:col-span-4 group outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-4 focus-visible:ring-offset-canvas rounded-card"
             >
               <article className="surface rounded-card p-6 h-full transition-all duration-200 ease-swift group-hover:shadow-card-hover">
                 <div className="flex items-start justify-between mb-5">
