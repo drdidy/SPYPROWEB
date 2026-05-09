@@ -14,6 +14,8 @@ import {
   renderSessionSegment,
 } from "@/lib/sessions";
 import { formatNumber, isLoadedNumber } from "@/lib/format-number";
+import { deriveProvenance } from "@/lib/spx-provenance";
+import { SpxProvenanceBadge, SpxDebugOverlay } from "@/components/decision-slate/SpxProvenance";
 import type { EngineState } from "@/lib/states";
 
 // ---------------------------------------------------------------------------
@@ -99,6 +101,13 @@ export function TopBar({
   const spyLoaded = isLoadedNumber(t.spy);
   const spxLoaded = isLoadedNumber(spxSnapshot.price.last);
 
+  // v6 P0-4: derive provenance from the snapshot's _meta block. The
+  // result drives the SPX badge (live / synthetic / stale) and the
+  // Cmd+Shift+D debug overlay. Memo-free — `useLiveSPX` returns a
+  // new object on each poll, so a fresh derive every render is the
+  // simplest correct behaviour.
+  const spxProvenance = deriveProvenance(spxSnapshot._meta);
+
   return (
     <header
       className={cn(
@@ -180,6 +189,11 @@ export function TopBar({
               />
             }
           />
+          {/* P0-4: SPX is a synthetic value derived from ES front-
+              month + basis. The badge surfaces the derivation tier
+              ("synthetic" / "stale") so a wrong-looking print is
+              never silent. */}
+          <SpxProvenanceBadge provenance={spxProvenance} />
         </Quote>
         <Quote label="VIX">
           <ValueWithTooltip
@@ -239,6 +253,15 @@ export function TopBar({
           <Bell size={15} />
         </button>
       </div>
+
+      {/* P0-4: dev-only diagnostic, toggled by Cmd/Ctrl + Shift + D.
+          Renders nothing until the keystroke fires, so prod users
+          never see it. Sits in a portal-equivalent fixed wrapper
+          so it isn't clipped by the TopBar's overflow-hidden. */}
+      <SpxDebugOverlay
+        provenance={spxProvenance}
+        displayedSpx={spxLoaded ? spxSnapshot.price.last : null}
+      />
     </header>
   );
 }

@@ -16,6 +16,8 @@ import { RecommendedAction } from "@/components/decision-slate/RecommendedAction
 import { PreviewState } from "@/components/decision-slate/PreviewState";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { ErrorState } from "@/components/ui/ErrorState";
+import { SpxProvenanceBadge } from "@/components/decision-slate/SpxProvenance";
+import { deriveProvenance } from "@/lib/spx-provenance";
 import { SLATE_COPY } from "@/content/copy";
 import { loadLiveSnapshot } from "@/lib/snapshot-fetch";
 import { loadSnapshot as loadSpxSnapshot } from "@/lib/spx-fetch";
@@ -532,6 +534,12 @@ function SpxVerdictCard({
           )}
           {!isPreConfig && (
             <PriceWithDelta price={snap.price.last} change={change} />
+          )}
+          {/* P0-4: SPX is synthetic (ES + basis). Surface the
+              derivation tier next to the price so a wrong-looking
+              number is never silent. */}
+          {!isPreConfig && (
+            <SpxProvenanceBadge provenance={deriveProvenance(snap._meta)} />
           )}
         </span>
       }

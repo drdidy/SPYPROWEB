@@ -6,6 +6,115 @@ entries grow newest-first.
 
 ## [Unreleased]
 
+### SPX value provenance (P0-4)
+
+The SPX value rendered on /dashboard is a synthetic: the engine
+pulls ES front-month bars and computes `displayed = ES_spot +
+applied_offset` for every user-facing "SPX" value. When the basis
+(offset) drifts — stale capture, wrong futures contract, or env
+override mismatch — the SPX number reads wrong. v6 makes that
+honestly visible to users and instantly diagnosable for
+engineers.
+
+**Documented data flow** (`lib/spx-provenance.ts`):
+
+  1. `api/_lib/spx_data.CompositeFetcher`
+     → Tastytrade primary (broker quote), yfinance fallback.
+  2. `Fetcher.fetch_es_bars(start, as_of)`
+     → ES front-month hourly OHLCV.
+  3. `Fetcher.fetch_sync_quote()`
+     → `SyncQuote { spx_spot, es_spot, offset, captured_at }`.
+     The offset = `spx_spot - es_spot` at capture time.
+  4. `applied_offset` = `SPX_ES_OFFSET_OVERRIDE` env (when set,
+     for broker-spread alignment) ELSE `quote.offset`.
+  5. `compute_snapshot(bars, applied_offset, as_of)` runs the
+     channel engine. Every line / level / `price.last` in the
+     emitted SPXSnapshot is `ES + applied_offset`.
+  6. Provenance surfaced to the FE via `SPXSnapshot._meta`:
+     `{ esSpot, spxSpot, appliedOffset, computedOffset,
+        offsetSource, quoteCapturedAt, asOf, ... }`.
+
+**Trust tiers** (`lib/spx-provenance.ts → SpxTrust`):
+
+  - `live`      — cash market open AND basis < 60s old.
+  - `synthetic` — cash market closed; honest "ES + basis" read.
+  - `stale`     — basis > 60s old; visible warning chip.
+
+`STALE_BASIS_MS = 60_000` per the spec. `isCashMarketOpenNow()`
+flips the synthetic / live distinction at RTH boundaries
+(M-F 08:30-15:00 CT).
+
+**User-facing affordances**
+
+- `<SpxProvenanceBadge />` — small pill rendered next to the SPX
+  value. `live` is invisible (no clutter when the value is
+  trustworthy). `synthetic` is a neutral "synthetic" pill on
+  paper-2/60. `stale` is a warm-warning ochre pill that's
+  unmissable. Both wrap an `<InfoTooltip>` whose body cites the
+  raw ES spot, the basis, and the basis age — so a wrong-looking
+  print is never silent.
+- Mounted in two places:
+  1. Global TopBar SPX quote (next to `5872.00`).
+  2. Dashboard SPX verdict-card price (next to `Take the channel
+     · 5872.00 · +12.40`).
+
+**Dev debug overlay**
+
+`<SpxDebugOverlay />` — fixed-position panel toggled by
+**Cmd+Shift+D** (or Ctrl+Shift+D on non-mac). Esc dismisses.
+Renders nothing until the keystroke fires, so prod users never
+see it. Surfaces:
+
+    trust              live | synthetic | stale
+    es spot (basis)    5843.50
+    spx spot (basis)   5872.00
+    basis (offset)     +28.50
+    computed spx       5872.00
+    displayed spx      5872.00
+    displayed − comp.  +0.00
+    basis age          12s
+    captured at        2026-05-12T15:00:00Z
+    offset source      computed | env_override | historical_replay
+
+The "displayed − computed" delta is the single number that
+catches every flavour of SPX bug in seconds rather than minutes
+spent grepping the snapshot JSON in devtools.
+
+**Backend drift check**
+
+`scripts/test-spx-drift.ts` — fetches our `/api/spx/snapshot`
+and yfinance's `^GSPC` cash quote, asserts the displayed SPX is
+within ±2 pts of cash during RTH, fails the build otherwise.
+Skips with a non-failure message when:
+  - `SPX_API_BASE` env is unset (local dev), or
+  - cash market is currently closed (drift only meaningful
+    during RTH), or
+  - either upstream fetch fails.
+
+Wire into CI by setting `SPX_API_BASE=https://www.spyprophet.app`
+and running `npx tsx scripts/test-spx-drift.ts` in the same step
+that runs the rest of `scripts/test-*.ts`.
+
+**Verification**
+
+- `npx tsc --noEmit` clean.
+- `npx next build` clean. `/dashboard` ships at 13.4 kB
+  (115 kB first-load).
+- `scripts/test-spx-provenance.ts` (new) — 19 cases pass.
+- `scripts/test-spx-drift.ts` (new) — skips correctly when env
+  unavailable; ready for CI.
+- All other `scripts/test-*.ts` continue to pass.
+
+**Constraints respected**
+
+- User-facing label stays "SPX" everywhere; "synthetic" appears
+  only as a provenance badge / tooltip.
+- No backend changes — `_meta` was already emitted; v6 only
+  consumes it. The drift script is a black-box check, not a
+  backend modification.
+
+---
+
 ### Decision Slate v5 — production polish
 
 Ship-readiness pass on top of v4. Three blocking defects resolved
