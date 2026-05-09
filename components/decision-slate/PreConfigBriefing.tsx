@@ -102,7 +102,10 @@ function EngineBriefing({ engine }: { engine: Engine }) {
         <LastSignalRecap recap={engine.lastSignal} />
       ) : (
         <p className="text-[11px] text-ink-3">
-          No recap available for the previous session.
+          No engine signal recorded for the previous session.{" "}
+          <span className="opacity-70">
+            (The recap reflects the engine&apos;s signal outcome, not user trades.)
+          </span>
         </p>
       )}
     </div>

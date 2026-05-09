@@ -18,6 +18,7 @@ import { PreConfigBriefing } from "@/components/decision-slate/PreConfigBriefing
 import { SLATE_COPY } from "@/content/copy";
 import { loadLiveSnapshot } from "@/lib/snapshot-fetch";
 import { loadSnapshot as loadSpxSnapshot } from "@/lib/spx-fetch";
+import { fetchLastSessionRecaps } from "@/lib/last-session-recap";
 import { getSessionInfo } from "@/lib/sessions";
 import type { AdaptedSnapshot } from "@/lib/snapshot-adapter";
 import type { DynamicLine, SPXSnapshot, SPXLine } from "@/lib/types";
@@ -34,8 +35,12 @@ export default async function Page() {
   // Both engines are independent fetches. Run them in parallel — the
   // slate is meant to be read in one glance, so a slow side shouldn't
   // hold up the other.
-  const [{ data: spy, source: spySource, error: spyError }, spxLoaded] =
-    await Promise.all([loadLiveSnapshot(), loadSpxSnapshot()]);
+  const [{ data: spy, source: spySource, error: spyError }, spxLoaded, recaps] =
+    await Promise.all([
+      loadLiveSnapshot(),
+      loadSpxSnapshot(),
+      fetchLastSessionRecaps(),
+    ]);
   const spx = spxLoaded.snap;
   const spxSource = spxLoaded.source;
 
@@ -63,21 +68,21 @@ export default async function Page() {
             label: "SPY",
             nextSetupISO: spySession.configWindowStart.toISOString(),
             nextSetupLabel: formatDayHM(spySession.configWindowStart),
-            lastSignal: null,
+            lastSignal: recaps.spy,
           }}
           spx={{
             label: "SPX",
             nextSetupISO: spxSession.configWindowStart.toISOString(),
             nextSetupLabel: formatDayHM(spxSession.configWindowStart),
-            lastSignal: null,
+            lastSignal: recaps.spx,
           }}
         />
       )}
 
       <SectionLabel>Today's read</SectionLabel>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <SpyVerdictCard snap={spy} />
-        <SpxVerdictCard snap={spx} />
+        <SpyVerdictCard snap={spy} lastSignal={recaps.spy} />
+        <SpxVerdictCard snap={spx} lastSignal={recaps.spx} />
       </div>
 
       <TimelineRow
@@ -171,7 +176,13 @@ function LadderRow({
 
 // ---- SPY ----
 
-function SpyVerdictCard({ snap }: { snap: AdaptedSnapshot }) {
+function SpyVerdictCard({
+  snap,
+  lastSignal,
+}: {
+  snap: AdaptedSnapshot;
+  lastSignal: import("@/types/decision-slate").LastSignalSummary | null;
+}) {
   const { decision, signal, quality, currentPrice } = snap;
   const isPreConfig = snap.currentState === "PRE_CONFIG";
   const headline = isPreConfig
@@ -250,7 +261,7 @@ function SpyVerdictCard({ snap }: { snap: AdaptedSnapshot }) {
         {(isPreConfig ||
           snap.currentState === "STAND_DOWN" ||
           snap.currentState === "COOLDOWN") && (
-          <LastSignalRecap recap={null} />
+          <LastSignalRecap recap={lastSignal} />
         )}
         {isPreConfig ? (
           <NextEventCallout engine="SPY" />
@@ -335,7 +346,13 @@ function SpyReadCard({ snap }: { snap: AdaptedSnapshot }) {
 
 // ---- SPX ----
 
-function SpxVerdictCard({ snap }: { snap: SPXSnapshot }) {
+function SpxVerdictCard({
+  snap,
+  lastSignal,
+}: {
+  snap: SPXSnapshot;
+  lastSignal: import("@/types/decision-slate").LastSignalSummary | null;
+}) {
   const action = snap.confluence.action;
   const score = Math.round(snap.confluence.score);
   const change = snap.price.change;
@@ -414,7 +431,7 @@ function SpxVerdictCard({ snap }: { snap: SPXSnapshot }) {
           </Metric>
         </div>
         {(isPreConfig || state === "STAND_DOWN" || state === "COOLDOWN") && (
-          <LastSignalRecap recap={null} />
+          <LastSignalRecap recap={lastSignal} />
         )}
         {isPreConfig ? (
           <NextEventCallout engine="SPX" />
