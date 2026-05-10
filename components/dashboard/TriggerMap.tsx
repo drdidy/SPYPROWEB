@@ -32,6 +32,31 @@ export function TriggerMap({
   lines: DynamicLine[];
   healthAction?: ReactNode;
 }) {
+  if (lines.length === 0) {
+    return (
+      <Card>
+        <CardHeader
+          eyebrow="Trigger Map"
+          title="Levels in play"
+          meta="Waiting for qualified structure"
+          action={healthAction}
+        />
+        <CardBody>
+          <div className="rounded-soft border border-rule bg-paper-2 px-4 py-5">
+            <div className="font-serif text-headline text-ink-2 italic font-light">
+              No qualified levels yet.
+            </div>
+            <p className="mt-2 max-w-lg text-[13px] leading-relaxed text-ink-3">
+              SPY levels arm after the premarket anchor window resolves and the
+              engine has a current line to evaluate. Until then, this panel is
+              intentionally quiet.
+            </p>
+          </div>
+        </CardBody>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader

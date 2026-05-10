@@ -1,7 +1,9 @@
 "use client";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 import { StatusPill } from "@/components/ui/StatusPill";
 import type { OptionsIntel as Intel, SelectedStrikes } from "@/lib/types";
+import { RefreshCw } from "lucide-react";
 import type { ReactNode } from "react";
 
 const alignmentVariant = {
@@ -43,6 +45,20 @@ export function OptionsIntelPanel({
             outside market hours, or the connection is still warming up).
             This panel populates once the chain arrives.
           </p>
+          <div className="flex flex-wrap items-center gap-3 pt-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => window.location.reload()}
+            >
+              <RefreshCw size={13} strokeWidth={1.75} />
+              Retry chain
+            </Button>
+            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-3">
+              Next automatic refresh follows the session clock
+            </span>
+          </div>
         </CardBody>
       </Card>
     );

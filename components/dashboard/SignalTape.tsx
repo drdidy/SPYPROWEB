@@ -40,12 +40,11 @@ export function SignalTape({
         <CardBody>
           <div className="py-10">
             <div className="font-serif text-headline text-ink-3 italic font-light">
-              The tape is quiet.
+              Session still warming up.
             </div>
             <p className="mt-3 text-[13px] text-ink-3 leading-relaxed max-w-md">
-              No qualified rejection has printed yet today. Each event posts
-              here as it crosses the wire, with entry, line, grade, and
-              reasoning attached.
+              No qualified touch, rejection, break, or risk event has printed
+              yet. New events post here as the engine observes them.
             </p>
           </div>
         </CardBody>

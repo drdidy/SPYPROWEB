@@ -1,4 +1,5 @@
 "use client";
+import { PanelHeartbeat } from "@/components/channel/ChannelLiveBadge";
 import { Card } from "@/components/ui/Card";
 import { StatusPill } from "@/components/ui/StatusPill";
 import type { AdaptedSnapshot, AnchorGroup } from "@/lib/snapshot-adapter";
@@ -59,6 +60,18 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
     },
     null,
   );
+  const nearestStructural = snap.lines
+    .slice()
+    .sort((a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice))[0];
+  const nearestRead =
+    nearest ??
+    (nearestStructural
+      ? {
+          label: nearestStructural.name,
+          dist: nearestStructural.distanceFromPrice,
+          value: nearestStructural.currentValue,
+        }
+      : null);
 
   const todayLabel = new Date().toISOString().slice(0, 10);
 
@@ -81,9 +94,12 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
                 Session {todayLabel}
               </span>
             </div>
-            <StatusPill variant={verdictTone[verdict] ?? "stale"} pulse>
-              {verdict}
-            </StatusPill>
+            <div className="flex items-center gap-2">
+              <PanelHeartbeat feedId="anchor-levels" />
+              <StatusPill variant={verdictTone[verdict] ?? "stale"} pulse>
+                {verdict}
+              </StatusPill>
+            </div>
           </div>
 
           <div className="mt-6 flex items-end gap-4">
@@ -112,40 +128,45 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
           <div className="mt-7 max-w-md">
             <div className="flex items-baseline justify-between mb-1.5">
               <span className="eyebrow text-ink-3">Nearest line</span>
-              {nearest ? (
+              {nearestRead ? (
                 <span className="font-mono text-sm text-ink tabular-nums">
-                  <span className="font-semibold">{nearest.label}</span>
-                  <span className="text-ink-4 ml-1.5">{nearest.value.toFixed(2)}</span>
+                  <span className="font-semibold">{nearestRead.label}</span>
+                  <span className="text-ink-4 ml-1.5">{nearestRead.value.toFixed(2)}</span>
                   <span
-                    className={`ml-1.5 ${nearest.dist >= 0 ? "text-bear-ink" : "text-bull-ink"}`}
+                    className={`ml-1.5 ${nearestRead.dist >= 0 ? "text-bear-ink" : "text-bull-ink"}`}
                   >
-                    ({nearest.dist >= 0 ? "+" : ""}
-                    {nearest.dist.toFixed(2)} pts)
+                    ({nearestRead.dist >= 0 ? "+" : ""}
+                    {nearestRead.dist.toFixed(2)} pts)
                   </span>
                 </span>
               ) : (
                 <span className="font-mono text-sm text-ink-3 italic">
-                  no anchor today
+                  awaiting structure
                 </span>
               )}
             </div>
-            {nearest && (
+            {nearestRead ? (
               <div className="relative h-1 bg-paper-2 rounded-full overflow-hidden">
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{
-                    width: `${Math.max(2, Math.min(100, 100 - Math.abs(nearest.dist) * 20))}%`,
+                    width: `${Math.max(2, Math.min(100, 100 - Math.abs(nearestRead.dist) * 20))}%`,
                   }}
                   transition={{ duration: 0.8, ease: [0.2, 0.8, 0.2, 1] }}
                   className="absolute inset-y-0 left-0 bg-ink rounded-full"
                 />
               </div>
+            ) : (
+              <span className="block mt-2 text-ink-3 text-[13.5px]">
+                No qualifying premarket anchor is active. The slate is using
+                current structural context only until a qualified line arms.
+              </span>
             )}
           </div>
 
           <p className="mt-7 text-[15px] text-ink-2 leading-relaxed max-w-xl">
             {snap.decision.finalExplanation || snap.bias.explanation || "Engine is initializing today's read."}
-            {primary && (
+            {primary ? (
               <span className="block mt-2 text-ink-3 text-[13.5px]">
                 {primary.role === "ANCHOR_2" ? "Anchor 2" : "Primary anchor"} ·
                 low <span className="font-mono">{primary.anchorLow.toFixed(2)}</span> ·
@@ -155,6 +176,11 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
                     using the const above. */}
                 Bands offset above and below the anchor; both decay
                 through the session.
+              </span>
+            ) : (
+              <span className="block mt-2 text-ink-3 text-[13.5px]">
+                No qualifying premarket anchor is active. The slate is using
+                current structural context only until a qualified line arms.
               </span>
             )}
           </p>
@@ -179,37 +205,51 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            <BandStat
-              label="Upper"
-              value={primary?.bands.upper.currentValue ?? null}
-              price={snap.currentPrice}
-            />
-            <BandStat
-              label="Main"
-              value={primary?.bands.main.currentValue ?? null}
-              price={snap.currentPrice}
-              emphasized
-            />
-            <BandStat
-              label="Lower"
-              value={primary?.bands.lower.currentValue ?? null}
-              price={snap.currentPrice}
-            />
-          </div>
+          {primary ? (
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              <BandStat
+                label="Upper"
+                value={primary.bands.upper.currentValue}
+                price={snap.currentPrice}
+              />
+              <BandStat
+                label="Main"
+                value={primary.bands.main.currentValue}
+                price={snap.currentPrice}
+                emphasized
+              />
+              <BandStat
+                label="Lower"
+                value={primary.bands.lower.currentValue}
+                price={snap.currentPrice}
+              />
+            </div>
+          ) : (
+            <div className="mb-4 rounded-soft bg-paper px-3 py-3 shadow-rule">
+              <div className="eyebrow text-ink-3 mb-1">Anchor lines today</div>
+              <p className="text-[12px] leading-snug text-ink-3">
+                No anchor today. Nearest structural line is{" "}
+                {nearestStructural
+                  ? `${nearestStructural.name} ${nearestStructural.currentValue.toFixed(2)} (${nearestStructural.distanceFromPrice >= 0 ? "+" : ""}${nearestStructural.distanceFromPrice.toFixed(2)} pts from LAST).`
+                  : "not available yet."}
+              </p>
+            </div>
+          )}
 
           <AnchorDiagram snap={snap} />
 
-          <div className="mt-3 grid grid-cols-2 gap-3 text-[11px]">
-            <AnchorCell
-              label="Primary"
-              group={primary}
-            />
-            <AnchorCell
-              label="Anchor 2"
-              group={anchor?.anchor2 ?? null}
-            />
-          </div>
+          {primary && (
+            <div className="mt-3 grid grid-cols-2 gap-3 text-[11px]">
+              <AnchorCell
+                label="Primary"
+                group={primary}
+              />
+              <AnchorCell
+                label="Anchor 2"
+                group={anchor?.anchor2 ?? null}
+              />
+            </div>
+          )}
         </div>
       </div>
     </Card>
@@ -321,6 +361,9 @@ function AnchorDiagram({ snap }: { snap: AdaptedSnapshot }) {
 
   // Y range: include current price plus every band's anchor & current value.
   const yPoints: number[] = [snap.currentPrice];
+  for (const line of snap.lines.slice(0, 4)) {
+    yPoints.push(line.currentValue);
+  }
   for (const g of groups) {
     yPoints.push(g.anchorLow);
     yPoints.push(g.anchorLow + 3.4);
@@ -344,6 +387,9 @@ function AnchorDiagram({ snap }: { snap: AdaptedSnapshot }) {
 
   const xNow = xOf(now);
   const yPrice = yOf(snap.currentPrice);
+  const nearestLine = snap.lines
+    .slice()
+    .sort((a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice))[0];
 
   const renderGroup = (g: AnchorGroup, idx: number, isPrimary: boolean) => {
     const ts0 = new Date(g.anchorTime).getTime();
@@ -457,6 +503,31 @@ function AnchorDiagram({ snap }: { snap: AdaptedSnapshot }) {
       {primary && renderGroup(primary, 0, true)}
       {anchor2 && renderGroup(anchor2, 1, false)}
 
+      {!primary && nearestLine && (
+        <g>
+          <line
+            x1={PAD_L}
+            y1={yOf(nearestLine.currentValue)}
+            x2={W - PAD_R}
+            y2={yOf(nearestLine.currentValue)}
+            stroke="#B8821F"
+            strokeWidth={1.4}
+            strokeDasharray="4 3"
+            opacity={0.8}
+          />
+          <text
+            x={W - PAD_R - 4}
+            y={yOf(nearestLine.currentValue) - 6}
+            fontSize="9"
+            fontFamily="var(--font-geist-mono)"
+            fill="#8A6117"
+            textAnchor="end"
+          >
+            {nearestLine.name} {nearestLine.currentValue.toFixed(2)}
+          </text>
+        </g>
+      )}
+
       {/* current price horizontal */}
       <line
         x1={PAD_L}
@@ -474,7 +545,7 @@ function AnchorDiagram({ snap }: { snap: AdaptedSnapshot }) {
         <circle cx={xNow} cy={yPrice} r={8} fill="#14161A" opacity={0.12} className="spy-price-halo" />
       </g>
 
-      {!primary && (
+      {!primary && !nearestLine && (
         <text
           x={W / 2}
           y={H / 2}
@@ -483,7 +554,7 @@ function AnchorDiagram({ snap }: { snap: AdaptedSnapshot }) {
           fill="#9CA3AF"
           textAnchor="middle"
         >
-          No qualifying premarket anchor today
+          Awaiting qualified structure
         </text>
       )}
     </svg>
