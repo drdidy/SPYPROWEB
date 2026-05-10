@@ -24,6 +24,7 @@ import { ENGINE_STATES, type EngineState } from "@/lib/states";
 import { PHASE_DEFINITIONS } from "@/content/phase-definitions";
 import { Countdown } from "@/components/decision-slate/Countdown";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import { displayEngine } from "@/lib/engine-labels";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -71,7 +72,7 @@ export function StatePipeline({
 
   return (
     <section
-      aria-label={`${engine} engine state pipeline`}
+      aria-label={`${displayEngine(engine)} engine state pipeline`}
       // v5 #1: min-w-0 + overflow-hidden on the section is the
       // overflow guard. Without it, the inner stepper's intrinsic
       // width (7 step pills + 6 connectors) bullies the parent grid
@@ -90,13 +91,16 @@ export function StatePipeline({
             names the state — rendering "Pre-config" twice (title +
             chip) was redundant. The ticker now stands alone. */}
         <div className="shrink-0 self-start">
+          {/* v8 P1-2: SPX → ES at the render boundary. The `engine`
+              prop stays as the wire-level identifier so the data
+              path (snapshot keys, /api/spx) keeps working unchanged. */}
           <span
             className={cn(
               "font-mono text-[11px] tracking-[0.18em] uppercase font-bold",
               labelTone,
             )}
           >
-            {engine}
+            {displayEngine(engine)}
           </span>
         </div>
 
@@ -109,7 +113,7 @@ export function StatePipeline({
             responsive label below. */}
         <ol
           role="list"
-          aria-label={`${engine} state progression`}
+          aria-label={`${displayEngine(engine)} state progression`}
           className="flex items-center gap-0 flex-1 min-w-0 overflow-hidden"
         >
           {ENGINE_STATES.map((state, i) => {

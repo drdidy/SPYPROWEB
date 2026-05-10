@@ -14,6 +14,7 @@ import { LastSignalRecap } from "./LastSignalRecap";
 import { EngineTrackRecord } from "./EngineTrackRecord";
 import { Countdown } from "./Countdown";
 import { SLATE_COPY } from "@/content/copy";
+import { displayEngine } from "@/lib/engine-labels";
 import { cn } from "@/lib/utils";
 import type { LastSignalSummary } from "@/types/decision-slate";
 import type { EngineTrackRecord as TrackRecord } from "@/lib/track-record";
@@ -87,6 +88,10 @@ export function PreConfigBriefing({ spy, spx }: Props) {
 
 function EngineBriefing({ engine }: { engine: Engine }) {
   const labelTone = engine.label === "SPX" ? "text-violet" : "text-ink-2";
+  // v8 P1-2: SPX renders as "ES" everywhere on /dashboard. The
+  // engine.label prop stays as the wire identifier so the data
+  // path keeps working.
+  const display = displayEngine(engine.label);
   return (
     <div className="rounded-soft border border-rule bg-paper px-4 py-3 space-y-3">
       <div className="flex items-baseline justify-between gap-3">
@@ -96,7 +101,7 @@ function EngineBriefing({ engine }: { engine: Engine }) {
             labelTone,
           )}
         >
-          {engine.label}
+          {display}
         </span>
         <span className="font-mono text-meta text-ink-3 tabular-nums">
           Setup {engine.nextSetupLabel} ·{" "}
@@ -120,7 +125,7 @@ function EngineBriefing({ engine }: { engine: Engine }) {
           "outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
         )}
       >
-        Open {engine.label} channel
+        Open {display} channel
         <ArrowRight size={11} className="text-ink-4" aria-hidden />
       </Link>
     </div>

@@ -15,11 +15,11 @@ import {
 } from "@/lib/sessions";
 import { formatNumber, isLoadedNumber } from "@/lib/format-number";
 import { deriveProvenance } from "@/lib/spx-provenance";
-import {
-  SpxProvenanceBadge,
-  SpxDebugOverlay,
-  SpxAsOfMicrotext,
-} from "@/components/decision-slate/SpxProvenance";
+// v8 P1-3: SpxProvenanceBadge / SpxAsOfMicrotext no longer mounted
+// here — synthesis is gone from the header. SpxDebugOverlay stays;
+// the Cmd+Shift+D diagnostic still has value when investigating
+// engine-state discrepancies on /dashboard.
+import { SpxDebugOverlay } from "@/components/decision-slate/SpxProvenance";
 import type { EngineState } from "@/lib/states";
 
 // ---------------------------------------------------------------------------
@@ -100,16 +100,27 @@ export function TopBar({
 
   // v5 #2: routed through isLoadedNumber so the contract for "value
   // is renderable" lives in one place. 0 is treated as unloaded for
-  // VIX/SPY/SPX since 0 is never a real reading on those tickers.
+  // VIX/SPY since 0 is never a real reading on those tickers.
   const vixLoaded = isLoadedNumber(t.vix);
   const spyLoaded = isLoadedNumber(t.spy);
-  const spxLoaded = isLoadedNumber(spxSnapshot.price.last);
 
-  // v6 P0-4: derive provenance from the snapshot's _meta block. The
-  // result drives the SPX badge (live / synthetic / stale) and the
-  // Cmd+Shift+D debug overlay. Memo-free — `useLiveSPX` returns a
-  // new object on each poll, so a fresh derive every render is the
-  // simplest correct behaviour.
+  // v8 P1-4: header shows ES front-month directly (the engine's
+  // native data), not the SPX cash equivalent it used to synthesize
+  // via basis offset. Pull from `_meta.esSpot` — the raw ES quote
+  // captured at the basis snapshot. Delta is unavailable at the
+  // snapshot level (the snapshot only carries the SPX price.change
+  // pair), so we fall back to the SPX delta which is identical in
+  // points (basis is a constant). When ES isn't loaded yet, the
+  // value renders an em-dash via formatNumber.
+  const esSpot = spxSnapshot._meta?.esSpot ?? null;
+  const esDelta = spxSnapshot.price.change;
+  const esLoaded = isLoadedNumber(esSpot);
+
+  // v6 P0-4: provenance still computed for the dashboard verdict
+  // card (SpxProvenanceBadge mounted there) and the Cmd+Shift+D
+  // debug overlay. The header chip + microtext are gone (v8
+  // P1-3) — those displayed the synthesis tier, which is no
+  // longer relevant since we show ES directly.
   const spxProvenance = deriveProvenance(spxSnapshot._meta);
 
   return (
@@ -151,9 +162,12 @@ export function TopBar({
         <span aria-hidden className="text-ink-4 text-[10px]">
           ·
         </span>
+        {/* v8 P1-4: chip displays "ES" (the engine's native data
+            ticker). The href stays /spx — the page rename to /es
+            is a separate PR. */}
         <SymbolChip
           href="/spx"
-          symbol="SPX"
+          symbol="ES"
           verb={spxVerb}
           verbTone={spxTone}
           meta={spxMeta}
@@ -163,11 +177,15 @@ export function TopBar({
 
       <Divider className="hidden md:block" />
 
-      {/* CLUSTER 2: Quote ribbon — SPY / SPX / VIX. Each value gets a
-          tooltip with the exact close-or-update timestamp so the
-          old inline "· Fri close" suffix isn't needed. flex-1 +
-          min-w-0 lets the ribbon absorb slack and truncate
-          gracefully when there isn't room. */}
+      {/* CLUSTER 2: Quote ribbon — SPY · ES · VIX. v8 P1-3/P1-4
+          replaced the SPX-from-basis synthetic with the raw ES
+          front-month spot from `_meta.esSpot`. Synthesizing SPX
+          had a real value (one-glance cash-equivalent) but added
+          three failure modes (stale basis, env override, mock
+          fallback) that all rendered identically wrong. ES is the
+          number the engine actually trades on — the trader-aligned
+          read. The SyntheticChip + AsOfMicrotext are gone with
+          the synthesis. */}
       <div className="hidden md:flex flex-1 items-center justify-center gap-3 lg:gap-4 min-w-0 overflow-hidden">
         <Quote label="SPY" wrapClass="hidden lg:flex">
           <ValueWithTooltip
@@ -180,28 +198,19 @@ export function TopBar({
             }
           />
         </Quote>
-        <Quote label="SPX" wrapClass="hidden lg:flex">
+        <Quote label="ES" wrapClass="hidden lg:flex" accent="violet">
           <ValueWithTooltip
             staleness={staleness}
             stalenessAt={stalenessAt}
-            delta={spxSnapshot.price.change}
-            loaded={spxLoaded}
+            delta={esDelta}
+            loaded={esLoaded}
             value={
               <NumberFlash
-                value={spxSnapshot.price.last}
-                format={(n) => formatNumber(n)}
+                value={esSpot ?? 0}
+                format={(n) => (esLoaded ? formatNumber(n) : "—")}
               />
             }
           />
-          {/* P0-4 + v7 P0-5: badge marks tier (synthetic/stale) and
-              microtext shows basis age. Live tier hides both — no
-              clutter when the displayed SPX is the real cash print. */}
-          <SpxProvenanceBadge provenance={spxProvenance} />
-          {spxProvenance && spxProvenance.trust !== "live" && (
-            <span className="hidden 2xl:inline-flex">
-              <SpxAsOfMicrotext provenance={spxProvenance} />
-            </span>
-          )}
         </Quote>
         <Quote label="VIX">
           <ValueWithTooltip
@@ -268,7 +277,17 @@ export function TopBar({
           so it isn't clipped by the TopBar's overflow-hidden. */}
       <SpxDebugOverlay
         provenance={spxProvenance}
-        displayedSpx={spxLoaded ? spxSnapshot.price.last : null}
+        // v8 P1-3: synthesis is gone from the header; the debug
+        // overlay still uses `spxSnapshot.price.last` as the
+        // displayed value because /dashboard's SPX verdict card
+        // (when it renders, off-PRE_CONFIG) shows the synthetic
+        // SPX. The overlay's "displayed - computed" delta is
+        // only meaningful against that surface.
+        displayedSpx={
+          isLoadedNumber(spxSnapshot.price.last)
+            ? spxSnapshot.price.last
+            : null
+        }
       />
     </header>
   );
@@ -338,11 +357,16 @@ function Quote({
   label,
   children,
   wrapClass,
+  accent,
 }: {
   label: string;
   children: React.ReactNode;
   wrapClass?: string;
+  /** Optional ticker-tone for the label, matching the engine-card
+   *  eyebrow palette (violet for ES, default ink for SPY/VIX). */
+  accent?: "violet";
 }) {
+  const labelTone = accent === "violet" ? "text-violet" : "text-ink-3";
   return (
     <div
       className={cn(
@@ -350,7 +374,7 @@ function Quote({
         wrapClass,
       )}
     >
-      <span className="eyebrow text-ink-3">{label}</span>
+      <span className={cn("eyebrow", labelTone)}>{label}</span>
       <span className="text-[13px] font-mono font-semibold text-ink tabular-nums">
         {children}
       </span>
@@ -409,7 +433,12 @@ function ValueWithTooltip({
           {valueNode}
         </span>
       </InfoTooltip>
-      {!staleness && loaded && (
+      {/* v8 P0-1: hide the change slot when the delta is 0, NaN,
+          or otherwise non-renderable. Rendering "+0.00" looked
+          like a real read of "no change" but was actually the
+          fallback for "value not yet available" — visually
+          indistinguishable from a flat market. */}
+      {!staleness && loaded && Number.isFinite(delta) && delta !== 0 && (
         <span className="hidden xl:inline-flex shrink-0">
           <DeltaTag value={delta} />
         </span>

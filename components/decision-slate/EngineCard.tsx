@@ -21,6 +21,7 @@
 import { type ReactNode } from "react";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { AsOfTicker } from "@/components/slate/AsOfTicker";
+import { displayEngine } from "@/lib/engine-labels";
 import { cn } from "@/lib/utils";
 
 export interface EngineCardProps {
@@ -66,7 +67,11 @@ export function EngineCard({
                 ENGINE_TONE[engine],
               )}
             >
-              {engine}
+              {/* v8 P1-2: SPX renders as "ES" everywhere on
+                  /dashboard. ENGINE_TONE keys off the wire
+                  identifier; the displayed text is mapped at
+                  render time. */}
+              {displayEngine(engine)}
             </span>
             <span className="text-ink-4" aria-hidden>
               ·

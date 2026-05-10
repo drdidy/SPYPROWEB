@@ -24,6 +24,7 @@ import { loadSnapshot as loadSpxSnapshot } from "@/lib/spx-fetch";
 import { fetchLastSessionRecaps } from "@/lib/last-session-recap";
 import { fetchTrackRecord } from "@/lib/track-record";
 import { getSessionInfo } from "@/lib/sessions";
+import { relabelDashboardString } from "@/lib/engine-labels";
 import { cn } from "@/lib/utils";
 import type { AdaptedSnapshot } from "@/lib/snapshot-adapter";
 import type { DynamicLine, SPXSnapshot, SPXLine } from "@/lib/types";
@@ -107,7 +108,11 @@ export default async function Page() {
             engine="SPX"
             current={spxState}
             nextEventISO={spxSession.nextSignificantEvent.at.toISOString()}
-            nextEventLabel={spxSession.nextSignificantEvent.label}
+            // v8 P1-2: lib/sessions.ts produces "SPX setup opens" /
+            // "SPX RTH closes". /dashboard relabels to "ES" at the
+            // render boundary; the underlying session source stays
+            // as SPX for /spx and other consumers.
+            nextEventLabel={relabelDashboardString(spxSession.nextSignificantEvent.label)}
             explanation={spxExplanation(spxState, spx)}
           />
         </div>
@@ -176,14 +181,12 @@ export default async function Page() {
 function PageHeader() {
   return (
     <header className="flex items-center justify-between gap-4 flex-wrap">
-      <div className="min-w-0 flex items-baseline gap-3">
-        <p className="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-3">
-          Workspace
-        </p>
-        <h1 className="font-serif text-h2 text-ink tracking-tight">
-          Decision Slate
-        </h1>
-      </div>
+      {/* v8 P1-1: WORKSPACE eyebrow dropped — the H1 stands alone.
+          v2 added the eyebrow to anchor the slate inside the
+          broader app, but the sidebar already does that work. */}
+      <h1 className="font-serif text-h2 text-ink tracking-tight min-w-0">
+        Decision Slate
+      </h1>
       <InfoTooltip
         label={SLATE_COPY.helpAboutSlate.title}
         content={SLATE_COPY.helpAboutSlate.body}

@@ -37,7 +37,9 @@ function check(label: string, ok: boolean, detail?: string) {
 
 // Find the single section block — there's only one in the file.
 const section = src.match(
-  /<section[\s\S]*?aria-label=\{`\$\{engine\} engine state pipeline`\}[\s\S]*?<\/section>/m,
+  // v8: aria-label was wrapped through displayEngine() so the
+  // regex now allows that template variant too.
+  /<section[\s\S]*?aria-label=\{`\$\{(?:engine|displayEngine\(engine\))\} engine state pipeline`\}[\s\S]*?<\/section>/m,
 );
 if (!section) {
   console.log("✗  Could not locate <section> block");

@@ -15,6 +15,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { displayEngine } from "@/lib/engine-labels";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { SLATE_COPY } from "@/content/copy";
 import type {
@@ -92,7 +93,8 @@ export function EngineTrackRecord({ record, className }: Props) {
             labelTone,
           )}
         >
-          {record.engine}
+          {/* v8 P1-2: SPX renders as "ES" everywhere on /dashboard. */}
+          {displayEngine(record.engine)}
           <span className="ml-1.5 text-ink-3 font-medium tracking-[0.06em] normal-case">
             {SLATE_COPY.trackRecord.rangeLabel(record.sessions.length).toLowerCase()}
           </span>
@@ -188,7 +190,7 @@ export function EngineTrackRecord({ record, className }: Props) {
           "outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
         )}
       >
-        Open {record.engine} replay
+        Open {displayEngine(record.engine)} replay
         <ArrowRight size={11} className="text-ink-4" aria-hidden />
       </Link>
     </div>

@@ -18,6 +18,7 @@
 import { useEffect, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { displayEngine } from "@/lib/engine-labels";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { ConvictionTrack } from "@/components/slate/ConvictionTrack";
 
@@ -178,7 +179,8 @@ function PreviewCard({
                 tickerTone,
               )}
             >
-              {engine}
+              {/* v8 P1-2: SPX renders as "ES" everywhere on /dashboard. */}
+              {displayEngine(engine)}
             </span>
             <span className="text-ink-4" aria-hidden>
               ·

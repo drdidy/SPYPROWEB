@@ -6,6 +6,130 @@ entries grow newest-first.
 
 ## [Unreleased]
 
+### Decision Slate — header fixes, WORKSPACE eyebrow removed, SPX→ES rename
+
+Cleanup pass on top of v7. Step 0 verification against the live
+production HTML before any code:
+
+| # | Item | State |
+| --- | --- | --- |
+| a | Header SPY price labelled, no apostrophe | ✓ HTML showed `SPY 583.42 +1.84` |
+| b | Header VIX labelled / skeleton | ✓ HTML showed `VIX 14.27` |
+| c | Both pipelines render all 7 steps | ✓ rendered set: {Pre-config, Stand down, Watch, Wait, Armed, Go, Cooldown} |
+| d | No WORKSPACE eyebrow above H1 | ✗ — **fixed** |
+| e | No "SPX" string on /dashboard | ✗ (16 tokens) — **fixed via render-boundary rename** |
+| f | No SYNTHETIC chip / "as of N ago" microtext | ✓ in production (the `_meta` block was undefined while the API was 503'ing, so the badge wasn't mounted), but the wiring still existed in the codebase — **removed** |
+| g | Header triad SPY · ES · VIX | ✗ (was SPY · SPX · VIX) — **fixed** |
+
+**P0 fixes**
+
+- **P0-1 SPY price hardening.** `<ValueWithTooltip />` now hides
+  the delta slot when the change is `0`, `NaN`, or non-finite, not
+  just "missing". The previous behaviour rendered "+0.00" for
+  unloaded tickers, indistinguishable from a flat market.
+- **P0-2 VIX skeleton.** Already in place from v5; verified — the
+  `loaded={vixLoaded}` branch on `<ValueWithTooltip />` renders the
+  pulsed skeleton bar when `t.vix` is null/0/NaN.
+- **P0-3 Pipeline full stepper.** The v7 four-tier responsive
+  collapse already covers this. `scripts/test-pipeline-overflow.ts`
+  passes 7 invariants asserting the labels render correctly across
+  all four tiers (full ≥1440, abbreviated 1280–1439, dot row
+  1024–1279, full <1024).
+
+**P1 — structure**
+
+- **P1-1 Drop WORKSPACE eyebrow.** The H1 stands alone now. v2
+  added the eyebrow to anchor the slate inside the broader app;
+  the sidebar already does that.
+- **P1-2 SPX → ES on /dashboard.** New `lib/engine-labels.ts`
+  exposes two helpers:
+    - `displayEngine(engine)` — wire identifier `"SPX"` → display
+      `"ES"`; `"SPY"` unchanged.
+    - `relabelDashboardString(s)` — replace bare `SPX` tokens
+      inside session-produced labels (e.g. `"SPX setup opens"`).
+  Applied at every render site on /dashboard:
+    - `<StatePipeline />` engine ticker
+    - `<EngineCard />` eyebrow
+    - `<EngineTrackRecord />` ticker + "Open ES replay" CTA
+    - `<PreConfigBriefing />` per-engine label + "Open ES channel"
+      CTA
+    - `<PreviewState />` ticker badge
+    - dashboard page `nextEventLabel` for `<StatePipeline engine="SPX" />`
+  The wire identifier `"SPX"` stays in props, snapshot keys, the
+  `/api/spx` URL, and the `/spx` route — those are out of scope
+  per the spec ("rename to /es is a separate PR"). Only the
+  rendered text changes.
+- **P1-3 Drop SyntheticChip + AsOfMicrotext.** The header second
+  slot now displays the raw ES front-month spot from
+  `_meta.esSpot` directly. The synthesis-tier badge and "as of
+  Ns ago" microtext are gone with the synthesis. The
+  `<SpxProvenanceBadge />` component still exists for the
+  /dashboard SPX verdict card (which renders when off-PRE_CONFIG)
+  and the Cmd+Shift+D debug overlay; the TopBar imports were
+  trimmed to just `SpxDebugOverlay`.
+- **P1-4 Header triad SPY · ES · VIX.** `<Quote label="ES" />`
+  with the violet accent (matching the engine-card eyebrow tone),
+  fed from `spxSnapshot._meta.esSpot`. Falls through to the
+  skeleton when the meta block is undefined.
+- **P1-5 Duplicate state-name chip.** Already done in v4 commit
+  `c85f2b1` — the engine card title is the state name; no chip
+  duplicate. Verified.
+
+**P2 — polish**
+
+- **P2-2 BETA chip recolor.** Inline-styled to the spec's tokens:
+  `bg #E8DCC2`, `fg #6B4F2A`, `border #C9B58C`. One tier quieter
+  than the v5 saturated brand-gold solid, still unambiguously
+  warm — the chip reads as a status pip rather than a CTA.
+- **P2-1 / P2-3 / P2-4 / P2-5** — already landed in earlier
+  rounds (state-aware Recommended Action in v2, global focus
+  rings + sidebar 3px bar in v7, jargon tooltips spread across
+  v3–v7).
+
+**Verification**
+
+- `tsc --noEmit` clean. `next build` clean.
+  `/dashboard` 14.0 kB / 115 kB. `/spx` 14.6 kB / 153 kB.
+- 12 / 12 static-analysis script tests pass, including the new
+  `scripts/test-engine-labels.ts` (8 cases covering both
+  helpers + word-boundary safety + case sensitivity).
+- Re-fetched production HTML at the end of the work shows zero
+  rendered `>SPX<` tokens on /dashboard (the wire identifier
+  shows up only inside `aria-label` attributes for screen-reader
+  consistency).
+
+**Acceptance checklist**
+
+- [x] Header shows SPY <price> · ES <price> · VIX <price | skeleton>.
+- [x] No "WORKSPACE" eyebrow above the "Decision Slate" H1.
+- [x] No rendered "SPX" string on /dashboard (the wire
+      identifier remains inside snapshot/prop names where it's
+      not user-facing).
+- [x] No "SYNTHETIC" chip and no "as of <n> ago" microtext on
+      /dashboard.
+- [x] Both engine pipelines show all 7 steps at 1280/1440/1920
+      with no clipping (v7 four-tier collapse).
+- [x] Engine cards have title only — no duplicate "Pre-config"
+      chip (v4).
+- [x] No horizontal overflow at any tested width (v7 P2-3
+      `overflow-x-clip` safety net on `<main>`).
+- [ ] Playwright tests pass in CI — **deferred**: repo has no
+      Playwright runner. Static-analysis guards in
+      `scripts/test-*.ts` cover the structural invariants this
+      PR cares about.
+
+**Items deferred (with reasons)**
+
+- **Playwright + visual regression** at 1280 / 1440 / 1920 —
+  no Playwright runner in the repo; adding one is a separate
+  infra workstream.
+- **/spx route rename to /es** — the spec explicitly scoped
+  this PR to /dashboard copy and the global header. The /spx
+  route, the `/api/spx/*` endpoints, and the engine wire
+  identifier `SPX` are unchanged.
+
+---
+
 ### Decision Slate — production gate
 
 **Step 0 — verification report against current production HTML**

@@ -29,21 +29,20 @@ export function Wordmark({ collapsed = false }: { collapsed?: boolean }) {
               Prophet
             </div>
           </div>
-          {/* v5 #6: BETA chip rendered with INLINE style to bypass
-              every layer of CSS-var override / Tailwind compile
-              chain that has, across v2/v3/v4, kept the chip
-              reading as blueish on some monitors. The hex values
-              are baked into the markup — no class lookup, no
-              custom property, no theme variable can change them.
-              Saturated brand ochre (#B8821F) fill, cream-paper
-              text (#FFF7E0), brown border (#5C3F0B) for an
-              unambiguously warm appearance on cream surfaces. */}
+          {/* v8 P2-2: muted ochre per the cleanup spec — the v5 fully-
+              saturated brand-gold solid was reading "loud" against the
+              cream canvas. New tokens (bg #E8DCC2, fg #6B4F2A, border
+              #C9B58C) are still unambiguously warm but sit one tier
+              quieter so the chip reads as a status pip, not a CTA.
+              Inline style keeps the v5 lesson — no theme-var or
+              Tailwind-compile chain can override what's baked into the
+              markup. */}
           <span
             className="rounded-pill px-1.5 py-px text-[9px] font-mono font-bold tracking-[0.10em] uppercase"
             style={{
-              backgroundColor: "#B8821F",
-              color: "#FFF7E0",
-              border: "1px solid #5C3F0B",
+              backgroundColor: "#E8DCC2",
+              color: "#6B4F2A",
+              border: "1px solid #C9B58C",
             }}
             aria-label="Closed beta"
           >
