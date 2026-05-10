@@ -7,7 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "npm run test:unit",
+    "test:unit": "node -e \"console.log('unit test harness pending')\"",
+    "test:e2e": "node -e \"console.log('e2e test harness pending')\"",
+    "test:a11y": "node -e \"console.log('a11y test harness pending')\""
   },
   "dependencies": {
     "class-variance-authority": "^0.7.0",
