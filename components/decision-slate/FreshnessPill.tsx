@@ -43,9 +43,9 @@ export function FreshnessPill({ freshnessISO, source, className }: Props) {
   }[tone];
 
   const textTone = {
-    fresh: "text-bull-ink",
-    stale: "text-gold-ink",
-    broken: "text-bear-ink",
+    fresh: "text-bull-soft",
+    stale: "text-gold-soft",
+    broken: "text-bear-soft",
   }[tone];
 
   const ctLabel = Number.isFinite(ts) ? formatCT(ts) : "—";

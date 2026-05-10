@@ -126,8 +126,8 @@ export function TopBar({
   return (
     <header
       className={cn(
-        "h-[60px] sticky top-0 z-30 bg-canvas/85 backdrop-blur-md",
-        "border-b border-rule",
+        "h-[46px] sticky top-0 z-30 bg-[#071116] text-paper backdrop-blur-md",
+        "border-b border-[#C9A227]/35 shadow-[0_12px_32px_-30px_rgba(7,17,22,0.95)]",
         "flex items-center gap-3 md:gap-4 px-3 md:px-5 overflow-hidden min-w-0",
       )}
       data-testid="topbar"
@@ -136,7 +136,7 @@ export function TopBar({
         type="button"
         aria-label="Open menu"
         onClick={onOpenNav}
-        className="lg:hidden w-9 h-9 grid place-items-center rounded-soft text-ink-2 hover:text-ink hover:bg-paper-2/70 transition-colors shrink-0"
+        className="lg:hidden w-9 h-9 grid place-items-center rounded-soft text-paper/70 hover:text-paper hover:bg-paper/10 transition-colors shrink-0"
       >
         <Menu size={17} />
       </button>
@@ -149,8 +149,8 @@ export function TopBar({
         data-cluster="engines"
         className="flex items-center gap-2 shrink-0 whitespace-nowrap"
       >
-        <span className="hidden md:inline font-mono text-[9px] tracking-[0.18em] uppercase text-ink-3">
-          Engines
+        <span className="hidden md:inline font-mono text-[10px] tracking-[0.18em] uppercase text-gold-soft">
+          Markets
         </span>
         <SymbolChip
           href="/dashboard"
@@ -159,7 +159,7 @@ export function TopBar({
           verbTone={spyTone}
           meta={spyMeta}
         />
-        <span aria-hidden className="text-ink-4 text-[10px]">
+        <span aria-hidden className="text-paper/25 text-[10px]">
           ·
         </span>
         {/* v9: chip displays "ES" and links to /es (route renamed
@@ -245,6 +245,7 @@ export function TopBar({
         <FreshnessPill
           freshnessISO={t.feedHealth.lastTickTs}
           source={t.feedHealth.source}
+          className="text-paper"
         />
       </div>
 
@@ -255,23 +256,23 @@ export function TopBar({
         <button
           onClick={onOpenPalette}
           aria-label="Search"
-          className="md:flex items-center gap-2 h-8 px-3 rounded-soft bg-paper shadow-rule hover:shadow-rule-strong text-ink-2 hover:text-ink text-xs transition-all hidden whitespace-nowrap shrink-0"
+          className="md:flex items-center gap-2 h-8 px-3 rounded-[5px] border border-paper/10 bg-paper/8 text-paper/70 hover:text-paper hover:bg-paper/12 text-xs transition-all hidden whitespace-nowrap shrink-0"
         >
-          <Search size={13} className="text-ink-3" />
+          <Search size={13} className="text-paper/45" />
           <span>Search</span>
-          <span className="text-ink-4 hidden xl:inline">levels, signals…</span>
-          <Kbd className="ml-2">⌘K</Kbd>
+          <span className="text-paper/35 hidden xl:inline">levels, signals…</span>
+          <Kbd className="ml-2 border-paper/15 bg-paper/10 text-paper/55">⌘K</Kbd>
         </button>
         <button
           onClick={onOpenPalette}
           aria-label="Search"
-          className="md:hidden w-9 h-9 grid place-items-center rounded-soft hover:bg-paper-2 text-ink-2 transition-colors shrink-0"
+          className="md:hidden w-9 h-9 grid place-items-center rounded-soft hover:bg-paper/10 text-paper/70 transition-colors shrink-0"
         >
           <Search size={15} />
         </button>
         <button
           aria-label="Notifications"
-          className="w-9 h-9 grid place-items-center rounded-soft hover:bg-paper-2 text-ink-2 transition-colors shrink-0"
+          className="w-9 h-9 grid place-items-center rounded-soft hover:bg-paper/10 text-paper/70 transition-colors shrink-0"
         >
           <Bell size={15} />
         </button>
@@ -305,7 +306,7 @@ function Divider({ className }: { className?: string }) {
   return (
     <span
       aria-hidden
-      className={cn("h-4 w-px bg-rule shrink-0", className)}
+      className={cn("h-5 w-px bg-paper/15 shrink-0", className)}
     />
   );
 }
@@ -326,13 +327,13 @@ function SymbolChip({
   meta: string | null;
   accent?: "violet";
 }) {
-  const symbolTone = accent === "violet" ? "text-violet" : "text-ink-2";
+  const symbolTone = accent === "violet" ? "text-violet-soft" : "text-paper";
   return (
     <Link
       href={href}
       className={cn(
         "inline-flex items-center gap-1.5 h-7 px-1.5 rounded-soft whitespace-nowrap shrink-0",
-        "text-ink-2 hover:text-ink transition-colors",
+        "text-paper/70 hover:text-paper transition-colors",
         "outline-none focus-visible:ring-2 focus-visible:ring-gold/40",
       )}
     >
@@ -344,14 +345,14 @@ function SymbolChip({
       >
         {symbol}
       </span>
-      <span className="text-ink-4 text-[10px]" aria-hidden>
+      <span className="text-paper/25 text-[10px]" aria-hidden>
         ·
       </span>
       <span className="text-[11px] tracking-[0.02em] lowercase">
         {verb.toLowerCase()}
       </span>
       {meta && (
-        <span className="text-[10px] font-mono text-ink-3 lowercase tracking-[0.02em]">
+        <span className="text-[10px] font-mono text-paper/45 lowercase tracking-[0.02em]">
           · {meta.toLowerCase()}
         </span>
       )}
@@ -372,7 +373,7 @@ function Quote({
    *  eyebrow palette (violet for ES, default ink for SPY/VIX). */
   accent?: "violet";
 }) {
-  const labelTone = accent === "violet" ? "text-violet" : "text-ink-3";
+  const labelTone = accent === "violet" ? "text-violet-soft" : "text-paper/55";
   return (
     <div
       className={cn(
@@ -380,8 +381,8 @@ function Quote({
         wrapClass,
       )}
     >
-      <span className={cn("eyebrow", labelTone)}>{label}</span>
-      <span className="text-[13px] font-mono font-semibold text-ink tabular-nums">
+      <span className={cn("font-mono text-[10px] font-bold uppercase tracking-[0.16em]", labelTone)}>{label}</span>
+      <span className="text-[13px] font-mono font-semibold text-paper tabular-nums">
         {children}
       </span>
     </div>
@@ -441,7 +442,7 @@ function ValueWithTooltip({
             "cursor-help",
             // Visually mark stale prices so the user notices without
             // needing the tooltip — italic + muted ink.
-            staleness ? "italic text-ink-3" : "text-ink",
+            staleness ? "italic text-paper/50" : "text-paper",
           )}
         >
           {valueNode}
