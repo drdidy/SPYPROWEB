@@ -572,21 +572,24 @@ function MarketStatusPanel({
               {tone === "bull" ? "Bid" : "Offer"}
             </span>
           </div>
-          <div className="flex items-end justify-between gap-3">
-            <div>
+          <div className="flex items-end justify-between gap-2">
+            <div className="min-w-0">
               <div className="font-mono text-[19px] font-semibold leading-none text-paper">
                 {money(quote?.spy)}
               </div>
               <div
                 className={cn(
-                  "mt-1 font-mono text-[10px]",
+                  "mt-1 flex flex-wrap items-center gap-x-1 font-mono text-[9px] leading-tight",
                   tone === "bull" ? "text-bull" : "text-bear",
                 )}
               >
-                {delta(change, changePct)}
+                <span>{signedNumber(change, 2)}</span>
+                <span className="opacity-80">({signedNumber(changePct, 2)}%)</span>
               </div>
             </div>
-            <MiniDeltaGauge tone={tone} progress={pctMagnitude} />
+            <div className="grid h-8 w-10 shrink-0 place-items-center overflow-hidden rounded-[7px] border border-paper/10 bg-paper/[0.035]">
+              <MiniDeltaGauge tone={tone} progress={pctMagnitude} />
+            </div>
           </div>
           <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-paper/10">
             <div
@@ -622,32 +625,32 @@ function MiniDeltaGauge({
   progress: number;
 }) {
   const stroke = tone === "bull" ? "#0E7C50" : "#B5301E";
-  const dash = Math.max(12, Math.min(44, progress * 44));
+  const dash = Math.max(9, Math.min(34, progress * 34));
   return (
-    <svg width="52" height="32" viewBox="0 0 52 32" aria-hidden className="shrink-0">
+    <svg width="38" height="26" viewBox="0 0 38 26" aria-hidden className="block shrink-0">
       <path
-        d="M8 25 A18 18 0 0 1 44 25"
+        d="M7 21 A12 12 0 0 1 31 21"
         fill="none"
         stroke="rgba(244,228,192,0.12)"
-        strokeWidth="5"
+        strokeWidth="4"
         strokeLinecap="round"
       />
       <path
-        d="M8 25 A18 18 0 0 1 44 25"
+        d="M7 21 A12 12 0 0 1 31 21"
         fill="none"
         stroke={stroke}
-        strokeWidth="5"
+        strokeWidth="4"
         strokeLinecap="round"
-        strokeDasharray={`${dash} 60`}
+        strokeDasharray={`${dash} 42`}
       />
-      <circle cx="26" cy="25" r="3" fill={stroke} />
+      <circle cx="19" cy="21" r="2.4" fill={stroke} />
       <line
-        x1="26"
-        y1="25"
-        x2={tone === "bull" ? "36" : "16"}
-        y2="14"
+        x1="19"
+        y1="21"
+        x2={tone === "bull" ? "27" : "11"}
+        y2="12"
         stroke={stroke}
-        strokeWidth="1.6"
+        strokeWidth="1.35"
         strokeLinecap="round"
       />
     </svg>
@@ -913,6 +916,11 @@ function percent(value?: number): string {
 
 function delta(change?: number, changePct?: number): string | undefined {
   if (!Number.isFinite(change) || !Number.isFinite(changePct)) return undefined;
-  const sign = change! > 0 ? "+" : "";
-  return `${sign}${change!.toFixed(2)} (${sign}${changePct!.toFixed(2)}%)`;
+  return `${signedNumber(change!, 2)} (${signedNumber(changePct!, 2)}%)`;
+}
+
+function signedNumber(value?: number, digits = 2): string {
+  if (!Number.isFinite(value)) return "-";
+  const sign = value! > 0 ? "+" : "";
+  return `${sign}${value!.toFixed(digits)}`;
 }
