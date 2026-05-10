@@ -10,8 +10,11 @@
     "typecheck": "tsc --noEmit",
     "test": "npm run test:unit",
     "test:unit": "node -e \"console.log('unit test harness pending')\"",
-    "test:e2e": "node -e \"console.log('e2e test harness pending')\"",
-    "test:a11y": "node -e \"console.log('a11y test harness pending')\""
+    "test:e2e": "node scripts/run-playwright-smoke.mjs",
+    "test:e2e:smoke": "npx playwright test tests/dashboard/smoke.spec.ts --reporter=line --workers=1",
+    "test:e2e:visual": "npx playwright test tests/visual --reporter=line --workers=1",
+    "test:e2e:all": "npx playwright test tests/dashboard tests/visual --reporter=line --workers=1",
+    "test:a11y": "node -e \"console.log('axe harness scaffolded; hard assertions enable in Task 4')\""
   },
   "dependencies": {
     "class-variance-authority": "^0.7.0",
@@ -26,6 +29,8 @@
     "tailwind-merge": "^2.5.4"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.3",
+    "@playwright/test": "^1.59.1",
     "@tailwindcss/typography": "^0.5.15",
     "@types/node": "^20.16.0",
     "@types/react": "^18.3.12",
