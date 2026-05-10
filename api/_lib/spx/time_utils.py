@@ -44,10 +44,8 @@ def session_date_ct(dt: datetime) -> date:
     """
     dt = to_ct(dt)
     d = dt.date()
-    # Before London open (02:00 CT) we're still in the prior trading
-    # session, even though the overnight anchor window ended at midnight.
-    if dt.time() < SESSION_BOUNDARY:
-        d = d - timedelta(days=1)
+    if d.weekday() == 6 and dt.time() >= OVERNIGHT_START:
+        return d + timedelta(days=1)
     # Walk back over weekends. SPX cash doesn't trade Sat/Sun.
     while d.weekday() >= 5:  # 5=Sat, 6=Sun
         d = d - timedelta(days=1)
@@ -101,5 +99,7 @@ def rth_window(session_date: date) -> SessionWindow:
 
 
 def hours_between(a: datetime, b: datetime) -> float:
-    """Signed hours from a to b. Both coerced to CT."""
-    return (to_ct(b) - to_ct(a)).total_seconds() / 3600.0
+    """Signed CT wall-clock hours from a to b."""
+    a_ct = to_ct(a).replace(tzinfo=None)
+    b_ct = to_ct(b).replace(tzinfo=None)
+    return (b_ct - a_ct).total_seconds() / 3600.0

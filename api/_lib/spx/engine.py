@@ -63,12 +63,22 @@ from .time_utils import (
 def _last_price_at(candles: list[Candle], as_of: datetime) -> tuple[float, datetime]:
     """Most recent close at or before `as_of`.
 
-    Falls back to the very last candle if everything is in the future.
+    Raises if all candles are in the future; replay/live snapshots must not
+    silently look ahead.
     """
     as_of = to_ct(as_of)
     eligible = [c for c in candles if to_ct(c.t) <= as_of]
-    last = max(eligible, key=lambda c: to_ct(c.t)) if eligible else max(candles, key=lambda c: to_ct(c.t))
+    if not eligible:
+        raise ValueError(f"No ES candles at or before {as_of.isoformat()}")
+    last = max(eligible, key=lambda c: to_ct(c.t))
     return last.c, to_ct(last.t)
+
+
+def _last_candle_at(candles: list[Candle], as_of: datetime) -> Optional[Candle]:
+    """Most recent candle at or before `as_of`; never look into the future."""
+    as_of = to_ct(as_of)
+    eligible = [c for c in candles if to_ct(c.t) <= as_of]
+    return max(eligible, key=lambda c: to_ct(c.t)) if eligible else None
 
 
 def _prev_session_close(candles: list[Candle], session_date: date) -> Optional[float]:
@@ -92,10 +102,35 @@ def _project_all(lines: list[Line], at: datetime, price: float) -> list[Projecte
 # ---------------------------------------------------------------------------
 
 
-def _engine_state_from(scenario: str, action: str) -> str:
+def _engine_state_from(
+    scenario: str,
+    action: str,
+    *,
+    primary_trade=None,
+    current_price: Optional[float] = None,
+    invalidation: Optional[dict] = None,
+    as_of: Optional[datetime] = None,
+    session: Optional[date] = None,
+) -> str:
     """Project SPX scenario + confluence action onto the shared 6-state ladder."""
     if scenario == "OUTSIDE_PLAY":
         return "STAND_DOWN"
+    if primary_trade is not None and current_price is not None:
+        target = primary_trade.exit_price
+        if primary_trade.side == "BUY" and current_price >= target:
+            return "COOLDOWN"
+        if primary_trade.side == "SELL" and current_price <= target:
+            return "COOLDOWN"
+        if invalidation is not None:
+            level = float(invalidation["level"])
+            offset = float(invalidation["stopOffset"])
+            stop = level - offset if primary_trade.side == "BUY" else level + offset
+            if primary_trade.side == "BUY" and current_price <= stop:
+                return "COOLDOWN"
+            if primary_trade.side == "SELL" and current_price >= stop:
+                return "COOLDOWN"
+        if as_of is not None and session is not None and to_ct(as_of) >= rth_window(session).end:
+            return "COOLDOWN"
     if action == "TAKE":
         return "GO"
     if action == "SELECTIVE":
@@ -163,20 +198,18 @@ def _invalidation_for(
 ) -> Optional[dict]:
     """Invalidation level + suggested stop offset.
 
-    Uses the primary trade's exit line as the "if you're wrong" reference
+    Uses the primary trade's entry rail as the "if you're wrong" reference
     when present; falls back to None when there's no qualified play.
     """
     if primary_trade is None:
         return None
     by_kind = {p.kind: p.value for p in projected}
-    exit_value = by_kind.get(primary_trade.exit_line)
-    if exit_value is None:
+    invalidation_value = by_kind.get(primary_trade.entry_line)
+    if invalidation_value is None:
         return None
-    # Stop offset: 0.5% of the level, floored at 1.0pt — matches the
-    # engine's slope magnitude class without committing to a number
-    # that might mislead users.
-    stop_offset = max(round(exit_value * 0.005, 2), 1.0)
-    return {"level": round(exit_value, 2), "stopOffset": stop_offset}
+    # Stop offset: percentage of the level, floored at the configured minimum.
+    stop_offset = max(round(invalidation_value * 0.005, 2), 1.0)
+    return {"level": round(invalidation_value, 2), "stopOffset": stop_offset}
 
 
 def _planned_envelope_for(projected: list[ProjectedLine]) -> Optional[dict]:
@@ -303,7 +336,7 @@ def compute_snapshot(
     # 9. Re-entry watch.
     ceiling_line = next((l for l in lines if l.kind == "CHANNEL_CEILING"), None)
     floor_line = next((l for l in lines if l.kind == "CHANNEL_FLOOR"), None)
-    reentry = evaluate_reentry(scenario, spx_candles[-1] if spx_candles else None, ceiling_line, floor_line)
+    reentry = evaluate_reentry(scenario, _last_candle_at(spx_candles, as_of_ct), ceiling_line, floor_line)
 
     # 10. Confluence.
     confluence = evaluate_confluence(
@@ -324,7 +357,6 @@ def compute_snapshot(
 
     # ---- Phase-1 hardening derivations ----
     as_of_iso = as_of_ct.isoformat()
-    current_state = _engine_state_from(scenario, confluence.action)
     flip_condition = _flip_condition_for(scenario, projected)
     decision_trace = _decision_trace(
         as_of_iso=as_of_iso,
@@ -334,8 +366,17 @@ def compute_snapshot(
         confluence_score=confluence.score,
         action=confluence.action,
     )
-    state_history = _state_history(as_of_iso=as_of_iso, current_state=current_state)
     invalidation = _invalidation_for(plays.primary, projected)
+    current_state = _engine_state_from(
+        scenario,
+        confluence.action,
+        primary_trade=plays.primary,
+        current_price=last_price,
+        invalidation=invalidation,
+        as_of=as_of_ct,
+        session=session,
+    )
+    state_history = _state_history(as_of_iso=as_of_iso, current_state=current_state)
     planned_envelope = _planned_envelope_for(projected)
     score_bands = _score_bands()
 

@@ -22,6 +22,7 @@ from _lib.prophet_core import (
     SelectedStrikes,
     SourceStatus,
     TradeSignal,
+    active_entry_lines,
     build_decision_state,
     build_pivot_source_table,
     build_primary_lines,
@@ -43,6 +44,7 @@ from _lib.prophet_core import (
     display_state_label,
     evaluate_chase_status,
     evaluate_daily_risk,
+    evaluate_retest_status,
     evaluate_structure_status,
     find_high_pivot,
     find_low_pivot,
@@ -489,6 +491,35 @@ def test_decision_priority_and_daily_guardrail() -> None:
     assert dp.final_decision == "WAIT_FOR_CONFIRMATION"
     stop = evaluate_daily_risk([_sig(), _sig(), _sig()], [score_signal_quality(_sig())], max_signals_per_day=3)
     assert stop["daily_action"] == "STOP_TRADING"
+
+
+def test_premarket_anchor_lines_expire_after_signal_day() -> None:
+    anchor_time = _ts("2026-04-28T05:00:00")
+    line = DynamicLine(
+        "ANC_PRIMARY_0500_MAIN",
+        100,
+        anchor_time,
+        0,
+        "descending",
+        "MAIN",
+        "premarket_anchor_PRIMARY",
+        True,
+        "",
+    )
+    same_day = active_entry_lines([line], 100.2, _ts("2026-04-28T10:00:00"))
+    next_day = active_entry_lines([line], 100.2, _ts("2026-04-29T10:00:00"))
+    assert [l.name for l in same_day] == ["ANC_PRIMARY_0500_MAIN"]
+    assert next_day == []
+
+
+def test_retest_does_not_confirm_until_price_returns_to_line() -> None:
+    line = DynamicLine("UD", 100, _ts("2026-04-28T08:00:00"), 0, "descending", "CALL_ZONE", "PRIMARY_HIGH", True, "")
+    far = evaluate_retest_status(_sig("CALL"), 101.0, _ts("2026-04-28T12:00:00"), line)
+    near = evaluate_retest_status(_sig("CALL"), 100.05, _ts("2026-04-28T12:00:00"), line)
+    failed = evaluate_retest_status(_sig("CALL"), 99.5, _ts("2026-04-28T12:00:00"), line)
+    assert far["retest_status"] == "WATCHING_RETEST"
+    assert near["retest_status"] == "RETEST_CONFIRMED"
+    assert failed["retest_status"] == "RETEST_FAILED"
 
 
 def test_wait_discipline_items_match_streamlit_labels() -> None:

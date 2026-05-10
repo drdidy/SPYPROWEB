@@ -34,7 +34,7 @@ from __future__ import annotations
 
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import requests
@@ -212,7 +212,7 @@ class TastytradeFetcher:
         items = _items(body)
         # Each item: { symbol: "/ESM6", expires-at: "2026-06-19T...",
         #              active-month: true, ... }
-        now_utc = datetime.utcnow()
+        now_utc = datetime.now(timezone.utc)
         candidates: list[tuple[datetime, str]] = []
         for it in items:
             sym = it.get("symbol")
@@ -224,10 +224,10 @@ class TastytradeFetcher:
                 exp = datetime.fromisoformat(exp_raw.replace("Z", "+00:00"))
             except ValueError:
                 continue
-            exp_naive = exp.replace(tzinfo=None) if exp.tzinfo else exp
-            if exp_naive <= now_utc:
+            exp_utc = exp.astimezone(timezone.utc) if exp.tzinfo else exp.replace(tzinfo=timezone.utc)
+            if exp_utc <= now_utc:
                 continue
-            candidates.append((exp_naive, sym))
+            candidates.append((exp_utc, sym))
 
         if not candidates:
             raise FetcherUnavailable(
@@ -306,7 +306,7 @@ class TastytradeFetcher:
         return SyncQuote(
             spx_spot=spx_last,
             es_spot=es_last,
-            captured_at=to_ct(datetime.utcnow()),
+            captured_at=to_ct(datetime.now(timezone.utc)),
         )
 
     # ---- ES bars (intentionally unimplemented; see module docstring) --------

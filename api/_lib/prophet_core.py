@@ -59,6 +59,10 @@ RTH_SESSION_END = time(15, 0)
 PROJECTION_SESSION_START = time(3, 0)
 PROJECTION_SESSION_END = time(18, 0)
 NEXT_SESSION_PREVIEW_START = time(17, 0)
+SPY_STOP_WICK_SLACK = float(os.environ.get("SPY_STOP_WICK_SLACK", "0.50"))
+SPY_BREAKEVEN_MOVE = float(os.environ.get("SPY_BREAKEVEN_MOVE", "0.50"))
+SPY_CHASE_MAX_DISTANCE = float(os.environ.get("SPY_CHASE_MAX_DISTANCE", "0.30"))
+ACTIVE_ENTRY_LINE_MAX_DISTANCE = float(os.environ.get("SPY_ACTIVE_ENTRY_LINE_MAX_DISTANCE", "5.0"))
 
 
 # ---------------------------------------------------------------------------
@@ -914,6 +918,23 @@ def structure_trigger_regime(lines: list[DynamicLine], current_price: float | No
 
 
 def line_is_active_entry(line: DynamicLine | None, lines: list[DynamicLine], current_price: float | None, current_dt: datetime) -> bool:
+    if line is None:
+        return False
+    if str(line.source or "").startswith("premarket_anchor_"):
+        if line.anchor_time is None:
+            return False
+        ct = get_central_tz()
+        cur = pd.Timestamp(current_dt)
+        anc = pd.Timestamp(line.anchor_time)
+        cur = cur.tz_localize(ct) if cur.tzinfo is None else cur.tz_convert(ct)
+        anc = anc.tz_localize(ct) if anc.tzinfo is None else anc.tz_convert(ct)
+        if cur.date() != anc.date() or cur <= anc:
+            return False
+        price = _price_float(current_price)
+        if not pd.isna(price):
+            dist = line.abs_distance_from_price(price, current_dt)
+            if not pd.isna(dist) and dist > ACTIVE_ENTRY_LINE_MAX_DISTANCE:
+                return False
     if line_is_descending_entry(line):
         return True
     if line_is_ascending_entry(line):
@@ -1406,6 +1427,24 @@ def is_put_rejection(candle_row: pd.Series, line: DynamicLine, candle_time: pd.T
     return (o < lv) and (h >= lv) and (c < lv)
 
 
+def _is_anchor_line(line: DynamicLine | None) -> bool:
+    return bool(line and str(line.source or "").startswith("premarket_anchor_"))
+
+
+def _is_call_trigger_for_line(candle_row: pd.Series, line: DynamicLine, candle_time: pd.Timestamp) -> bool:
+    if _is_anchor_line(line):
+        from . import premarket_anchors as pa
+        return pa.is_anchor_buy_trigger(candle_row, line, candle_time)
+    return is_call_rejection(candle_row, line, candle_time)
+
+
+def _is_put_trigger_for_line(candle_row: pd.Series, line: DynamicLine, candle_time: pd.Timestamp) -> bool:
+    if _is_anchor_line(line):
+        from . import premarket_anchors as pa
+        return pa.is_anchor_sell_trigger(candle_row, line, candle_time)
+    return is_put_rejection(candle_row, line, candle_time)
+
+
 def find_target_for_signal(
     signal_type: str,
     rejected_line_name: str,
@@ -1454,7 +1493,11 @@ def build_trade_signal_from_rejection(
     status = "CONFIRMED" if confirmed else "PENDING_CONFIRMATION"
     entry_time = next_time if confirmed else None
     entry_price = float(next_row["Open"]) if confirmed else float("nan")
-    stop_price = float(rejection_row["Low"] - 0.50) if signal_type == "CALL" else float(rejection_row["High"] + 0.50)
+    stop_price = (
+        float(rejection_row["Low"] - SPY_STOP_WICK_SLACK)
+        if signal_type == "CALL"
+        else float(rejection_row["High"] + SPY_STOP_WICK_SLACK)
+    )
     ref_time = entry_time if confirmed else rejection_time
     ref_price = entry_price if confirmed else float(rejection_row["Close"])
     target_name, target_price = find_target_for_signal(signal_type, line.name, ref_price, ref_time, all_lines)
@@ -1473,7 +1516,7 @@ def build_trade_signal_from_rejection(
         rejection_time,
         float(rejection_row["Open"]), float(rejection_row["High"]), float(rejection_row["Low"]), float(rejection_row["Close"]),
         entry_time, entry_price, stop_price, target_name, target_price, risk, reward, rr,
-        "Move to breakeven after +$0.50 favorable SPY move.",
+        f"Move to breakeven after +${SPY_BREAKEVEN_MOVE:.2f} favorable SPY move.",
         expl,
     )
 
@@ -1501,9 +1544,9 @@ def detect_rejection_signals(
             if line.name not in active_names:
                 continue
             sig: TradeSignal | None = None
-            if is_call_rejection(row, line, ts):
+            if _is_call_trigger_for_line(row, line, ts):
                 sig = build_trade_signal_from_rejection("CALL", line, row, ts, next_row, next_ts, all_lines)
-            elif is_put_rejection(row, line, ts):
+            elif _is_put_trigger_for_line(row, line, ts):
                 sig = build_trade_signal_from_rejection("PUT", line, row, ts, next_row, next_ts, all_lines)
             if sig and sig.signal_id not in seen:
                 seen.add(sig.signal_id)
@@ -1627,7 +1670,7 @@ def score_signal_quality(signal: TradeSignal) -> SignalQuality:
     )
 
 
-def evaluate_chase_status(signal: Any, current_price: float, max_chase_distance: float = 0.30) -> dict:
+def evaluate_chase_status(signal: Any, current_price: float, max_chase_distance: float = SPY_CHASE_MAX_DISTANCE) -> dict:
     if signal is None:
         return {"chase_status": "NO_SIGNAL", "chase_distance": float("nan"), "chase_warning": None, "explanation": "No signal"}
     if signal.status == "PENDING_CONFIRMATION":
@@ -1644,13 +1687,16 @@ def evaluate_retest_status(signal: Any, current_price: float, current_dt: Any, r
     lv = rejected_line.tradable_value_at(current_dt)
     if pd.isna(lv):
         return {"retest_status": "NONE", "retest_line_name": rejected_line.name, "explanation": "Line value unavailable."}
-    if abs(current_price - lv) <= tolerance:
+    dist = current_price - lv
+    if abs(dist) <= tolerance:
+        if (signal.signal_type == "CALL" and dist >= 0) or (signal.signal_type == "PUT" and dist <= 0):
+            return {"retest_status": "RETEST_CONFIRMED", "retest_line_name": rejected_line.name, "explanation": "Price retested the rejected line without losing structure."}
         return {"retest_status": "WATCHING_RETEST", "retest_line_name": rejected_line.name, "explanation": "Price is near rejected line; monitoring retest."}
     if signal.signal_type == "CALL":
-        status = "RETEST_CONFIRMED" if current_price > lv else "RETEST_FAILED"
+        status = "WATCHING_RETEST" if current_price > lv else "RETEST_FAILED"
     else:
-        status = "RETEST_CONFIRMED" if current_price < lv else "RETEST_FAILED"
-    return {"retest_status": status, "retest_line_name": rejected_line.name, "explanation": "Current-price retest heuristic (close confirmation to be added later)."}
+        status = "WATCHING_RETEST" if current_price < lv else "RETEST_FAILED"
+    return {"retest_status": status, "retest_line_name": rejected_line.name, "explanation": "Waiting for a true retest of the rejected line."}
 
 
 def evaluate_structure_status(signal: Any, latest_candle_row: Any, rejected_line: DynamicLine | None, latest_time: Any) -> dict:
@@ -1682,7 +1728,9 @@ def evaluate_daily_risk(
         return {"daily_action": "STOP_TRADING", "explanation": "Maximum daily signal count reached."}
     if qualities_today:
         g = qualities_today[-1].grade
-        if g in {"C", "D", "NO_TRADE"}:
+        grade_rank = {"NO_TRADE": 0, "D": 1, "C": 2, "B": 3, "A": 4, "A+": 5}
+        min_rank = grade_rank.get(str(min_grade_to_trade or "B").upper(), grade_rank["B"])
+        if grade_rank.get(str(g).upper(), 0) < min_rank:
             return {"daily_action": "NO_TRADE", "explanation": "Latest signal quality is below trade threshold."}
         if g in {"A+", "A", "B"}:
             return {

@@ -49,6 +49,10 @@ def test_none_direction_always_outside_play():
     assert classify("NONE", 5872.0, _projected()) == "OUTSIDE_PLAY"
 
 
+def test_inverted_channel_rails_stand_down():
+    assert classify("ASCENDING", 5872.0, _projected(ceiling=5860.0, floor=5880.0)) == "OUTSIDE_PLAY"
+
+
 def test_inside_plays_buy_floor_sell_ceiling():
     plays = build_plays("INSIDE_ASCENDING", _projected())
     assert plays.primary is not None and plays.alternate is not None
@@ -78,6 +82,12 @@ def test_below_plays_use_prev_low_ref_and_floor():
 
 def test_outside_play_returns_no_plays():
     plays = build_plays("OUTSIDE_PLAY", _projected())
+    assert plays.primary is None
+    assert plays.alternate is None
+
+
+def test_unfavorable_play_prices_are_suppressed():
+    plays = build_plays("ABOVE_ASCENDING", _projected(ceiling=5890.0, prev_high=5880.0))
     assert plays.primary is None
     assert plays.alternate is None
 

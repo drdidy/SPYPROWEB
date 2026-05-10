@@ -248,6 +248,14 @@ def test_buy_trigger_rejects_green_candle():
     assert pa.is_anchor_buy_trigger(row, line, ts) is False
 
 
+def test_buy_trigger_rejects_when_not_from_above():
+    ct = pc.get_central_tz()
+    ts = pd.Timestamp("2026-05-07 10:00", tz=ct)
+    line = _line_at(580.00, ts)
+    row = pd.Series({"Open": 579.90, "High": 581.20, "Low": 579.50, "Close": 580.50})
+    assert pa.is_anchor_buy_trigger(row, line, ts) is False
+
+
 def test_sell_trigger_green_touch_close_below_within_band():
     ct = pc.get_central_tz()
     ts = pd.Timestamp("2026-05-07 10:00", tz=ct)
@@ -277,6 +285,14 @@ def test_sell_trigger_rejects_red_candle():
     ts = pd.Timestamp("2026-05-07 10:00", tz=ct)
     line = _line_at(580.00, ts)
     row = pd.Series({"Open": 580.20, "High": 580.50, "Low": 579.30, "Close": 579.50})
+    assert pa.is_anchor_sell_trigger(row, line, ts) is False
+
+
+def test_sell_trigger_rejects_when_not_from_below():
+    ct = pc.get_central_tz()
+    ts = pd.Timestamp("2026-05-07 10:00", tz=ct)
+    line = _line_at(580.00, ts)
+    row = pd.Series({"Open": 580.10, "High": 580.50, "Low": 579.20, "Close": 579.50})
     assert pa.is_anchor_sell_trigger(row, line, ts) is False
 
 

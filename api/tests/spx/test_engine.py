@@ -26,6 +26,13 @@ def test_snapshot_inside_ascending_with_plays(es_candles_ascending_inside, es_of
     assert snap.plays.alternate.side == "SELL"
 
 
+def test_snapshot_invalidation_uses_entry_rail(es_candles_ascending_inside, es_offset, as_of):
+    snap = compute_snapshot(es_candles_ascending_inside, es_offset, as_of)
+    assert snap.plays.primary is not None
+    assert snap.invalidation is not None
+    assert snap.invalidation.level == pytest.approx(snap.plays.primary.entry_price)
+
+
 def test_snapshot_contracts_match_play_sides(es_candles_ascending_inside, es_offset, as_of):
     snap = compute_snapshot(es_candles_ascending_inside, es_offset, as_of)
     assert snap.contracts.for_primary is not None

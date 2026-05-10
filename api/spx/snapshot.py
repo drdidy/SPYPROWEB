@@ -20,7 +20,7 @@ import os
 import sys
 import time
 import traceback
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 from threading import Lock
@@ -34,6 +34,7 @@ if str(_API_ROOT) not in sys.path:
 
 from _lib.spx_data import build_default_fetcher, build_snapshot_with_provenance  # noqa: E402
 from _lib.spx_data.historical_offset import historical_offset_for_date  # noqa: E402
+from _lib.spx.time_utils import hours_between  # noqa: E402
 
 CT = ZoneInfo("America/Chicago")
 SNAPSHOT_TTL = float(os.environ.get("SPX_SNAPSHOT_TTL", "30"))
@@ -180,22 +181,89 @@ def _build_spx_replay_block(payload: dict, replay_date: date | None) -> dict:
         }
 
     has_channel = direction in ("ASCENDING", "DESCENDING")
-    if has_channel and day is not None:
-        net = day["close"] - day["open"]
-        bullish_bet = direction == "ASCENDING"
-        if bullish_bet:
-            block["verdictOutcome"] = (
-                "WIN" if net > 0 else ("LOSS" if net < 0 else "PUSH")
-            )
-            block["verdictPnl"] = round(net, 2)
-        else:
-            block["verdictOutcome"] = (
-                "WIN" if net < 0 else ("LOSS" if net > 0 else "PUSH")
-            )
-            block["verdictPnl"] = round(-net, 2)
-    else:
+    if not has_channel:
         block["verdictOutcome"] = "N_A"
+        return block
+
+    replay_result = _grade_replay_from_rail_tag(payload, replay_date, offset)
+    if replay_result is None:
+        block["verdictOutcome"] = "N_A"
+        return block
+
+    block["verdictOutcome"] = replay_result["outcome"]
+    block["verdictPnl"] = replay_result["pnl"]
     return block
+
+
+def _grade_replay_from_rail_tag(payload: dict, replay_date: date, offset: float) -> dict | None:
+    primary = ((payload.get("plays") or {}).get("primary") or {})
+    if not primary:
+        return None
+    entry_line = primary.get("entryLine")
+    exit_line = primary.get("exitLine")
+    side = primary.get("side")
+    if side not in ("BUY", "SELL") or not entry_line or not exit_line:
+        return None
+
+    lines = {line.get("kind"): line for line in payload.get("lines") or []}
+    entry_payload = lines.get(entry_line)
+    exit_payload = lines.get(exit_line)
+    if not entry_payload or not exit_payload:
+        return None
+
+    invalidation = payload.get("invalidation") or {}
+    if not isinstance(invalidation.get("level"), (int, float)) or not isinstance(invalidation.get("stopOffset"), (int, float)):
+        return None
+
+    bars = _spx_session_intraday(replay_date, offset)
+    if not bars:
+        return None
+
+    entry_price = None
+    close_price = None
+    for bar in bars:
+        close_price = float(bar["close"])
+        t = bar["time"]
+        entry_value = _project_payload_line(entry_payload, t)
+        exit_value = _project_payload_line(exit_payload, t)
+        if entry_value is None or exit_value is None:
+            return None
+
+        if entry_price is None:
+            if float(bar["low"]) <= entry_value <= float(bar["high"]):
+                entry_price = entry_value
+            else:
+                continue
+
+        stop = (
+            float(invalidation["level"]) - float(invalidation["stopOffset"])
+            if side == "BUY"
+            else float(invalidation["level"]) + float(invalidation["stopOffset"])
+        )
+        if side == "BUY":
+            if float(bar["low"]) <= stop:
+                return {"outcome": "LOSS", "pnl": round(stop - entry_price, 2)}
+            if float(bar["high"]) >= exit_value:
+                return {"outcome": "WIN", "pnl": round(exit_value - entry_price, 2)}
+        else:
+            if float(bar["high"]) >= stop:
+                return {"outcome": "LOSS", "pnl": round(entry_price - stop, 2)}
+            if float(bar["low"]) <= exit_value:
+                return {"outcome": "WIN", "pnl": round(entry_price - exit_value, 2)}
+
+    if entry_price is None or close_price is None:
+        return None
+    pnl = close_price - entry_price if side == "BUY" else entry_price - close_price
+    outcome = "WIN" if pnl > 0 else ("LOSS" if pnl < 0 else "PUSH")
+    return {"outcome": outcome, "pnl": round(pnl, 2)}
+
+
+def _project_payload_line(line: dict, at: datetime) -> float | None:
+    try:
+        anchor_time = datetime.fromisoformat(str(line["anchorTime"]))
+        return float(line["anchorPrice"]) + float(line["slopePerHour"]) * hours_between(anchor_time, at)
+    except Exception:
+        return None
 
 
 def _spx_session_ohlc(d: date, offset: float) -> dict | None:
@@ -225,6 +293,52 @@ def _spx_session_ohlc(d: date, offset: float) -> dict | None:
         return {"open": spy["open"] * 10, "close": spy["close"] * 10}
 
     return None
+
+
+def _spx_session_intraday(d: date, offset: float) -> list[dict]:
+    """RTH intraday bars in SPX-equivalent points for replay grading."""
+    try:
+        import yfinance as yf  # type: ignore[import-not-found]
+    except Exception:
+        return []
+    try:
+        start = d.isoformat()
+        end = (d + timedelta(days=1)).isoformat()
+        df = yf.download(
+            tickers="ES=F",
+            start=start,
+            end=end,
+            interval="60m",
+            progress=False,
+            auto_adjust=False,
+            actions=False,
+            prepost=False,
+        )
+        if df is None or df.empty:
+            return []
+        if hasattr(df.columns, "nlevels") and df.columns.nlevels > 1:
+            df.columns = df.columns.get_level_values(0)
+        out: list[dict] = []
+        for ts, row in df.iterrows():
+            t = ts.to_pydatetime() if hasattr(ts, "to_pydatetime") else ts
+            if t.tzinfo is None:
+                t = t.replace(tzinfo=CT)
+            else:
+                t = t.astimezone(CT)
+            if t.date() != d:
+                continue
+            if not (8 <= t.hour <= 15):
+                continue
+            out.append({
+                "time": t,
+                "open": float(row["Open"]) + offset,
+                "high": float(row["High"]) + offset,
+                "low": float(row["Low"]) + offset,
+                "close": float(row["Close"]) + offset,
+            })
+        return out
+    except Exception:
+        return []
 
 
 def _yf_daily_ohlc(ticker: str, d: date) -> dict | None:

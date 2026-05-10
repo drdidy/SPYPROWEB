@@ -17,11 +17,13 @@ Spec:
     to primary as a fallback.)
   - Secondaries: every other bearish candle in 3:00-6:00 CT (whether or
     not it qualifies); shown as backup entry candidates.
-  - Lines per anchor: Upper (+3.4 SPY pts), Main (anchor.low),
-    Lower (-3.4), all descending at the engine's calibrated slope, anchored
+  - Lines per anchor: Upper (+ANCHOR_BAND_OFFSET), Main (anchor.low),
+    Lower (-ANCHOR_BAND_OFFSET), all descending at the engine's calibrated slope, anchored
     at the bearish-candle timestamp.
-  - Buy trigger: red candle wicks down to a line, closes above by 0 < d <= 1.7.
-  - Sell trigger: green candle wicks up to a line, closes below by 0 < d <= 1.7.
+  - Buy trigger: red candle wicks down to a line and closes above within
+    ANCHOR_TRIGGER_MAX_DISTANCE.
+  - Sell trigger: green candle wicks up to a line and closes below within
+    ANCHOR_TRIGGER_MAX_DISTANCE.
   - Triggers fire on ANY RTH bar; the next bar is the expected entry.
 """
 from __future__ import annotations
@@ -316,7 +318,7 @@ def build_anchor_lines(anchor, slope: float):
             zone_type="CALL_ZONE",
             source=src,
             is_primary=is_primary,
-            description=f"Anchor {anchor.role} Upper (+{ANCHOR_BAND_OFFSET})",
+            description=f"Anchor {anchor.role} Upper (+band)",
         ),
         pc.DynamicLine(
             name=f"{base}_MAIN",
@@ -338,7 +340,7 @@ def build_anchor_lines(anchor, slope: float):
             zone_type="PUT_ZONE",
             source=src,
             is_primary=is_primary,
-            description=f"Anchor {anchor.role} Lower (-{ANCHOR_BAND_OFFSET})",
+            description=f"Anchor {anchor.role} Lower (-band)",
         ),
     ]
 
@@ -366,6 +368,8 @@ def is_anchor_buy_trigger(candle_row: pd.Series, line, candle_time: pd.Timestamp
     line_val = line.tradable_value_at(candle_time)
     if pd.isna(line_val):
         return False
+    if open_ <= line_val:
+        return False
     if low_ > line_val:
         return False
     if close_ <= line_val:
@@ -388,6 +392,8 @@ def is_anchor_sell_trigger(candle_row: pd.Series, line, candle_time: pd.Timestam
     line_val = line.tradable_value_at(candle_time)
     if pd.isna(line_val):
         return False
+    if open_ >= line_val:
+        return False
     if high_ < line_val:
         return False
     if close_ >= line_val:
@@ -407,7 +413,12 @@ def detect_anchor_triggers(rth_candles: pd.DataFrame, anchor_lines: list):
         ts = df.index[i]
         row = df.iloc[i]
         next_ts = df.index[i + 1] if (i + 1) < len(df) else None
+        active_names = {
+            line.name for line in pc.active_entry_lines(anchor_lines, float(row["Close"]), ts)
+        }
         for line in anchor_lines:
+            if line.name not in active_names:
+                continue
             line_val = line.tradable_value_at(ts)
             if pd.isna(line_val):
                 continue

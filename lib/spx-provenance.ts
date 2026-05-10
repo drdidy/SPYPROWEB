@@ -38,6 +38,7 @@ export type SpxTrust = "live" | "synthetic" | "stale";
 
 /** Stale threshold per the v6 spec (P0-4 #3). */
 export const STALE_BASIS_MS = 60_000;
+export const CLOSE_ANCHORED_BASIS_STALE_MS = 36 * 60 * 60 * 1000;
 
 export interface SpxProvenance {
   trust: SpxTrust;
@@ -78,8 +79,9 @@ export function deriveProvenance(
   if (!meta) return null;
   const capturedAt = Date.parse(meta.quoteCapturedAt);
   const basisAgeMs = Number.isFinite(capturedAt) ? now.getTime() - capturedAt : NaN;
+  const staleThresholdMs = basisStaleThresholdMs(meta);
   const stale =
-    !Number.isFinite(basisAgeMs) || basisAgeMs > STALE_BASIS_MS;
+    !Number.isFinite(basisAgeMs) || basisAgeMs > staleThresholdMs;
   const trust: SpxTrust = stale
     ? "stale"
     : cashMarketOpen
@@ -97,6 +99,16 @@ export function deriveProvenance(
     offsetMethod: meta.offsetMethod ?? null,
     isOverridden: meta.offsetSource === "env_override",
   };
+}
+
+export function basisStaleThresholdMs(meta: SPXSnapshotMeta): number {
+  if (
+    meta.offsetSource === "historical_replay" ||
+    meta.offsetMethod === "close_anchored"
+  ) {
+    return CLOSE_ANCHORED_BASIS_STALE_MS;
+  }
+  return STALE_BASIS_MS;
 }
 
 /**
@@ -175,4 +187,6 @@ export const __test = {
   provenanceLabel,
   provenanceDetail,
   STALE_BASIS_MS,
+  CLOSE_ANCHORED_BASIS_STALE_MS,
+  basisStaleThresholdMs,
 };

@@ -33,7 +33,7 @@ def test_build_snapshot_pulls_bars_and_offset_then_runs_engine(
     fetcher.fetch_es_bars.assert_called_once()
     start_arg, end_arg = fetcher.fetch_es_bars.call_args.args
     assert end_arg == as_of
-    assert start_arg == as_of - timedelta(hours=36)
+    assert start_arg == as_of - timedelta(hours=120)
 
 
 def test_build_snapshot_raises_when_fetcher_returns_no_bars(as_of):

@@ -88,6 +88,9 @@ def classify(
     prev_high = by.get("PREV_RTH_HIGH_ASC")
     prev_low = by.get("PREV_RTH_LOW_DESC")
 
+    if ceiling is not None and floor is not None and floor >= ceiling:
+        return "OUTSIDE_PLAY"
+
     if ceiling is None or floor is None:
         # Channel rails missing despite a non-NONE direction — defensive.
         return "OUTSIDE_PLAY"
@@ -158,12 +161,18 @@ def _trade(
     """Construct a Trade if both lines have current values; else None."""
     if entry not in by or exit_ not in by:
         return None
+    entry_price = by[entry]
+    exit_price = by[exit_]
+    if side == "BUY" and exit_price <= entry_price:
+        return None
+    if side == "SELL" and exit_price >= entry_price:
+        return None
     return Trade(
         side=side,
         entry_line=entry,
-        entry_price=by[entry],
+        entry_price=entry_price,
         exit_line=exit_,
-        exit_price=by[exit_],
+        exit_price=exit_price,
     )
 
 

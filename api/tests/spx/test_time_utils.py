@@ -30,10 +30,15 @@ def test_session_date_ct_after_2am_is_today():
     assert session_date_ct(dt) == date(2026, 5, 8)
 
 
-def test_session_date_ct_before_2am_belongs_to_prior_session():
-    # 01:30 CT on Friday morning -> still part of Thursday's session.
+def test_session_date_ct_before_boundary_belongs_to_rth_session_date():
+    # Tokyo crosses midnight into the Friday RTH session.
     dt = datetime(2026, 5, 8, 1, 30, tzinfo=CT)
-    assert session_date_ct(dt) == date(2026, 5, 7)
+    assert session_date_ct(dt) == date(2026, 5, 8)
+
+
+def test_sunday_evening_belongs_to_monday_session():
+    dt = datetime(2026, 5, 10, 18, 0, tzinfo=CT)
+    assert session_date_ct(dt) == date(2026, 5, 11)
 
 
 def test_session_date_ct_walks_back_over_weekends():
@@ -48,11 +53,11 @@ def test_previous_session_date_skips_weekend():
     assert previous_session_date(monday) == date(2026, 5, 8)
 
 
-def test_overnight_window_spans_15h_prev_to_3am_today():
-    """Overnight anchor window is 15:00 prev-day -> 03:00 today CT (12 hours)."""
+def test_overnight_window_spans_prev_day_to_session_boundary():
+    """Overnight anchor window is 15:00 prev-day -> session boundary today."""
     w = overnight_window(date(2026, 5, 8))
     assert w.start == datetime(2026, 5, 7, 15, 0, tzinfo=CT)
-    assert w.end == datetime(2026, 5, 8, 3, 0, tzinfo=CT)
+    assert w.end == datetime(2026, 5, 8, 2, 0, tzinfo=CT)
 
 
 def test_sydney_and_tokyo_windows_have_one_hour_gap():
@@ -65,7 +70,7 @@ def test_sydney_and_tokyo_windows_have_one_hour_gap():
     assert s.start == datetime(2026, 5, 7, 17, 0, tzinfo=CT)
     assert s.end == datetime(2026, 5, 7, 20, 0, tzinfo=CT)
     assert t.start == datetime(2026, 5, 7, 21, 0, tzinfo=CT)
-    assert t.end == datetime(2026, 5, 8, 3, 0, tzinfo=CT)
+    assert t.end == datetime(2026, 5, 8, 2, 0, tzinfo=CT)
     # Hour-gap between Sydney close and Tokyo open is real.
     assert (t.start - s.end).total_seconds() == 3600
 
@@ -81,3 +86,9 @@ def test_hours_between_signed():
     b = datetime(2026, 5, 8, 12, 30, tzinfo=CT)
     assert hours_between(a, b) == 3.5
     assert hours_between(b, a) == -3.5
+
+
+def test_hours_between_uses_ct_wall_clock_across_dst():
+    a = datetime(2026, 3, 8, 1, 0, tzinfo=CT)
+    b = datetime(2026, 3, 8, 3, 0, tzinfo=CT)
+    assert hours_between(a, b) == 2.0
