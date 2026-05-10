@@ -36,7 +36,14 @@ interface Props {
   nextEventLabel?: string;
   /** One-line plain-English explanation of why the engine is in this state. */
   explanation?: string;
+  structureLevels?: StructureLevels;
   className?: string;
+}
+
+export interface StructureLevels {
+  upper?: number | null;
+  anchor?: number | null;
+  lower?: number | null;
 }
 
 // v10 P1-4: state-color top border. The most consequential change
@@ -83,6 +90,7 @@ export function StatePipeline({
   nextEventISO,
   nextEventLabel,
   explanation,
+  structureLevels,
   className,
 }: Props) {
   const currentIdx = ENGINE_STATES.indexOf(current);
@@ -323,7 +331,11 @@ export function StatePipeline({
 
       </div>
 
-      <MiniStructureMap engine={engine} current={current} />
+      <MiniStructureMap
+        engine={engine}
+        current={current}
+        levels={structureLevels}
+      />
 
       <EngineFooterMetrics engine={engine} current={current} />
 
@@ -339,58 +351,93 @@ export function StatePipeline({
 function MiniStructureMap({
   engine,
   current,
+  levels,
 }: {
   engine: "SPY" | "SPX";
   current: EngineState;
+  levels?: StructureLevels;
 }) {
   const isEs = engine === "SPX";
   const rails = isEs
-    ? ["Ceiling", "Mid", "Floor"]
-    : ["Upper", "Main", "Lower"];
+    ? [
+        { label: "Upper rail", value: levels?.upper ?? null, tone: "text-bull-ink" },
+        { label: "Anchor", value: levels?.anchor ?? null, tone: "text-gold-ink" },
+        { label: "Lower rail", value: levels?.lower ?? null, tone: "text-bear-ink" },
+      ]
+    : [
+        { label: "Upper rail", value: levels?.upper ?? null, tone: "text-bull-ink" },
+        { label: "Anchor", value: levels?.anchor ?? null, tone: "text-gold-ink" },
+        { label: "Lower rail", value: levels?.lower ?? null, tone: "text-bear-ink" },
+      ];
   const stateIndex = Math.max(0, ENGINE_STATES.indexOf(current));
   const markerLeft = `${Math.min(86, 12 + stateIndex * 12)}%`;
 
   return (
-    <div className="mt-3 rounded-soft border border-rule-soft bg-paper-tier3 px-3 py-3">
+    <div className="group/structure mt-3 rounded-soft border border-rule-soft bg-paper-tier3 px-3 py-3 transition-colors hover:border-rule-strong">
       <div className="mb-2 flex items-center justify-between gap-3">
         <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3">
-          {isEs ? "Overnight channel" : "Premarket anchor"}
+          Session rails
         </span>
         <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-4">
           Structure map
         </span>
       </div>
-      <div className="relative h-[64px] overflow-hidden rounded-[6px] bg-paper">
+      <div className="grid gap-3 md:grid-cols-[112px_1fr]">
+        <div className="space-y-2.5">
+          {rails.map((rail) => (
+            <div key={rail.label} className="grid grid-cols-[1fr_auto] gap-2">
+              <span className="font-mono text-[10px] text-ink-3">
+                {rail.label}
+              </span>
+              <span
+                className={cn(
+                  "font-mono text-[10px] tabular-nums",
+                  rail.tone,
+                )}
+              >
+                {typeof rail.value === "number" ? rail.value.toFixed(isEs ? 0 : 2) : "--"}
+              </span>
+            </div>
+          ))}
+        </div>
+        <div className="relative h-[88px] overflow-hidden rounded-[6px] border border-rule-soft bg-paper shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
         <div
           aria-hidden
-          className="absolute inset-0 opacity-60"
+          className="absolute inset-0 opacity-70"
           style={{
             backgroundImage:
               "linear-gradient(rgba(20,22,26,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(20,22,26,0.045) 1px, transparent 1px)",
             backgroundSize: "28px 22px",
           }}
         />
+        <div
+          aria-hidden
+          className="absolute inset-y-0 w-px bg-ink/35 opacity-0 transition-opacity group-hover/structure:opacity-100"
+          style={{ left: markerLeft }}
+        />
         {rails.map((rail, i) => (
           <div
-            key={rail}
+            key={rail.label}
             className={cn(
               "absolute left-3 right-3 border-t",
-              i === 1 ? "border-gold" : "border-rule-strong",
-              isEs ? "rotate-[-1.5deg]" : "rotate-[1.5deg]",
+              i === 0
+                ? "border-bull/70 border-dashed"
+                : i === 1
+                  ? "border-gold"
+                  : "border-bear/70 border-dashed",
+              isEs ? "rotate-[-1.2deg]" : "rotate-[1.2deg]",
             )}
-            style={{ top: `${22 + i * 18}%` }}
+            style={{ top: `${28 + i * 20}%` }}
           >
-            <span className="absolute -top-2 left-0 bg-paper pr-1 font-mono text-[9px] uppercase tracking-[0.08em] text-ink-4">
-              {rail}
-            </span>
+            <span aria-hidden className="absolute -right-1 -top-[3px] h-1.5 w-1.5 rounded-full bg-gold" />
           </div>
         ))}
-        <div className="absolute left-[23%] right-[18%] top-[28%] flex h-[34px] items-end gap-1.5">
-          {[22, 30, 18, 35, 27, 40, 24, 32, 38, 26].map((height, i) => (
+        <div className="absolute left-[18%] right-[18%] top-[25%] flex h-[48px] items-end gap-1.5">
+          {[22, 30, 18, 35, 27, 40, 24, 32, 38, 26, 43, 34, 46, 39].map((height, i) => (
             <span
               key={i}
               aria-hidden
-              className="relative flex w-1.5 items-center justify-center"
+              className="relative flex w-2 items-center justify-center"
               style={{ height }}
             >
               <span className="absolute h-full w-px bg-ink-4/45" />
@@ -409,20 +456,20 @@ function MiniStructureMap({
         </div>
         <div
           aria-hidden
-          className="absolute right-[5%] top-[18%] h-[34px] w-[28%] rotate-[-6deg] border-t-2 border-dashed border-bull/75"
+          className="absolute right-[4%] top-[18%] h-[38px] w-[30%] rotate-[-8deg] border-t-2 border-dashed border-bull/80"
         />
         <div
           aria-hidden
-          className="absolute right-[5%] top-[58%] h-[34px] w-[28%] rotate-[7deg] border-t-2 border-dashed border-bear/75"
+          className="absolute right-[4%] top-[60%] h-[38px] w-[30%] rotate-[8deg] border-t-2 border-dashed border-bear/80"
         />
         <div
           className={cn(
-            "absolute top-[14px] h-9 w-px",
+            "absolute top-[18px] h-12 w-px",
             isEs ? "bg-violet" : "bg-ink-2",
           )}
           style={{ left: markerLeft }}
         >
-          <span
+              <span
             className={cn(
               "absolute -left-[5px] top-[20px] h-2.5 w-2.5 rounded-full ring-2 ring-paper",
               current === "GO"
@@ -434,6 +481,14 @@ function MiniStructureMap({
                     : "bg-ink-2",
             )}
           />
+        </div>
+        <button
+          type="button"
+          className="absolute bottom-1.5 right-2 rounded-[3px] border border-rule-soft bg-paper/90 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] text-ink-3 opacity-0 shadow-card transition-opacity hover:text-ink group-hover/structure:opacity-100 focus:opacity-100"
+          aria-label={`${displayEngine(engine)} structure scan focus`}
+        >
+          Scan
+        </button>
         </div>
       </div>
     </div>

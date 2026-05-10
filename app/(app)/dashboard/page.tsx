@@ -11,7 +11,10 @@ import { WhyChips } from "@/components/decision-slate/WhyChips";
 import { LastSignalRecap } from "@/components/decision-slate/LastSignalRecap";
 import { EngineTrackRecord } from "@/components/decision-slate/EngineTrackRecord";
 import { PreConfigBriefing } from "@/components/decision-slate/PreConfigBriefing";
-import { StatePipeline } from "@/components/decision-slate/StatePipeline";
+import {
+  StatePipeline,
+  type StructureLevels,
+} from "@/components/decision-slate/StatePipeline";
 import { EngineCard } from "@/components/decision-slate/EngineCard";
 import { RecommendedAction } from "@/components/decision-slate/RecommendedAction";
 import { PreviewState } from "@/components/decision-slate/PreviewState";
@@ -85,7 +88,7 @@ export default async function Page() {
     //   row → row inside briefing   16 (handled inside briefing)
     //   last card → "What to watch" 24 (handled inside briefing)
     //   briefing → preview          24 (mt-6 on preview)
-    <div className="max-w-[1200px] mx-auto pb-12 pt-6 anim-rise">
+    <div className="w-full max-w-[1440px] pb-12 pt-6 anim-rise">
       <PageHeader />
 
       {/* v4 #3 + v10 P1-12: Recommended Action page hero. 24px
@@ -123,6 +126,7 @@ export default async function Page() {
             nextEventISO={spySession.nextSignificantEvent.at.toISOString()}
             nextEventLabel={spySession.nextSignificantEvent.label}
             explanation={spyExplanation(spyState, spy)}
+            structureLevels={spyStructureLevels(spy)}
           />
           <StatePipeline
             engine="SPX"
@@ -134,6 +138,7 @@ export default async function Page() {
             // as SPX for /spx and other consumers.
             nextEventLabel={relabelDashboardString(spxSession.nextSignificantEvent.label)}
             explanation={spxExplanation(spxState, spx)}
+            structureLevels={spxStructureLevels(spx)}
           />
         </div>
       </section>
@@ -324,6 +329,68 @@ function spxExplanation(state: EngineState, snap: SPXSnapshot): string {
     return "Trade has resolved. No new signals until the next overnight window.";
   }
   return snap.scenarioExplanation || snap.channel.reason || "";
+}
+
+function spyStructureLevels(snap: AdaptedSnapshot): StructureLevels {
+  const primaryAnchor = snap.anchor?.primary;
+  const upper = primaryAnchor?.bands.upper.currentValue;
+  const anchor = primaryAnchor?.bands.main.currentValue;
+  const lower = primaryAnchor?.bands.lower.currentValue;
+  if (
+    typeof upper === "number" ||
+    typeof anchor === "number" ||
+    typeof lower === "number"
+  ) {
+    return { upper, anchor, lower };
+  }
+
+  const sorted = snap.lines
+    .slice()
+    .sort((a, b) => a.currentValue - b.currentValue);
+  if (sorted.length === 0) {
+    const biasRails = [
+      snap.bias.ua.value,
+      snap.bias.ud.value,
+      snap.bias.la.value,
+      snap.bias.ld.value,
+    ].filter((value) => Number.isFinite(value) && value > 0);
+    if (biasRails.length === 0) return {};
+    const upperBias = Math.max(...biasRails);
+    const lowerBias = Math.min(...biasRails);
+    return {
+      upper: upperBias,
+      anchor: (upperBias + lowerBias) / 2,
+      lower: lowerBias,
+    };
+  }
+  const below = sorted.filter((l) => l.currentValue <= snap.currentPrice).at(-1);
+  const above = sorted.find((l) => l.currentValue >= snap.currentPrice);
+  const nearest =
+    sorted
+      .slice()
+      .sort(
+        (a, b) =>
+          Math.abs(a.currentValue - snap.currentPrice) -
+          Math.abs(b.currentValue - snap.currentPrice),
+      )[0] ?? null;
+  return {
+    upper: above?.currentValue ?? sorted.at(-1)?.currentValue ?? null,
+    anchor: nearest?.currentValue ?? null,
+    lower: below?.currentValue ?? sorted[0]?.currentValue ?? null,
+  };
+}
+
+function spxStructureLevels(snap: SPXSnapshot): StructureLevels {
+  const ceiling = snap.lines.find((line) => line.kind === "CHANNEL_CEILING");
+  const floor = snap.lines.find((line) => line.kind === "CHANNEL_FLOOR");
+  const upper = ceiling?.currentValue ?? snap.overnight.high.price ?? null;
+  const lower = floor?.currentValue ?? snap.overnight.low.price ?? null;
+  const anchor =
+    typeof upper === "number" && typeof lower === "number"
+      ? (upper + lower) / 2
+      : null;
+
+  return { upper, anchor, lower };
 }
 
 // ---------------------------------------------------------------------

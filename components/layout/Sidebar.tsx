@@ -13,9 +13,10 @@ import {
   X,
   Columns3,
   Rewind,
+  Grid2X2,
+  ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
-import { Wordmark } from "@/components/brand/Wordmark";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
 
@@ -52,6 +53,8 @@ const sections = [
   },
 ];
 
+const BUILD_LABEL = "Build 0.9.7";
+
 export function Sidebar({
   open = false,
   onClose,
@@ -64,7 +67,8 @@ export function Sidebar({
     <aside
       className={cn(
         // Mobile: fixed off-canvas drawer that slides in.
-        "w-[224px] shrink-0 h-screen bg-paper border-r border-rule flex flex-col",
+        "w-[180px] shrink-0 h-screen border-r border-[#C9A227]/45 flex flex-col",
+        "bg-[#FFF9EC] text-ink shadow-[inset_-1px_0_0_rgba(201,162,39,0.18)]",
         "fixed inset-y-0 left-0 z-40 transform transition-transform duration-200 ease-swift",
         open ? "translate-x-0" : "-translate-x-full",
         // Desktop (lg+): permanent sticky sidebar, always visible.
@@ -73,9 +77,16 @@ export function Sidebar({
     >
       <Link
         href="/"
-        className="h-[60px] flex items-center px-5 border-b border-rule hover:bg-paper-2/40 transition-colors"
+        className="h-[82px] flex items-start px-5 pt-4 border-b border-[#E1C98F]/50 hover:bg-[#F8EDCF]/45 transition-colors"
       >
-        <Wordmark />
+        <div className="leading-none">
+          <div className="font-serif text-[22px] leading-[0.92] tracking-[0.05em] text-ink">
+            SPY PROPHET
+          </div>
+          <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.22em] text-gold-ink/75">
+            Options intelligence
+          </div>
+        </div>
         <button
           type="button"
           aria-label="Close menu"
@@ -86,10 +97,12 @@ export function Sidebar({
         </button>
       </Link>
 
-      <nav className="flex-1 overflow-y-auto py-2">
+      <nav className="relative flex-1 overflow-y-auto py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {sections.map((s) => (
-          <div key={s.label} className="mt-3 first:mt-1">
-            <div className="px-5 mb-1.5 eyebrow text-ink-3">{s.label}</div>
+          <div key={s.label} className="mt-5 first:mt-0">
+            <div className="px-5 mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-ink-3">
+              {s.label}
+            </div>
             {s.items.map((it) => {
               const Icon = it.icon;
               const isActive = pathname === it.href;
@@ -104,20 +117,23 @@ export function Sidebar({
                   // WCAG AA on the cream canvas.
                   aria-current={isActive ? "page" : undefined}
                   className={cn(
-                    "flex items-center gap-2.5 mx-3 px-2.5 h-8 rounded-soft text-[13px] transition-all duration-150 ease-swift relative",
-                    "outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper",
+                    "flex items-center gap-2.5 mx-2 px-3 h-[42px] rounded-[4px] text-[13px] transition-all duration-150 ease-swift relative",
+                    "outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#FFF9EC]",
                     isActive
-                      ? "bg-paper-2 text-ink font-medium"
-                      : "text-ink-2 hover:text-ink hover:bg-paper-2/60",
+                      ? "bg-[#071116] text-gold-soft font-semibold shadow-[0_10px_28px_-18px_rgba(7,17,22,0.85),inset_0_1px_0_rgba(255,255,255,0.10)]"
+                      : "text-ink-2 hover:text-ink hover:bg-[#F5E8C6]/65",
                   )}
                 >
-                  {isActive && (
+                  {isActive ? (
                     <span
                       aria-hidden
-                      className="absolute -left-1 top-1 bottom-1 w-[3px] bg-gold rounded-r"
-                    />
+                      className="grid h-5 w-5 place-items-center rounded-[3px] border border-gold/45 text-gold"
+                    >
+                      <Grid2X2 size={13} strokeWidth={2.1} />
+                    </span>
+                  ) : (
+                    <Icon size={15} strokeWidth={1.65} className="text-ink-2" />
                   )}
-                  <Icon size={14} className={cn(isActive ? "text-gold-ink" : "text-ink-3")} />
                   {it.label}
                 </a>
               );
@@ -126,18 +142,52 @@ export function Sidebar({
         ))}
       </nav>
 
-      {/* Beta-status pip moved to the header next to the wordmark
-          (see <Wordmark />). The sidebar avatar slot now reads as
-          plain user identity. */}
-      <div className="px-4 py-3 border-t border-rule flex items-center gap-2.5">
-        <div className="w-7 h-7 rounded-full bg-gold-tint grid place-items-center text-[11px] font-serif font-semibold text-gold-ink shadow-rule">
-          d
-        </div>
-        <div className="flex-1 min-w-0 leading-tight">
-          <div className="text-xs font-medium text-ink truncate">Trader</div>
-          <div className="text-[10px] text-ink-3 truncate font-mono">Signed in</div>
+      <div className="pointer-events-none relative mx-5 mb-5 h-28 shrink-0 opacity-[0.12]">
+        <CompassMark />
+      </div>
+
+      <div className="mx-2 mb-2 rounded-[5px] border border-[#D7B764] bg-[#FFF6DE] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+        <div className="flex items-center gap-2">
+          <span className="grid h-7 w-7 place-items-center rounded-[4px] border border-[#D7B764] bg-[#F8E7B8] text-gold-ink">
+            <ShieldCheck size={15} />
+          </span>
+          <div className="min-w-0">
+            <div className="font-serif text-[13px] leading-none tracking-[0.04em] text-gold-ink">
+              CLOSED BETA
+            </div>
+            <div className="mt-1 font-mono text-[9px] text-ink-3">
+              {BUILD_LABEL}
+            </div>
+          </div>
         </div>
       </div>
     </aside>
+  );
+}
+
+function CompassMark() {
+  return (
+    <svg viewBox="0 0 120 120" className="h-full w-full text-gold-ink" aria-hidden>
+      <circle cx="60" cy="60" r="43" fill="none" stroke="currentColor" strokeWidth="0.8" />
+      <circle cx="60" cy="60" r="33" fill="none" stroke="currentColor" strokeWidth="0.6" />
+      {Array.from({ length: 24 }, (_, i) => {
+        const a = (i * Math.PI) / 12;
+        const r1 = i % 3 === 0 ? 35 : 40;
+        const r2 = 48;
+        return (
+          <line
+            key={i}
+            x1={60 + Math.cos(a) * r1}
+            y1={60 + Math.sin(a) * r1}
+            x2={60 + Math.cos(a) * r2}
+            y2={60 + Math.sin(a) * r2}
+            stroke="currentColor"
+            strokeWidth={i % 3 === 0 ? 0.9 : 0.45}
+          />
+        );
+      })}
+      <path d="M60 14 68 60 60 106 52 60Z" fill="currentColor" opacity="0.28" />
+      <path d="M14 60 60 52 106 60 60 68Z" fill="currentColor" opacity="0.18" />
+    </svg>
   );
 }
