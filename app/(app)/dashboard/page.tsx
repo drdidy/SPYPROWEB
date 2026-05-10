@@ -9,6 +9,7 @@ import { NextEventCallout } from "@/components/slate/NextEventLine";
 import { MetricSlot } from "@/components/decision-slate/MetricSlot";
 import { WhyChips } from "@/components/decision-slate/WhyChips";
 import { LastSignalRecap } from "@/components/decision-slate/LastSignalRecap";
+import { EngineTrackRecord } from "@/components/decision-slate/EngineTrackRecord";
 import { PreConfigBriefing } from "@/components/decision-slate/PreConfigBriefing";
 import { StatePipeline } from "@/components/decision-slate/StatePipeline";
 import { EngineCard } from "@/components/decision-slate/EngineCard";
@@ -176,6 +177,25 @@ export default async function Page() {
               )}
               <SpxVerdictCard snap={spx} lastSignal={recaps.spx} />
             </div>
+            <div className="mt-5 rounded-card border border-rule bg-paper-tier3 p-4 shadow-card">
+              <div className="mb-4 flex items-baseline justify-between gap-3">
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-3">
+                    Engine track record
+                  </p>
+                  <p className="mt-1 font-serif text-h3 text-ink">
+                    Last five sessions
+                  </p>
+                </div>
+                <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-4">
+                  Replay scored
+                </span>
+              </div>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <EngineTrackRecord record={spyTrack} />
+                <EngineTrackRecord record={spxTrack} />
+              </div>
+            </div>
           </Section>
 
           <TimelineRow
@@ -215,13 +235,13 @@ function PageHeader() {
   }).format(new Date());
   return (
     <header className="flex items-center justify-between gap-4 flex-wrap">
-      <div className="min-w-0">
-        <h1 className="font-serif text-h2 text-ink tracking-tight">
+      <div className="min-w-0 md:flex md:items-end md:gap-5">
+        <h1 className="font-serif text-[42px] leading-none text-ink tracking-tight">
           Decision Slate
         </h1>
         {/* v10 P1-5: subtle session-date stamp directly under the
             H1. ~14px sans, muted ink. */}
-        <p className="mt-0.5 text-[14px] text-ink-3 leading-snug">
+        <p className="mt-1 border-rule text-[14px] text-ink-3 leading-snug md:mt-0 md:border-l md:pl-5">
           {/* "Friday, May 9, 2026" → "Friday · May 9, 2026"
               (one replace = first comma only). */}
           {dateLabel.replace(",", " ·")}

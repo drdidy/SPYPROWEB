@@ -29,11 +29,11 @@ const ICONS: Record<Recommendation["id"], LucideIcon> = {
 };
 
 const COMMAND_COPY: Record<Recommendation["id"], { title: string; posture: string }> = {
-  "live-spy": { title: "Track SPY Structure", posture: "LIVE ENGINE" },
-  "live-spx": { title: "Track ES Structure", posture: "LIVE ENGINE" },
-  "options-cockpit": { title: "Stage Execution", posture: "ORDER WINDOW" },
-  "log-replay": { title: "Review The Tape", posture: "SESSION CLOSED" },
-  "daily-brief": { title: "Stand Aside", posture: "AWAIT STRUCTURE" },
+  "live-spy": { title: "Track SPY Structure", posture: "SPY LIVE - WATCH STRUCTURE" },
+  "live-spx": { title: "Track ES Structure", posture: "ES LIVE - WATCH STRUCTURE" },
+  "options-cockpit": { title: "Stage Execution", posture: "ORDER WINDOW - SIZE RISK" },
+  "log-replay": { title: "Review The Tape", posture: "SESSION CLOSED - GRADE EXECUTION" },
+  "daily-brief": { title: "Stand Aside", posture: "MARKETS QUIET - AWAIT STRUCTURE" },
 };
 
 interface Props {
@@ -59,6 +59,12 @@ export function RecommendedAction({
   const Icon = ICONS[rec.id];
   const command = COMMAND_COPY[rec.id];
   const showContext = !!(spyNextEventISO || spxNextEventISO);
+  const confidence =
+    spyState === "GO" || spxState === "GO"
+      ? 88
+      : spyState === "ARMED" || spxState === "ARMED"
+        ? 82
+        : 72;
 
   return (
     <section
@@ -111,6 +117,13 @@ export function RecommendedAction({
             {rec.label}
             <ArrowRight size={12} className="opacity-70" aria-hidden />
           </Link>
+
+          <div className="mt-7 grid max-w-2xl grid-cols-2 gap-y-4 border-l-2 border-gold pl-4 md:grid-cols-4 md:divide-x md:divide-paper/20">
+            <HeroMetric label="Confidence" value={`${confidence}%`} tone="text-gold-soft" />
+            <HeroMetric label="Risk exposure" value="Low" tone="text-bull-soft" />
+            <HeroMetric label="Reward setup" value="Neutral" tone="text-gold-soft" />
+            <HeroMetric label="Trend context" value="Range" tone="text-paper" />
+          </div>
         </div>
 
         <CommandRailDiagram />
@@ -147,11 +160,44 @@ export function RecommendedAction({
                   </div>
                 </div>
               )}
+              <div className="border-t border-paper/10 pt-4">
+                <div className="text-[10px] uppercase tracking-[0.16em] text-paper/45">
+                  Data window
+                </div>
+                <div className="mt-1 text-paper">Live rails</div>
+              </div>
+              <div className="border-t border-paper/10 pt-4">
+                <div className="text-[10px] uppercase tracking-[0.16em] text-gold-soft">
+                  Hold filter
+                </div>
+                <div className="mt-1 text-paper">Neutral</div>
+              </div>
             </div>
           )}
         </aside>
       </div>
     </section>
+  );
+}
+
+function HeroMetric({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: string;
+}) {
+  return (
+    <div className="md:px-5 first:md:pl-0">
+      <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-gold-soft/80">
+        {label}
+      </div>
+      <div className={cn("mt-1 font-serif text-[23px] leading-none", tone)}>
+        {value}
+      </div>
+    </div>
   );
 }
 

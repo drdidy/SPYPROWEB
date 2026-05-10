@@ -106,7 +106,7 @@ export function StatePipeline({
       )}
       style={{ borderTopColor: STATE_TOP_BORDER[current] }}
     >
-      <div className="flex items-start justify-between gap-3 min-w-0">
+      <div className="grid gap-4 border-b border-rule pb-4 md:grid-cols-[200px_1fr_170px] md:items-start">
         {/* v4 #5: drop the serif state-name title that lived next to
             the ticker. The active pill in the stepper below already
             names the state — rendering "Pre-config" twice (title +
@@ -115,36 +115,57 @@ export function StatePipeline({
           {/* v8 P1-2: SPX → ES at the render boundary. The `engine`
               prop stays as the wire-level identifier so the data
               path (snapshot keys, /api/spx) keeps working unchanged. */}
-          <div className="flex items-center gap-2 min-w-0">
-            <span
+          <div className="min-w-0">
+            <h2
               className={cn(
-                "font-mono text-[11px] tracking-[0.18em] uppercase font-bold",
+                "font-serif text-[40px] leading-none tracking-tight",
                 labelTone,
               )}
             >
               {displayEngine(engine)}
-            </span>
+            </h2>
             <span
               className={cn(
-                "inline-flex h-5 items-center rounded-pill px-2 text-[10px] font-semibold tracking-[0.01em]",
-                CURRENT_PILL_TONE[current],
+                "mt-2 inline-flex h-6 items-center rounded-[4px] px-2 font-mono text-[10px] font-bold uppercase tracking-[0.10em]",
+                current === "GO" || current === "ARMED"
+                  ? "bg-bull text-paper"
+                  : "bg-paper-2 text-ink-2 ring-1 ring-rule-strong",
               )}
             >
+              {current === "GO" || current === "ARMED" ? "Bull engine" : "Neutral engine"}
+            </span>
+          </div>
+        </div>
+
+        <div className="min-w-0 border-rule md:border-l md:pl-6">
+          <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3">
+            Current state
+          </div>
+          <div className="mt-1 flex items-baseline gap-3">
+            <span className="font-serif text-[40px] leading-none text-bull-ink">
+              {Math.max(1, currentIdx + 1)}
+            </span>
+            <span className="font-serif text-[24px] leading-none text-ink">
               {currentPhase.label}
             </span>
           </div>
         </div>
 
         {(nextEventISO || nextEventLabel) && (
-          <div className="shrink-0 text-right whitespace-nowrap flex flex-col gap-0.5">
+          <div className="shrink-0 border-rule md:border-l md:pl-6 md:text-right">
             {nextEventLabel && (
               <span className="font-mono text-[10px] tracking-[0.10em] uppercase text-ink-3">
-                {nextEventLabel}
+                Time to next state
               </span>
             )}
             {nextEventISO && (
-              <span className="font-mono text-meta tabular-nums text-ink">
-                <Countdown to={nextEventISO} verb="in" />
+              <span className="mt-1 block font-mono text-[18px] tabular-nums text-bull-ink">
+                <Countdown to={nextEventISO} verb="" />
+              </span>
+            )}
+            {nextEventLabel && (
+              <span className="mt-0.5 block font-mono text-[10px] text-ink-3">
+                {nextEventLabel}
               </span>
             )}
           </div>
@@ -180,7 +201,7 @@ export function StatePipeline({
               <li
                 key={state}
                 aria-current={isCurrent ? "step" : undefined}
-                className="flex items-center shrink-0 min-w-0"
+                className="flex items-center min-w-0"
               >
                 {/* Connector hairline. v5 #1: thinner spacing at lg
                     so seven nodes fit a half-screen card without the
@@ -189,7 +210,7 @@ export function StatePipeline({
                   <span
                     aria-hidden
                     className={cn(
-                      "h-px w-2 md:w-3 xl:w-4",
+                      "h-px w-1.5 md:w-2 xl:w-2.5",
                       isPassed || isCurrent
                         ? "bg-rule-strong"
                         : "bg-rule",
@@ -226,8 +247,8 @@ export function StatePipeline({
                       The active step always shows the full label. */}
                   <span
                     className={cn(
-                      "inline-flex items-center rounded-pill",
-                      "text-[11px] tracking-[0.01em] whitespace-nowrap",
+                      "inline-flex items-center gap-1 rounded-pill",
+                      "text-[10.5px] tracking-[0.01em] whitespace-nowrap",
                       "transition-colors",
                       // The active pill is always rendered as a labeled
                       // chip; the dot-mode at lg only applies to non-
@@ -235,14 +256,27 @@ export function StatePipeline({
                       // dot below.
                       isCurrent
                         ? cn(
-                            "px-1.5 py-0.5 font-semibold animate-breathe",
+                            "px-1 py-0.5 font-semibold animate-breathe",
                             CURRENT_PILL_TONE[state],
                           )
                         : isPassed
-                          ? "px-1.5 py-0.5 bg-paper-2/50 text-ink-3 font-medium"
-                          : "px-1.5 py-0.5 text-ink-3 font-normal",
+                          ? "px-1 py-0.5 bg-paper-2/50 text-ink-3 font-medium"
+                          : "px-1 py-0.5 text-ink-3 font-normal",
                     )}
                   >
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "inline-flex h-5 w-5 items-center justify-center rounded-full border text-[10px] font-semibold",
+                        isCurrent
+                          ? "border-bull bg-bull text-paper"
+                          : isPassed
+                            ? "border-ink-2 bg-paper text-ink"
+                            : "border-rule-strong bg-paper text-ink-3",
+                      )}
+                    >
+                      {stepNum}
+                    </span>
                     {/* < lg: full label (the row stacks vertically) */}
                     <span className="lg:hidden">{phase.label}</span>
                     {/* lg–xl-plus: full for the current step only.
@@ -290,6 +324,8 @@ export function StatePipeline({
       </div>
 
       <MiniStructureMap engine={engine} current={current} />
+
+      <EngineFooterMetrics engine={engine} current={current} />
 
       {/* Plain-English explanation underneath the stepper. */}
       {explanation && (
@@ -349,6 +385,36 @@ function MiniStructureMap({
             </span>
           </div>
         ))}
+        <div className="absolute left-[23%] right-[18%] top-[28%] flex h-[34px] items-end gap-1.5">
+          {[22, 30, 18, 35, 27, 40, 24, 32, 38, 26].map((height, i) => (
+            <span
+              key={i}
+              aria-hidden
+              className="relative flex w-1.5 items-center justify-center"
+              style={{ height }}
+            >
+              <span className="absolute h-full w-px bg-ink-4/45" />
+              <span
+                className={cn(
+                  "h-3.5 w-1.5 rounded-[1px]",
+                  i % 4 === 0
+                    ? "bg-bear/80"
+                    : isEs
+                      ? "bg-violet/75"
+                      : "bg-ink-2/75",
+                )}
+              />
+            </span>
+          ))}
+        </div>
+        <div
+          aria-hidden
+          className="absolute right-[5%] top-[18%] h-[34px] w-[28%] rotate-[-6deg] border-t-2 border-dashed border-bull/75"
+        />
+        <div
+          aria-hidden
+          className="absolute right-[5%] top-[58%] h-[34px] w-[28%] rotate-[7deg] border-t-2 border-dashed border-bear/75"
+        />
         <div
           className={cn(
             "absolute top-[14px] h-9 w-px",
@@ -370,6 +436,45 @@ function MiniStructureMap({
           />
         </div>
       </div>
+    </div>
+  );
+}
+
+function EngineFooterMetrics({
+  engine,
+  current,
+}: {
+  engine: "SPY" | "SPX";
+  current: EngineState;
+}) {
+  const active = current === "GO" || current === "ARMED" || current === "WAIT";
+  const watching = current === "WATCH";
+  const metrics = engine === "SPX"
+    ? [
+        ["Bias", active ? "Bull" : "Neutral"],
+        ["Trend", active ? "Ascending" : "Range"],
+        ["Strength", active ? "High" : watching ? "Medium" : "Low"],
+        ["Quality", active ? "A" : watching ? "B" : "Pending"],
+      ]
+    : [
+        ["Bias", active ? "Call" : "Neutral"],
+        ["Trend", active ? "Anchor" : "Range"],
+        ["Strength", active ? "High" : watching ? "Medium" : "Low"],
+        ["Quality", active ? "A" : watching ? "B" : "Pending"],
+      ];
+
+  return (
+    <div className="mt-3 grid grid-cols-4 divide-x divide-rule-soft rounded-[6px] border border-rule-soft bg-paper-tier3">
+      {metrics.map(([label, value]) => (
+        <div key={label} className="min-w-0 px-2.5 py-2">
+          <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-4">
+            {label}
+          </div>
+          <div className="mt-1 truncate font-serif text-[18px] leading-none text-ink">
+            {value}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
