@@ -3,6 +3,7 @@ import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 import { StatusPill } from "@/components/ui/StatusPill";
 import type { RiskGuardrailState } from "@/lib/types";
 import { Shield, Zap, Layers, Calendar } from "lucide-react";
+import type { ReactNode } from "react";
 
 const variantMap = {
   OK: "ok",
@@ -12,7 +13,13 @@ const variantMap = {
   MISSED_ENTRY: "breached",
 } as const;
 
-export function RiskGuardrails({ state }: { state: RiskGuardrailState }) {
+export function RiskGuardrails({
+  state,
+  healthAction,
+}: {
+  state: RiskGuardrailState;
+  healthAction?: ReactNode;
+}) {
   const rows = [
     { key: "chase", label: "Chase Guard", icon: Zap, value: state.chase },
     { key: "retest", label: "Retest", icon: Layers, value: state.retest },
@@ -21,7 +28,11 @@ export function RiskGuardrails({ state }: { state: RiskGuardrailState }) {
   ];
   return (
     <Card>
-      <CardHeader eyebrow="Risk Guardrails" title="Why we are (or aren't) trading" />
+      <CardHeader
+        eyebrow="Risk Guardrails"
+        title="Why we are (or aren't) trading"
+        action={healthAction}
+      />
       <CardBody className="space-y-3">
         {rows.map((r) => {
           const Icon = r.icon;

@@ -2,6 +2,7 @@
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 import { StatusPill } from "@/components/ui/StatusPill";
 import type { DynamicLine } from "@/lib/types";
+import type { ReactNode } from "react";
 
 function lineState(distance: number): "armed" | "watching" | "stale" {
   const a = Math.abs(distance);
@@ -24,13 +25,20 @@ const lineStyle: Record<string, { dot: string; label: string }> = {
   DAY_OPEN: { dot: "bg-gold", label: "Day Open" },
 };
 
-export function TriggerMap({ lines }: { lines: DynamicLine[] }) {
+export function TriggerMap({
+  lines,
+  healthAction,
+}: {
+  lines: DynamicLine[];
+  healthAction?: ReactNode;
+}) {
   return (
     <Card>
       <CardHeader
         eyebrow="Trigger Map"
         title="Levels in play"
         meta="sorted by proximity"
+        action={healthAction}
       />
       <CardBody className="px-0 pb-0">
         <div className="grid grid-cols-12 px-5 pb-2 eyebrow text-ink-3">

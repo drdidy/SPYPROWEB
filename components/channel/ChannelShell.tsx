@@ -1,15 +1,28 @@
 import { AnchorSlate } from "@/components/channel/AnchorSlate";
+import { ChannelLiveBadge, LastUpdatedAge } from "@/components/channel/ChannelLiveBadge";
 import { OptionsIntelligence } from "@/components/channel/OptionsIntelligence";
 import { PreOpenBias } from "@/components/channel/PreOpenBias";
 import { RiskGuardrails } from "@/components/channel/RiskGuardrails";
 import { SignalTape } from "@/components/channel/SignalTape";
 import { TriggerMap } from "@/components/channel/TriggerMap";
+import {
+  DegradedModeBanner,
+  FeedHealthProvider,
+} from "@/components/decision-slate/FeedHealthProvider";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { CHANNEL_COPY } from "@/content/channel";
 import { getChannelConfig } from "@/lib/channel/config";
 import type { Engine } from "@/lib/contracts/channel";
+import {
+  buildFeedSeed,
+  FEED_DEFAULTS,
+  type FeedHealthSeed,
+  type FeedStatus,
+} from "@/lib/feed-health";
+import { getSessionInfo } from "@/lib/sessions";
 import type { AdaptedSnapshot } from "@/lib/snapshot-adapter";
 import type { LiveSnapshotSource } from "@/lib/snapshot-fetch";
+import type { ReactNode } from "react";
 
 export interface ChannelShellData {
   snap: AdaptedSnapshot;
@@ -36,9 +49,18 @@ export function ChannelShell({
     strikes,
     signalTicks,
   } = data.snap;
+  const now = new Date();
+  const serverNowISO = now.toISOString();
+  const session = getSessionInfo(engine === "spy" ? "SPY" : "SPX", now);
+  const feeds = buildChannelFeedSeeds(
+    data,
+    serverNowISO,
+    session.nextSignificantEvent.at,
+  );
 
   return (
-    <div className="w-full max-w-[1440px] space-y-10 pb-16">
+    <FeedHealthProvider serverNowISO={serverNowISO} feeds={feeds}>
+      <div className="w-full max-w-[1440px] space-y-10 pb-16">
       {/* Editorial header - matches the previous /spy surface exactly. */}
       <header className="relative overflow-hidden rounded-[18px] border border-[#D6BC75]/45 bg-[#071116] px-5 py-5 text-paper shadow-[0_24px_60px_-42px_rgba(7,17,22,0.95)] md:px-7 md:py-6">
         <div
@@ -59,6 +81,7 @@ export function ChannelShell({
               <span className="font-mono text-[10px] text-paper/48 tracking-[0.20em] uppercase">
                 {todayLabel()}
               </span>
+              <ChannelLiveBadge />
               <SourceBadge source={data.source} error={data.error} />
             </div>
             <h1 className="mt-3 text-[36px] font-serif leading-none tracking-tight text-paper md:text-[46px]">
@@ -71,10 +94,16 @@ export function ChannelShell({
           <div className="hidden md:flex items-center gap-6 text-right">
             <Stat label="Bias" value={bias.bias} highlight={bias.bias} />
             <Stat label="Window" value={decision.windowET || "—"} />
-            <Stat label="Last" value={currentPrice.toFixed(2)} />
+            <Stat
+              label="Last"
+              value={currentPrice.toFixed(2)}
+              support={<LastUpdatedAge />}
+            />
           </div>
         </div>
       </header>
+
+      <DegradedModeBanner className="-mt-6" />
 
       <AnchorSlate engine={engine} snap={data.snap} />
 
@@ -121,8 +150,105 @@ export function ChannelShell({
         <span>{copy.footer.left}</span>
         <span>{copy.footer.right}</span>
       </footer>
-    </div>
+      </div>
+    </FeedHealthProvider>
   );
+}
+
+function buildChannelFeedSeeds(
+  data: ChannelShellData,
+  serverNowISO: string,
+  nextExpectedAt: Date,
+): FeedHealthSeed[] {
+  const snap = data.snap;
+  const sourceStatus = statusFromSource(data.source);
+  const failedAt = sourceStatus === "failed" ? serverNowISO : null;
+  const nextIso = nextExpectedAt.toISOString();
+  const structureStatus =
+    sourceStatus === "failed"
+      ? "failed"
+      : sourceStatus === "stale"
+        ? "stale"
+        : undefined;
+  const panelStatus = sourceStatus === "failed" ? "failed" : undefined;
+  const priceUpdatedAt = snap.shellState.feedHealth.lastTickTs || snap.asOf;
+  const optionsReady = Boolean(snap.optionsIntel && snap.strikes);
+
+  return [
+    buildFeedSeed("price-tick", {
+      lastUpdatedAt: priceUpdatedAt,
+      nextExpectedAt: nextIso,
+      staleAfterMs: FEED_DEFAULTS.priceTickMs,
+      failAfterMs: 30_000,
+      critical: true,
+      failedAt,
+      initialStatus: sourceStatus,
+    }),
+    buildFeedSeed("anchor-levels", {
+      lastUpdatedAt: snap.asOf,
+      nextExpectedAt: nextIso,
+      staleAfterMs: FEED_DEFAULTS.channelStructureMs,
+      failAfterMs: 10 * 60_000,
+      critical: true,
+      failedAt,
+      initialStatus: structureStatus,
+    }),
+    buildFeedSeed("trigger-lines", {
+      lastUpdatedAt: snap.asOf,
+      nextExpectedAt: nextIso,
+      staleAfterMs: FEED_DEFAULTS.channelStructureMs,
+      failAfterMs: 10 * 60_000,
+      failedAt,
+      initialStatus: structureStatus,
+    }),
+    buildFeedSeed("pre-open-bias", {
+      lastUpdatedAt: snap.asOf,
+      nextExpectedAt: nextIso,
+      staleAfterMs: FEED_DEFAULTS.channelPanelMs,
+      failAfterMs: 30 * 60_000,
+      failedAt,
+      initialStatus: panelStatus,
+    }),
+    buildFeedSeed("options-chain", {
+      lastUpdatedAt: optionsReady ? snap.asOf : null,
+      nextExpectedAt: nextIso,
+      staleAfterMs: FEED_DEFAULTS.channelPanelMs,
+      failAfterMs: 30 * 60_000,
+      failedAt,
+      initialStatus:
+        sourceStatus === "failed" ? "failed" : optionsReady ? undefined : "loading",
+    }),
+    buildFeedSeed("signal-tape", {
+      lastUpdatedAt: snap.asOf,
+      nextExpectedAt: nextIso,
+      staleAfterMs: FEED_DEFAULTS.channelPanelMs,
+      failAfterMs: 30 * 60_000,
+      critical: true,
+      failedAt,
+      initialStatus: panelStatus,
+    }),
+    buildFeedSeed("risk-guardrails", {
+      lastUpdatedAt: snap.asOf,
+      nextExpectedAt: nextIso,
+      staleAfterMs: FEED_DEFAULTS.channelPanelMs,
+      failAfterMs: 30 * 60_000,
+      failedAt,
+      initialStatus: panelStatus,
+    }),
+    buildFeedSeed("session-clock", {
+      lastUpdatedAt: serverNowISO,
+      nextExpectedAt: nextIso,
+      staleAfterMs: FEED_DEFAULTS.marketClockMs,
+      failAfterMs: 5 * 60_000,
+      critical: true,
+    }),
+  ];
+}
+
+function statusFromSource(source: LiveSnapshotSource): FeedStatus | undefined {
+  if (source === "error") return "failed";
+  if (source === "live") return undefined;
+  return "stale";
 }
 
 function SourceBadge({
@@ -167,10 +293,12 @@ function Stat({
   label,
   value,
   highlight,
+  support,
 }: {
   label: string;
   value: string;
   highlight?: string;
+  support?: ReactNode;
 }) {
   return (
     <div>
@@ -187,6 +315,7 @@ function Stat({
       >
         {value}
       </div>
+      {support}
     </div>
   );
 }

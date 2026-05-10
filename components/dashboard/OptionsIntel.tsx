@@ -2,6 +2,7 @@
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 import { StatusPill } from "@/components/ui/StatusPill";
 import type { OptionsIntel as Intel, SelectedStrikes } from "@/lib/types";
+import type { ReactNode } from "react";
 
 const alignmentVariant = {
   ALIGNED: "confirmed",
@@ -13,10 +14,12 @@ export function OptionsIntelPanel({
   intel,
   strikes,
   spy,
+  healthAction,
 }: {
   intel: Intel | null;
   strikes: SelectedStrikes | null;
   spy: number;
+  healthAction?: ReactNode;
 }) {
   if (!intel || !strikes) {
     return (
@@ -24,7 +27,12 @@ export function OptionsIntelPanel({
         <CardHeader
           eyebrow="Options Intelligence"
           title="Dealer & flow"
-          action={<StatusPill variant="stale">PENDING</StatusPill>}
+          action={
+            <>
+              {healthAction}
+              <StatusPill variant="stale">PENDING</StatusPill>
+            </>
+          }
         />
         <CardBody className="space-y-3 py-10">
           <div className="font-serif text-headline text-ink-3 italic font-light">
@@ -59,9 +67,12 @@ export function OptionsIntelPanel({
         eyebrow="Options Intelligence"
         title="Dealer & flow"
         action={
-          <StatusPill variant={alignmentVariant[intel.alignment]}>
-            {intel.alignment}
-          </StatusPill>
+          <>
+            {healthAction}
+            <StatusPill variant={alignmentVariant[intel.alignment]}>
+              {intel.alignment}
+            </StatusPill>
+          </>
         }
       />
       <CardBody className="space-y-5">

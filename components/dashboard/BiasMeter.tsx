@@ -2,6 +2,7 @@
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 import type { BiasState } from "@/lib/types";
 import { motion } from "framer-motion";
+import type { ReactNode } from "react";
 
 const biasTone = {
   BULLISH: "text-bull-ink",
@@ -9,7 +10,13 @@ const biasTone = {
   NEUTRAL: "text-ink-2",
 } as const;
 
-export function BiasMeter({ state }: { state: BiasState }) {
+export function BiasMeter({
+  state,
+  healthAction,
+}: {
+  state: BiasState;
+  healthAction?: ReactNode;
+}) {
   const lines = [
     { kind: "UA", value: state.ua.value, touched: state.ua.touched, tone: "bull" as const },
     { kind: "UD", value: state.ud.value, touched: state.ud.touched, tone: "bear" as const },
@@ -28,23 +35,26 @@ export function BiasMeter({ state }: { state: BiasState }) {
         }
         meta={`Strength ${state.strengthScore}/100`}
         action={
-          <div className="flex flex-col items-end gap-1">
-            <div className="font-mono text-[10px] text-ink-3 tabular-nums">
-              {state.strengthScore.toFixed(0)}
-            </div>
-            <div className="w-24 h-1 bg-paper-2 rounded-full overflow-hidden">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${state.strengthScore}%` }}
-                transition={{ duration: 0.7, ease: [0.2, 0.8, 0.2, 1] }}
-                className={`h-full rounded-full ${
-                  state.bias === "BULLISH"
-                    ? "bg-bull"
-                    : state.bias === "BEARISH"
-                      ? "bg-bear"
-                      : "bg-ink"
-                }`}
-              />
+          <div className="flex items-start gap-2">
+            {healthAction}
+            <div className="flex flex-col items-end gap-1">
+              <div className="font-mono text-[10px] text-ink-3 tabular-nums">
+                {state.strengthScore.toFixed(0)}
+              </div>
+              <div className="w-24 h-1 bg-paper-2 rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${state.strengthScore}%` }}
+                  transition={{ duration: 0.7, ease: [0.2, 0.8, 0.2, 1] }}
+                  className={`h-full rounded-full ${
+                    state.bias === "BULLISH"
+                      ? "bg-bull"
+                      : state.bias === "BEARISH"
+                        ? "bg-bear"
+                        : "bg-ink"
+                  }`}
+                />
+              </div>
             </div>
           </div>
         }

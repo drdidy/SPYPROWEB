@@ -91,6 +91,7 @@ export function useFeedHealth(feedId: FeedId): FeedHealthState {
       nextExpectedAt: null,
       critical: false,
       failedForMs: 0,
+      ageMs: Number.POSITIVE_INFINITY,
     };
   }
 
@@ -104,6 +105,7 @@ export function useFeedHealth(feedId: FeedId): FeedHealthState {
       nextExpectedAt: null,
       critical: false,
       failedForMs: 0,
+      ageMs: Number.POSITIVE_INFINITY,
     };
   }
 
@@ -126,6 +128,7 @@ export function useFeedHealth(feedId: FeedId): FeedHealthState {
     nextExpectedAt: seed.nextExpectedAt ?? null,
     critical: seed.critical ?? false,
     failedForMs,
+    ageMs,
   };
 }
 
@@ -137,6 +140,7 @@ function resolveStatus(
 ): FeedStatus {
   if (initialStatus === "failed") return "failed";
   if (initialStatus === "loading") return "loading";
+  if (initialStatus === "stale") return "stale";
   if (!Number.isFinite(ageMs)) return "loading";
   if (ageMs > failAfterMs) return "failed";
   if (ageMs > staleAfterMs) return "stale";
@@ -192,6 +196,14 @@ export function DegradedModeBanner({ className }: { className?: string }) {
     useFeedHealth("spx-last-session"),
     useFeedHealth("daily-brief-preview"),
     useFeedHealth("market-clock"),
+    useFeedHealth("price-tick"),
+    useFeedHealth("anchor-levels"),
+    useFeedHealth("trigger-lines"),
+    useFeedHealth("pre-open-bias"),
+    useFeedHealth("options-chain"),
+    useFeedHealth("signal-tape"),
+    useFeedHealth("risk-guardrails"),
+    useFeedHealth("session-clock"),
   ];
   const failed = feeds
     .filter(

@@ -3,6 +3,7 @@ import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 import { GradeBadge } from "@/components/ui/GradeBadge";
 import { Sparkline } from "@/components/ui/Sparkline";
 import type { Grade } from "@/lib/types";
+import type { ReactNode } from "react";
 
 type Tick = {
   time: string;
@@ -19,7 +20,13 @@ const typeStyle = {
   NOTE: { label: "NOTE", color: "text-ink-3", bar: "bg-ink-4" },
 } as const;
 
-export function SignalTape({ ticks: liveTicks }: { ticks?: Tick[] } = {}) {
+export function SignalTape({
+  ticks: liveTicks,
+  healthAction,
+}: {
+  ticks?: Tick[];
+  healthAction?: ReactNode;
+} = {}) {
   const ticks = liveTicks ?? [];
   if (ticks.length === 0) {
     return (
@@ -28,6 +35,7 @@ export function SignalTape({ ticks: liveTicks }: { ticks?: Tick[] } = {}) {
           eyebrow="Signal Tape"
           title="Today's prints"
           meta="No events yet"
+          action={healthAction}
         />
         <CardBody>
           <div className="py-10">
@@ -50,6 +58,7 @@ export function SignalTape({ ticks: liveTicks }: { ticks?: Tick[] } = {}) {
         eyebrow="Signal Tape"
         title="Today's prints"
         meta={`${ticks.length} event${ticks.length === 1 ? "" : "s"} · session live`}
+        action={healthAction}
       />
       <CardBody className="px-0 pb-0">
         <ol className="divide-y divide-rule border-t border-rule">
