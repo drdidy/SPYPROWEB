@@ -406,21 +406,93 @@ export function HeroSection({
 
 function CompassMark() {
   return (
-    <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden className="shrink-0">
+    <svg
+      width="46"
+      height="46"
+      viewBox="0 0 46 46"
+      aria-hidden
+      className="shrink-0 drop-shadow-[0_12px_24px_rgba(110,76,14,0.18)]"
+    >
       <defs>
         <linearGradient id="hero-compass" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stopColor="#D29A2C" />
           <stop offset="55%" stopColor="#B8821F" />
           <stop offset="100%" stopColor="#6E4C0E" />
         </linearGradient>
+        <linearGradient id="hero-compass-bull" x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0%" stopColor="#0B4F3A" />
+          <stop offset="100%" stopColor="#16A06A" />
+        </linearGradient>
+        <radialGradient id="hero-compass-fill" cx="50%" cy="42%" r="58%">
+          <stop offset="0%" stopColor="#FFF8E7" />
+          <stop offset="62%" stopColor="#F4E4C0" />
+          <stop offset="100%" stopColor="#E4C782" />
+        </radialGradient>
       </defs>
+      <circle cx="23" cy="23" r="21" fill="#FBF8EF" />
+      <circle cx="23" cy="23" r="18.5" fill="url(#hero-compass-fill)" opacity="0.42" />
+      <circle cx="23" cy="23" r="17.5" fill="none" stroke="url(#hero-compass)" strokeWidth="1.5" />
+      <circle cx="23" cy="23" r="12.5" fill="none" stroke="#6E4C0E" strokeDasharray="1.4 3.2" strokeOpacity="0.42" />
+      {Array.from({ length: 16 }, (_, i) => {
+        const angle = (i * Math.PI) / 8 - Math.PI / 2;
+        const major = i % 4 === 0;
+        const inner = major ? 14.4 : 15.8;
+        const outer = 17.8;
+        return (
+          <line
+            key={i}
+            x1={23 + Math.cos(angle) * inner}
+            y1={23 + Math.sin(angle) * inner}
+            x2={23 + Math.cos(angle) * outer}
+            y2={23 + Math.sin(angle) * outer}
+            stroke="#6E4C0E"
+            strokeOpacity={major ? 0.68 : 0.34}
+            strokeWidth={major ? 1 : 0.55}
+            strokeLinecap="round"
+          />
+        );
+      })}
       <path
-        d="M14 1.8 17.2 10.8 26.2 14 17.2 17.2 14 26.2 10.8 17.2 1.8 14 10.8 10.8 14 1.8Z"
-        fill="none"
+        d="M23 4.8 26.4 19.6 41.2 23 26.4 26.4 23 41.2 19.6 26.4 4.8 23 19.6 19.6Z"
+        fill="#FBF8EF"
         stroke="url(#hero-compass)"
-        strokeWidth="1.15"
+        strokeWidth="1.05"
+        strokeLinejoin="round"
       />
-      <circle cx="14" cy="14" r="2.1" fill="url(#hero-compass)" />
+      <path
+        d="M13.2 29.4 22.2 22.2 34.2 13.6 25.4 25.2Z"
+        fill="url(#hero-compass-bull)"
+        opacity="0.88"
+      />
+      <path
+        d="M10.8 16.2 22.4 22.5 35.4 29.7 20.4 25.1Z"
+        fill="url(#hero-compass)"
+        opacity="0.82"
+      />
+      <circle cx="23" cy="23" r="4.2" fill="#FBF8EF" stroke="#6E4C0E" strokeOpacity="0.45" />
+      <circle cx="23" cy="23" r="2.4" fill="url(#hero-compass)" />
+      <text
+        x="10.5"
+        y="13"
+        fill="#6E4C0E"
+        fontFamily="var(--font-geist-mono)"
+        fontSize="5.2"
+        fontWeight="700"
+        letterSpacing="0.5"
+      >
+        SPY
+      </text>
+      <text
+        x="29.5"
+        y="36.6"
+        fill="#0B4F3A"
+        fontFamily="var(--font-geist-mono)"
+        fontSize="5.2"
+        fontWeight="700"
+        letterSpacing="0.5"
+      >
+        ES
+      </text>
     </svg>
   );
 }
