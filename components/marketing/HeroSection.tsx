@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { ArrowRight, BookOpen, Gauge, Radio, ShieldCheck } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import type { DecisionState } from "@/lib/types";
@@ -17,6 +18,9 @@ interface HeroProps {
   quote?: { spy: number; change: number; changePct: number; vix: number };
   initialLive?: boolean;
   chart?: StructureChartData | null;
+  spxChart?: StructureChartData | null;
+  previewLabel?: string;
+  chartDate?: string;
 }
 
 const workspaceNav = [
@@ -32,6 +36,9 @@ export function HeroSection({
   quote: serverQuote,
   initialLive,
   chart,
+  spxChart,
+  previewLabel = "Latest structure",
+  chartDate,
 }: HeroProps = {}) {
   const reduce = useReducedMotion();
   const fadeUp = (delay = 0) =>
@@ -52,7 +59,6 @@ export function HeroSection({
         : "gold";
   const decisionLabel = labelize(serverDecision?.finalDecision ?? "WAIT_FOR_CONFIRMATION");
   const verdict = serverDecision?.verdict ?? "WAIT";
-  const updatedAt = serverDecision?.updatedAt ?? "latest snapshot";
   const explanation =
     serverDecision?.finalExplanation ||
     "The live slate loads from current market structure when the data source is available.";
@@ -164,7 +170,7 @@ export function HeroSection({
                   </div>
                 </div>
                 <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-paper/45">
-                  <span>Updated {updatedAt}</span>
+                  <span>{previewLabel}</span>
                   <span
                     className={cn(
                       "rounded-[4px] border px-2 py-1",
@@ -173,13 +179,13 @@ export function HeroSection({
                         : "border-paper/15 text-paper/55",
                     )}
                   >
-                    {initialLive ? "Live" : "Latest"}
+                    {initialLive ? "Live" : "Replay"}
                   </span>
                 </div>
               </div>
 
-              <div className="grid grid-cols-12">
-                <aside className="hidden border-r border-paper/10 p-4 md:col-span-3 md:block">
+              <div className="grid grid-cols-1 md:grid-cols-[170px_1fr]">
+                <aside className="hidden border-r border-paper/10 p-4 md:block">
                   <div className="space-y-1.5">
                     {workspaceNav.map((item, index) => (
                       <div
@@ -206,15 +212,15 @@ export function HeroSection({
                   </div>
                 </aside>
 
-                <div className="col-span-12 p-4 sm:p-5 md:col-span-9">
-                  <div className="grid grid-cols-12 gap-4">
-                    <div className="col-span-12 rounded-[8px] border border-paper/10 bg-paper/[0.035] p-4 lg:col-span-7">
+                <div className="p-4 sm:p-5">
+                  <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_260px]">
+                    <div className="rounded-[8px] border border-paper/10 bg-paper/[0.035] p-4">
                       <div className="mb-4 flex items-start justify-between gap-4">
                         <div>
                           <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-paper/45">
                             Recommended next step
                           </div>
-                          <h2 className="mt-2 font-serif text-[24px] leading-tight tracking-[-0.01em] text-paper">
+                          <h2 className="mt-2 max-w-[15ch] font-serif text-[24px] leading-tight tracking-[-0.01em] text-paper sm:text-[28px]">
                             {verdict}: {decisionLabel}
                           </h2>
                         </div>
@@ -228,13 +234,13 @@ export function HeroSection({
                           data={chart}
                           variant="dark"
                           accent={statusTone === "bear" ? "bear" : statusTone === "bull" ? "bull" : "gold"}
-                          height={190}
+                          height={220}
                           title="Actual SPY path vs rails"
                         />
                       </div>
                     </div>
 
-                    <div className="col-span-12 rounded-[8px] border border-paper/10 bg-paper/[0.035] p-4 lg:col-span-5">
+                    <div className="rounded-[8px] border border-paper/10 bg-paper/[0.035] p-4">
                       <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-paper/45">
                         Today's game plan
                       </div>
@@ -242,7 +248,7 @@ export function HeroSection({
                         <PlanRow label="Verdict" value={verdict} />
                         <PlanRow label="Decision" value={decisionLabel} />
                         <PlanRow label="Conviction" value={percent(serverDecision?.conviction)} />
-                        <PlanRow label="Window" value={serverDecision?.windowET ?? "Loading"} />
+                        <PlanRow label="Replay date" value={chartDate ?? chart?.date ?? "Latest"} />
                       </dl>
                       <div className="mt-5 border-t border-paper/10 pt-4">
                         <Link
@@ -259,6 +265,37 @@ export function HeroSection({
                           Open live slate <ArrowRight size={13} />
                         </Link>
                       </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 xl:col-span-2 md:grid-cols-2">
+                      <PreviewChartCard
+                        title="SPY structure map"
+                        value={money(serverQuote?.spy)}
+                        delta={delta(serverQuote?.change, serverQuote?.changePct)}
+                        tone={(serverQuote?.change ?? 0) >= 0 ? "bull" : "bear"}
+                      >
+                        <StructurePathChart
+                          data={chart}
+                          variant="dark"
+                          accent="gold"
+                          height={170}
+                          title="Premarket anchors"
+                        />
+                      </PreviewChartCard>
+                      <PreviewChartCard
+                        title="ES structure map"
+                        value={lastChartPrice(spxChart)}
+                        delta={undefined}
+                        tone="bull"
+                      >
+                        <StructurePathChart
+                          data={spxChart}
+                          variant="dark"
+                          accent="bull"
+                          height={170}
+                          title="Overnight channel"
+                        />
+                      </PreviewChartCard>
                     </div>
                   </div>
                 </div>
@@ -369,6 +406,53 @@ function PreviewMetric({
   );
 }
 
+function PreviewChartCard({
+  title,
+  value,
+  delta: deltaText,
+  tone,
+  children,
+}: {
+  title: string;
+  value: string;
+  delta?: string;
+  tone: "bull" | "bear" | "neutral";
+  children: ReactNode;
+}) {
+  return (
+    <div className="rounded-[8px] border border-paper/10 bg-paper/[0.035] p-4">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-paper/45">
+            {title}
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="font-mono text-[18px] font-semibold text-paper">
+              {value}
+            </span>
+            {deltaText && (
+              <span
+                className={cn(
+                  "font-mono text-[10px]",
+                  tone === "bull" && "text-bull",
+                  tone === "bear" && "text-bear",
+                  tone === "neutral" && "text-paper/45",
+                )}
+              >
+                {deltaText}
+              </span>
+            )}
+          </div>
+        </div>
+        <span className="rounded-[4px] border border-gold/35 bg-gold/10 px-2 py-1 font-mono text-[9px] uppercase tracking-[0.12em] text-gold-soft">
+          Actual
+        </span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 function PlanRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-4 border-b border-paper/10 pb-2.5 last:border-b-0">
@@ -378,6 +462,12 @@ function PlanRow({ label, value }: { label: string; value: string }) {
       </dd>
     </div>
   );
+}
+
+function lastChartPrice(chart?: StructureChartData | null): string {
+  const last = chart?.bars.at(-1);
+  if (!last || !Number.isFinite(last.c)) return "-";
+  return last.c.toFixed(chart?.label === "ES" ? 0 : 2);
 }
 
 function labelize(value: string): string {
@@ -393,7 +483,7 @@ function money(value?: number): string {
 }
 
 function number(value?: number, digits = 1): string {
-  if (!Number.isFinite(value)) return "-";
+  if (!Number.isFinite(value) || (value ?? 0) <= 0) return "-";
   return value!.toFixed(digits);
 }
 
