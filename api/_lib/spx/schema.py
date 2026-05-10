@@ -46,8 +46,6 @@ SPXConfluenceKey = Literal[
     "asian",
     "london",
     "reaction",
-    "factor4_tbd",
-    "factor5_tbd",
 ]
 
 

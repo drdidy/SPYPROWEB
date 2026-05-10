@@ -205,7 +205,7 @@ export interface SPXContractSuggestion {
 }
 
 export interface SPXConfluenceFactor {
-  key: "asian" | "london" | "reaction" | "factor4_tbd" | "factor5_tbd";
+  key: "asian" | "london" | "reaction";
   label: string;
   value: number; // 0..1 normalized
   weight: number; // 0..1

@@ -84,14 +84,12 @@ ACTION_TAKE_THRESHOLD = 70
 ACTION_SELECTIVE_THRESHOLD = 50
 
 # ---------------------------------------------------------------------------
-# Confluence factors. Weights sum to 1.0 across the five-factor set.
-# Factors 4 & 5 are placeholders (weight 0) until specified.
+# Confluence factors. Only implemented factors are emitted to the UI.
+# Weights sum to 1.0 across the live factor set.
 # ---------------------------------------------------------------------------
 
 FACTOR_WEIGHTS = {
     "asian": 0.30,
     "london": 0.30,
     "reaction": 0.40,
-    "factor4_tbd": 0.0,
-    "factor5_tbd": 0.0,
 }

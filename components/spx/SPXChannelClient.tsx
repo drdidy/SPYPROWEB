@@ -351,7 +351,7 @@ function ReplayBanner({ date }: { date: string }) {
 function SourceBadge({ live }: { live: boolean }) {
   const liveCls =
     "bg-bull-tint text-bull-ink shadow-[inset_0_0_0_1px_rgba(14,124,80,0.30)]";
-  const mockCls =
+  const offlineCls =
     "bg-paper-2 text-ink-3 shadow-[inset_0_0_0_1px_rgba(20,22,26,0.10)]";
   return (
     <span
@@ -360,12 +360,12 @@ function SourceBadge({ live }: { live: boolean }) {
           ? "Live snapshot from API"
           : "Snapshot unavailable. Engine is reconnecting; retry in a moment."
       }
-      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-pill text-[9px] font-mono font-semibold uppercase tracking-[0.12em] ${live ? liveCls : mockCls}`}
+      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-pill text-[9px] font-mono font-semibold uppercase tracking-[0.12em] ${live ? liveCls : offlineCls}`}
     >
       <span
         className={`w-1 h-1 rounded-full ${live ? "bg-bull animate-breathe" : "bg-ink-4"}`}
       />
-      {live ? "live" : "mock"}
+      {live ? "live" : "offline"}
     </span>
   );
 }

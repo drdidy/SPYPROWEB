@@ -48,7 +48,7 @@ def test_snapshot_confluence_action_present(es_candles_ascending_inside, es_offs
     snap = compute_snapshot(es_candles_ascending_inside, es_offset, as_of)
     assert snap.confluence.action in ("TAKE", "SELECTIVE", "STAND_DOWN")
     assert 0 <= snap.confluence.score <= 100
-    assert len(snap.confluence.factors) == 5
+    assert len(snap.confluence.factors) == 3
 
 
 def test_snapshot_serializes_to_camelcase_json(es_candles_ascending_inside, es_offset, as_of):

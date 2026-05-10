@@ -1,8 +1,8 @@
-"""Five-factor confluence: factor stubs + weighted sum + action gate.
+"""ES confluence: implemented factors + weighted sum + action gate.
 
 Three factors are implemented as reasonable proxies (asian, london,
-reaction). Two slots remain for the user to specify (factor4_tbd,
-factor5_tbd). Until specified they carry weight 0 and contribute
+reaction). Unimplemented factor ideas are intentionally not emitted.
+Production surfaces should show only actionable, real inputs.
 nothing — the score is honest about its provisional state.
 
 Contract:
@@ -36,7 +36,7 @@ from .time_utils import at_ct, rth_window
 from datetime import time
 
 Action = Literal["TAKE", "SELECTIVE", "STAND_DOWN"]
-FactorKey = Literal["asian", "london", "reaction", "factor4_tbd", "factor5_tbd"]
+FactorKey = Literal["asian", "london", "reaction"]
 
 
 @dataclass(frozen=True)
@@ -202,14 +202,6 @@ def _factor_reaction(
     )
 
 
-def _factor_placeholder(key: FactorKey, label: str) -> FactorResult:
-    """TBD factor stub — weight 0 so it does not contribute to the score."""
-    return FactorResult(
-        key=key, label=label, value=0.0, weight=FACTOR_WEIGHTS[key],
-        contribution=0.0, note="Placeholder — factor specification pending.",
-    )
-
-
 # ---------------------------------------------------------------------------
 # Top-level evaluator
 # ---------------------------------------------------------------------------
@@ -230,8 +222,6 @@ def evaluate(
         _factor_asian(channel, sydney, tokyo),
         _factor_london(candles, session_date, ceiling, floor),
         _factor_reaction(candles, session_date, scenario, ceiling, floor),
-        _factor_placeholder("factor4_tbd", "Factor 4 (TBD)"),
-        _factor_placeholder("factor5_tbd", "Factor 5 (TBD)"),
     ]
     raw_score = sum(f.contribution for f in factors)  # 0..1
     score = round(raw_score * 100, 1)

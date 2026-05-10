@@ -35,9 +35,9 @@ def test_score_in_range_and_action_take(es_candles_ascending_inside, es_offset, 
         ceiling=ceiling, floor=floor,
     )
     assert 0 <= res.score <= 100
-    # Two TBD slots have weight 0; max score from the three live factors is
+    # Max score from the three live factors is
     # 0.30*0.95 + 0.30*0.95 + 0.40*0.95 = 0.95 -> 95. Min on a clean read
-    # is ~50. Score should not be below the SELECTIVE threshold.
+    # is about 50. Score should not be below the SELECTIVE threshold.
     assert res.score >= 50.0
     assert res.action in ("TAKE", "SELECTIVE")
 
@@ -60,7 +60,7 @@ def test_outside_play_forces_stand_down(es_candles_ascending_inside, es_offset, 
     assert res.action == "STAND_DOWN"
 
 
-def test_factors_contain_all_five_slots(es_candles_ascending_inside, es_offset, session_date):
+def test_factors_contain_only_implemented_slots(es_candles_ascending_inside, es_offset, session_date):
     spx = apply_offset_to_series(es_candles_ascending_inside, es_offset)
     syd = sydney_range(spx, session_date)
     tky = tokyo_range(spx, session_date)
@@ -77,10 +77,10 @@ def test_factors_contain_all_five_slots(es_candles_ascending_inside, es_offset, 
         ceiling=ceiling, floor=floor,
     )
     keys = [f.key for f in res.factors]
-    assert keys == ["asian", "london", "reaction", "factor4_tbd", "factor5_tbd"]
+    assert keys == ["asian", "london", "reaction"]
 
 
-def test_placeholder_factors_contribute_zero(es_candles_ascending_inside, es_offset, session_date):
+def test_no_unimplemented_placeholder_factors_are_emitted(es_candles_ascending_inside, es_offset, session_date):
     spx = apply_offset_to_series(es_candles_ascending_inside, es_offset)
     syd = sydney_range(spx, session_date)
     tky = tokyo_range(spx, session_date)
@@ -96,6 +96,5 @@ def test_placeholder_factors_contribute_zero(es_candles_ascending_inside, es_off
         sydney=syd, tokyo=tky, scenario="INSIDE_ASCENDING",
         ceiling=ceiling, floor=floor,
     )
-    placeholders = [f for f in res.factors if f.key.startswith("factor")]
-    assert all(f.contribution == 0.0 for f in placeholders)
-    assert all(f.weight == 0.0 for f in placeholders)
+    assert all(not f.key.startswith("factor") for f in res.factors)
+    assert all(f.weight > 0 for f in res.factors)
