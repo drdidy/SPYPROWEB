@@ -19,6 +19,10 @@ import {
 } from "@/lib/recommendations";
 import { Countdown } from "@/components/decision-slate/Countdown";
 import type { EngineState } from "@/lib/states";
+import {
+  StructurePathChart,
+  type StructureChartData,
+} from "./StructurePathChart";
 
 const ICONS: Record<Recommendation["id"], LucideIcon> = {
   "live-spy": Activity,
@@ -43,6 +47,8 @@ interface Props {
   spxNextEventISO?: string;
   spyEventVerb?: string;
   spxEventVerb?: string;
+  spyChart?: StructureChartData | null;
+  spxChart?: StructureChartData | null;
   className?: string;
 }
 
@@ -53,6 +59,8 @@ export function RecommendedAction({
   spxNextEventISO,
   spyEventVerb = "opens",
   spxEventVerb = "opens",
+  spyChart,
+  spxChart,
   className,
 }: Props) {
   const rec = recommendationFor(spyState, spxState);
@@ -64,7 +72,16 @@ export function RecommendedAction({
       ? 88
       : spyState === "ARMED" || spxState === "ARMED"
         ? 82
-        : 72;
+      : 72;
+  const activeChart = rec.id === "live-spx" ? spxChart : spyChart ?? spxChart;
+  const chartAccent =
+    rec.id === "live-spx"
+      ? "violet"
+      : spyState === "GO" || spxState === "GO"
+        ? "bull"
+        : spyState === "ARMED" || spxState === "ARMED"
+          ? "gold"
+          : "neutral";
 
   return (
     <section
@@ -126,7 +143,7 @@ export function RecommendedAction({
           </div>
         </div>
 
-        <CommandRailDiagram />
+        <CommandRailDiagram chart={activeChart} accent={chartAccent} />
 
         <aside className="border-t border-paper/10 px-6 py-5 lg:border-l lg:border-t-0 lg:px-5 lg:py-7">
           <div className="flex items-center gap-2 text-gold-soft">
@@ -164,7 +181,9 @@ export function RecommendedAction({
                 <div className="text-[10px] uppercase tracking-[0.16em] text-paper/45">
                   Data window
                 </div>
-                <div className="mt-1 text-paper">Live rails</div>
+                <div className="mt-1 text-paper">
+                  {activeChart ? `${activeChart.label} ${activeChart.date}` : "Awaiting bars"}
+                </div>
               </div>
               <div className="border-t border-paper/10 pt-4">
                 <div className="text-[10px] uppercase tracking-[0.16em] text-gold-soft">
@@ -201,44 +220,23 @@ function HeroMetric({
   );
 }
 
-function CommandRailDiagram() {
-  const candles = [34, 38, 31, 44, 40, 36, 48, 42, 46, 39, 50, 45, 52, 47];
+function CommandRailDiagram({
+  chart,
+  accent,
+}: {
+  chart?: StructureChartData | null;
+  accent: "bull" | "gold" | "violet" | "neutral";
+}) {
   return (
     <div className="hidden min-h-[238px] border-t border-paper/10 px-4 py-7 lg:block lg:border-t-0">
       <div className="relative h-full min-h-[190px]">
-        <div className="absolute inset-x-0 top-[22%] border-t border-dashed border-paper/25" />
-        <div className="absolute inset-x-0 top-1/2 border-t border-dashed border-gold/70" />
-        <div className="absolute inset-x-0 top-[78%] border-t border-dashed border-paper/25" />
-        <div className="absolute left-0 top-[18%] font-mono text-[10px] text-paper/50">
-          Upper rail
-        </div>
-        <div className="absolute left-0 top-[46%] font-mono text-[10px] text-gold-soft">
-          Anchor
-        </div>
-        <div className="absolute left-0 top-[74%] font-mono text-[10px] text-paper/50">
-          Lower rail
-        </div>
-        <div className="absolute left-[22%] right-[19%] top-[36%] flex h-[70px] items-end gap-2">
-          {candles.map((height, i) => (
-            <span
-              key={i}
-              className="relative flex w-2 items-center justify-center"
-              style={{ height }}
-            >
-              <span className="absolute h-full w-px bg-paper/45" />
-              <span
-                className={cn(
-                  "h-5 w-1.5 rounded-[1px] border",
-                  i % 3 === 0
-                    ? "border-bear bg-bear/85"
-                    : "border-paper/60 bg-paper/80",
-                )}
-              />
-            </span>
-          ))}
-        </div>
-        <div className="absolute right-[5%] top-[24%] h-[50px] w-[28%] rotate-[-8deg] border-t-2 border-dashed border-bull" />
-        <div className="absolute right-[5%] top-[61%] h-[50px] w-[28%] rotate-[8deg] border-t-2 border-dashed border-bear" />
+        <StructurePathChart
+          data={chart}
+          variant="dark"
+          accent={accent}
+          height={190}
+          title="recommended path"
+        />
       </div>
     </div>
   );

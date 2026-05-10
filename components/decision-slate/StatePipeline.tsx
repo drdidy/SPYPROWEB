@@ -26,6 +26,10 @@ import { Countdown } from "@/components/decision-slate/Countdown";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { displayEngine } from "@/lib/engine-labels";
 import { cn } from "@/lib/utils";
+import {
+  StructurePathChart,
+  type StructureChartData,
+} from "./StructurePathChart";
 
 interface Props {
   engine: "SPY" | "SPX";
@@ -37,6 +41,7 @@ interface Props {
   /** One-line plain-English explanation of why the engine is in this state. */
   explanation?: string;
   structureLevels?: StructureLevels;
+  structureChart?: StructureChartData | null;
   className?: string;
 }
 
@@ -91,6 +96,7 @@ export function StatePipeline({
   nextEventLabel,
   explanation,
   structureLevels,
+  structureChart,
   className,
 }: Props) {
   const currentIdx = ENGINE_STATES.indexOf(current);
@@ -335,6 +341,7 @@ export function StatePipeline({
         engine={engine}
         current={current}
         levels={structureLevels}
+        chart={structureChart}
       />
 
       <EngineFooterMetrics engine={engine} current={current} />
@@ -352,10 +359,12 @@ function MiniStructureMap({
   engine,
   current,
   levels,
+  chart,
 }: {
   engine: "SPY" | "SPX";
   current: EngineState;
   levels?: StructureLevels;
+  chart?: StructureChartData | null;
 }) {
   const isEs = engine === "SPX";
   const rails = isEs
@@ -369,8 +378,14 @@ function MiniStructureMap({
         { label: "Anchor", value: levels?.anchor ?? null, tone: "text-gold-ink" },
         { label: "Lower rail", value: levels?.lower ?? null, tone: "text-bear-ink" },
       ];
-  const stateIndex = Math.max(0, ENGINE_STATES.indexOf(current));
-  const markerLeft = `${Math.min(86, 12 + stateIndex * 12)}%`;
+  const accent =
+    current === "GO" || current === "ARMED"
+      ? "bull"
+      : current === "WAIT" || current === "WATCH"
+        ? "gold"
+        : isEs
+          ? "violet"
+          : "neutral";
 
   return (
     <div className="group/structure mt-3 rounded-soft border border-rule-soft bg-paper-tier3 px-3 py-3 transition-colors hover:border-rule-strong">
@@ -379,7 +394,7 @@ function MiniStructureMap({
           Session rails
         </span>
         <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-4">
-          Structure map
+          Actual path
         </span>
       </div>
       <div className="grid gap-3 md:grid-cols-[112px_1fr]">
@@ -400,96 +415,13 @@ function MiniStructureMap({
             </div>
           ))}
         </div>
-        <div className="relative h-[88px] overflow-hidden rounded-[6px] border border-rule-soft bg-paper shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
-        <div
-          aria-hidden
-          className="absolute inset-0 opacity-70"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(20,22,26,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(20,22,26,0.045) 1px, transparent 1px)",
-            backgroundSize: "28px 22px",
-          }}
+        <StructurePathChart
+          data={chart}
+          variant="paper"
+          accent={accent}
+          height={112}
+          title="price vs rails"
         />
-        <div
-          aria-hidden
-          className="absolute inset-y-0 w-px bg-ink/35 opacity-0 transition-opacity group-hover/structure:opacity-100"
-          style={{ left: markerLeft }}
-        />
-        {rails.map((rail, i) => (
-          <div
-            key={rail.label}
-            className={cn(
-              "absolute left-3 right-3 border-t",
-              i === 0
-                ? "border-bull/70 border-dashed"
-                : i === 1
-                  ? "border-gold"
-                  : "border-bear/70 border-dashed",
-              isEs ? "rotate-[-1.2deg]" : "rotate-[1.2deg]",
-            )}
-            style={{ top: `${28 + i * 20}%` }}
-          >
-            <span aria-hidden className="absolute -right-1 -top-[3px] h-1.5 w-1.5 rounded-full bg-gold" />
-          </div>
-        ))}
-        <div className="absolute left-[18%] right-[18%] top-[25%] flex h-[48px] items-end gap-1.5">
-          {[22, 30, 18, 35, 27, 40, 24, 32, 38, 26, 43, 34, 46, 39].map((height, i) => (
-            <span
-              key={i}
-              aria-hidden
-              className="relative flex w-2 items-center justify-center"
-              style={{ height }}
-            >
-              <span className="absolute h-full w-px bg-ink-4/45" />
-              <span
-                className={cn(
-                  "h-3.5 w-1.5 rounded-[1px]",
-                  i % 4 === 0
-                    ? "bg-bear/80"
-                    : isEs
-                      ? "bg-violet/75"
-                      : "bg-ink-2/75",
-                )}
-              />
-            </span>
-          ))}
-        </div>
-        <div
-          aria-hidden
-          className="absolute right-[4%] top-[18%] h-[38px] w-[30%] rotate-[-8deg] border-t-2 border-dashed border-bull/80"
-        />
-        <div
-          aria-hidden
-          className="absolute right-[4%] top-[60%] h-[38px] w-[30%] rotate-[8deg] border-t-2 border-dashed border-bear/80"
-        />
-        <div
-          className={cn(
-            "absolute top-[18px] h-12 w-px",
-            isEs ? "bg-violet" : "bg-ink-2",
-          )}
-          style={{ left: markerLeft }}
-        >
-              <span
-            className={cn(
-              "absolute -left-[5px] top-[20px] h-2.5 w-2.5 rounded-full ring-2 ring-paper",
-              current === "GO"
-                ? "bg-bull"
-                : current === "ARMED" || current === "WAIT"
-                  ? "bg-gold"
-                  : isEs
-                    ? "bg-violet"
-                    : "bg-ink-2",
-            )}
-          />
-        </div>
-        <button
-          type="button"
-          className="absolute bottom-1.5 right-2 rounded-[3px] border border-rule-soft bg-paper/90 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] text-ink-3 opacity-0 shadow-card transition-opacity hover:text-ink group-hover/structure:opacity-100 focus:opacity-100"
-          aria-label={`${displayEngine(engine)} structure scan focus`}
-        >
-          Scan
-        </button>
-        </div>
       </div>
     </div>
   );

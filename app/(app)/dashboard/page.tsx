@@ -25,6 +25,7 @@ import { deriveProvenance } from "@/lib/spx-provenance";
 import { SLATE_COPY } from "@/content/copy";
 import { loadLiveSnapshot } from "@/lib/snapshot-fetch";
 import { loadSnapshot as loadSpxSnapshot } from "@/lib/spx-fetch";
+import { loadIntradayReplay } from "@/lib/intraday-replay-fetch";
 import { fetchLastSessionRecaps } from "@/lib/last-session-recap";
 import { fetchTrackRecord } from "@/lib/track-record";
 import { getSessionInfo } from "@/lib/sessions";
@@ -32,6 +33,11 @@ import { relabelDashboardString } from "@/lib/engine-labels";
 import { cn } from "@/lib/utils";
 import type { AdaptedSnapshot } from "@/lib/snapshot-adapter";
 import type { DynamicLine, SPXSnapshot, SPXLine } from "@/lib/types";
+import type {
+  StructureChartBar,
+  StructureChartData,
+  StructureChartLine,
+} from "@/components/decision-slate/StructurePathChart";
 import {
   type EngineState,
   SPY_DISTANCE_PROXIMITY,
@@ -42,6 +48,8 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function Page() {
+  const now = new Date();
+  const chartDate = chartSessionDateISO(now);
   // Both engines are independent fetches. Run them in parallel — the
   // slate is meant to be read in one glance, so a slow side shouldn't
   // hold up the other.
@@ -51,12 +59,18 @@ export default async function Page() {
     recaps,
     spyTrack,
     spxTrack,
+    chartSpyLoaded,
+    chartSpxLoaded,
+    intraday,
   ] = await Promise.all([
     loadLiveSnapshot(),
     loadSpxSnapshot(),
     fetchLastSessionRecaps(),
     fetchTrackRecord("SPY"),
     fetchTrackRecord("SPX"),
+    loadLiveSnapshot(chartDate),
+    loadSpxSnapshot(chartDate),
+    loadIntradayReplay(chartDate),
   ]);
   const spx = spxLoaded.snap;
   const spxSource = spxLoaded.source;
@@ -69,9 +83,18 @@ export default async function Page() {
   const spyState = spy.currentState;
   const spxState = (spx.currentState as EngineState | undefined) ?? "STAND_DOWN";
   const bothPreConfig = spyState === "PRE_CONFIG" && spxState === "PRE_CONFIG";
-  const now = new Date();
   const spySession = getSessionInfo("SPY", now);
   const spxSession = getSessionInfo("SPX", now);
+  const spyChart = buildSpyStructureChart(
+    chartSpyLoaded.data,
+    intraday?.spy ?? null,
+    chartDate,
+  );
+  const spxChart = buildSpxStructureChart(
+    chartSpxLoaded.snap,
+    intraday?.es ?? null,
+    chartDate,
+  );
 
   // Per-card error state. We render the error inside the engine's
   // section instead of replacing the whole page so a partial outage
@@ -110,6 +133,8 @@ export default async function Page() {
         )
           .replace(/^ES\s+/, "")
           .toLowerCase()}
+        spyChart={spyChart}
+        spxChart={spxChart}
       />
 
       {/* v4 #6 + v5 #8 + v10 P1-12: engines row. 24px rhythm
@@ -127,6 +152,7 @@ export default async function Page() {
             nextEventLabel={spySession.nextSignificantEvent.label}
             explanation={spyExplanation(spyState, spy)}
             structureLevels={spyStructureLevels(spy)}
+            structureChart={spyChart}
           />
           <StatePipeline
             engine="SPX"
@@ -139,6 +165,7 @@ export default async function Page() {
             nextEventLabel={relabelDashboardString(spxSession.nextSignificantEvent.label)}
             explanation={spxExplanation(spxState, spx)}
             structureLevels={spxStructureLevels(spx)}
+            structureChart={spxChart}
           />
         </div>
       </section>
@@ -396,6 +423,128 @@ function spxStructureLevels(snap: SPXSnapshot): StructureLevels {
 // ---------------------------------------------------------------------
 // Section primitive — one tier of section eyebrow above grids.
 // ---------------------------------------------------------------------
+
+function buildSpyStructureChart(
+  snap: AdaptedSnapshot,
+  intradayBars: StructureChartBar[] | null,
+  date: string,
+): StructureChartData | null {
+  const anchor = snap.anchor?.primary;
+  if (!anchor) return null;
+  const slope = Number(snap.anchor?.slopePerHour);
+  if (!Number.isFinite(slope)) return null;
+  const bars = normalizeChartBars(
+    intradayBars && intradayBars.length > 1 ? intradayBars : snap.candles,
+  );
+  const lines: StructureChartLine[] = [
+    makeSpyBand("Upper", anchor.bands.upper.anchorPrice, anchor.anchorTime, slope, "upper"),
+    makeSpyBand("Anchor", anchor.bands.main.anchorPrice, anchor.anchorTime, slope, "anchor"),
+    makeSpyBand("Lower", anchor.bands.lower.anchorPrice, anchor.anchorTime, slope, "lower"),
+  ].filter(Boolean) as StructureChartLine[];
+  if (bars.length < 2 || lines.length === 0) return null;
+  return { label: "SPY", date, bars, lines };
+}
+
+function makeSpyBand(
+  label: string,
+  anchorPrice: number | null,
+  anchorTime: string,
+  slopePerHour: number,
+  tone: StructureChartLine["tone"],
+): StructureChartLine | null {
+  if (!Number.isFinite(anchorPrice ?? NaN)) return null;
+  return {
+    label,
+    anchorTime,
+    anchorPrice: Number(anchorPrice),
+    slopePerHour,
+    tone,
+  };
+}
+
+function buildSpxStructureChart(
+  snap: SPXSnapshot,
+  intradayBars: StructureChartBar[] | null,
+  date: string,
+): StructureChartData | null {
+  const offset = snap._meta?.appliedOffset ?? 0;
+  const bars = normalizeChartBars(intradayBars ?? []).map((bar) => ({
+    t: bar.t,
+    h: bar.h + offset,
+    l: bar.l + offset,
+    c: bar.c + offset,
+  }));
+  const lines = snap.lines
+    .map((line): StructureChartLine => ({
+      label: shortSpxLineLabel(line.kind),
+      anchorTime: line.anchorTime,
+      anchorPrice: line.anchorPrice,
+      slopePerHour: line.slopePerHour,
+      tone:
+        line.kind === "CHANNEL_CEILING"
+          ? "upper"
+          : line.kind === "CHANNEL_FLOOR"
+            ? "lower"
+            : "reference",
+    }))
+    .filter((line) => Number.isFinite(line.anchorPrice));
+  if (bars.length < 2 || lines.length === 0) return null;
+  return { label: "ES", date, bars, lines };
+}
+
+function normalizeChartBars(
+  bars: Array<{ t: string; h: number; l: number; c: number }> | null | undefined,
+): StructureChartBar[] {
+  return (bars ?? [])
+    .filter(
+      (bar) =>
+        !!bar.t &&
+        Number.isFinite(bar.h) &&
+        Number.isFinite(bar.l) &&
+        Number.isFinite(bar.c),
+    )
+    .map((bar) => ({ t: bar.t, h: bar.h, l: bar.l, c: bar.c }))
+    .sort((a, b) => new Date(a.t).getTime() - new Date(b.t).getTime());
+}
+
+function shortSpxLineLabel(kind: string): string {
+  const m: Record<string, string> = {
+    CHANNEL_CEILING: "Ceil",
+    CHANNEL_FLOOR: "Floor",
+    PREV_RTH_HIGH_ASC: "Prev H",
+    PREV_RTH_LOW_DESC: "Prev L",
+  };
+  return m[kind] || "Ref";
+}
+
+function chartSessionDateISO(now: Date): string {
+  const session = getSessionInfo("SPY", now);
+  if (session.phase === "RTH_OPEN" || session.phase === "POST_RTH") {
+    return chicagoDateISO(session.rthClose);
+  }
+  return previousTradingDateISO("SPY", now);
+}
+
+function chicagoDateISO(d: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+function previousTradingDateISO(engine: "SPY" | "SPX", now: Date): string {
+  const todayISO = chicagoDateISO(now);
+  for (let offset = 1; offset <= 14; offset++) {
+    const probe = new Date(now.getTime() - offset * 86_400_000);
+    if (chicagoDateISO(probe) === todayISO) continue;
+    const session = getSessionInfo(engine, probe);
+    const tradingDateISO = chicagoDateISO(session.rthClose);
+    if (tradingDateISO < todayISO) return tradingDateISO;
+  }
+  return todayISO;
+}
 
 function Section({
   title,
