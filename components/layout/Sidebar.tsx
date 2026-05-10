@@ -67,8 +67,8 @@ export function Sidebar({
     <aside
       className={cn(
         // Mobile: fixed off-canvas drawer that slides in.
-        "w-[180px] shrink-0 h-screen border-r border-[#C9A227]/45 flex flex-col",
-        "bg-[#FFF9EC] text-ink shadow-[inset_-1px_0_0_rgba(201,162,39,0.18)]",
+        "w-[196px] shrink-0 h-screen border-r border-[#C9A227]/30 flex flex-col",
+        "bg-[#071116] text-paper shadow-[inset_-1px_0_0_rgba(244,228,192,0.08),18px_0_55px_-42px_rgba(0,0,0,0.92)]",
         "fixed inset-y-0 left-0 z-40 transform transition-transform duration-200 ease-swift",
         open ? "translate-x-0" : "-translate-x-full",
         // Desktop (lg+): permanent sticky sidebar, always visible.
@@ -77,21 +77,26 @@ export function Sidebar({
     >
       <Link
         href="/"
-        className="h-[82px] flex items-start px-5 pt-4 border-b border-[#E1C98F]/50 hover:bg-[#F8EDCF]/45 transition-colors"
+        className="relative h-[92px] flex items-start px-5 pt-5 border-b border-gold/25 hover:bg-paper/[0.035] transition-colors overflow-hidden"
       >
+        <div
+          aria-hidden
+          className="absolute -right-12 -top-12 h-32 w-32 rounded-full border border-gold/20"
+        />
         <div className="leading-none">
-          <div className="font-serif text-[22px] leading-[0.92] tracking-[0.05em] text-ink">
+          <div className="font-serif text-[22px] leading-[0.92] tracking-[0.05em] text-paper">
             SPY PROPHET
           </div>
-          <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.22em] text-gold-ink/75">
+          <div className="mt-2 font-mono text-[9px] uppercase tracking-[0.22em] text-gold-soft/78">
             Options intelligence
           </div>
+          <div className="mt-3 h-1 w-16 rounded-full bg-gradient-to-r from-gold-soft via-gold to-transparent" />
         </div>
         <button
           type="button"
           aria-label="Close menu"
           onClick={onClose}
-          className="ml-auto w-7 h-7 grid place-items-center rounded-soft text-ink-3 hover:text-ink hover:bg-paper-2/70 transition-colors lg:hidden"
+          className="ml-auto w-7 h-7 grid place-items-center rounded-soft text-paper/55 hover:text-paper hover:bg-paper/10 transition-colors lg:hidden"
         >
           <X size={14} />
         </button>
@@ -100,7 +105,7 @@ export function Sidebar({
       <nav className="relative flex-1 overflow-y-auto py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {sections.map((s) => (
           <div key={s.label} className="mt-5 first:mt-0">
-            <div className="px-5 mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-ink-3">
+            <div className="px-5 mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-gold-soft/45">
               {s.label}
             </div>
             {s.items.map((it) => {
@@ -117,22 +122,28 @@ export function Sidebar({
                   // WCAG AA on the cream canvas.
                   aria-current={isActive ? "page" : undefined}
                   className={cn(
-                    "flex items-center gap-2.5 mx-2 px-3 h-[42px] rounded-[4px] text-[13px] transition-all duration-150 ease-swift relative",
-                    "outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#FFF9EC]",
+                    "group flex items-center gap-2.5 mx-2 px-3 h-[42px] rounded-[8px] text-[13px] transition-all duration-150 ease-swift relative",
+                    "outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#071116]",
                     isActive
-                      ? "bg-[#071116] text-gold-soft font-semibold shadow-[0_10px_28px_-18px_rgba(7,17,22,0.85),inset_0_1px_0_rgba(255,255,255,0.10)]"
-                      : "text-ink-2 hover:text-ink hover:bg-[#F5E8C6]/65",
+                      ? "bg-[linear-gradient(135deg,rgba(244,228,192,0.18),rgba(255,255,255,0.055))] text-gold-soft font-semibold shadow-[0_14px_34px_-24px_rgba(244,228,192,0.28),inset_0_1px_0_rgba(255,255,255,0.13)] ring-1 ring-gold/35"
+                      : "text-paper/62 hover:text-paper hover:bg-paper/[0.055]",
                   )}
                 >
+                  {isActive && (
+                    <span
+                      aria-hidden
+                      className="absolute left-0 top-1/2 h-7 w-[3px] -translate-y-1/2 rounded-r-full bg-gold-soft shadow-[0_0_18px_rgba(244,228,192,0.45)]"
+                    />
+                  )}
                   {isActive ? (
                     <span
                       aria-hidden
-                      className="grid h-5 w-5 place-items-center rounded-[3px] border border-gold/45 text-gold"
+                      className="grid h-5 w-5 place-items-center rounded-[5px] border border-gold/45 bg-[#071116]/70 text-gold-soft"
                     >
                       <Grid2X2 size={13} strokeWidth={2.1} />
                     </span>
                   ) : (
-                    <Icon size={15} strokeWidth={1.65} className="text-ink-2" />
+                    <Icon size={15} strokeWidth={1.65} className="text-paper/42 transition-colors group-hover:text-gold-soft/80" />
                   )}
                   {it.label}
                 </a>
@@ -142,20 +153,20 @@ export function Sidebar({
         ))}
       </nav>
 
-      <div className="pointer-events-none relative mx-5 mb-5 h-28 shrink-0 opacity-[0.12]">
+      <div className="pointer-events-none relative mx-5 mb-4 h-28 shrink-0 opacity-[0.22]">
         <CompassMark />
       </div>
 
-      <div className="mx-2 mb-2 rounded-[5px] border border-[#D7B764] bg-[#FFF6DE] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+      <div className="mx-2 mb-2 rounded-[10px] border border-gold/30 bg-paper/[0.055] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
         <div className="flex items-center gap-2">
-          <span className="grid h-7 w-7 place-items-center rounded-[4px] border border-[#D7B764] bg-[#F8E7B8] text-gold-ink">
+          <span className="grid h-7 w-7 place-items-center rounded-[6px] border border-gold/35 bg-gold-soft/10 text-gold-soft">
             <ShieldCheck size={15} />
           </span>
           <div className="min-w-0">
-            <div className="font-serif text-[13px] leading-none tracking-[0.04em] text-gold-ink">
+            <div className="font-serif text-[13px] leading-none tracking-[0.04em] text-paper">
               CLOSED BETA
             </div>
-            <div className="mt-1 font-mono text-[9px] text-ink-3">
+            <div className="mt-1 font-mono text-[9px] text-paper/45">
               {BUILD_LABEL}
             </div>
           </div>

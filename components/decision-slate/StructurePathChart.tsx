@@ -53,7 +53,7 @@ export function StructurePathChart({
     return (
       <div
         className={cn(
-          "grid place-items-center rounded-[6px] border px-3 text-center font-mono text-[11px]",
+          "relative overflow-hidden rounded-[8px] border px-3 text-center font-mono text-[11px]",
           variant === "dark"
             ? "border-paper/10 bg-paper/[0.035] text-paper/45"
             : "border-rule-soft bg-paper text-ink-3",
@@ -61,7 +61,54 @@ export function StructurePathChart({
         )}
         style={{ minHeight: height }}
       >
-        No session path loaded
+        <div
+          aria-hidden
+          className={cn(
+            "absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] bg-[size:38px_38px]",
+            variant === "dark" ? "opacity-40" : "opacity-20",
+          )}
+        />
+        <div className="relative grid min-h-[inherit] place-items-center py-6">
+          <div>
+            <div
+              className={cn(
+                "mx-auto mb-3 grid h-9 w-9 place-items-center rounded-[9px] border",
+                variant === "dark"
+                  ? "border-gold/30 bg-gold-soft/10 text-gold-soft"
+                  : "border-gold/25 bg-gold-tint text-gold-ink",
+              )}
+            >
+              <span className="h-2 w-2 rounded-full bg-current animate-breathe" />
+            </div>
+            <div
+              className={cn(
+                "text-[9px] uppercase tracking-[0.18em]",
+                variant === "dark" ? "text-gold-soft/70" : "text-gold-ink",
+              )}
+            >
+              Data link standby
+            </div>
+            <div
+              className={cn(
+                "mt-2 max-w-[260px] text-[11px] leading-relaxed",
+                variant === "dark" ? "text-paper/48" : "text-ink-3",
+              )}
+            >
+              Actual path and rails render only after replay bars and structure
+              lines are available.
+            </div>
+            {data?.date && (
+              <div
+                className={cn(
+                  "mt-3 text-[10px] tabular-nums",
+                  variant === "dark" ? "text-paper/36" : "text-ink-4",
+                )}
+              >
+                {data.label} - {data.date}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     );
   }

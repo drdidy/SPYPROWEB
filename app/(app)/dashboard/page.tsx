@@ -266,17 +266,35 @@ function PageHeader() {
     year: "numeric",
   }).format(new Date());
   return (
-    <header className="flex items-center justify-between gap-4 flex-wrap">
-      <div className="min-w-0 md:flex md:items-end md:gap-5">
-        <h1 className="font-serif text-[42px] leading-none text-ink tracking-tight">
+    <header className="relative overflow-hidden rounded-[18px] border border-[#D6BC75]/45 bg-[#071116] px-5 py-5 text-paper shadow-[0_24px_60px_-42px_rgba(7,17,22,0.95)] md:px-7 md:py-6">
+      <div
+        aria-hidden
+        className="absolute inset-0 opacity-[0.18] bg-[linear-gradient(rgba(244,228,192,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(244,228,192,0.10)_1px,transparent_1px)] bg-[size:42px_42px]"
+      />
+      <div
+        aria-hidden
+        className="absolute -right-16 -top-24 h-72 w-72 rounded-full border border-gold/20"
+      />
+      <div className="relative flex items-start justify-between gap-4">
+      <div className="min-w-0">
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <span className="font-mono text-[10px] uppercase tracking-[0.20em] text-gold-soft/82">
+            Command workspace
+          </span>
+          <span aria-hidden className="h-px w-10 bg-gold/45" />
+          <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-paper/48">
+            {dateLabel}
+          </span>
+        </div>
+        <h1 className="font-serif text-[36px] leading-none text-paper tracking-tight md:text-[46px]">
           Decision Slate
         </h1>
         {/* v10 P1-5: subtle session-date stamp directly under the
             H1. ~14px sans, muted ink. */}
-        <p className="mt-1 border-rule text-[14px] text-ink-3 leading-snug md:mt-0 md:border-l md:pl-5">
+        <p className="mt-3 max-w-2xl text-[14px] leading-relaxed text-paper/68">
           {/* "Friday, May 9, 2026" → "Friday · May 9, 2026"
               (one replace = first comma only). */}
-          {dateLabel.replace(",", " ·")}
+          SPY and ES stay separate until the slate asks for a decision.
         </p>
       </div>
       {/* v10 P1-9: About → ? icon-button at the top-right, matching
@@ -290,15 +308,16 @@ function PageHeader() {
         <span
           aria-label="About this page"
           className={cn(
-            "inline-flex items-center justify-center w-7 h-7 rounded-full shrink-0",
-            "bg-paper-2/60 text-ink-3 hover:text-ink hover:bg-paper-2",
-            "border border-rule transition-colors cursor-help",
+            "inline-flex items-center justify-center w-8 h-8 rounded-full shrink-0",
+            "bg-paper/[0.06] text-paper/66 hover:text-paper hover:bg-paper/10",
+            "border border-paper/15 transition-colors cursor-help",
             "text-[12px] font-bold tabular-nums",
           )}
         >
           ?
         </span>
       </InfoTooltip>
+      </div>
     </header>
   );
 }

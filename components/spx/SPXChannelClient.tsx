@@ -181,25 +181,33 @@ export function SPXChannelClient({ replayDate }: Props) {
   return (
     <div className="w-full max-w-[1440px] space-y-10 pb-16">
       {replayDate && <ReplayBanner date={replayDate} />}
-      {/* Editorial header */}
-      <header className="flex items-end justify-between pt-2 pb-1">
+      <header className="relative overflow-hidden rounded-[18px] border border-[#D6BC75]/45 bg-[#071116] px-5 py-5 text-paper shadow-[0_24px_60px_-42px_rgba(7,17,22,0.95)] md:px-7 md:py-6">
+        <div
+          aria-hidden
+          className="absolute inset-0 opacity-[0.18] bg-[linear-gradient(rgba(244,228,192,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(244,228,192,0.10)_1px,transparent_1px)] bg-[size:42px_42px]"
+        />
+        <div
+          aria-hidden
+          className="absolute -right-16 -top-24 h-72 w-72 rounded-full border border-gold/20"
+        />
+        <div className="relative flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <span className="font-mono text-[10px] text-ink-3 tracking-[0.20em] uppercase">
+            <span className="font-mono text-[10px] text-gold-soft/82 tracking-[0.20em] uppercase">
               ES · Channel · session {snap.sessionDateCT}
             </span>
-            <span className="h-px w-10 bg-rule-strong" />
-            <span className="font-mono text-[10px] text-ink-3 tracking-[0.20em] uppercase">
+            <span className="h-px w-10 bg-gold/45" />
+            <span className="font-mono text-[10px] text-paper/48 tracking-[0.20em] uppercase">
               {dayLabel(snap.sessionDateCT)}
             </span>
             <SourceBadge live />
           </div>
-          <h1 className="mt-3 text-display font-serif tracking-tight text-ink">
+          <h1 className="mt-3 text-[36px] font-serif leading-none tracking-tight text-paper md:text-[46px]">
             The corridor,{" "}
-            <span className="text-ink-3 italic font-light">read aloud.</span>
+            <span className="text-gold-soft/72 italic font-light">read aloud.</span>
           </h1>
           {meta && (
-            <div className="mt-3 flex flex-wrap items-center gap-3 text-[10px] font-mono text-ink-3 tracking-[0.04em]">
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-[10px] font-mono text-paper/48 tracking-[0.04em] [&_.text-ink-2]:!text-paper/78 [&_.text-ink-4]:!text-paper/32">
               <span>
                 Bars <span className="text-ink-2">{meta.barsSource}</span>
                 <span className="text-ink-4 ml-1">({meta.barsCount})</span>
@@ -263,6 +271,7 @@ export function SPXChannelClient({ replayDate }: Props) {
           />
           <Stat label="Scenario" value={snap.scenario.replace(/_/g, " ")} />
           {/* v9: Slope stat removed — proprietary engine parameter. */}
+        </div>
         </div>
       </header>
 
@@ -392,10 +401,10 @@ function Stat({
       ? "text-bull-ink"
       : highlight === "DESCENDING"
         ? "text-bear-ink"
-        : "text-ink";
+        : "text-paper";
   return (
     <div>
-      <div className="eyebrow text-ink-3 mb-0.5">{label}</div>
+      <div className="eyebrow text-paper/45 mb-0.5">{label}</div>
       <div
         className={`font-mono text-[13px] font-semibold tabular-nums ${tone}`}
         data-num

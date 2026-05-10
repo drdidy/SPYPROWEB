@@ -19,7 +19,7 @@ export function CommandEmptyState({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-card border border-[#243138] bg-[#071116] text-paper shadow-[0_20px_50px_-34px_rgba(7,17,22,0.95)]",
+        "relative overflow-hidden rounded-[18px] border border-[#D6BC75]/35 bg-[#071116] text-paper shadow-[0_24px_70px_-40px_rgba(7,17,22,0.95)]",
         className,
       )}
     >
@@ -39,7 +39,7 @@ export function CommandEmptyState({
               {rows.map((row) => (
                 <div
                   key={row.label}
-                  className="border border-paper/10 bg-paper/[0.045] px-3 py-2.5 rounded-soft"
+              className="border border-paper/10 bg-paper/[0.055] px-3 py-2.5 rounded-[8px] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
                 >
                   <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-paper/40">
                     {row.label}
