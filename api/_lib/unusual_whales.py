@@ -22,6 +22,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from . import prophet_core as pc
+from . import tastytrade
 
 BASE = "https://api.unusualwhales.com/api"
 CT = ZoneInfo("America/Chicago")
@@ -146,6 +147,14 @@ def _num(row: dict, *keys: str) -> float | None:
     return None
 
 
+def _clean_num(value: Any) -> float | None:
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return None
+    return out if out == out else None
+
+
 def _int(row: dict, *keys: str) -> int:
     val = _num(row, *keys)
     return int(val) if val is not None else 0
@@ -212,6 +221,89 @@ def _normalize_contract(row: dict) -> dict:
         "oi": _int(row, "open_interest", "oi"),
         "volume": _int(row, "volume", "vol"),
     }
+
+
+def _broker_contract(row: dict) -> dict:
+    return {
+        "optionSymbol": _text(row, "optionSymbol", "option_symbol"),
+        "expiration": _text(row, "expiration"),
+        "dte": _clean_num(row.get("dte")),
+        "strike": _clean_num(row.get("strike")),
+        "side": _text(row, "side") or "UNKNOWN",
+        "bid": _clean_num(row.get("bid")),
+        "ask": _clean_num(row.get("ask")),
+        "mark": _clean_num(row.get("mark")),
+        "iv": _clean_num(row.get("iv")),
+        "delta": _clean_num(row.get("delta")),
+        "gamma": _clean_num(row.get("gamma")),
+        "theta": _clean_num(row.get("theta")),
+        "vega": _clean_num(row.get("vega")),
+        "rho": _clean_num(row.get("rho")),
+        "oi": int(_clean_num(row.get("oi")) or 0),
+        "volume": int(_clean_num(row.get("volume")) or 0),
+    }
+
+
+def _chain_from_broker(ticker: str, session_date: str, require_expiration: str | None = None) -> dict | None:
+    chain = tastytrade.fetch_chain_snapshot(ticker, underlying_price=None, span=None)
+    if not chain:
+        return None
+    expiration = chain.get("expiration")
+    if require_expiration and expiration != require_expiration:
+        return None
+    calls = [_broker_contract(c) for c in chain.get("calls") or []]
+    puts = [_broker_contract(p) for p in chain.get("puts") or []]
+    calls = [c for c in calls if c["strike"] is not None and c["side"] == "CALL"]
+    puts = [p for p in puts if p["strike"] is not None and p["side"] == "PUT"]
+    if not calls and not puts:
+        return None
+    call_oi = sum(int(c.get("oi") or 0) for c in calls)
+    put_oi = sum(int(c.get("oi") or 0) for c in puts)
+    call_vol = sum(int(c.get("volume") or 0) for c in calls)
+    put_vol = sum(int(c.get("volume") or 0) for c in puts)
+    return {
+        "ticker": ticker.upper(),
+        "sessionDate": session_date,
+        "expiration": expiration,
+        "calls": sorted(calls, key=lambda c: c["strike"] or 0),
+        "puts": sorted(puts, key=lambda c: c["strike"] or 0),
+        "totals": {
+            "callOi": call_oi,
+            "putOi": put_oi,
+            "callVol": call_vol,
+            "putVol": put_vol,
+            "pcr": round(put_vol / call_vol, 2) if call_vol > 0 else None,
+        },
+    }
+
+
+def _has_contract_greeks(chain: dict | None) -> bool:
+    if not chain:
+        return False
+    for row in (chain.get("calls") or []) + (chain.get("puts") or []):
+        if row.get("delta") is not None or row.get("gamma") is not None:
+            return True
+    return False
+
+
+def _merge_chain_greeks(base: dict, greek_chain: dict) -> dict:
+    if base.get("expiration") != greek_chain.get("expiration"):
+        return base
+    greek_by_key = {
+        (row.get("side"), row.get("strike")): row
+        for row in (greek_chain.get("calls") or []) + (greek_chain.get("puts") or [])
+    }
+    for side_key, rows_key in (("CALL", "calls"), ("PUT", "puts")):
+        for row in base.get(rows_key) or []:
+            match = greek_by_key.get((side_key, row.get("strike")))
+            if not match:
+                continue
+            for field in ("bid", "ask", "mark", "iv", "delta", "gamma", "theta", "vega", "rho", "oi", "volume"):
+                if row.get(field) is None or field in ("delta", "gamma", "theta", "vega", "rho"):
+                    val = match.get(field)
+                    if val is not None:
+                        row[field] = val
+    return base
 
 
 def _gex_total(row: dict) -> float | None:
@@ -455,7 +547,7 @@ def fetch_option_chain(ticker: str = "SPY", effective_date: str | None = None) -
     contracts = [_normalize_contract(r) for r in _rows(raw)]
     contracts = [c for c in contracts if c["strike"] is not None and c["side"] in ("CALL", "PUT")]
     if not contracts:
-        return None
+        return _chain_from_broker(ticker, session_date, require_expiration=None if session_date == datetime.now(CT).date().isoformat() else session_date)
     expirations = [c["expiration"] for c in contracts if c["expiration"]]
     expiration = sorted(expirations)[0] if expirations else None
     if expiration:
@@ -468,7 +560,7 @@ def fetch_option_chain(ticker: str = "SPY", effective_date: str | None = None) -
     put_oi = sum(int(c.get("oi") or 0) for c in puts)
     call_vol = sum(int(c.get("volume") or 0) for c in calls)
     put_vol = sum(int(c.get("volume") or 0) for c in puts)
-    return {
+    out = {
         "ticker": ticker.upper(),
         "sessionDate": session_date,
         "expiration": expiration,
@@ -482,6 +574,11 @@ def fetch_option_chain(ticker: str = "SPY", effective_date: str | None = None) -
             "pcr": round(put_vol / call_vol, 2) if call_vol > 0 else None,
         },
     }
+    if not _has_contract_greeks(out):
+        broker = _chain_from_broker(ticker, session_date, require_expiration=expiration)
+        if broker and _has_contract_greeks(broker):
+            out = _merge_chain_greeks(out, broker)
+    return out
 
 
 @pc.ttl_cache(ttl_seconds=120.0, maxsize=16)
@@ -538,7 +635,34 @@ def fetch_greeks(ticker: str = "SPY", effective_date: str | None = None) -> list
                     **vals,
                 }
             )
-    return out
+    if out:
+        return out
+    # Contract Greeks are present in the broker chain even when UW's
+    # /greeks endpoint is unavailable for the selected expiry.
+    broker = _chain_from_broker(ticker, session_date, require_expiration=expiry)
+    if not broker:
+        return []
+    rows = []
+    for row in (broker.get("calls") or []) + (broker.get("puts") or []):
+        if row.get("delta") is None and row.get("gamma") is None and row.get("iv") is None:
+            continue
+        rows.append(
+            {
+                "sessionDate": session_date,
+                "strike": row.get("strike"),
+                "expiration": expiry,
+                "side": row.get("side"),
+                "optionSymbol": row.get("optionSymbol"),
+                "delta": row.get("delta"),
+                "gamma": row.get("gamma"),
+                "theta": row.get("theta"),
+                "vega": row.get("vega"),
+                "rho": row.get("rho"),
+                "iv": row.get("iv"),
+                "gex": None,
+            }
+        )
+    return rows
 
 
 def fetch_symbol_options_intel(ticker: str, effective_date: str | None = None) -> dict:

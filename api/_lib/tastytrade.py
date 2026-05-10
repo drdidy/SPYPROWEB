@@ -143,24 +143,37 @@ def _row_from_strike(strike: dict, side: str) -> dict | None:
     if all(v != v for v in (bid, ask)):  # both nan
         return None
     return {
+        "optionSymbol": strike.get(f"{side}-streamer-symbol") or strike.get(f"{side}-symbol"),
         "strike": _safe_float(strike.get("strike-price")),
+        "side": "CALL" if side == "call" else "PUT",
         "bid": bid,
         "ask": ask,
+        "mark": _safe_float(strike.get(f"{side}-mark") or strike.get(f"{side}-last")),
         "iv": _safe_float(strike.get(f"{side}-iv") or strike.get("iv") or strike.get("implied-volatility")),
         "delta": _safe_float(strike.get(f"{side}-delta") or strike.get("delta")),
         "gamma": _safe_float(strike.get(f"{side}-gamma") or strike.get("gamma")),
+        "theta": _safe_float(strike.get(f"{side}-theta") or strike.get("theta")),
+        "vega": _safe_float(strike.get(f"{side}-vega") or strike.get("vega")),
+        "rho": _safe_float(strike.get(f"{side}-rho") or strike.get("rho")),
         "oi": _safe_float(strike.get(f"{side}-open-interest") or strike.get("open-interest")),
         "volume": _safe_float(strike.get(f"{side}-volume") or strike.get("volume")),
     }
 
 
-def fetch_options_snapshot(underlying_price: float, span: int = 7) -> dict | None:
-    """Return a dict with strike ladder + summary fields, or None if any
-    step fails. Caller treats None as "options unavailable" and the UI
-    falls back to mocked data."""
+def fetch_chain_snapshot(
+    symbol: str = "SPY",
+    underlying_price: float | None = None,
+    span: int | None = 7,
+) -> dict | None:
+    """Return a dict with strike ladder + summary fields.
+
+    Provider-neutral callers use this to enrich option-chain Greeks.
+    When `underlying_price` is None or `span` is None, the nearest
+    expiration's full strike list is returned.
+    """
     if not _has_secrets():
         return None
-    chain = _fetch_nested_chain("SPY")
+    chain = _fetch_nested_chain(symbol)
     if not chain:
         return None
     now = datetime.now(tz=pc.get_central_tz())
@@ -169,12 +182,13 @@ def fetch_options_snapshot(underlying_price: float, span: int = 7) -> dict | Non
     if nearest is None:
         return None
 
-    atm = round(underlying_price)
-    lo, hi = atm - span, atm + span
+    strikes_list = nearest.get("strikes") or []
+    atm = round(underlying_price) if underlying_price is not None else _infer_atm(strikes_list)
+    lo = atm - span if span is not None and atm is not None else float("-inf")
+    hi = atm + span if span is not None and atm is not None else float("inf")
     rows_call: list[dict] = []
     rows_put: list[dict] = []
 
-    strikes_list = nearest.get("strikes") or []
     for s in strikes_list:
         try:
             sp = float(s.get("strike-price"))
@@ -185,8 +199,10 @@ def fetch_options_snapshot(underlying_price: float, span: int = 7) -> dict | Non
         c = _row_from_strike(s, "call")
         p = _row_from_strike(s, "put")
         if c is not None:
+            c["expiration"] = nearest.get("expiration-date")
             rows_call.append(c)
         if p is not None:
+            p["expiration"] = nearest.get("expiration-date")
             rows_put.append(p)
 
     rows_call.sort(key=lambda r: r["strike"])
@@ -201,6 +217,7 @@ def fetch_options_snapshot(underlying_price: float, span: int = 7) -> dict | Non
     total_put_vol = sum(r.get("volume") or 0 for r in rows_put if r.get("volume") == r.get("volume"))
 
     return {
+        "ticker": symbol.upper(),
         "expiration": nearest.get("expiration-date"),
         "atm": atm,
         "calls": rows_call,
@@ -213,3 +230,34 @@ def fetch_options_snapshot(underlying_price: float, span: int = 7) -> dict | Non
             "pcr": (total_put_oi / total_call_oi) if total_call_oi else None,
         },
     }
+
+
+def fetch_options_snapshot(underlying_price: float, span: int = 7) -> dict | None:
+    """Backward-compatible SPY options snapshot used by the SPY engine."""
+    return fetch_chain_snapshot("SPY", underlying_price=underlying_price, span=span)
+
+
+def _infer_atm(strikes: list[dict]) -> int | None:
+    """Infer a useful center when no underlying price is supplied.
+
+    The broker chain can be requested by the Options tab without a
+    live spot. Use the highest combined-volume strike as the center
+    when possible, otherwise the median strike.
+    """
+    parsed = []
+    for s in strikes:
+        try:
+            sp = float(s.get("strike-price"))
+        except (TypeError, ValueError):
+            continue
+        vol = _safe_float(s.get("call-volume")) + _safe_float(s.get("put-volume"))
+        if vol != vol:
+            vol = 0.0
+        parsed.append((sp, vol))
+    if not parsed:
+        return None
+    best = max(parsed, key=lambda row: row[1])
+    if best[1] > 0:
+        return round(best[0])
+    parsed.sort(key=lambda row: row[0])
+    return round(parsed[len(parsed) // 2][0])

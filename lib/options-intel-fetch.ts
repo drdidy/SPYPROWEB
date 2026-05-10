@@ -96,6 +96,7 @@ export interface UwOptionChain {
 
 export interface UwGreekRow {
   sessionDate?: string;
+  optionSymbol?: string | null;
   strike: number | null;
   expiration: string | null;
   side: "CALL" | "PUT" | "UNKNOWN" | string;
@@ -103,6 +104,7 @@ export interface UwGreekRow {
   gamma: number | null;
   theta: number | null;
   vega: number | null;
+  rho?: number | null;
   iv: number | null;
   gex: number | null;
 }
