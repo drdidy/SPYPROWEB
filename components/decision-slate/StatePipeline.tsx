@@ -87,6 +87,7 @@ export function StatePipeline({
 }: Props) {
   const currentIdx = ENGINE_STATES.indexOf(current);
   const labelTone = engine === "SPX" ? "text-violet" : "text-ink-2";
+  const currentPhase = PHASE_DEFINITIONS[current];
 
   return (
     <section
@@ -98,32 +99,59 @@ export function StatePipeline({
       // + a 2px top border colored by the current state. The border
       // tone is set inline so theme/Tailwind chains can't reorder it.
       className={cn(
-        "rounded-card border border-rule-tier2 bg-paper-tier2 px-4 py-3 md:px-5 md:py-4",
-        "border-t-[2px]",
+        "rounded-card border border-rule-tier2 bg-paper-tier2 px-4 py-3.5 md:px-5 md:py-4",
+        "border-t-[3px] shadow-card",
         "min-w-0 overflow-hidden",
         className,
       )}
       style={{ borderTopColor: STATE_TOP_BORDER[current] }}
     >
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4 min-w-0">
+      <div className="flex items-start justify-between gap-3 min-w-0">
         {/* v4 #5: drop the serif state-name title that lived next to
             the ticker. The active pill in the stepper below already
             names the state — rendering "Pre-config" twice (title +
             chip) was redundant. The ticker now stands alone. */}
-        <div className="shrink-0 self-start">
+        <div className="min-w-0">
           {/* v8 P1-2: SPX → ES at the render boundary. The `engine`
               prop stays as the wire-level identifier so the data
               path (snapshot keys, /api/spx) keeps working unchanged. */}
-          <span
-            className={cn(
-              "font-mono text-[11px] tracking-[0.18em] uppercase font-bold",
-              labelTone,
-            )}
-          >
-            {displayEngine(engine)}
-          </span>
+          <div className="flex items-center gap-2 min-w-0">
+            <span
+              className={cn(
+                "font-mono text-[11px] tracking-[0.18em] uppercase font-bold",
+                labelTone,
+              )}
+            >
+              {displayEngine(engine)}
+            </span>
+            <span
+              className={cn(
+                "inline-flex h-5 items-center rounded-pill px-2 text-[10px] font-semibold tracking-[0.01em]",
+                CURRENT_PILL_TONE[current],
+              )}
+            >
+              {currentPhase.label}
+            </span>
+          </div>
         </div>
 
+        {(nextEventISO || nextEventLabel) && (
+          <div className="shrink-0 text-right whitespace-nowrap flex flex-col gap-0.5">
+            {nextEventLabel && (
+              <span className="font-mono text-[10px] tracking-[0.10em] uppercase text-ink-3">
+                {nextEventLabel}
+              </span>
+            )}
+            {nextEventISO && (
+              <span className="font-mono text-meta tabular-nums text-ink">
+                <Countdown to={nextEventISO} verb="in" />
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="mt-3 min-w-0">
         {/* Stepper. Real <ol> with aria-current="step" on the active
             <li>. Each step has an sr-only description so screen
             readers announce position + label + status.
@@ -161,7 +189,7 @@ export function StatePipeline({
                   <span
                     aria-hidden
                     className={cn(
-                      "h-px w-2 md:w-3 xl:w-5",
+                      "h-px w-2 md:w-3 xl:w-4",
                       isPassed || isCurrent
                         ? "bg-rule-strong"
                         : "bg-rule",
@@ -228,11 +256,11 @@ export function StatePipeline({
                           {phase.label}
                         </span>
                         {/* xl–xl-plus: short abbreviation */}
-                        <span className="hidden xl:inline xl-plus:hidden">
+                        <span className="hidden">
                           {phase.short}
                         </span>
                         {/* xl-plus+: full label */}
-                        <span className="hidden xl-plus:inline">
+                        <span className="hidden xl:inline">
                           {phase.label}
                         </span>
                       </>
@@ -243,11 +271,11 @@ export function StatePipeline({
                           •
                         </span>
                         {/* xl–xl-plus: short abbreviation */}
-                        <span className="hidden xl:inline xl-plus:hidden">
+                        <span className="hidden xl:inline">
                           {phase.short}
                         </span>
                         {/* xl-plus+: full label */}
-                        <span className="hidden xl-plus:inline">
+                        <span className="hidden">
                           {phase.label}
                         </span>
                       </>
@@ -259,25 +287,9 @@ export function StatePipeline({
           })}
         </ol>
 
-        {/* Right-rail meta column. v5 #1: dropped the 160px min-width
-            reservation so the stepper has more breathing room at lg
-            widths. The text is whitespace-nowrap, so it stays on
-            one line without the hard floor. */}
-        {(nextEventISO || nextEventLabel) && (
-          <div className="shrink-0 self-start md:self-center md:text-right whitespace-nowrap flex flex-col gap-0.5">
-            {nextEventLabel && (
-              <span className="font-mono text-[10px] tracking-[0.10em] uppercase text-ink-3">
-                {nextEventLabel}
-              </span>
-            )}
-            {nextEventISO && (
-              <span className="font-mono text-meta tabular-nums text-ink">
-                <Countdown to={nextEventISO} verb="in" />
-              </span>
-            )}
-          </div>
-        )}
       </div>
+
+      <MiniStructureMap engine={engine} current={current} />
 
       {/* Plain-English explanation underneath the stepper. */}
       {explanation && (
@@ -288,6 +300,80 @@ export function StatePipeline({
 }
 
 // Deliverable alias from the v2 spec — same component, canonical name.
+function MiniStructureMap({
+  engine,
+  current,
+}: {
+  engine: "SPY" | "SPX";
+  current: EngineState;
+}) {
+  const isEs = engine === "SPX";
+  const rails = isEs
+    ? ["Ceiling", "Mid", "Floor"]
+    : ["Upper", "Main", "Lower"];
+  const stateIndex = Math.max(0, ENGINE_STATES.indexOf(current));
+  const markerLeft = `${Math.min(86, 12 + stateIndex * 12)}%`;
+
+  return (
+    <div className="mt-3 rounded-soft border border-rule-soft bg-paper-tier3 px-3 py-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3">
+          {isEs ? "Overnight channel" : "Premarket anchor"}
+        </span>
+        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-4">
+          Structure map
+        </span>
+      </div>
+      <div className="relative h-[64px] overflow-hidden rounded-[6px] bg-paper">
+        <div
+          aria-hidden
+          className="absolute inset-0 opacity-60"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(20,22,26,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(20,22,26,0.045) 1px, transparent 1px)",
+            backgroundSize: "28px 22px",
+          }}
+        />
+        {rails.map((rail, i) => (
+          <div
+            key={rail}
+            className={cn(
+              "absolute left-3 right-3 border-t",
+              i === 1 ? "border-gold" : "border-rule-strong",
+              isEs ? "rotate-[-1.5deg]" : "rotate-[1.5deg]",
+            )}
+            style={{ top: `${22 + i * 18}%` }}
+          >
+            <span className="absolute -top-2 left-0 bg-paper pr-1 font-mono text-[9px] uppercase tracking-[0.08em] text-ink-4">
+              {rail}
+            </span>
+          </div>
+        ))}
+        <div
+          className={cn(
+            "absolute top-[14px] h-9 w-px",
+            isEs ? "bg-violet" : "bg-ink-2",
+          )}
+          style={{ left: markerLeft }}
+        >
+          <span
+            className={cn(
+              "absolute -left-[5px] top-[20px] h-2.5 w-2.5 rounded-full ring-2 ring-paper",
+              current === "GO"
+                ? "bg-bull"
+                : current === "ARMED" || current === "WAIT"
+                  ? "bg-gold"
+                  : isEs
+                    ? "bg-violet"
+                    : "bg-ink-2",
+            )}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export { StatePipeline as PipelineStepper };
 
 // ---------------------------------------------------------------------

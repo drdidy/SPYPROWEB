@@ -74,7 +74,7 @@ export function PreConfigBriefing({ spy, spx, className }: Props) {
       {/* v10 P1-12: 24px rhythm — last card row → "What to watch".
           v10 P1-3: tier-3 surface (faint cream, top divider only,
           no border). */}
-      <div className="mt-6 pt-4 border-t border-rule bg-paper-tier3 px-4 py-4 rounded-soft flex items-start gap-3">
+      <div className="mt-6 rounded-soft border border-rule bg-paper px-4 py-4 shadow-card flex items-start gap-3">
         <BookOpen size={14} className="mt-0.5 shrink-0 text-ink-3" aria-hidden />
         <div className="space-y-1">
           {/* v10 P1-11: editorial section title → serif. */}
@@ -96,7 +96,7 @@ function EngineBriefing({ engine }: { engine: Engine }) {
   const display = displayEngine(engine.label);
   return (
     // v10 P1-3: tier-3 surface — faint cream, top divider only.
-    <div className="rounded-soft bg-paper-tier3 border-t border-rule px-4 py-3 space-y-3">
+    <div className="rounded-soft border border-rule bg-paper px-4 py-4 shadow-card space-y-3">
       <div className="flex items-baseline justify-between gap-3">
         <span
           className={cn(

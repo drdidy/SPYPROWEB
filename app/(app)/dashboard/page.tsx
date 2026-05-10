@@ -113,7 +113,7 @@ export default async function Page() {
           every other top-level section. */}
       <section
         aria-label="Engine states"
-        className="mt-6 rounded-card bg-paper-2/30 border border-rule-soft px-5 py-4 md:px-6 md:py-5"
+        className="mt-6"
       >
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4 [grid-template-columns:1fr] lg:[grid-template-columns:1fr_1fr] min-w-0">
           <StatePipeline
@@ -165,7 +165,7 @@ export default async function Page() {
       ) : (
         <>
           <Section title="Today's read">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
               {spyHardError ? (
                 <ErrorState
                   title="SPY data unavailable"
@@ -184,7 +184,7 @@ export default async function Page() {
           />
 
           <Section title="Active levels">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
               {spyHardError ? null : <SpyReadCard snap={spy} />}
               <SpxReadCard snap={spx} />
             </div>
