@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 
 import { Card } from "@/components/ui/Card";
+import { CommandEmptyState } from "@/components/ui/CommandEmptyState";
 import { StatusPill } from "@/components/ui/StatusPill";
 import {
   adaptSnapshot,
@@ -172,12 +173,12 @@ export function ReplayWorkspace({ initialDate }: Props) {
   return (
     <div className="space-y-8">
       {/* Calendar bar */}
-      <Card className="bg-paper">
+      <Card className="bg-[#071116] text-paper border-[#243138]">
         <div className="flex flex-col md:flex-row md:items-end gap-4 p-5">
           <div className="flex-1">
             <div className="flex items-center gap-2">
-              <CalendarDays size={14} className="text-gold-ink" strokeWidth={1.6} />
-              <span className="eyebrow text-gold-ink">Replay date</span>
+              <CalendarDays size={14} className="text-gold-soft" strokeWidth={1.6} />
+              <span className="font-mono text-[10px] uppercase tracking-[0.20em] text-gold-soft">Replay date</span>
             </div>
             <div className="mt-2 flex items-center gap-3">
               <input
@@ -191,19 +192,19 @@ export function ReplayWorkspace({ initialDate }: Props) {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") apply(draft || null);
                 }}
-                className="bg-paper-2 border border-rule rounded-pill px-3 py-2 font-mono text-[13px] text-ink tabular-nums focus:outline-none focus:ring-1 focus:ring-ink-3"
+                className="bg-paper/8 border border-paper/15 rounded-pill px-3 py-2 font-mono text-[13px] text-paper tabular-nums focus:outline-none focus:ring-1 focus:ring-gold"
               />
               {date && (
                 <button
                   type="button"
                   onClick={() => apply(null)}
-                  className="font-mono text-[10px] uppercase tracking-[0.10em] text-ink-3 hover:text-ink transition-colors"
+                  className="font-mono text-[10px] uppercase tracking-[0.10em] text-paper/45 hover:text-paper transition-colors"
                 >
                   clear
                 </button>
               )}
               {loading && (
-                <span className="inline-flex items-center gap-1 font-mono text-[11px] text-ink-3">
+                <span className="inline-flex items-center gap-1 font-mono text-[11px] text-paper/50">
                   <Loader2 size={12} className="animate-spin" strokeWidth={2} />
                   fetching session…
                 </span>
@@ -309,18 +310,16 @@ export function ReplayWorkspace({ initialDate }: Props) {
 
 function EmptyState() {
   return (
-    <Card className="bg-paper-2/40">
-      <div className="p-12 text-center">
-        <div className="inline-flex w-12 h-12 rounded-full bg-paper-2 items-center justify-center mb-4">
-          <CalendarDays size={20} className="text-ink-3" strokeWidth={1.5} />
-        </div>
-        <h3 className="text-title font-serif text-ink">Pick a trading day</h3>
-        <p className="mt-2 text-[13px] text-ink-2 max-w-md mx-auto">
-          Choose a past date above to rebuild that session's ES channel
-          and SPY anchor framework, then watch the day play out.
-        </p>
-      </div>
-    </Card>
+    <CommandEmptyState
+      eyebrow="Replay studio"
+      title="Pick a trading day."
+      body="Choose a past date above to rebuild that session's ES channel and SPY anchor framework, then watch the real intraday bars play out when history is available."
+      rows={[
+        { label: "SPY", value: "Snapshot replay" },
+        { label: "ES", value: "Channel replay" },
+        { label: "Bars", value: "Historical only" },
+      ]}
+    />
   );
 }
 
@@ -631,10 +630,10 @@ function Stat({
 }) {
   return (
     <div>
-      <div className="eyebrow text-ink-3 mb-0.5">{label}</div>
+      <div className="eyebrow mb-0.5 text-current opacity-50">{label}</div>
       <div
         className={`text-[13px] font-semibold tabular-nums ${mono ? "font-mono" : ""} ${
-          tone === "bull" ? "text-bull-ink" : tone === "bear" ? "text-bear-ink" : "text-ink"
+          tone === "bull" ? "text-bull-ink" : tone === "bear" ? "text-bear-ink" : "text-current"
         }`}
         data-num
       >
