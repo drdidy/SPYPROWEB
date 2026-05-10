@@ -61,8 +61,9 @@ export function SurfacesGrid() {
             backgroundSize: "70px 70px",
           }}
         />
-        <div className="absolute left-1/2 top-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-gold/15" />
-        <div className="absolute left-1/2 top-1/2 h-[330px] w-[330px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-gold/20" />
+        <div className="pointer-events-none absolute left-1/2 top-[45%] h-[760px] w-[760px] -translate-x-1/2 -translate-y-1/2 opacity-[0.18]">
+          <CompassBackdrop />
+        </div>
 
         <div className="relative mx-auto max-w-[1240px] px-5 py-20 sm:px-7 lg:py-28">
           <div className="mx-auto max-w-3xl text-center">
@@ -169,29 +170,118 @@ function EngineColumn({
 
 function CompassHub() {
   return (
-    <div className="relative mx-auto grid aspect-square max-w-[360px] place-items-center lg:col-span-4">
-      <div className="absolute inset-0 rounded-full border border-gold/15" />
-      <div className="absolute inset-[12%] rounded-full border border-gold/20" />
-      <div className="absolute inset-[25%] rounded-full border border-dashed border-gold/25" />
-      <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-gold/20" />
-      <div className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-gold/20" />
-      <div className="relative grid h-28 w-28 place-items-center rounded-full border border-gold/35 bg-[#07141C] shadow-[0_0_80px_rgba(184,130,31,0.16)]">
-        <svg width="84" height="84" viewBox="0 0 84 84" aria-hidden>
-          <path
-            d="M42 5 51 33 79 42 51 51 42 79 33 51 5 42 33 33 42 5Z"
-            fill="none"
-            stroke="#F4E4C0"
-            strokeWidth="1.2"
-          />
-          <circle cx="42" cy="42" r="5" fill="#B8821F" />
-        </svg>
+    <div className="relative mx-auto grid aspect-square max-w-[380px] place-items-center lg:col-span-4">
+      <div className="absolute inset-0 rounded-full border border-gold/18 bg-[radial-gradient(circle,rgba(184,130,31,0.12),transparent_58%)]" />
+      <div className="absolute inset-[8%] rounded-full border border-gold/25" />
+      <div className="absolute inset-[20%] rounded-full border border-dashed border-gold/30" />
+      <div className="absolute inset-[32%] rounded-full border border-gold/18" />
+      <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-gradient-to-b from-transparent via-gold/28 to-transparent" />
+      <div className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-gradient-to-r from-transparent via-gold/28 to-transparent" />
+      <div className="absolute inset-[14%] rotate-45 rounded-full border border-gold/10" />
+
+      <div className="absolute left-4 top-1/2 -translate-y-1/2 rounded-[8px] border border-paper/10 bg-[#061017]/80 px-4 py-3 text-left shadow-[0_24px_50px_-36px_rgba(244,228,192,0.5)] backdrop-blur">
+        <div className="font-serif text-[34px] leading-none text-paper">SPY</div>
+        <div className="mt-1 font-mono text-[8px] uppercase tracking-[0.18em] text-gold-soft/60">
+          Anchor
+        </div>
       </div>
-      <div className="absolute left-8 top-1/2 -translate-y-1/2 font-serif text-[32px] text-paper">
-        SPY
+      <div className="absolute right-4 top-1/2 -translate-y-1/2 rounded-[8px] border border-paper/10 bg-[#061017]/80 px-4 py-3 text-right shadow-[0_24px_50px_-36px_rgba(244,228,192,0.5)] backdrop-blur">
+        <div className="font-serif text-[34px] leading-none text-paper">ES</div>
+        <div className="mt-1 font-mono text-[8px] uppercase tracking-[0.18em] text-gold-soft/60">
+          Channel
+        </div>
       </div>
-      <div className="absolute right-12 top-1/2 -translate-y-1/2 font-serif text-[32px] text-paper">
-        ES
+
+      <div className="relative grid h-32 w-32 place-items-center rounded-full border border-gold/40 bg-[#07141C] shadow-[0_0_90px_rgba(184,130,31,0.22),inset_0_1px_0_rgba(244,228,192,0.08)]">
+        <CompassGlyph />
+        <div className="absolute -bottom-8 left-1/2 flex -translate-x-1/2 items-center gap-2 font-mono text-[9px] uppercase tracking-[0.18em] text-gold-soft/65">
+          <span className="h-px w-7 bg-gold/35" />
+          <span>Slate</span>
+          <span className="h-px w-7 bg-gold/35" />
+        </div>
       </div>
     </div>
+  );
+}
+
+function CompassBackdrop() {
+  return (
+    <svg viewBox="0 0 760 760" className="h-full w-full" aria-hidden>
+      <defs>
+        <radialGradient id="surfaces-compass-glow" cx="50%" cy="50%" r="48%">
+          <stop offset="0%" stopColor="#B8821F" stopOpacity="0.45" />
+          <stop offset="58%" stopColor="#B8821F" stopOpacity="0.1" />
+          <stop offset="100%" stopColor="#B8821F" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <circle cx="380" cy="380" r="350" fill="url(#surfaces-compass-glow)" />
+      {[330, 260, 195, 124].map((r) => (
+        <circle
+          key={r}
+          cx="380"
+          cy="380"
+          r={r}
+          fill="none"
+          stroke="#D7B764"
+          strokeWidth={r === 260 ? 1.4 : 0.8}
+          strokeDasharray={r === 195 ? "5 10" : undefined}
+        />
+      ))}
+      {Array.from({ length: 48 }, (_, i) => {
+        const a = (i * Math.PI) / 24 - Math.PI / 2;
+        const major = i % 6 === 0;
+        const inner = major ? 300 : 318;
+        const outer = 338;
+        return (
+          <line
+            key={i}
+            x1={380 + Math.cos(a) * inner}
+            y1={380 + Math.sin(a) * inner}
+            x2={380 + Math.cos(a) * outer}
+            y2={380 + Math.sin(a) * outer}
+            stroke="#D7B764"
+            strokeWidth={major ? 1.4 : 0.65}
+          />
+        );
+      })}
+      <path
+        d="M380 92 428 332 668 380 428 428 380 668 332 428 92 380 332 332Z"
+        fill="none"
+        stroke="#D7B764"
+        strokeWidth="1"
+      />
+      <line x1="380" x2="380" y1="32" y2="728" stroke="#D7B764" strokeWidth="0.7" />
+      <line x1="32" x2="728" y1="380" y2="380" stroke="#D7B764" strokeWidth="0.7" />
+    </svg>
+  );
+}
+
+function CompassGlyph() {
+  return (
+    <svg width="92" height="92" viewBox="0 0 92 92" aria-hidden>
+      <defs>
+        <linearGradient id="surfaces-compass-gold" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#F4E4C0" />
+          <stop offset="55%" stopColor="#B8821F" />
+          <stop offset="100%" stopColor="#6E4C0E" />
+        </linearGradient>
+        <linearGradient id="surfaces-compass-green" x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0%" stopColor="#0B4F3A" />
+          <stop offset="100%" stopColor="#16A06A" />
+        </linearGradient>
+      </defs>
+      <circle cx="46" cy="46" r="38" fill="none" stroke="#F4E4C0" strokeOpacity="0.34" />
+      <circle cx="46" cy="46" r="24" fill="none" stroke="#F4E4C0" strokeDasharray="3 6" strokeOpacity="0.34" />
+      <path
+        d="M46 8 55 37 84 46 55 55 46 84 37 55 8 46 37 37Z"
+        fill="none"
+        stroke="url(#surfaces-compass-gold)"
+        strokeWidth="1.35"
+      />
+      <path d="M24 59 44 44 70 24 52 52Z" fill="url(#surfaces-compass-green)" opacity="0.9" />
+      <path d="M21 32 45 45 72 60 40 51Z" fill="url(#surfaces-compass-gold)" opacity="0.88" />
+      <circle cx="46" cy="46" r="6" fill="#061017" stroke="#F4E4C0" strokeOpacity="0.6" />
+      <circle cx="46" cy="46" r="3" fill="#B8821F" />
+    </svg>
   );
 }
