@@ -30,9 +30,12 @@ import { SLATE_COPY } from "@/content/copy";
 import { loadLiveSnapshot } from "@/lib/snapshot-fetch";
 import { loadSnapshot as loadSpxSnapshot } from "@/lib/spx-fetch";
 import { loadIntradayReplay } from "@/lib/intraday-replay-fetch";
+import { loadOptionsIntelBundle } from "@/lib/options-intel-fetch";
 import { fetchLastSessionRecaps } from "@/lib/last-session-recap";
 import { fetchTrackRecord } from "@/lib/track-record";
 import { getSessionInfo } from "@/lib/sessions";
+import { buildSpyContractProjection } from "@/lib/spy-contract-projection";
+import { buildSpxContractProjection } from "@/lib/spx-contract-projection";
 import { relabelDashboardString } from "@/lib/engine-labels";
 import {
   FEED_DEFAULTS,
@@ -71,6 +74,7 @@ export default async function Page() {
     chartSpyLoaded,
     chartSpxLoaded,
     intraday,
+    optionBundle,
   ] = await Promise.all([
     loadLiveSnapshot(),
     loadSpxSnapshot(),
@@ -80,6 +84,7 @@ export default async function Page() {
     loadLiveSnapshot(chartDate),
     loadSpxSnapshot(chartDate),
     loadIntradayReplay(chartDate),
+    loadOptionsIntelBundle(["SPX"]),
   ]);
   const spx = spxLoaded.snap;
   const spxSource = spxLoaded.source;
@@ -117,6 +122,11 @@ export default async function Page() {
     intraday?.es ?? null,
     chartDate,
   );
+  const spyProjection = buildSpyContractProjection(spy);
+  const spxProjection = buildSpxContractProjection({
+    snap: spx,
+    chain: optionBundle.data.symbols.SPX?.chain ?? null,
+  });
 
   // Per-card error state. We render the error inside the engine's
   // section instead of replacing the whole page so a partial outage
@@ -159,6 +169,8 @@ export default async function Page() {
           .toLowerCase()}
         spyChart={spyChart}
         spxChart={spxChart}
+        spyProjection={spyProjection}
+        spxProjection={spxProjection}
       />
 
       {/* v4 #6 + v5 #8 + v10 P1-12: engines row. 24px rhythm

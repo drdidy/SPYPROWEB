@@ -23,6 +23,8 @@ import {
   StructurePathChart,
   type StructureChartData,
 } from "./StructurePathChart";
+import { ContractProjectionCard } from "@/components/options/ContractProjection";
+import type { ContractProjection } from "@/lib/contract-projection";
 
 const ICONS: Record<Recommendation["id"], LucideIcon> = {
   "live-spy": Activity,
@@ -49,6 +51,8 @@ interface Props {
   spxEventVerb?: string;
   spyChart?: StructureChartData | null;
   spxChart?: StructureChartData | null;
+  spyProjection?: ContractProjection | null;
+  spxProjection?: ContractProjection | null;
   className?: string;
 }
 
@@ -61,6 +65,8 @@ export function RecommendedAction({
   spxEventVerb = "opens",
   spyChart,
   spxChart,
+  spyProjection,
+  spxProjection,
   className,
 }: Props) {
   const rec = recommendationFor(spyState, spxState);
@@ -74,6 +80,8 @@ export function RecommendedAction({
         ? 82
       : 72;
   const activeChart = rec.id === "live-spx" ? spxChart : spyChart ?? spxChart;
+  const activeProjection =
+    rec.id === "live-spx" ? spxProjection : spyProjection ?? spxProjection;
   const chartAccent =
     rec.id === "live-spx"
       ? "violet"
@@ -141,6 +149,11 @@ export function RecommendedAction({
             <HeroMetric label="Reward setup" value="Neutral" tone="text-gold-soft" />
             <HeroMetric label="Trend context" value="Range" tone="text-paper" />
           </div>
+          <ContractProjectionCard
+            projection={activeProjection ?? null}
+            compact
+            className="mt-5 border-paper/15 bg-paper/[0.06] text-paper [&_.text-ink]:!text-paper [&_.text-ink-3]:!text-paper/58 [&_.text-ink-4]:!text-paper/42 [&_.bg-paper]:!bg-paper/[0.08] [&_.bg-paper-2\\/55]:!bg-paper/[0.08]"
+          />
         </div>
 
         <CommandRailDiagram chart={activeChart} accent={chartAccent} />

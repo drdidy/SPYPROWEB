@@ -32,6 +32,7 @@ import { SPXConfluence } from "@/components/spx/SPXConfluence";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { cn } from "@/lib/utils";
+import type { SpxProjectionChainInput } from "@/lib/spx-contract-projection";
 import type { SPXSnapshot } from "@/lib/types";
 
 interface Props {
@@ -54,10 +55,12 @@ interface ApiErrorBody {
 
 export function SPXChannelClient({ replayDate }: Props) {
   const [state, setState] = useState<FetchState>({ status: "loading" });
+  const [optionsChain, setOptionsChain] = useState<SpxProjectionChainInput | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setState({ status: "loading" });
+    setOptionsChain(null);
     const url = replayDate
       ? `/api/spx/snapshot?date=${encodeURIComponent(replayDate)}`
       : `/api/spx/snapshot`;
@@ -67,6 +70,8 @@ export function SPXChannelClient({ replayDate }: Props) {
         if (res.ok) {
           const json = (await res.json()) as SPXSnapshot;
           if (!cancelled) setState({ status: "ready", snap: json });
+          const chain = await fetchSpxOptionsChain(replayDate);
+          if (!cancelled) setOptionsChain(chain);
           return;
         }
         // Try to surface the API's error body. The handler emits
@@ -269,7 +274,7 @@ export function SPXChannelClient({ replayDate }: Props) {
 
       <section className="space-y-5">
         <SectionLabel number="01">Plays</SectionLabel>
-        <SPXPlaysSlate snap={snap} />
+        <SPXPlaysSlate snap={snap} optionsChain={optionsChain} />
       </section>
 
       <section className="space-y-5">
@@ -363,6 +368,29 @@ function SourceBadge({ live }: { live: boolean }) {
       {live ? "live" : "mock"}
     </span>
   );
+}
+
+async function fetchSpxOptionsChain(
+  replayDate?: string,
+): Promise<SpxProjectionChainInput | null> {
+  try {
+    const params = new URLSearchParams({ symbols: "SPX" });
+    if (replayDate) params.set("date", replayDate);
+    const res = await fetch(`/api/options/intel?${params.toString()}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as {
+      symbols?: {
+        SPX?: {
+          chain?: SpxProjectionChainInput | null;
+        };
+      };
+    };
+    return json.symbols?.SPX?.chain ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function dayLabel(isoDate: string): string {

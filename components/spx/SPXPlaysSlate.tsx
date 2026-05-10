@@ -1,5 +1,10 @@
 "use client";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
+import { ContractProjectionCard } from "@/components/options/ContractProjection";
+import {
+  buildSpxContractProjection,
+  type SpxProjectionChainInput,
+} from "@/lib/spx-contract-projection";
 import type {
   SPXContractSuggestion,
   SPXLineKind,
@@ -15,7 +20,13 @@ const lineLabel: Record<SPXLineKind, string> = {
   PREV_RTH_LOW_DESC: "Prev RTH Low · Desc",
 };
 
-export function SPXPlaysSlate({ snap }: { snap: SPXSnapshot }) {
+export function SPXPlaysSlate({
+  snap,
+  optionsChain,
+}: {
+  snap: SPXSnapshot;
+  optionsChain?: SpxProjectionChainInput | null;
+}) {
   const standDown = snap.scenario === "OUTSIDE_PLAY" || !snap.plays.primary;
 
   return (
@@ -46,13 +57,17 @@ export function SPXPlaysSlate({ snap }: { snap: SPXSnapshot }) {
           <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-rule">
             <PlayPanel
               kind="primary"
+              snap={snap}
               trade={snap.plays.primary!}
               contract={snap.contracts.forPrimary}
+              optionsChain={optionsChain}
             />
             <PlayPanel
               kind="alternate"
+              snap={snap}
               trade={snap.plays.alternate!}
               contract={snap.contracts.forAlternate}
+              optionsChain={optionsChain}
             />
           </div>
         </CardBody>
@@ -63,12 +78,16 @@ export function SPXPlaysSlate({ snap }: { snap: SPXSnapshot }) {
 
 function PlayPanel({
   kind,
+  snap,
   trade,
   contract,
+  optionsChain,
 }: {
   kind: "primary" | "alternate";
+  snap: SPXSnapshot;
   trade: SPXTrade;
   contract: SPXContractSuggestion | null;
+  optionsChain?: SpxProjectionChainInput | null;
 }) {
   const isBuy = trade.side === "BUY";
   const Icon = isBuy ? ArrowUp : ArrowDown;
@@ -76,6 +95,12 @@ function PlayPanel({
   const sideBg = isBuy ? "bg-bull-tint" : "bg-bear-tint";
   const move = trade.exitPrice - trade.entryPrice;
   const moveAbs = Math.abs(move);
+  const projection = buildSpxContractProjection({
+    snap,
+    chain: optionsChain,
+    trade,
+    contract,
+  });
 
   return (
     <div className="p-6">
@@ -152,6 +177,7 @@ function PlayPanel({
           </div>
         </div>
       )}
+      <ContractProjectionCard projection={projection} className="mt-3" />
     </div>
   );
 }

@@ -48,6 +48,8 @@ export function ChannelShell({
     optionsIntel,
     strikes,
     signalTicks,
+    signal,
+    optionsChain,
   } = data.snap;
   const now = new Date();
   const serverNowISO = now.toISOString();
@@ -115,6 +117,9 @@ export function ChannelShell({
           intel={optionsIntel}
           strikes={strikes}
           spy={currentPrice}
+          chain={optionsChain}
+          signal={signal}
+          snap={data.snap}
         />
       </section>
 

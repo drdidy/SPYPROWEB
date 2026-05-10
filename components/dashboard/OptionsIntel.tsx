@@ -1,7 +1,9 @@
 "use client";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { ContractProjectionCard } from "@/components/options/ContractProjection";
 import { StatusPill } from "@/components/ui/StatusPill";
+import type { ContractProjection } from "@/lib/contract-projection";
 import type { OptionsIntel as Intel, SelectedStrikes } from "@/lib/types";
 import { RefreshCw } from "lucide-react";
 import type { ReactNode } from "react";
@@ -17,11 +19,13 @@ export function OptionsIntelPanel({
   strikes,
   spy,
   healthAction,
+  projection,
 }: {
   intel: Intel | null;
   strikes: SelectedStrikes | null;
   spy: number;
   healthAction?: ReactNode;
+  projection?: ContractProjection | null;
 }) {
   if (!intel || !strikes) {
     return (
@@ -166,6 +170,8 @@ export function OptionsIntelPanel({
             ))}
           </div>
         </div>
+
+        <ContractProjectionCard projection={projection ?? null} />
 
         <p className="text-[12px] text-ink-2 leading-snug">{intel.alignmentNote}</p>
 
