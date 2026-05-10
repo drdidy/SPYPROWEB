@@ -157,9 +157,19 @@ export function HeroSection({
           role="region"
           aria-label="Live product preview"
         >
-          <div className="relative mx-auto max-w-[920px] lg:ml-auto">
-            <div className="absolute -bottom-5 left-8 right-8 h-10 rounded-full bg-ink/25 blur-2xl" />
-            <div className="relative overflow-hidden rounded-[18px] border border-paper/10 bg-[#061017] shadow-[0_28px_90px_-40px_rgba(6,16,23,0.9),0_1px_0_rgba(255,255,255,0.08)_inset]">
+          <div className="relative mx-auto max-w-[980px] lg:ml-auto lg:[perspective:1500px]">
+            <div className="absolute -bottom-9 left-12 right-4 h-16 rounded-full bg-ink/30 blur-3xl lg:left-20" />
+            <div
+              className="relative rounded-[28px] border border-ink/80 bg-[#02070B] p-2 shadow-[0_36px_110px_-48px_rgba(6,16,23,0.95),0_18px_45px_-30px_rgba(20,22,26,0.9)] lg:origin-center"
+              style={{
+                transform: reduce
+                  ? undefined
+                  : "rotateY(-6deg) rotateX(2deg) rotateZ(0.6deg)",
+              }}
+            >
+              <div className="absolute left-1/2 top-1 h-1 w-20 -translate-x-1/2 rounded-full bg-paper/12" />
+              <div className="absolute right-3 top-1/2 h-16 w-1 -translate-y-1/2 rounded-full bg-paper/10" />
+              <div className="relative overflow-hidden rounded-[22px] border border-paper/10 bg-[#061017] shadow-[0_1px_0_rgba(255,255,255,0.08)_inset]">
               <div className="flex items-center justify-between border-b border-paper/10 px-4 py-3 sm:px-5">
                 <div>
                   <div className="font-serif text-[17px] leading-none text-paper">
@@ -220,8 +230,8 @@ export function HeroSection({
                           <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-paper/45">
                             Recommended next step
                           </div>
-                          <h2 className="mt-2 max-w-[15ch] font-serif text-[24px] leading-tight tracking-[-0.01em] text-paper sm:text-[28px]">
-                            {verdict}: {decisionLabel}
+                          <h2 className="mt-2 max-w-[19ch] font-serif text-[24px] leading-tight tracking-[-0.01em] text-paper sm:text-[27px]">
+                            {decisionLabel}
                           </h2>
                         </div>
                         <StateChip tone={statusTone}>{decisionLabel}</StateChip>
@@ -229,15 +239,11 @@ export function HeroSection({
                       <p className="line-clamp-3 min-h-[4.6rem] text-[13px] leading-relaxed text-paper/62">
                         {explanation}
                       </p>
-                      <div className="mt-4">
-                        <StructurePathChart
-                          data={chart}
-                          variant="dark"
-                          accent={statusTone === "bear" ? "bear" : statusTone === "bull" ? "bull" : "gold"}
-                          height={220}
-                          title="Actual SPY path vs rails"
-                        />
-                      </div>
+                      <DecisionFlowPanel
+                        tone={statusTone}
+                        date={chartDate ?? chart?.date ?? "Latest"}
+                        decision={decisionLabel}
+                      />
                     </div>
 
                     <div className="rounded-[8px] border border-paper/10 bg-paper/[0.035] p-4">
@@ -299,6 +305,7 @@ export function HeroSection({
                     </div>
                   </div>
                 </div>
+              </div>
               </div>
             </div>
           </div>
@@ -401,6 +408,117 @@ function PreviewMetric({
             {deltaText}
           </span>
         )}
+      </div>
+    </div>
+  );
+}
+
+function DecisionFlowPanel({
+  tone,
+  date,
+  decision,
+}: {
+  tone: "bull" | "bear" | "gold";
+  date: string;
+  decision: string;
+}) {
+  const stroke =
+    tone === "bull" ? "#0E7C50" : tone === "bear" ? "#B5301E" : "#B8821F";
+  return (
+    <div className="mt-4 overflow-hidden rounded-[7px] border border-paper/10 bg-[#08161D]">
+      <div className="grid grid-cols-3 border-b border-paper/10">
+        <FlowStep n="01" label="Read" value={date} />
+        <FlowStep n="02" label="Confirm" value={decision} />
+        <FlowStep n="03" label="Manage" value="Risk first" />
+      </div>
+      <svg
+        viewBox="0 0 620 160"
+        className="h-[136px] w-full"
+        role="img"
+        aria-label="Decision flow from structure read to confirmation and management"
+      >
+        <defs>
+          <linearGradient id="decision-flow-fill" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor={stroke} stopOpacity="0.05" />
+            <stop offset="50%" stopColor={stroke} stopOpacity="0.22" />
+            <stop offset="100%" stopColor={stroke} stopOpacity="0.08" />
+          </linearGradient>
+        </defs>
+        <rect width="620" height="160" fill="transparent" />
+        {[90, 220, 350, 480].map((x) => (
+          <line
+            key={x}
+            x1={x}
+            x2={x}
+            y1="22"
+            y2="138"
+            stroke="rgba(255,255,255,0.08)"
+            strokeWidth="1"
+          />
+        ))}
+        <path
+          d="M46 112 C118 48 188 54 250 86 C318 122 370 38 444 56 C506 72 542 94 576 44"
+          fill="none"
+          stroke={stroke}
+          strokeWidth="2.8"
+          strokeLinecap="round"
+          className="structure-price-path"
+          pathLength={1}
+        />
+        <path
+          d="M46 112 C118 48 188 54 250 86 C318 122 370 38 444 56 C506 72 542 94 576 44 L576 138 L46 138 Z"
+          fill="url(#decision-flow-fill)"
+        />
+        {[
+          { x: 116, y: 58, label: "structure" },
+          { x: 292, y: 103, label: "confirmation" },
+          { x: 444, y: 56, label: "managed" },
+        ].map((point) => (
+          <g key={point.label}>
+            <circle cx={point.x} cy={point.y} r="7" fill={stroke} opacity="0.18" />
+            <circle cx={point.x} cy={point.y} r="3" fill={stroke} />
+            <text
+              x={point.x}
+              y={point.y - 13}
+              textAnchor="middle"
+              fontFamily="var(--font-geist-mono)"
+              fontSize="9"
+              fill="rgba(244,228,192,0.62)"
+            >
+              {point.label}
+            </text>
+          </g>
+        ))}
+        <line
+          x1="46"
+          x2="576"
+          y1="118"
+          y2="118"
+          stroke="rgba(244,228,192,0.32)"
+          strokeDasharray="5 8"
+          strokeWidth="1"
+        />
+      </svg>
+    </div>
+  );
+}
+
+function FlowStep({
+  n,
+  label,
+  value,
+}: {
+  n: string;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="border-r border-paper/10 px-3 py-3 last:border-r-0">
+      <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-paper/35">
+        {n} {label}
+      </div>
+      <div className="mt-1 truncate font-mono text-[10px] uppercase tracking-[0.08em] text-gold-soft">
+        {value}
       </div>
     </div>
   );
