@@ -116,7 +116,7 @@ function EngineBriefing({ engine }: { engine: Engine }) {
         </p>
       )}
       <Link
-        href={engine.label === "SPY" ? "/spy" : "/spx"}
+        href={engine.label === "SPY" ? "/spy" : "/es"}
         className={cn(
           "inline-flex items-center gap-1 h-7 px-2.5 rounded-pill",
           "bg-paper-2/60 text-ink-2 hover:text-ink hover:bg-paper-2",

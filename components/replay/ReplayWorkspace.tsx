@@ -228,7 +228,7 @@ export function ReplayWorkspace({ initialDate }: Props) {
                 }
               />
               <Stat
-                label="SPX scenario"
+                label="ES scenario"
                 value={spx?.scenario.replace(/_/g, " ") ?? "—"}
               />
             </div>
@@ -316,7 +316,7 @@ function EmptyState() {
         </div>
         <h3 className="text-title font-serif text-ink">Pick a trading day</h3>
         <p className="mt-2 text-[13px] text-ink-2 max-w-md mx-auto">
-          Choose a past date above to rebuild that session's SPX channel
+          Choose a past date above to rebuild that session's ES channel
           and SPY anchor framework, then watch the day play out.
         </p>
       </div>
@@ -369,7 +369,8 @@ function SPYPlanCard({ snap }: { snap: AdaptedSnapshot | null }) {
                 {anchor.anchorLow.toFixed(2)}
               </span>{" "}
               set at <span className="font-mono">{shortTime(anchor.anchorTime)}</span> CT.
-              Bands decay at {(snap?.anchor?.slopePerHour ?? 0.2).toFixed(2)} pts/hr.
+              {/* v9: slope value hidden — proprietary engine parameter. */}
+              Bands decay through the session.
             </p>
           </>
         ) : (
@@ -397,7 +398,7 @@ function SPXPlanCard({
     return (
       <Card className="bg-paper">
         <div className="p-5">
-          <span className="eyebrow text-ink-3">SPX · plan</span>
+          <span className="eyebrow text-ink-3">ES · plan</span>
           <h3 className="mt-1 text-title font-serif text-ink">Channel</h3>
           <div className="mt-3 font-mono text-[12px] text-ink-3 italic">
             No data
@@ -417,22 +418,23 @@ function SPXPlanCard({
       <div className="p-5 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <span className="eyebrow text-ink-3">SPX · plan</span>
+            <span className="eyebrow text-ink-3">ES · plan</span>
             <h3 className="mt-1 text-title font-serif text-ink">
               {snap.scenario.replace(/_/g, " ").toLowerCase()}
             </h3>
           </div>
           <div className="flex items-center gap-2">
-            {/* Deep link into the full SPX Channel page for this same
-                replay date — fixes the user's "shows mock data on
-                the SPX Channel tab" jump by explicitly carrying the
-                date through the URL. */}
+            {/* Deep link into the full ES Channel page for this same
+                replay date. (v6 fix: fixes the "shows mock data on
+                the channel tab" jump by carrying the date through
+                the URL. v9: route now /es; the legacy /spx URL
+                308-redirects.) */}
             {replayDate && (
               <Link
-                href={`/spx?date=${replayDate}`}
+                href={`/es?date=${replayDate}`}
                 className="inline-flex items-center gap-1 h-7 px-2.5 rounded-pill bg-paper-2/70 text-ink-2 hover:text-ink hover:bg-paper-2 border border-rule transition-colors text-[11px] tracking-[0.02em] font-medium outline-none focus-visible:ring-2 focus-visible:ring-gold/40"
               >
-                Open SPX Channel
+                Open ES Channel
                 <ArrowRight size={11} className="text-ink-4" aria-hidden />
               </Link>
             )}

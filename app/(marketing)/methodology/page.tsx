@@ -68,7 +68,7 @@ export default function MethodologyPage() {
       <p>
         The engine on the dashboard runs the methodology continuously
         during market hours. Each morning at 03:00 CT (SPY) and
-        17:00 CT the previous day (SPX) it observes the configuration
+        17:00 CT the previous day (ES) it observes the configuration
         window and plots the day&apos;s lines. From RTH open through
         close it watches each price print against the lines, applies
         the discipline gates, and surfaces a single

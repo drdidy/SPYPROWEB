@@ -25,7 +25,7 @@ const sections = [
     items: [
       { icon: LineChart, label: "Decision Slate", href: "/dashboard" },
       { icon: Activity, label: "SPY Channel", href: "/spy" },
-      { icon: Columns3, label: "SPX Channel", href: "/spx" },
+      { icon: Columns3, label: "ES Channel", href: "/es" },
       { icon: Rewind, label: "Replay", href: "/replay" },
       { icon: Eye, label: "Foresight", href: "/foresight" },
     ],

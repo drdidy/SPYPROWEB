@@ -162,11 +162,10 @@ export function TopBar({
         <span aria-hidden className="text-ink-4 text-[10px]">
           ·
         </span>
-        {/* v8 P1-4: chip displays "ES" (the engine's native data
-            ticker). The href stays /spx — the page rename to /es
-            is a separate PR. */}
+        {/* v9: chip displays "ES" and links to /es (route renamed
+            from /spx in this round). */}
         <SymbolChip
-          href="/spx"
+          href="/es"
           symbol="ES"
           verb={spxVerb}
           verbTone={spxTone}

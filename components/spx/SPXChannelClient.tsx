@@ -127,13 +127,13 @@ export function SPXChannelClient({ replayDate }: Props) {
           className="rounded-card border border-rule bg-paper-2/50 px-5 py-6 md:px-6 md:py-8"
         >
           <p className="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-3 mb-2">
-            SPX · Channel
+            ES · Channel
           </p>
           <h1 className="font-serif text-h2 text-ink tracking-tight">
             Channel forms after the configuration window
           </h1>
           <p className="mt-3 text-body text-ink-2 leading-snug max-w-2xl">
-            The engine plots SPX from ES front-month overnight bars
+            The engine plots from ES front-month overnight bars
             (15:00 prev-day → 02:00 today CT). Outside that window —
             on weekends, holidays, or when the data feed gaps — there
             is nothing yet to plot. Check back during the next
@@ -161,8 +161,8 @@ export function SPXChannelClient({ replayDate }: Props) {
         <ErrorState
           title={
             replayDate
-              ? `Couldn't load the SPX snapshot for ${replayDate}`
-              : "Couldn't load the live SPX snapshot"
+              ? `Couldn't load the ES snapshot for ${replayDate}`
+              : "Couldn't load the live ES snapshot"
           }
           message={`${state.message}. The /replay tab uses the same endpoint and may be working — if it is, retry in a moment.`}
         />
@@ -186,7 +186,7 @@ export function SPXChannelClient({ replayDate }: Props) {
         <div>
           <div className="flex items-center gap-3">
             <span className="font-mono text-[10px] text-ink-3 tracking-[0.20em] uppercase">
-              SPX · Channel · session {snap.sessionDateCT}
+              ES · Channel · session {snap.sessionDateCT}
             </span>
             <span className="h-px w-10 bg-rule-strong" />
             <span className="font-mono text-[10px] text-ink-3 tracking-[0.20em] uppercase">
@@ -234,9 +234,13 @@ export function SPXChannelClient({ replayDate }: Props) {
                 )}
               </span>
               <span className="text-ink-4">·</span>
+              {/* v9: dropped the "/ SPX <cash>" half — the cash
+                  index quote was diagnostic-only and the only
+                  user-facing SPX leak left on this page. The
+                  Cmd+Shift+D overlay still surfaces the full
+                  basis pair for debugging. */}
               <span>
-                ES <span className="text-ink-2 tabular-nums">{meta.esSpot.toFixed(2)}</span>{" "}
-                / SPX <span className="text-ink-2 tabular-nums">{meta.spxSpot.toFixed(2)}</span>
+                ES <span className="text-ink-2 tabular-nums">{meta.esSpot.toFixed(2)}</span>
               </span>
               {meta.barsError && (
                 <span className="text-bear-ink">
@@ -258,7 +262,7 @@ export function SPXChannelClient({ replayDate }: Props) {
             highlight={snap.channel.direction}
           />
           <Stat label="Scenario" value={snap.scenario.replace(/_/g, " ")} />
-          <Stat label="Slope" value="±1.04 pts/hr" />
+          {/* v9: Slope stat removed — proprietary engine parameter. */}
         </div>
       </header>
 
@@ -291,7 +295,7 @@ export function SPXChannelClient({ replayDate }: Props) {
       </section>
 
       <footer className="pt-6 mt-6 border-t border-rule flex items-center justify-between text-[10px] text-ink-3 font-mono uppercase tracking-[0.18em]">
-        <span>Prophet · SPX channel</span>
+        <span>Prophet · ES channel</span>
         <span>End of slate</span>
       </footer>
     </div>
@@ -319,7 +323,7 @@ function ReplayBanner({ date }: { date: string }) {
         </span>
         <span aria-hidden className="h-3 w-px bg-gold/40" />
         <span className="text-ink-2 font-medium">
-          Showing the historical SPX channel for{" "}
+          Showing the historical ES channel for{" "}
           <span className="font-mono tabular-nums text-ink">{date}</span>
         </span>
       </div>

@@ -17,7 +17,7 @@ const surfaces = [
     icon: LineChart,
     title: "Decision Slate",
     href: "/dashboard",
-    body: "Both engines on one page. SPY verdict next to SPX verdict, in under a minute.",
+    body: "Both engines on one page. SPY verdict next to ES verdict, in under a minute.",
   },
   {
     n: "02",
@@ -29,8 +29,8 @@ const surfaces = [
   {
     n: "03",
     icon: Columns3,
-    title: "SPX Channel",
-    href: "/spx",
+    title: "ES Channel",
+    href: "/es",
     body: "Overnight pivots become the day's channel. Sydney and Tokyo set direction; the slope carries through.",
   },
   {

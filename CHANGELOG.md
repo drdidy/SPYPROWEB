@@ -6,6 +6,115 @@ entries grow newest-first.
 
 ## [Unreleased]
 
+### Full SPX → ES rename + slope-value redaction
+
+**Scope expansion.** v8 renamed SPX → ES on /dashboard only. v9
+expands the rename to **every user-facing surface in the app**.
+The two exceptions per the trader's instruction are kept intact:
+
+  - **Options Cockpit** (`/options`) — still talks SPX because
+    that's what the option contracts traded there are.
+  - **0DTE contract references** — same reason; the chain shows
+    real SPX option strikes.
+
+The wire identifier (`SPX`), the API URL (`/api/spx/snapshot`),
+the file paths (`components/spx/*`, `lib/spx-fetch.ts`), and the
+Python engine internals all keep their SPX naming — they're
+implementation details that no user reads.
+
+**Slope values redacted (proprietary engine parameters).**
+
+The engine's per-hour slope was rendering on five surfaces:
+
+  - `SPXChannelHero` header sub-eyebrow: `Slope ±1.04 pts/hr`
+  - `SPXChannelClient` header stat strip: `<Stat label="Slope" value="±1.04 pts/hr" />`
+  - `SPXLineLadder` meta line: `slope 1.04 pts/hr`
+  - `SPYChannelHero` header + body: `Slope ‑0.20 pts/hr`, `decaying at 0.2 pts/hr`
+  - `ReplayWorkspace`: `Bands decay at 0.20 pts/hr`
+
+All five are now suppressed. The constants themselves stay in
+`api/_lib/spx/constants.py` and `components/spy/SPYChannelHero.tsx`
+(`SLOPE_PER_HOUR`) — they're the source of truth for the
+projection math; only the rendered display strings are gone.
+
+`scripts/test-no-slope-leak.ts` (new) — six pattern guards
+against `1.04 pts`, `0.20 pts`, `Slope ±X pts`, `slope X pts`,
+and the two "decay" phrasings sneaking back into any of the
+six user-visible component files. Comments + internal `const`
+declarations are stripped before matching, so the source-level
+constants don't trip the guard.
+
+**Route rename `/spx` → `/es`**
+
+  - `app/(app)/es/page.tsx` (new) — full client-rendered ES
+    Channel surface, identical contents to the prior /spx page.
+  - `app/(app)/spx/page.tsx` (rewritten) — 12-line stub that
+    `permanentRedirect()`s to `/es`, preserving the `?date=`
+    query string. Existing bookmarks and replay deep-links keep
+    working without breakage.
+  - All nav and deep links updated:
+      - `components/layout/Sidebar.tsx` — `/spx` → `/es`,
+        label `"SPX Channel"` → `"ES Channel"`.
+      - `components/layout/TopBar.tsx` — SymbolChip `href="/es"`.
+      - `components/marketing/MarketingFooter.tsx` — `/spx` → `/es`.
+      - `components/marketing/SurfacesGrid.tsx` — `/spx` → `/es`,
+        title rename.
+      - `components/decision-slate/PreConfigBriefing.tsx` —
+        engine link `/spx` → `/es`.
+      - `components/replay/ReplayWorkspace.tsx` — "Open ES
+        Channel" deep link → `/es?date=…`.
+  - `scripts/test-spx-replay-routing.ts` extended with one new
+    invariant: `/spx` source must stay a `permanentRedirect` to
+    `/es`. (12 invariants total; was 11.)
+
+**Copy sweep — every user-visible "SPX" string outside the two
+exceptions becomes "ES":**
+
+  - `SPXChannelClient` page header eyebrow `"SPX · Channel"`,
+    sub-eyebrow `"SPX · Channel · session …"`, footer
+    `"Prophet · SPX channel"`, replay banner
+    `"historical SPX channel"`, error titles
+    `"Couldn't load the SPX snapshot"`, the
+    `"plots SPX from ES front-month"` description, and the
+    diagnostic `/ SPX <cash>` half of the basis pair (dropped;
+    the Cmd+Shift+D overlay still surfaces both).
+  - `app/(app)/replay/page.tsx` — lede `"rebuild the SPX
+    channel"`.
+  - `components/replay/ReplayWorkspace.tsx` — `"SPX scenario"`
+    stat label, "SPX channel" empty-state body, two `"SPX ·
+    plan"` eyebrows, the deep-link comment.
+  - `components/marketing/SurfacesGrid.tsx` — Decision Slate
+    body `"SPY verdict next to SPX verdict"`.
+  - `app/(marketing)/methodology/page.tsx` — engine description.
+  - `content/faqs.ts` — closed-beta surface list.
+
+**Verification**
+
+- `tsc --noEmit` clean. `next build` clean.
+  `/dashboard` 14.0 kB / 115 kB.
+  `/es` 14.5 kB / 153 kB (new full route).
+  `/spx` 182 B / 87.4 kB (redirect stub).
+- 13 / 13 static-analysis script tests pass:
+  - new `scripts/test-no-slope-leak.ts` — 8 cases,
+  - extended `scripts/test-spx-replay-routing.ts` — 12 invariants.
+
+**Verified untouched (per trader's exception)**
+
+- `app/(app)/options/page.tsx` — Options Cockpit still routes
+  through the SPY snapshot endpoint and renders raw strike
+  numbers. No SPX/ES label shown either way; when the chain
+  populates with SPX option contracts, the symbols display as
+  the real SPX option codes.
+- `app/(marketing)/disclosures/page.tsx` — "SPX options"
+  reference kept (the disclosure is literally about SPX option
+  trading risk).
+- The Python engine, the `/api/spx/*` endpoints, the wire
+  identifier `"SPX"` in props/types, and every file path under
+  `components/spx/` and `lib/spx-*.ts` — all internal,
+  unchanged.
+
+---
+
 ### Decision Slate — header fixes, WORKSPACE eyebrow removed, SPX→ES rename
 
 Cleanup pass on top of v7. Step 0 verification against the live

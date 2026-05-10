@@ -7,7 +7,7 @@ const cols = [
     items: [
       { label: "Decision Slate", href: "/dashboard" },
       { label: "SPY Channel", href: "/spy" },
-      { label: "SPX Channel", href: "/spx" },
+      { label: "ES Channel", href: "/es" },
       { label: "Foresight", href: "/foresight" },
     ],
   },

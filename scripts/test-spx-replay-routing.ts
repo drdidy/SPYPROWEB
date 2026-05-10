@@ -55,12 +55,30 @@ check(
   ),
 );
 
-// 3. The page-side guard: /spx must accept ?date= via searchParams
-//    and forward it to the client component. v6 rewrote the page
-//    as a thin server-shell that delegates rendering to
-//    <SPXChannelClient />, so the assertion is now about the prop
-//    handoff rather than direct loadSnapshot use.
+// 3. The page-side guard: /es accepts ?date= via searchParams and
+//    forwards it to the client component. v9 renamed the route
+//    from /spx to /es; /spx now 308-redirects to /es.
 const pageFile = path.join(
+  __dirname,
+  "..",
+  "app",
+  "(app)",
+  "es",
+  "page.tsx",
+);
+const pageSrc = fs.readFileSync(pageFile, "utf-8");
+check(
+  "/es page accepts searchParams.date",
+  /searchParams\?:\s*\{\s*date\?:\s*string\s*\}/.test(pageSrc),
+);
+check(
+  "/es page forwards replayDate to <SPXChannelClient />",
+  /<SPXChannelClient[^>]*replayDate=\{replayDate\}/.test(pageSrc),
+);
+// /spx is now a redirect stub. Make sure it stays one — if a future
+// edit accidentally turns it back into a full page, /es and /spx
+// would diverge silently.
+const redirectFile = path.join(
   __dirname,
   "..",
   "app",
@@ -68,14 +86,10 @@ const pageFile = path.join(
   "spx",
   "page.tsx",
 );
-const pageSrc = fs.readFileSync(pageFile, "utf-8");
+const redirectSrc = fs.readFileSync(redirectFile, "utf-8");
 check(
-  "/spx page accepts searchParams.date",
-  /searchParams\?:\s*\{\s*date\?:\s*string\s*\}/.test(pageSrc),
-);
-check(
-  "/spx page forwards replayDate to <SPXChannelClient />",
-  /<SPXChannelClient[^>]*replayDate=\{replayDate\}/.test(pageSrc),
+  "/spx page is a permanentRedirect to /es (with ?date= preserved)",
+  /permanentRedirect\(`\/es\$\{qs\}`\)/.test(redirectSrc),
 );
 
 // 4. Client-side fetch invariant. /spx's data fetch must happen
