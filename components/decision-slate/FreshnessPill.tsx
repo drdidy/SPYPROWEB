@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 interface Props {
   /** ISO timestamp of the snapshot the rest of the slate is rendering. */
   freshnessISO: string;
-  /** Where the data came from. e.g. "yfinance", "tastytrade". */
+  /** Internal feed label; visible copy is deliberately provider-neutral. */
   source: string;
   className?: string;
 }

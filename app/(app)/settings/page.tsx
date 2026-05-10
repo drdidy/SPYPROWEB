@@ -5,8 +5,8 @@ import { PageHeader } from "@/components/layout/PageHeader";
 export const dynamic = "force-static";
 
 const integrations = [
-  { name: "Broker feed", detail: "Server-side credentials; options chain and sync quote", lane: "Broker" },
-  { name: "Unusual Whales", detail: "REST flow and GEX", lane: "Flow" },
+  { name: "Market data sync", detail: "Server-side credentials for quotes and engine inputs", lane: "Market data" },
+  { name: "Unusual Whales", detail: "Flow, dark pools, GEX, SPY/SPX chains, and Greeks", lane: "Options" },
   { name: "Market data feed", detail: "ES/SPY hourly bars plus VIX/DXY/^TNX", lane: "Market data" },
   { name: "OpenAI", detail: "Reserved for daily-brief generation", lane: "Brief" },
 ];

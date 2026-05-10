@@ -1,12 +1,12 @@
 // Map main's /api/snapshot response (the seeded/yfinance-backed +
-// Tastytrade-options Snapshot shape that the SPY pipeline already
+// Options Snapshot shape that the SPY pipeline already
 // produces) onto the typed shapes the editorial UI components expect.
 // The editorial UI was built mock-first against my own type system;
 // this adapter is the bridge so the same components render against
 // live data without rewriting them.
 //
 // Goal: every visible value on /dashboard is either live or
-// computed from live values. Tastytrade options come through
+// computed from live values. Option-chain fields come through
 // raw.options. Yahoo Finance feeds the underlying yfinance bars
 // behind raw.candles + raw.quote + raw.context. Unusual Whales
 // integration plugs in here when its endpoint lands.
@@ -253,17 +253,17 @@ export interface AdaptedSnapshot {
   bias: BiasState;
   guardrails: RiskGuardrailState;
   waitDiscipline: WaitDisciplineItem[];
-  // Null when the Tastytrade chain hasn't been fetched (weekend, auth
+  // Null when the option chain hasn't been fetched (weekend, auth
   // pending, upstream slow). OptionsIntelPanel renders empty state.
   optionsIntel: OptionsIntel | null;
   strikes: SelectedStrikes | null;
   signalTicks: SignalTick[];
   // Standalone Unusual Whales context (also null until the upstream
-  // returns data). Distinct from the Tastytrade-derived options panel.
+  // returns data). Distinct from the options panel.
   flow: FlowSummary | null;
   gex: GexSummary | null;
   marketContext: MarketContextRaw | null;
-  // Full Tastytrade options chain so the Options Cockpit page can show
+  // Full options chain so the Options page can show
   // a strike ladder beyond the OptionsIntel summary on the dashboard.
   optionsChain: OptionsRaw | null;
   shellState: {

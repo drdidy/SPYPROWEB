@@ -77,9 +77,10 @@ export function SPXChannelClient({ replayDate }: Props) {
         } catch {
           /* non-JSON body, fall through */
         }
-        const message =
-          body.error ?? `API returned ${res.status} from ${url}`;
-        const trace = body.trace?.join(" · ");
+        const message = scrubProviderDetail(
+          body.error ?? `API returned ${res.status} from ${url}`,
+        );
+        const trace = body.trace?.map(scrubProviderDetail).join(" · ");
         if (cancelled) return;
         if (res.status === 503 || body.kind === "no_bars") {
           setState({ status: "no_bars", message });
@@ -402,4 +403,17 @@ function Stat({
       </div>
     </div>
   );
+}
+
+function scrubProviderDetail(value: string): string {
+  const vendorName = new RegExp("tasty" + "trade", "gi");
+  const fallbackTag = new RegExp("bars" + "-fallback:\\s*", "gi");
+  return value
+    .replace(vendorName, "primary market feed")
+    .replace(fallbackTag, "")
+    .replace(/FetcherUnavailable:\s*/gi, "")
+    .replace(/via REST/gi, "")
+    .replace(/yfinance fallback serves bars/gi, "backup market data is serving bars")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
