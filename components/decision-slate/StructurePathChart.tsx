@@ -113,7 +113,13 @@ export function StructurePathChart({
       )}
       style={{ minHeight: height }}
     >
-      <div className="absolute left-3 top-2 z-10">
+      <div
+        className={cn(
+          "relative z-10 flex items-start justify-between gap-3 border-b px-3 py-2",
+          variant === "dark" ? "border-paper/10 bg-[#071218]/88" : "border-rule-soft bg-paper/80",
+        )}
+      >
+        <div>
         <div
           className={cn(
             "font-mono text-[9px] uppercase tracking-[0.16em]",
@@ -130,8 +136,25 @@ export function StructurePathChart({
         >
           {data?.label} - {data?.date}
         </div>
+        </div>
+        <div
+          className={cn(
+            "rounded-[4px] border px-2 py-1 font-mono text-[8px] uppercase tracking-[0.14em]",
+            variant === "dark"
+              ? "border-paper/10 bg-paper/[0.035] text-paper/42"
+              : "border-rule-soft bg-paper-2 text-ink-3",
+          )}
+        >
+          Rails
+        </div>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="h-full w-full" role="img" aria-label={`${data?.label} actual price path against engine rails`}>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full"
+        style={{ height: Math.max(118, height - 38) }}
+        role="img"
+        aria-label={`${data?.label} actual price path against engine rails`}
+      >
         <style>{chartStyles}</style>
         <rect x="0" y="0" width={W} height={H} fill="transparent" />
         {[0.25, 0.5, 0.75].map((f) => {

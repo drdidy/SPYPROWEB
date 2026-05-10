@@ -263,19 +263,10 @@ export function HeroSection({
                       </div>
                     ))}
                   </div>
-                    <div className="mt-4 rounded-[9px] border border-paper/10 bg-paper/[0.035] p-3">
-                      <div className="mb-3 flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.14em] text-paper/35">
-                        <span>{previewLabel}</span>
-                        <ChevronDown size={12} />
-                      </div>
-                    <PreviewMetric
-                      label="SPY"
-                      value={money(serverQuote?.spy)}
-                      delta={delta(serverQuote?.change, serverQuote?.changePct)}
-                      tone={(serverQuote?.change ?? 0) >= 0 ? "bull" : "bear"}
+                    <MarketStatusPanel
+                      previewLabel={previewLabel}
+                      quote={serverQuote}
                     />
-                    <PreviewMetric label="VIX" value={number(serverQuote?.vix, 2)} />
-                  </div>
                 </aside>
 
                   <div className="p-4 sm:p-5">
@@ -533,38 +524,133 @@ function StateChip({
   );
 }
 
-function PreviewMetric({
-  label,
-  value,
-  delta: deltaText,
-  tone = "neutral",
+function MarketStatusPanel({
+  previewLabel,
+  quote,
 }: {
-  label: string;
-  value: string;
-  delta?: string;
-  tone?: "bull" | "bear" | "neutral";
+  previewLabel: string;
+  quote?: { spy: number; change: number; changePct: number; vix: number };
 }) {
+  const change = quote?.change ?? 0;
+  const changePct = quote?.changePct ?? 0;
+  const tone = change >= 0 ? "bull" : "bear";
+  const pctMagnitude = Math.min(1, Math.abs(changePct) / 2);
+
   return (
-    <div className="mb-4">
-      <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-paper/35">
-        {label}
-      </div>
-      <div className="mt-1 flex items-baseline gap-2">
-        <span className="font-mono text-[18px] text-paper">{value}</span>
-        {deltaText && (
-          <span
-            className={cn(
-              "font-mono text-[10px]",
-              tone === "bull" && "text-bull",
-              tone === "bear" && "text-bear",
-              tone === "neutral" && "text-paper/45",
-            )}
-          >
-            {deltaText}
+    <div className="mt-4 overflow-hidden rounded-[10px] border border-paper/10 bg-[linear-gradient(145deg,rgba(255,255,255,0.06),rgba(255,255,255,0.018))] shadow-[0_18px_38px_-34px_rgba(244,228,192,0.42)]">
+      <div className="flex items-center justify-between border-b border-paper/10 bg-[#09151C] px-3 py-2.5">
+        <div className="flex items-center gap-2">
+          <span className="grid h-6 w-6 place-items-center rounded-[6px] border border-gold/25 bg-gold/10 text-gold-soft">
+            <Activity size={12} />
           </span>
-        )}
+          <div>
+            <div className="font-mono text-[8px] uppercase tracking-[0.14em] text-paper/35">
+              Session Tape
+            </div>
+            <div className="mt-0.5 truncate font-mono text-[9px] uppercase tracking-[0.1em] text-paper/58">
+              {previewLabel}
+            </div>
+          </div>
+        </div>
+        <ChevronDown size={12} className="text-paper/35" />
+      </div>
+
+      <div className="p-3">
+        <div className="rounded-[8px] border border-paper/10 bg-[#071218] p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-paper/42">
+              SPY
+            </div>
+            <span
+              className={cn(
+                "rounded-[4px] border px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.1em]",
+                tone === "bull"
+                  ? "border-bull/30 bg-bull/10 text-bull"
+                  : "border-bear/30 bg-bear/10 text-bear",
+              )}
+            >
+              {tone === "bull" ? "Bid" : "Offer"}
+            </span>
+          </div>
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <div className="font-mono text-[19px] font-semibold leading-none text-paper">
+                {money(quote?.spy)}
+              </div>
+              <div
+                className={cn(
+                  "mt-1 font-mono text-[10px]",
+                  tone === "bull" ? "text-bull" : "text-bear",
+                )}
+              >
+                {delta(change, changePct)}
+              </div>
+            </div>
+            <MiniDeltaGauge tone={tone} progress={pctMagnitude} />
+          </div>
+          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-paper/10">
+            <div
+              className={cn("h-full rounded-full", tone === "bull" ? "bg-bull" : "bg-bear")}
+              style={{ width: `${Math.max(12, pctMagnitude * 100)}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="mt-2 flex items-center justify-between rounded-[8px] border border-paper/10 bg-paper/[0.035] px-3 py-2">
+          <div className="flex items-center gap-2">
+            <span className="grid h-6 w-6 place-items-center rounded-[6px] bg-paper/[0.055] text-paper/45">
+              <Gauge size={12} />
+            </span>
+            <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-paper/38">
+              VIX
+            </span>
+          </div>
+          <span className="font-mono text-[13px] font-semibold text-paper/78">
+            {number(quote?.vix, 2)}
+          </span>
+        </div>
       </div>
     </div>
+  );
+}
+
+function MiniDeltaGauge({
+  tone,
+  progress,
+}: {
+  tone: "bull" | "bear";
+  progress: number;
+}) {
+  const stroke = tone === "bull" ? "#0E7C50" : "#B5301E";
+  const dash = Math.max(12, Math.min(44, progress * 44));
+  return (
+    <svg width="52" height="32" viewBox="0 0 52 32" aria-hidden className="shrink-0">
+      <path
+        d="M8 25 A18 18 0 0 1 44 25"
+        fill="none"
+        stroke="rgba(244,228,192,0.12)"
+        strokeWidth="5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M8 25 A18 18 0 0 1 44 25"
+        fill="none"
+        stroke={stroke}
+        strokeWidth="5"
+        strokeLinecap="round"
+        strokeDasharray={`${dash} 60`}
+      />
+      <circle cx="26" cy="25" r="3" fill={stroke} />
+      <line
+        x1="26"
+        y1="25"
+        x2={tone === "bull" ? "36" : "16"}
+        y2="14"
+        stroke={stroke}
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }
 
@@ -675,23 +761,13 @@ function DecisionFlowPanel({
           fill="url(#decision-flow-fill)"
         />
         {[
-          { x: 116, y: 58, label: "structure" },
-          { x: 292, y: 103, label: "confirmation" },
-          { x: 444, y: 56, label: "managed" },
+          { x: 116, y: 58 },
+          { x: 292, y: 103 },
+          { x: 444, y: 56 },
         ].map((point) => (
-          <g key={point.label}>
+          <g key={`${point.x}-${point.y}`}>
             <circle cx={point.x} cy={point.y} r="7" fill={stroke} opacity="0.18" />
             <circle cx={point.x} cy={point.y} r="3" fill={stroke} />
-            <text
-              x={point.x}
-              y={point.y - 13}
-              textAnchor="middle"
-              fontFamily="var(--font-geist-mono)"
-              fontSize="9"
-              fill="rgba(244,228,192,0.62)"
-            >
-              {point.label}
-            </text>
           </g>
         ))}
         <line
