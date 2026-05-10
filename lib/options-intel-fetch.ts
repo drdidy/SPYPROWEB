@@ -82,6 +82,7 @@ export interface UwOptionContract {
 export interface UwOptionChain {
   ticker: string;
   sessionDate?: string;
+  chainDate?: string;
   expiration: string | null;
   calls: UwOptionContract[];
   puts: UwOptionContract[];
@@ -96,6 +97,7 @@ export interface UwOptionChain {
 
 export interface UwGreekRow {
   sessionDate?: string;
+  chainDate?: string;
   optionSymbol?: string | null;
   strike: number | null;
   expiration: string | null;
@@ -112,6 +114,7 @@ export interface UwGreekRow {
 export interface UwSymbolIntel {
   ticker: string;
   sessionDate?: string;
+  chainDate?: string;
   available: boolean;
   flow: UwFlowSummary | null;
   gex: UwGexSummary | null;
@@ -125,6 +128,7 @@ export interface OptionsIntelBundle {
   available: boolean;
   asOf: string;
   sessionDate?: string;
+  chainDate?: string;
   isHistoricalSession?: boolean;
   symbols: Record<string, UwSymbolIntel>;
 }

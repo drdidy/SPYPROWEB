@@ -65,6 +65,13 @@ def _previous_weekday(d: date) -> date:
     return d
 
 
+def _next_weekday(d: date) -> date:
+    d = d + timedelta(days=1)
+    while d.weekday() >= 5:
+        d = d + timedelta(days=1)
+    return d
+
+
 def effective_options_date(now: datetime | None = None) -> str:
     """Date used for session-scoped options intelligence.
 
@@ -80,9 +87,28 @@ def effective_options_date(now: datetime | None = None) -> str:
         while d.weekday() >= 5:
             d = d - timedelta(days=1)
         return d.isoformat()
-    if OPTIONS_SESSION_START <= now_ct.time() <= OPTIONS_SESSION_END:
+    if now_ct.time() >= OPTIONS_SESSION_START:
         return today.isoformat()
     return _previous_weekday(today).isoformat()
+
+
+def effective_chain_date(now: datetime | None = None) -> str:
+    """Date used for forward-looking option chains.
+
+    Flow/dark-pool/GEX are completed-session reads. Chains are tradeable
+    instruments, so outside an active options session the useful expiry
+    is the next weekday, not the previous completed day.
+    """
+    now_ct = (now or datetime.now(CT)).astimezone(CT)
+    today = now_ct.date()
+    if today.weekday() >= 5:
+        d = today
+        while d.weekday() >= 5:
+            d = d + timedelta(days=1)
+        return d.isoformat()
+    if now_ct.time() > OPTIONS_SESSION_END:
+        return _next_weekday(today).isoformat()
+    return today.isoformat()
 
 
 def _date_params(effective_date: str | None, extra: dict | None = None) -> dict:
@@ -264,6 +290,7 @@ def _chain_from_broker(ticker: str, session_date: str, require_expiration: str |
     return {
         "ticker": ticker.upper(),
         "sessionDate": session_date,
+        "chainDate": require_expiration or expiration,
         "expiration": expiration,
         "calls": sorted(calls, key=lambda c: c["strike"] or 0),
         "puts": sorted(puts, key=lambda c: c["strike"] or 0),
@@ -536,20 +563,27 @@ def fetch_darkpool_summary(ticker: str = "SPY", effective_date: str | None = Non
 
 
 @pc.ttl_cache(ttl_seconds=120.0, maxsize=16)
-def fetch_option_chain(ticker: str = "SPY", effective_date: str | None = None) -> dict | None:
+def fetch_option_chain(
+    ticker: str = "SPY",
+    effective_date: str | None = None,
+    chain_date: str | None = None,
+) -> dict | None:
     session_date = effective_date or effective_options_date()
+    expiry_date = chain_date or effective_chain_date()
     raw = _first_response(
         [
             (f"/stock/{ticker}/option-contracts", {"limit": 500}),
-            (f"/stock/{ticker}/option-chains", _date_params(session_date)),
+            (f"/stock/{ticker}/option-chains", _date_params(expiry_date)),
         ]
     )
     contracts = [_normalize_contract(r) for r in _rows(raw)]
     contracts = [c for c in contracts if c["strike"] is not None and c["side"] in ("CALL", "PUT")]
     if not contracts:
-        return _chain_from_broker(ticker, session_date, require_expiration=None if session_date == datetime.now(CT).date().isoformat() else session_date)
-    expirations = [c["expiration"] for c in contracts if c["expiration"]]
+        return _chain_from_broker(ticker, session_date, require_expiration=expiry_date)
+    expirations = [c["expiration"] for c in contracts if c["expiration"] and c["expiration"] >= expiry_date]
     expiration = sorted(expirations)[0] if expirations else None
+    if expiration is None:
+        return _chain_from_broker(ticker, session_date, require_expiration=expiry_date)
     if expiration:
         active = [c for c in contracts if c["expiration"] == expiration]
         if active:
@@ -563,6 +597,7 @@ def fetch_option_chain(ticker: str = "SPY", effective_date: str | None = None) -
     out = {
         "ticker": ticker.upper(),
         "sessionDate": session_date,
+        "chainDate": expiry_date,
         "expiration": expiration,
         "calls": calls,
         "puts": puts,
@@ -584,17 +619,18 @@ def fetch_option_chain(ticker: str = "SPY", effective_date: str | None = None) -
 @pc.ttl_cache(ttl_seconds=120.0, maxsize=16)
 def fetch_greeks(ticker: str = "SPY", effective_date: str | None = None) -> list[dict]:
     session_date = effective_date or effective_options_date()
-    chain = fetch_option_chain(ticker, session_date)
+    chain_date = effective_chain_date()
+    chain = fetch_option_chain(ticker, session_date, chain_date)
     expiry = chain.get("expiration") if chain else None
     if not expiry:
         return []
     raw = _first_response(
         [
-            (f"/stock/{ticker}/greeks", _date_params(session_date, {"expiry": expiry})),
+            (f"/stock/{ticker}/greeks", _date_params(chain_date, {"expiry": expiry})),
         ]
     )
     out = []
-    for r in _filter_rows_for_date(_rows(raw), session_date)[:50]:
+    for r in _filter_rows_for_date(_rows(raw), chain_date)[:50]:
         strike = _num(r, "strike", "strike_price")
         expiration = _text(r, "expiration", "expiry", "expiry_date", "expiration_date") or expiry
         pairs = [
@@ -629,6 +665,7 @@ def fetch_greeks(ticker: str = "SPY", effective_date: str | None = None) -> list
             out.append(
                 {
                     "sessionDate": session_date,
+                    "chainDate": chain_date,
                     "strike": strike,
                     "expiration": expiration,
                     "side": side,
@@ -649,6 +686,7 @@ def fetch_greeks(ticker: str = "SPY", effective_date: str | None = None) -> list
         rows.append(
             {
                 "sessionDate": session_date,
+                "chainDate": chain_date,
                 "strike": row.get("strike"),
                 "expiration": expiry,
                 "side": row.get("side"),
@@ -668,15 +706,17 @@ def fetch_greeks(ticker: str = "SPY", effective_date: str | None = None) -> list
 def fetch_symbol_options_intel(ticker: str, effective_date: str | None = None) -> dict:
     symbol = ticker.upper()
     session_date = effective_date or effective_options_date()
+    chain_date = effective_chain_date()
     flow = fetch_flow_summary(symbol, session_date)
     gex = fetch_gex_summary(symbol, session_date)
     alerts = fetch_flow_alerts(symbol, session_date)
     darkpool = fetch_darkpool_summary(symbol, session_date)
-    chain = fetch_option_chain(symbol, session_date)
+    chain = fetch_option_chain(symbol, session_date, chain_date)
     greeks = fetch_greeks(symbol, session_date) if chain else []
     return {
         "ticker": symbol,
         "sessionDate": session_date,
+        "chainDate": chain_date,
         "available": bool(flow or gex or alerts or darkpool or chain or greeks),
         "flow": flow,
         "gex": gex,
@@ -691,12 +731,14 @@ def fetch_symbol_options_intel(ticker: str, effective_date: str | None = None) -
 def fetch_options_bundle(tickers: tuple[str, ...] = ("SPY", "SPX"), effective_date: str | None = None) -> dict:
     clean = tuple(dict.fromkeys(t.upper().strip() for t in tickers if t and t.strip()))
     session_date = effective_date or effective_options_date()
+    chain_date = effective_chain_date()
     today_ct = datetime.now(CT).date().isoformat()
     symbols = {ticker: fetch_symbol_options_intel(ticker, session_date) for ticker in clean}
     return {
         "available": any(v.get("available") for v in symbols.values()),
         "asOf": datetime.now(timezone.utc).isoformat(),
         "sessionDate": session_date,
+        "chainDate": chain_date,
         "isHistoricalSession": session_date != today_ct,
         "symbols": symbols,
     }

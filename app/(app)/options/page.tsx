@@ -30,15 +30,21 @@ export default async function Page() {
       <PageHeader
         eyebrow="Execution - 06"
         title="Options Intelligence"
-        lede="Unusual Whales flow, dark pools, dealer gamma, option chains, and Greeks for SPY and SPX."
+        lede="Flow, dark pools, dealer gamma, forward option chains, and Greeks for SPY and SPX."
         source={source}
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
         <CommandStat
-          label="Options session"
+          label="Flow session"
           value={options.data.sessionDate ?? "Waiting"}
-          note={options.data.isHistoricalSession ? "Most recent completed session" : "Current options session"}
+          note={options.data.isHistoricalSession ? "Most recent completed session" : "Current flow session"}
+          tone="gold"
+        />
+        <CommandStat
+          label="Chain expiry"
+          value={spyChain?.expiration ?? spxChain?.expiration ?? options.data.chainDate ?? "Waiting"}
+          note="Next tradable chain"
           tone="gold"
         />
         <CommandStat
