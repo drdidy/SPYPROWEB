@@ -15,7 +15,11 @@ import {
 } from "@/lib/sessions";
 import { formatNumber, isLoadedNumber } from "@/lib/format-number";
 import { deriveProvenance } from "@/lib/spx-provenance";
-import { SpxProvenanceBadge, SpxDebugOverlay } from "@/components/decision-slate/SpxProvenance";
+import {
+  SpxProvenanceBadge,
+  SpxDebugOverlay,
+  SpxAsOfMicrotext,
+} from "@/components/decision-slate/SpxProvenance";
 import type { EngineState } from "@/lib/states";
 
 // ---------------------------------------------------------------------------
@@ -189,11 +193,15 @@ export function TopBar({
               />
             }
           />
-          {/* P0-4: SPX is a synthetic value derived from ES front-
-              month + basis. The badge surfaces the derivation tier
-              ("synthetic" / "stale") so a wrong-looking print is
-              never silent. */}
+          {/* P0-4 + v7 P0-5: badge marks tier (synthetic/stale) and
+              microtext shows basis age. Live tier hides both — no
+              clutter when the displayed SPX is the real cash print. */}
           <SpxProvenanceBadge provenance={spxProvenance} />
+          {spxProvenance && spxProvenance.trust !== "live" && (
+            <span className="hidden 2xl:inline-flex">
+              <SpxAsOfMicrotext provenance={spxProvenance} />
+            </span>
+          )}
         </Quote>
         <Quote label="VIX">
           <ValueWithTooltip

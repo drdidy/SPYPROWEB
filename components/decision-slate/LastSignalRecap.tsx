@@ -15,9 +15,19 @@
 //     literal letter R appended to the multiple, so the helping
 //     gloss sits exactly where the unfamiliar token does.
 
+import { AlertTriangle } from "lucide-react";
+
 import type { LastSignalSummary } from "@/types/decision-slate";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { cn } from "@/lib/utils";
+
+// v7 P1-10: a single trade rarely produces |R| > 20. When it does
+// (~1% of sessions), the value is almost always evidence of a mis-
+// sized stop, a data error, or a partial fill mis-read by the
+// grader — surface a small ⚠ with a "verify session sizing" hint
+// so the number doesn't anchor the user's mental model of normal
+// outcomes.
+const R_OUTLIER_THRESHOLD = 20;
 
 interface Props {
   recap: LastSignalSummary | null;
@@ -82,22 +92,39 @@ export function LastSignalRecap({ recap, className }: Props) {
         {/* v5 #3: R-multiple now renders in parens to match the
             EngineTrackRecord summary pattern — visual rhyme between
             the two surfaces. */}
-        <span className={cn("font-semibold inline-flex items-baseline", rTone)}>
-          (
-          {rValue}
-          <InfoTooltip
-            label="R-multiple"
-            content="Profit or loss expressed as multiples of the trade's initial risk. +1.5R means the move was 1.5× the original stop distance in the favorable direction."
-          >
-            <span className="cursor-help">R</span>
-          </InfoTooltip>
-          )
+        <span className={cn("font-semibold inline-flex items-baseline gap-1", rTone)}>
+          <span className="inline-flex items-baseline">
+            (
+            {rValue}
+            <InfoTooltip
+              label="R-multiple"
+              content="Profit or loss expressed as multiples of the trade's initial risk. +1.5R means the move was 1.5× the original stop distance in the favorable direction."
+            >
+              <span className="cursor-help">R</span>
+            </InfoTooltip>
+            )
+          </span>
+          {recap.rMultiple != null &&
+            Math.abs(recap.rMultiple) > R_OUTLIER_THRESHOLD && (
+              <InfoTooltip
+                label="Outlier"
+                content={`|${rValue}R| exceeds the ${R_OUTLIER_THRESHOLD}R typical band. Verify the session's risk sizing — the grader may have used a stop that was off, a partial fill that wasn't logged, or a stale exit price.`}
+              >
+                <span
+                  className="inline-flex items-center text-gold-ink cursor-help"
+                  aria-label="Outlier R-multiple"
+                >
+                  <AlertTriangle size={11} aria-hidden />
+                </span>
+              </InfoTooltip>
+            )}
         </span>
       </div>
     </div>
   );
 }
 
-// Pure helper exported for testing — used by scripts/test-last-signal-recap.ts
-// to assert the duplication can't sneak back in.
-export const __test = { WATCHED_PREFIX };
+// Pure helpers exported for testing — used by
+// scripts/test-last-signal-recap.ts to lock the duplication-fix
+// behaviour and the new outlier threshold.
+export const __test = { WATCHED_PREFIX, R_OUTLIER_THRESHOLD };

@@ -40,14 +40,11 @@ export function SpxProvenanceBadge({
   if (!provenance) return null;
   if (provenance.trust === "live" && !showWhenLive) return null;
 
-  const palette =
-    provenance.trust === "stale"
-      ? // Warm-warning ochre on the cream surface — unambiguous,
-        // matches the brand palette without leaning on red.
-        "bg-gold-tint text-gold-ink"
-      : // Synthetic — neutral slate text on faint cool surface.
-        "bg-paper-2/60 text-ink-3";
-
+  // v7 P0-5: muted amber palette so "synthetic" reads as a flag,
+  // not a neutral chip the eye glides past. Stale gets a brighter
+  // amber + a pulsing dot so the basis-age problem is impossible
+  // to miss.
+  const isStale = provenance.trust === "stale";
   return (
     <InfoTooltip
       label={provenanceLabel(provenance)}
@@ -59,14 +56,73 @@ export function SpxProvenanceBadge({
         className={cn(
           "inline-flex items-center gap-1 px-1.5 py-px rounded-pill",
           "text-[9px] font-mono font-semibold uppercase tracking-[0.10em]",
-          "shadow-[inset_0_0_0_1px_rgba(20,22,26,0.06)] cursor-help",
-          palette,
+          "cursor-help",
           className,
         )}
+        // Inline style with explicit hex so theme overrides /
+        // Tailwind compile chains can't render the chip neutral
+        // gray (the v6 user complaint).
+        style={
+          isStale
+            ? {
+                backgroundColor: "#F4D9A2",
+                color: "#5C3F0B",
+                border: "1px solid #B8821F",
+              }
+            : {
+                backgroundColor: "#F4E4BC",
+                color: "#6B4F2A",
+                border: "1px solid #C9B58C",
+              }
+        }
       >
-        {provenance.trust === "stale" ? "stale" : "synthetic"}
+        {isStale && (
+          <span
+            aria-hidden
+            className="inline-block h-1.5 w-1.5 rounded-full bg-gold animate-breathe"
+          />
+        )}
+        {isStale ? "stale" : "synthetic"}
       </span>
     </InfoTooltip>
+  );
+}
+
+/**
+ * Microtext rendered next to a synthetic SPX value showing how old
+ * the basis is, e.g. "as of 12s ago" or "as of Fri 15:00 CT". Lives
+ * in this module so the wording stays in sync with the badge tooltip.
+ */
+export function SpxAsOfMicrotext({
+  provenance,
+  className,
+}: {
+  provenance: SpxProvenance | null;
+  className?: string;
+}) {
+  if (!provenance) return null;
+  const ageMs = provenance.basisAgeMs;
+  let ageLabel: string;
+  if (!Number.isFinite(ageMs)) {
+    ageLabel = "—";
+  } else if (ageMs < 60_000) {
+    ageLabel = `${Math.max(0, Math.floor(ageMs / 1000))}s ago`;
+  } else if (ageMs < 3_600_000) {
+    ageLabel = `${Math.floor(ageMs / 60_000)}m ago`;
+  } else if (ageMs < 86_400_000) {
+    ageLabel = `${Math.floor(ageMs / 3_600_000)}h ago`;
+  } else {
+    ageLabel = `${Math.floor(ageMs / 86_400_000)}d ago`;
+  }
+  return (
+    <span
+      className={cn(
+        "text-[10px] font-mono text-ink-3 tabular-nums whitespace-nowrap",
+        className,
+      )}
+    >
+      as of {ageLabel}
+    </span>
   );
 }
 

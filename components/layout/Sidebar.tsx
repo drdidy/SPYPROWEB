@@ -97,17 +97,27 @@ export function Sidebar({
                 <a
                   key={it.href}
                   href={it.href}
+                  // v7 P1-5: stronger active state. The previous
+                  // 2px sidebar-edge accent was easy to miss. Now
+                  // a 3px brand-tinted left bar runs the full row
+                  // height + a 4% paper-2 fill. Both visible at
+                  // WCAG AA on the cream canvas.
+                  aria-current={isActive ? "page" : undefined}
                   className={cn(
                     "flex items-center gap-2.5 mx-3 px-2.5 h-8 rounded-soft text-[13px] transition-all duration-150 ease-swift relative",
+                    "outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper",
                     isActive
                       ? "bg-paper-2 text-ink font-medium"
                       : "text-ink-2 hover:text-ink hover:bg-paper-2/60",
                   )}
                 >
                   {isActive && (
-                    <span className="absolute -left-3 top-1/2 -translate-y-1/2 h-4 w-[2px] bg-gold rounded-r" />
+                    <span
+                      aria-hidden
+                      className="absolute -left-1 top-1 bottom-1 w-[3px] bg-gold rounded-r"
+                    />
                   )}
-                  <Icon size={14} className={cn(isActive ? "text-gold" : "text-ink-3")} />
+                  <Icon size={14} className={cn(isActive ? "text-gold-ink" : "text-ink-3")} />
                   {it.label}
                 </a>
               );

@@ -62,15 +62,26 @@ check(
   "missing one of: flex-1, min-w-0, overflow-hidden on the <ol>",
 );
 
-// 3. The responsive collapse split: full label hidden below xl,
-//    glyph hidden at xl+.
+// 3. v7 four-tier responsive collapse:
+//    < lg: full label (vertical stack)
+//    lg-xl: dot for inactive, full label for current
+//    xl-(xl-plus): short abbreviation
+//    xl-plus+: full label
 check(
-  "label uses hidden xl:inline for full text",
-  /hidden xl:inline/.test(block),
+  "label uses xl-plus:inline for the widest tier (full label)",
+  /xl-plus:inline/.test(block),
 );
 check(
-  "label uses xl:hidden for collapsed glyph",
-  /xl:hidden/.test(block),
+  "label uses xl:inline xl-plus:hidden for the abbreviated tier",
+  /hidden xl:inline xl-plus:hidden/.test(block),
+);
+check(
+  "label uses lg:inline xl:hidden for the lg dot/current tier",
+  /hidden lg:inline xl:hidden/.test(block),
+);
+check(
+  "PHASE_DEFINITIONS exposes a `short` abbreviation",
+  /phase\.short/.test(block),
 );
 
 // 4. The right-rail meta column must NOT reserve a hard min-width

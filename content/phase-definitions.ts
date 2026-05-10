@@ -9,8 +9,14 @@
 import type { EngineState } from "@/lib/states";
 
 export interface PhaseDefinition {
-  /** Short label shown on the rail itself. */
+  /** Full label (e.g. "Pre-config"). Shown on the rail at the
+   *  widest breakpoint and inside tooltips at every breakpoint. */
   label: string;
+  /** Short 3-5 letter abbreviation for the rail at intermediate
+   *  widths (1280–1439) where the full label doesn't fit but a
+   *  single-letter glyph would be ambiguous (Watch / Wait both
+   *  start with W). */
+  short: string;
   /** One-sentence description in the popover. */
   summary: string;
   /** What rule or event entered this phase. */
@@ -25,6 +31,7 @@ export interface PhaseDefinition {
 export const PHASE_DEFINITIONS: Record<EngineState, PhaseDefinition> = {
   PRE_CONFIG: {
     label: "Pre-config",
+    short: "Pre",
     summary:
       "The engine hasn't observed its setup window yet. No lines or envelope are plotted.",
     enterOn:
@@ -34,6 +41,7 @@ export const PHASE_DEFINITIONS: Record<EngineState, PhaseDefinition> = {
   },
   STAND_DOWN: {
     label: "Stand down",
+    short: "Stand",
     summary:
       "The engine has run and the setup is plotted, but conditions don't favor a trade.",
     enterOn:
@@ -42,6 +50,7 @@ export const PHASE_DEFINITIONS: Record<EngineState, PhaseDefinition> = {
   },
   WATCH: {
     label: "Watch",
+    short: "Watch",
     summary:
       "Price is approaching a primary trigger, but no setup is qualified yet.",
     enterOn: "Price moves within the proximity threshold of a primary line.",
@@ -50,6 +59,7 @@ export const PHASE_DEFINITIONS: Record<EngineState, PhaseDefinition> = {
   },
   WAIT: {
     label: "Wait",
+    short: "Wait",
     summary:
       "A rejection candle has printed. The engine is waiting for the next bar to confirm.",
     enterOn: "First qualifying rejection candle on a primary line.",
@@ -57,6 +67,7 @@ export const PHASE_DEFINITIONS: Record<EngineState, PhaseDefinition> = {
   },
   ARMED: {
     label: "Armed",
+    short: "Armed",
     summary:
       "Confirmation has printed. The trade setup is live and the entry trigger is armed.",
     enterOn: "Confirmation candle following a qualified rejection.",
@@ -65,6 +76,7 @@ export const PHASE_DEFINITIONS: Record<EngineState, PhaseDefinition> = {
   },
   GO: {
     label: "Go",
+    short: "Go",
     summary:
       "Entry trigger has fired. The engine considers the trade live for the rest of the session.",
     enterOn: "Price prints through the armed entry level.",
@@ -72,6 +84,7 @@ export const PHASE_DEFINITIONS: Record<EngineState, PhaseDefinition> = {
   },
   COOLDOWN: {
     label: "Cooldown",
+    short: "Cool",
     summary:
       "A trade has resolved this session. No new signals until the next session reset.",
     enterOn: "Stop or target prints, or the session ends with an open position.",

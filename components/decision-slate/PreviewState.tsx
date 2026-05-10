@@ -72,9 +72,13 @@ export function PreviewState({ className }: Props) {
           Preview
         </h2>
         <span aria-hidden className="h-px flex-1 bg-rule" />
-        {/* v4 #9: multi-word eyebrows render in sentence case. Caps
-            tracking is reserved for single-word eyebrows. */}
-        <span className="text-[11px] tracking-[0.02em] text-ink-3 italic">
+        {/* v7 P1-11: settle the rule — every section eyebrow on the
+            slate uses the tracked-caps `.eyebrow` utility. v4
+            briefly demoted this to sentence-case, the v5 spec
+            said to align with the rest of the page; v7 commits.
+            Same treatment as WORKSPACE / ENGINES / RECOMMENDED
+            NEXT STEP / LAST SESSION / PREVIEW. */}
+        <span className="eyebrow text-ink-3">
           What you'll see at setup
         </span>
         {/* v5 #16: aria-expanded mirrors the disclosure relationship

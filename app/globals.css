@@ -32,9 +32,13 @@
     color: #14161a;
   }
 
-  *:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(184, 130, 31, 0.28);
+  /* v7 P1-3: standard focus-visible utility — 2px brand-tint
+     outline + 2px offset. Applied via the `:where()` wrapper at
+     zero specificity so component-level rings (e.g. focus-visible:
+     ring-2 ring-gold/40 on slate buttons) still win when set. */
+  :where(button, a, [role="button"], [tabindex]):focus-visible {
+    outline: 2px solid rgba(184, 130, 31, 0.55);
+    outline-offset: 2px;
     border-radius: 6px;
   }
 

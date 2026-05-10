@@ -33,7 +33,11 @@ const DOT_TONE: Record<SessionOutcome["outcome"], string> = {
   WIN: "bg-bull ring-1 ring-bull-ink/20",
   LOSS: "bg-bear ring-1 ring-bear-ink/20",
   PUSH: "bg-state-neutral ring-1 ring-ink/15",
-  SKIP: "bg-ink-5 ring-1 ring-ink-3/30",
+  // v7 P1-7: SKIP renders as a hollow ring (1.5px stroke, no
+  // fill) so a "no graded sessions" lookback reads as "engine
+  // watched but didn't qualify a setup" rather than five
+  // neutral results.
+  SKIP: "bg-transparent ring-[1.5px] ring-ink-4/60",
 };
 
 const OUTCOME_LABEL: Record<SessionOutcome["outcome"], string> = {
@@ -166,7 +170,7 @@ export function EngineTrackRecord({ record, className }: Props) {
           >
             <Swatch className="bg-bull ring-1 ring-bull-ink/20" /> win
             <Swatch className="bg-bear ring-1 ring-bear-ink/20 ml-2" /> loss
-            <Swatch className="bg-ink-5 ring-1 ring-ink-3/30 ml-2" /> skip
+            <Swatch className="bg-transparent ring-[1.5px] ring-ink-4/60 ml-2" /> skip
           </p>
         </>
       )}

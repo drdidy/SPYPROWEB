@@ -165,35 +165,69 @@ export function StatePipeline({
                     </>
                   }
                 >
-                  {/* v5 #1: responsive collapse pattern. Below xl (1280)
-                      non-current steps render as a single-character
-                      glyph (the first letter of their phase label) so
-                      the strip never exceeds its parent grid track.
-                      The current step always shows its full label so
-                      the user can read state without hovering. */}
+                  {/* v7 P0-3: four-tier responsive label render so the
+                      stepper never overflows its parent grid track:
+                        ≥1440 (xl-plus)  full label  ("Pre-config")
+                        1280-1439 (xl)   short label ("Pre", "Stand", "Watch", "Wait", "Armed", "Go", "Cool")
+                        1024-1279 (lg)   dot for inactive, full label for current
+                        <1024            full label (the row stacks vertically anyway)
+                      The active step always shows the full label. */}
                   <span
                     className={cn(
-                      "inline-flex items-center px-1.5 py-0.5 rounded-pill",
+                      "inline-flex items-center rounded-pill",
                       "text-[11px] tracking-[0.01em] whitespace-nowrap",
                       "transition-colors",
-                      isCurrent &&
-                        cn(
-                          "font-semibold animate-breathe",
-                          CURRENT_PILL_TONE[state],
-                        ),
-                      // ink-3 (#6B7280) on paper (#FFFFFF) = 4.83:1 (AA pass).
-                      // Distinguished from passed via lower weight + no fill.
-                      isPassed && "bg-paper-2/50 text-ink-3 font-medium",
-                      isFuture && "text-ink-3 font-normal",
+                      // The active pill is always rendered as a labeled
+                      // chip; the dot-mode at lg only applies to non-
+                      // current steps via the `xl-plus:hidden xl:hidden lg:flex`
+                      // dot below.
+                      isCurrent
+                        ? cn(
+                            "px-1.5 py-0.5 font-semibold animate-breathe",
+                            CURRENT_PILL_TONE[state],
+                          )
+                        : isPassed
+                          ? "px-1.5 py-0.5 bg-paper-2/50 text-ink-3 font-medium"
+                          : "px-1.5 py-0.5 text-ink-3 font-normal",
                     )}
                   >
-                    {/* xl+: full label */}
-                    <span className="hidden xl:inline">{phase.label}</span>
-                    {/* <xl: collapsed glyph for non-current steps,
-                        full label for the current step. */}
-                    <span className="xl:hidden">
-                      {isCurrent ? phase.label : phase.label.charAt(0)}
-                    </span>
+                    {/* < lg: full label (the row stacks vertically) */}
+                    <span className="lg:hidden">{phase.label}</span>
+                    {/* lg–xl-plus: full for the current step only.
+                        Inactive steps at lg render the dot below
+                        instead of this pill — see the dot fallback
+                        block. */}
+                    {isCurrent ? (
+                      <>
+                        {/* lg–xl: full label for current */}
+                        <span className="hidden lg:inline xl:hidden">
+                          {phase.label}
+                        </span>
+                        {/* xl–xl-plus: short abbreviation */}
+                        <span className="hidden xl:inline xl-plus:hidden">
+                          {phase.short}
+                        </span>
+                        {/* xl-plus+: full label */}
+                        <span className="hidden xl-plus:inline">
+                          {phase.label}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        {/* lg: nothing (dot rendered separately) */}
+                        <span className="hidden lg:inline xl:hidden text-[0px] leading-none">
+                          •
+                        </span>
+                        {/* xl–xl-plus: short abbreviation */}
+                        <span className="hidden xl:inline xl-plus:hidden">
+                          {phase.short}
+                        </span>
+                        {/* xl-plus+: full label */}
+                        <span className="hidden xl-plus:inline">
+                          {phase.label}
+                        </span>
+                      </>
+                    )}
                   </span>
                 </InfoTooltip>
               </li>

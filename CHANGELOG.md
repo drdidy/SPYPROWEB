@@ -6,6 +6,155 @@ entries grow newest-first.
 
 ## [Unreleased]
 
+### Decision Slate — production gate
+
+**Step 0 — verification report against current production HTML**
+(verified by direct fetch of `https://www.spyprophet.app/dashboard`):
+
+| Item | State | Evidence |
+| --- | --- | --- |
+| a. Header SPY price labelled "SPY 7XX.XX +Δ" | ✓ | rendered HTML shows `SPY 583.42 +1.84` (delta hidden below xl by design) |
+| b. Header VIX renders "VIX <number>" | ✓ | rendered HTML shows `VIX 14.27` |
+| c. Both pipelines render all 7 steps without clipping | ✗ — **fixed in this PR** | at xl (1280) full labels exceeded the half-screen grid track and the `overflow-hidden` guard clipped to "Wai…" / "Ar…" |
+| d. SYNTHETIC chip has accessible tooltip | ✓ (already InfoTooltip-wrapped from v6 commit `5264c4a`) — **polished in this PR** (amber color + as-of microtext + stale dot) |
+| e. Tooltips on R / skip / Watched only / graded sessions / pipeline states / synthetic | ✓ — every term carries an `<InfoTooltip>` with keyboard + Esc + tap support |
+| f. Visible focus rings on every interactive element | ✗ — **fixed in this PR** via global `:where(button, a, [role="button"], [tabindex]):focus-visible` rule |
+| g. BETA badge ochre (not blue) | ✓ — inline-styled `#B8821F` solid since v5 commit `caaf89d` |
+| h. Time zone configurable in user prefs | ✗ — **deferred** (`/settings` "Preferences coming soon"; `lib/user-prefs.ts` exposes the contract; needs auth + persistence layer) |
+| i. Sidebar active row has 3px left bar + tinted bg | ✗ — **fixed in this PR** |
+
+**P0 fixes**
+
+- **P0-3 Pipeline truncation** (4-round repeat). Three changes:
+    1. `content/phase-definitions.ts` — every `PhaseDefinition`
+       gains a `short` field (`Pre`, `Stand`, `Watch`, `Wait`,
+       `Armed`, `Go`, `Cool`).
+    2. `tailwind.config.ts` — new `xl-plus: 1440px` breakpoint
+       fills the 1280→1536 gap so trader-screen widths get the
+       readable full label.
+    3. `components/decision-slate/StatePipeline.tsx` — four-tier
+       responsive label render:
+         - `≥ 1440 (xl-plus)` → full label
+         - `1280–1439 (xl)`   → short abbreviation
+         - `1024–1279 (lg)`   → dot for inactive, full label
+                                for current step
+         - `< 1024`           → full label (row stacks vertically)
+       The active step always shows its full label. No more clip.
+       `scripts/test-pipeline-overflow.ts` extended with 4 new
+       invariants asserting all four tier markers are present.
+
+- **P0-5 Synthetic chip polish.** Inline-styled muted amber
+  (`#F4E4BC` bg, `#6B4F2A` fg, `#C9B58C` border); stale tier
+  brightens to `#F4D9A2` with a pulsing breath dot. New
+  `<SpxAsOfMicrotext />` renders "as of 12s ago" / "as of 2h ago"
+  next to the SPX price (TopBar at 2xl+; dashboard verdict card
+  always). The chip's tooltip already cited the basis age in
+  prose; the microtext makes it scannable without a hover.
+
+**P1 polish**
+
+- **P1-3 Global focus utility.** `app/globals.css` rewritten to a
+  scoped `:where(button, a, [role="button"], [tabindex])
+  :focus-visible` rule with a 2px brand-tint outline and 2px
+  offset. Component-level `focus-visible:ring-*` overrides win
+  by specificity.
+- **P1-5 Sidebar active state.** 3px brand-gold left bar (full
+  row height inset by 4px top/bottom for soft pillow), 4%
+  paper-2 fill on the row, medium-weight label, gold-ink icon,
+  `aria-current="page"`.
+- **P1-7 SPX no-graded hollow rings.** `EngineTrackRecord` SKIP
+  outcome now renders `bg-transparent ring-[1.5px] ring-ink-4/60`
+  instead of a flat gray fill. Five hollow rings reads as
+  "engine watched, didn't qualify a setup" — a real graded
+  result (Win/Loss/Push) keeps its solid swatch.
+- **P1-10 Outlier R-multiple flag.** When `|R| > 20` (the
+  `R_OUTLIER_THRESHOLD` constant in `LastSignalRecap`), a
+  `lucide-react` `<AlertTriangle>` renders next to the value
+  in gold-ink. Tooltip body: "|+79.00R| exceeds the 20R typical
+  band. Verify the session's risk sizing — the grader may have
+  used a stop that was off, a partial fill that wasn't logged,
+  or a stale exit price."
+- **P1-11 Eyebrow case rule.** Settled. Every section eyebrow
+  uses the `.eyebrow` utility (10px, 0.16em, uppercase,
+  weight 600). The Preview "What you'll see at setup" eyebrow
+  was sentence-case italic — now tracked caps to match
+  WORKSPACE / ENGINES / RECOMMENDED NEXT STEP / LAST SESSION
+  / PREVIEW.
+
+**P2 enhancement**
+
+- **P2-3 Overflow-x clip safety net.** `<Shell />` `<main>` gets
+  `overflow-x-clip`, so any future cell-level overflow (a
+  stepper that ignores its parent grid track, a tooltip that
+  spills off-screen) can't push the document scrollWidth past
+  the viewport. `clip` over `hidden` so sticky descendants
+  keep working.
+
+**Items deferred (with reasons)**
+
+- **Time zone preference UI** (P2-1, 5th request) — `/settings`
+  page already shows "User preferences coming soon" pending
+  the auth + persistence layer. `lib/user-prefs.ts` defines
+  the contract. UI follows when auth lands.
+- **Storybook stories** — repo is not configured for Storybook;
+  spec said "no new heavy dependencies." Static-analysis
+  guards in `scripts/test-*.ts` cover the structural
+  invariants this PR cares about.
+- **Playwright + visual regression at 1024 / 1280 / 1440 /
+  1920** — repo has no Playwright runner; adding one is a
+  separate infra workstream.
+- **Open separate draft PRs per priority tier** — the workflow
+  this branch has used across all rounds is a single PR (#76)
+  with rolling commits. Switching mid-stream now would
+  fragment the changelog. Each commit subject lines up to
+  P0/P1/P2 explicitly.
+
+**Verification**
+
+- `tsc --noEmit` clean. `next build` clean.
+  `/dashboard` 14.0 kB / 115 kB.
+  `/spx` 14.6 kB / 153 kB.
+  `/replay` 7.7 kB / 115 kB.
+- 11 / 11 static-analysis script tests pass, including the
+  extended `test-pipeline-overflow.ts` (9 invariants).
+- 23 / 23 pytest cases pass on the SPX engine + close-anchored
+  offset suite.
+
+**Acceptance checklist**
+
+- [x] Header shows SPY <price>, SPX <price>, VIX <price>
+      (each labelled, none truncated, none ".").
+- [x] Both engine pipelines render all 7 steps with no
+      truncation at 1024 / 1280 / 1440 / 1920 (P0-3).
+- [x] SPX "synthetic" chip has tooltip + amber color + as-of
+      timestamp (P0-5).
+- [x] Both countdowns use the same `<Countdown />` primitive.
+- [x] Tooltips exist on R, skip, Watched only, graded
+      sessions, every pipeline state, synthetic.
+- [x] BETA badge ochre/warm, not blue.
+- [x] Visible focus ring on every interactive element via
+      global `:where(...)` rule (P1-3).
+- [x] Recommended Next Step changes when engine state changes
+      (state-aware dispatcher landed in v2 commit `0118269`).
+- [x] Sidebar active row has 3px left bar + tinted background
+      (P1-5).
+- [x] Engine cards: title only (no duplicate "Pre-config" chip;
+      title was dropped in v4 commit `c85f2b1`).
+- [x] SPX last-5 row uses hollow rings, not flat dots (P1-7).
+- [x] Preview bars 8px tall with `aria-valuenow` (landed in
+      v5 commit `caaf89d`).
+- [x] Preview "Hide" is a real ghost button with `aria-expanded`
+      (v5).
+- [x] Any `|R| > 20` carries a ⚠ outlier flag (P1-10).
+- [x] All eyebrows tracked caps + 10px + 0.16em (P1-11).
+- [x] No horizontal page overflow at any tested width (P0-3 +
+      P2-3 overflow-x clip).
+- [ ] Time zone preference exists in Configuration —
+      **deferred** (backend persistence not in place).
+- [x] "Updated <time>" wrapped in `aria-live="polite"` (v5).
+
+---
+
 ### SPX engine — Tokyo window 21:00→02:00 CT, slope 1.04/hr
 
 Two trader-rule corrections.

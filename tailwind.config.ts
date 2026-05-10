@@ -4,6 +4,15 @@ const config: Config = {
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
+      // 1440 boundary used by the SPX/SPY pipeline stepper to switch
+      // between abbreviated and full step labels. Tailwind's stock
+      // breakpoints jump from 1280 (xl) straight to 1536 (2xl); the
+      // stepper needs a pivot in that gap so trader-screen widths
+      // (1440 / 1600) get the readable full label without the 1280
+      // crowd losing their layout.
+      screens: {
+        "xl-plus": "1440px",
+      },
       colors: {
         canvas: "#FAF8F3",
         paper: "#FFFFFF",
