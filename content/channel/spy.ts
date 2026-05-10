@@ -2,6 +2,8 @@ export const SPY_CHANNEL_COPY = {
   hero: {
     eyebrow: "SPY · Channel · Session today",
     title: "The trading day, read aloud.",
+    titleLead: "The trading day,",
+    titleEmphasis: "read aloud.",
     subtitle:
       "Anchor lines, trigger proximity, tape, and guardrails stay in one operating surface.",
   },
