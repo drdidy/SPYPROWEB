@@ -129,6 +129,35 @@ def fetch_spy_intraday(period: str = "1d", interval: str = "5m") -> pd.DataFrame
     return df
 
 
+def _fetch_spy_intraday_for_date(session_day: date, interval: str = "5m") -> pd.DataFrame:
+    try:
+        import yfinance as yf
+        start = (pd.Timestamp(session_day) - pd.Timedelta(days=1)).date().isoformat()
+        end = (pd.Timestamp(session_day) + pd.Timedelta(days=1)).date().isoformat()
+        df = yf.download(
+            pc.SYMBOL,
+            start=start,
+            end=end,
+            interval=interval,
+            progress=False,
+            auto_adjust=False,
+            prepost=False,
+            actions=False,
+        )
+    except Exception:
+        return pd.DataFrame()
+    if df is None or df.empty:
+        return pd.DataFrame()
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
+    df = pc.normalize_yfinance_frame(df)
+    df = pc.ensure_central_index(df)
+    ct = pc.get_central_tz()
+    start_ct = pd.Timestamp(session_day, tz=ct).replace(hour=8, minute=30)
+    end_ct = pd.Timestamp(session_day, tz=ct).replace(hour=15, minute=0)
+    return df[(df.index >= start_ct) & (df.index <= end_ct)].sort_index()
+
+
 @pc.ttl_cache(ttl_seconds=60.0, maxsize=8)
 def fetch_last_close(symbol: str) -> float:
     try:
@@ -952,12 +981,13 @@ def _build_replay_block(
     signal_day,
     rth_today: pd.DataFrame,
     decision: dict,
+    signals: list[pc.TradeSignal] | None = None,
+    intraday_5m: pd.DataFrame | None = None,
 ) -> dict:
     """OHLC + verdict-outcome card for backtest mode.
 
-    Scoring rule: LONG wins when close > open, SHORT wins when close <
-    open. WAIT / STAND DOWN / HOLD are scored as N/A. PnL is the signed
-    move from open to close (in SPY pts), oriented by verdict direction.
+    Scoring rule: first confirmed engine entry, force-close after one hour.
+    No confirmed entry is N/A.
     """
     block: dict = {
         "isReplay": is_replay,
@@ -981,6 +1011,44 @@ def _build_replay_block(
         "netPts": round(c - o, 2),
         "netPct": round(((c - o) / o * 100) if o else 0.0, 3),
     }
+    confirmed = [
+        s for s in (signals or [])
+        if s.status == "CONFIRMED" and s.entry_time is not None and not pd.isna(s.entry_price)
+    ]
+    if not confirmed:
+        block["verdictOutcome"] = "N_A"
+        block["verdictPnl"] = None
+        return block
+
+    sig = min(confirmed, key=lambda s: pd.Timestamp(s.entry_time))
+    entry_time = pd.Timestamp(sig.entry_time)
+    entry_price = float(sig.entry_price)
+    exit_time = entry_time + pd.Timedelta(hours=1)
+    exit_price = None
+    if intraday_5m is not None and not intraday_5m.empty:
+        frame = intraday_5m.sort_index()
+        future = frame[frame.index >= exit_time]
+        row = future.iloc[0] if not future.empty else frame.iloc[-1]
+        exit_price = float(row["Close"])
+    if exit_price is None:
+        future_hourly = rth_today[rth_today.index >= exit_time]
+        row = future_hourly.iloc[0] if not future_hourly.empty else rth_today.iloc[-1]
+        exit_price = float(row["Close"])
+
+    pnl = (exit_price - entry_price) if sig.signal_type == "CALL" else (entry_price - exit_price)
+    block["entry"] = {
+        "time": entry_time.isoformat(),
+        "price": round(entry_price, 2),
+        "side": "LONG" if sig.signal_type == "CALL" else "SHORT",
+    }
+    block["exit"] = {
+        "time": exit_time.isoformat(),
+        "price": round(exit_price, 2),
+        "rule": "FORCED_1H",
+    }
+    block["verdictOutcome"] = "WIN" if pnl > 0 else ("LOSS" if pnl < 0 else "PUSH")
+    block["verdictPnl"] = round(pnl, 2)
+    return block
     # The decision dict's directional field is `verb` (set at the
     # `_build_decision` return — see "verb": verb above). The previous
     # code read the non-existent key "verdict" and so every session's
@@ -1135,7 +1203,7 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
         "signalDay": str(signal_day) if signal_day else None,
     }
 
-    intraday = fetch_spy_intraday("1d", "5m")
+    intraday = _fetch_spy_intraday_for_date(signal_day, "5m") if is_replay else fetch_spy_intraday("1d", "5m")
     candles = _candles_for_chart(rth_today, intraday)
     # Hourly series for the dashboard chart's 1h/4h/D timeframes. Last
     # ~30 trading days of regular-session hourly bars; the chart resamples
@@ -1181,6 +1249,8 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
         signal_day=signal_day,
         rth_today=rth_today,
         decision=decision,
+        signals=raw_signals,
+        intraday_5m=intraday,
     ) if is_replay else None
 
     # Premarket-bar diagnostic — only ship on replay so live payloads

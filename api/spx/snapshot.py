@@ -196,23 +196,28 @@ def _build_spx_replay_block(payload: dict, replay_date: date | None) -> dict:
 
 
 def _grade_replay_from_rail_tag(payload: dict, replay_date: date, offset: float) -> dict | None:
-    primary = ((payload.get("plays") or {}).get("primary") or {})
-    if not primary:
-        return None
-    entry_line = primary.get("entryLine")
-    exit_line = primary.get("exitLine")
-    side = primary.get("side")
-    if side not in ("BUY", "SELL") or not entry_line or not exit_line:
+    plays = payload.get("plays") or {}
+    candidates = [
+        trade
+        for trade in (plays.get("primary"), plays.get("alternate"))
+        if isinstance(trade, dict)
+    ]
+    if not candidates:
         return None
 
     lines = {line.get("kind"): line for line in payload.get("lines") or []}
-    entry_payload = lines.get(entry_line)
-    exit_payload = lines.get(exit_line)
-    if not entry_payload or not exit_payload:
-        return None
-
-    invalidation = payload.get("invalidation") or {}
-    if not isinstance(invalidation.get("level"), (int, float)) or not isinstance(invalidation.get("stopOffset"), (int, float)):
+    valid_trades: list[dict] = []
+    for trade in candidates:
+        side = trade.get("side")
+        entry_line = trade.get("entryLine")
+        entry_payload = lines.get(entry_line)
+        if side in ("BUY", "SELL") and entry_payload:
+            valid_trades.append({
+                "side": side,
+                "entryLine": entry_line,
+                "entryPayload": entry_payload,
+            })
+    if not valid_trades:
         return None
 
     bars = _spx_session_intraday(replay_date, offset)
@@ -220,38 +225,32 @@ def _grade_replay_from_rail_tag(payload: dict, replay_date: date, offset: float)
         return None
 
     entry_price = None
+    exit_after = None
     close_price = None
+    side = None
     for bar in bars:
         close_price = float(bar["close"])
         t = bar["time"]
-        entry_value = _project_payload_line(entry_payload, t)
-        exit_value = _project_payload_line(exit_payload, t)
-        if entry_value is None or exit_value is None:
-            return None
 
         if entry_price is None:
-            if float(bar["low"]) <= entry_value <= float(bar["high"]):
-                entry_price = entry_value
-            else:
+            for trade in valid_trades:
+                entry_value = _project_payload_line(trade["entryPayload"], t)
+                if entry_value is None:
+                    continue
+                if float(bar["low"]) <= entry_value <= float(bar["high"]):
+                    entry_price = entry_value
+                    exit_after = t + timedelta(hours=1)
+                    side = trade["side"]
+                    break
+            if entry_price is None:
                 continue
 
-        stop = (
-            float(invalidation["level"]) - float(invalidation["stopOffset"])
-            if side == "BUY"
-            else float(invalidation["level"]) + float(invalidation["stopOffset"])
-        )
-        if side == "BUY":
-            if float(bar["low"]) <= stop:
-                return {"outcome": "LOSS", "pnl": round(stop - entry_price, 2)}
-            if float(bar["high"]) >= exit_value:
-                return {"outcome": "WIN", "pnl": round(exit_value - entry_price, 2)}
-        else:
-            if float(bar["high"]) >= stop:
-                return {"outcome": "LOSS", "pnl": round(entry_price - stop, 2)}
-            if float(bar["low"]) <= exit_value:
-                return {"outcome": "WIN", "pnl": round(entry_price - exit_value, 2)}
+        if exit_after is not None and t >= exit_after:
+            pnl = float(bar["close"]) - entry_price if side == "BUY" else entry_price - float(bar["close"])
+            outcome = "WIN" if pnl > 0 else ("LOSS" if pnl < 0 else "PUSH")
+            return {"outcome": outcome, "pnl": round(pnl, 2)}
 
-    if entry_price is None or close_price is None:
+    if entry_price is None or close_price is None or side is None:
         return None
     pnl = close_price - entry_price if side == "BUY" else entry_price - close_price
     outcome = "WIN" if pnl > 0 else ("LOSS" if pnl < 0 else "PUSH")
@@ -308,7 +307,7 @@ def _spx_session_intraday(d: date, offset: float) -> list[dict]:
             tickers="ES=F",
             start=start,
             end=end,
-            interval="60m",
+            interval="5m",
             progress=False,
             auto_adjust=False,
             actions=False,

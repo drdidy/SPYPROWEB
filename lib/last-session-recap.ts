@@ -6,9 +6,8 @@
 // render. SPX side is inferred from PnL sign because the SPX engine
 // doesn't emit a verb on the replay block.
 //
-// Important caveat: the recap reflects the ENGINE's signal outcome
-// for that day, not the user's personal trade. SPY Prophet does not
-// track user-side execution.
+// Important caveat: the recap reflects the engine's one-hour signal
+// replay, not the user's personal trade.
 
 import { loadLiveSnapshot } from "@/lib/snapshot-fetch";
 import { loadSnapshot as loadSpxSnapshot } from "@/lib/spx-fetch";
@@ -62,24 +61,11 @@ function buildSpyRecap(snap: AdaptedSnapshot | null): LastSignalSummary | null {
   if (!snap || !snap.replay || !snap.replay.isReplay) return null;
   const block = snap.replay;
   const verdict = snap.decision.verdict;
-  const session = block.session;
-
-  // Strong recap when the engine actually graded a trade.
   const side: "LONG" | "SHORT" | null =
     verdict === "LONG" ? "LONG" : verdict === "SHORT" ? "SHORT" : null;
-  if (
-    side &&
-    block.verdictOutcome &&
-    block.verdictOutcome !== "N_A"
-  ) {
-    return shapeRecap(side, block, snap.asOf);
-  }
 
-  // Soft recap: even on a WAIT / STAND_DOWN day, surface what the
-  // engine saw — verdict + how the day moved. Better than "no recap"
-  // when the user did trade off price action.
-  if (session) {
-    return shapeSoftRecap("SPY", verdict, session, snap.asOf);
+  if (side && block.verdictOutcome && block.verdictOutcome !== "N_A") {
+    return shapeRecap(side, block, snap.asOf);
   }
   return null;
 }
@@ -92,13 +78,11 @@ function buildSpxRecap(snap: SPXSnapshot | null): LastSignalSummary | null {
         verdictOutcome?: "WIN" | "LOSS" | "PUSH" | "N_A" | null;
         verdictPnl?: number | null;
         isReplay?: boolean;
-        session?: { netPts?: number; close?: number; open?: number } | null;
       }
     | null
     | undefined;
   if (!block || !block.isReplay) return null;
 
-  // Strong recap when there's a directional outcome.
   if (block.verdictOutcome && block.verdictOutcome !== "N_A") {
     const pnl = block.verdictPnl ?? 0;
     if (pnl !== 0) {
@@ -113,24 +97,15 @@ function buildSpxRecap(snap: SPXSnapshot | null): LastSignalSummary | null {
       );
     }
   }
-
-  // Soft recap from the day's net move.
-  if (block.session && typeof block.session.netPts === "number") {
-    const pnl = block.session.netPts;
-    return {
-      side: pnl >= 0 ? "LONG" : "SHORT",
-      triggerAt: snap.asOf,
-      exitAt: snap.asOf,
-      rMultiple: pnl,
-      oneLine: `Watched only — day closed ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} pts`,
-    };
-  }
   return null;
 }
 
 function shapeRecap(
   side: "LONG" | "SHORT",
-  block: { verdictOutcome: "WIN" | "LOSS" | "PUSH" | "N_A" | null; verdictPnl: number | null },
+  block: {
+    verdictOutcome: "WIN" | "LOSS" | "PUSH" | "N_A" | null;
+    verdictPnl: number | null;
+  },
   ts: string,
 ): LastSignalSummary {
   const pnl = block.verdictPnl;
@@ -147,50 +122,4 @@ function shapeRecap(
     rMultiple: pnl,
     oneLine,
   };
-}
-
-// Soft recap surfaces the engine's posture + how the day moved, even
-// when no graded trade occurred. Shown as a secondary "engine watched"
-// line so the user knows what the engine saw without conflating it
-// with a real signal.
-function shapeSoftRecap(
-  _engine: "SPY" | "SPX",
-  verdict: string | undefined,
-  session: { open: number; close: number; netPts: number },
-  ts: string,
-): LastSignalSummary {
-  const pnl = session.netPts;
-  // Sentence-case, human-friendly framing. Verdict labels like
-  // "stand_down" become "stood down"; absent verdict reads "watched".
-  const verdictLabel = verdict
-    ? humanizeVerdict(verdict)
-    : "Watched";
-  const oneLine = `${verdictLabel} — day closed ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} pts (${session.open.toFixed(2)} → ${session.close.toFixed(2)})`;
-  return {
-    side: pnl >= 0 ? "LONG" : "SHORT",
-    triggerAt: ts,
-    exitAt: ts,
-    rMultiple: pnl,
-    oneLine,
-  };
-}
-
-// Map raw verdict tokens to a calm, sentence-cased phrase suitable for
-// the last-session line. Unknown tokens fall back to the lowercased
-// raw value so we don't accidentally render code identifiers.
-function humanizeVerdict(verdict: string): string {
-  const normalized = verdict.toUpperCase().replace(/-/g, "_");
-  const map: Record<string, string> = {
-    LONG: "Leaned long",
-    SHORT: "Leaned short",
-    HOLD: "Held position",
-    WAIT: "Waited",
-    STAND_DOWN: "Stood down",
-    TAKE: "Took the channel",
-    SELECTIVE: "Traded selectively",
-    NO_TRADE: "Watched",
-    NA: "Watched",
-    N_A: "Watched",
-  };
-  return map[normalized] ?? verdict.toLowerCase().replace(/_/g, " ");
 }

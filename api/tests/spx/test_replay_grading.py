@@ -1,4 +1,4 @@
-"""SPX replay grading requires an actual rail tag."""
+"""SPX replay grading requires an actual rail tag and a one-hour exit."""
 from __future__ import annotations
 
 from datetime import date, datetime
@@ -22,6 +22,13 @@ def _payload(action: str = "STAND_DOWN", direction: str = "ASCENDING", offset: f
                 "entryPrice": 100.0,
                 "exitLine": "CHANNEL_CEILING",
                 "exitPrice": 110.0,
+            },
+            "alternate": {
+                "side": "SELL",
+                "entryLine": "CHANNEL_CEILING",
+                "entryPrice": 110.0,
+                "exitLine": "CHANNEL_FLOOR",
+                "exitPrice": 100.0,
             }
         },
         "lines": [
@@ -56,7 +63,7 @@ def _bar(hour: int, high: float, low: float, close: float):
     }
 
 
-def test_replay_grades_win_only_after_entry_rail_tag_and_target():
+def test_replay_grades_win_after_entry_rail_tag_and_one_hour_exit():
     with (
         patch("spx.snapshot._spx_session_ohlc", return_value=_ohlc()),
         patch("spx.snapshot._spx_session_intraday", return_value=[
@@ -66,14 +73,14 @@ def test_replay_grades_win_only_after_entry_rail_tag_and_target():
     ):
         block = _build_spx_replay_block(_payload(), date(2026, 5, 8))
     assert block["verdictOutcome"] == "WIN"
-    assert block["verdictPnl"] == 10.0
+    assert block["verdictPnl"] == 10.5
 
 
 def test_replay_no_tag_is_not_credited_by_day_net():
     with (
         patch("spx.snapshot._spx_session_ohlc", return_value=_ohlc(open_=100.0, close=120.0)),
         patch("spx.snapshot._spx_session_intraday", return_value=[
-            _bar(9, high=120.0, low=101.0, close=115.0),
+            _bar(9, high=109.0, low=101.0, close=108.0),
         ]),
     ):
         block = _build_spx_replay_block(_payload(), date(2026, 5, 8))
@@ -82,7 +89,20 @@ def test_replay_no_tag_is_not_credited_by_day_net():
     assert block["verdictPnl"] is None
 
 
-def test_replay_stop_before_target_is_loss():
+def test_replay_grades_alternate_when_it_is_first_touched_entry():
+    with (
+        patch("spx.snapshot._spx_session_ohlc", return_value=_ohlc(open_=100.0, close=99.0)),
+        patch("spx.snapshot._spx_session_intraday", return_value=[
+            _bar(9, high=110.0, low=104.0, close=108.0),
+            _bar(10, high=109.0, low=101.0, close=102.0),
+        ]),
+    ):
+        block = _build_spx_replay_block(_payload(), date(2026, 5, 8))
+    assert block["verdictOutcome"] == "WIN"
+    assert block["verdictPnl"] == 8.0
+
+
+def test_replay_one_hour_exit_can_be_loss():
     with (
         patch("spx.snapshot._spx_session_ohlc", return_value=_ohlc()),
         patch("spx.snapshot._spx_session_intraday", return_value=[
