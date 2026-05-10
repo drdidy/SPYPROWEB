@@ -177,13 +177,33 @@ def _side(row: dict) -> str:
     return "UNKNOWN"
 
 
+def _parse_osi_symbol(symbol: str | None) -> dict:
+    if not symbol or len(symbol) < 15:
+        return {}
+    tail = symbol[-15:]
+    yymmdd = tail[:6]
+    cp = tail[6:7]
+    strike_raw = tail[7:]
+    try:
+        expiry = f"20{yymmdd[:2]}-{yymmdd[2:4]}-{yymmdd[4:6]}"
+        strike = int(strike_raw) / 1000
+    except (TypeError, ValueError):
+        return {}
+    return {
+        "expiration": expiry,
+        "side": "CALL" if cp == "C" else "PUT" if cp == "P" else "UNKNOWN",
+        "strike": strike,
+    }
+
+
 def _normalize_contract(row: dict) -> dict:
+    parsed = _parse_osi_symbol(_text(row, "option_symbol", "optionSymbol", "contract", "symbol"))
     return {
         "optionSymbol": _text(row, "option_symbol", "optionSymbol", "contract", "symbol"),
-        "expiration": _text(row, "expiration", "expiry", "expiry_date", "expiration_date"),
+        "expiration": _text(row, "expiration", "expiry", "expiry_date", "expiration_date") or parsed.get("expiration"),
         "dte": _num(row, "dte", "days_to_expiration"),
-        "strike": _num(row, "strike", "strike_price"),
-        "side": _side(row),
+        "strike": _num(row, "strike", "strike_price") or parsed.get("strike"),
+        "side": _side(row) if _side(row) != "UNKNOWN" else parsed.get("side", "UNKNOWN"),
         "bid": _num(row, "bid"),
         "ask": _num(row, "ask"),
         "mark": _num(row, "mark", "mid", "price", "last"),
@@ -196,6 +216,49 @@ def _normalize_contract(row: dict) -> dict:
         "oi": _int(row, "open_interest", "oi"),
         "volume": _int(row, "volume", "vol"),
     }
+
+
+def _gex_total(row: dict) -> float | None:
+    call = _num(row, "call_gamma", "call_gex", "callGamma", "callGex")
+    put = _num(row, "put_gamma", "put_gex", "putGamma", "putGex")
+    direct = _num(row, "gex", "total_gex", "total_gamma", "net_gex", "netGamma")
+    if direct is not None:
+        return direct
+    if call is None and put is None:
+        return None
+    return (call or 0.0) + (put or 0.0)
+
+
+def _gex_strike_rows(raw: Any, effective_date: str) -> list[dict]:
+    out = []
+    for row in _filter_rows_for_date(_rows(raw), effective_date):
+        total = _gex_total(row)
+        strike = _num(row, "strike", "price")
+        if total is None or strike is None:
+            continue
+        out.append(
+            {
+                "strike": strike,
+                "callGEX": _num(row, "call_gex", "call_gamma"),
+                "putGEX": _num(row, "put_gex", "put_gamma"),
+                "netGEX": round(total, 2),
+            }
+        )
+    return sorted(out, key=lambda r: r["strike"])
+
+
+def _gamma_flip(strike_rows: list[dict]) -> float | None:
+    prev: dict | None = None
+    for row in strike_rows:
+        if prev is not None:
+            a = float(prev.get("netGEX") or 0)
+            b = float(row.get("netGEX") or 0)
+            if a == 0:
+                return float(prev["strike"])
+            if (a < 0 <= b) or (a > 0 >= b):
+                return float(row["strike"])
+        prev = row
+    return None
 
 
 def _flow_lean(items: list[dict], ticker: str) -> dict | None:
@@ -273,19 +336,24 @@ def fetch_gex_summary(ticker: str = "SPY", effective_date: str | None = None) ->
     raw = _first_response(
         [
             (f"/stock/{ticker}/greek-exposure", _date_params(session_date)),
-            (f"/stock/{ticker}/greeks", _date_params(session_date)),
         ]
     )
     if not raw:
         return None
-    data = _data(raw)
-    if isinstance(data, list) and data:
-        data = data[0]
-    if not isinstance(data, dict):
+    rows = _filter_rows_for_date(_rows(raw), session_date)
+    if not rows:
         return None
-    gex = _num(data, "gex", "total_gex", "total_gamma", "gamma_exposure", "dealer_gamma")
-    flip = _num(data, "flip_point", "zero_gamma", "zero_gamma_price", "gamma_flip")
-    gex_f = gex if gex is not None else 0.0
+    latest = rows[0]
+    gex_f = _gex_total(latest)
+    if gex_f is None:
+        return None
+    strike_raw = _first_response(
+        [
+            (f"/stock/{ticker}/greek-exposure/strike", _date_params(session_date)),
+        ]
+    )
+    strike_levels = _gex_strike_rows(strike_raw, session_date)
+    flip = _gamma_flip(strike_levels)
     if gex_f > 0:
         regime = "POSITIVE"
     elif gex_f < 0:
@@ -298,6 +366,7 @@ def fetch_gex_summary(ticker: str = "SPY", effective_date: str | None = None) ->
         "totalGEX": round(gex_f, 2),
         "regime": regime,
         "flipPoint": flip,
+        "strikeLevels": strike_levels[:80],
     }
 
 
@@ -383,9 +452,8 @@ def fetch_option_chain(ticker: str = "SPY", effective_date: str | None = None) -
     session_date = effective_date or effective_options_date()
     raw = _first_response(
         [
+            (f"/stock/{ticker}/option-contracts", {"limit": 500}),
             (f"/stock/{ticker}/option-chains", _date_params(session_date)),
-            (f"/stock/{ticker}/option-chain", _date_params(session_date)),
-            (f"/stock/{ticker}/options", _date_params(session_date)),
         ]
     )
     contracts = [_normalize_contract(r) for r in _rows(raw)]
@@ -423,28 +491,57 @@ def fetch_option_chain(ticker: str = "SPY", effective_date: str | None = None) -
 @pc.ttl_cache(ttl_seconds=120.0, maxsize=16)
 def fetch_greeks(ticker: str = "SPY", effective_date: str | None = None) -> list[dict]:
     session_date = effective_date or effective_options_date()
+    chain = fetch_option_chain(ticker, session_date)
+    expiry = chain.get("expiration") if chain else None
+    if not expiry:
+        return []
     raw = _first_response(
         [
-            (f"/stock/{ticker}/greeks", _date_params(session_date, {"limit": 50})),
-            (f"/stock/{ticker}/greek-exposure", _date_params(session_date, {"limit": 50})),
+            (f"/stock/{ticker}/greeks", _date_params(session_date, {"expiry": expiry})),
         ]
     )
     out = []
     for r in _filter_rows_for_date(_rows(raw), session_date)[:50]:
-        out.append(
-            {
-                "sessionDate": session_date,
-                "strike": _num(r, "strike", "strike_price"),
-                "expiration": _text(r, "expiration", "expiry", "expiry_date", "expiration_date"),
-                "side": _side(r),
-                "delta": _num(r, "delta"),
-                "gamma": _num(r, "gamma"),
-                "theta": _num(r, "theta"),
-                "vega": _num(r, "vega"),
-                "iv": _num(r, "iv", "implied_volatility"),
-                "gex": _num(r, "gex", "gamma_exposure", "total_gamma"),
-            }
-        )
+        strike = _num(r, "strike", "strike_price")
+        expiration = _text(r, "expiration", "expiry", "expiry_date", "expiration_date") or expiry
+        pairs = [
+            (
+                "CALL",
+                {
+                    "optionSymbol": _text(r, "call_option_symbol"),
+                    "delta": _num(r, "call_delta"),
+                    "gamma": _num(r, "call_gamma"),
+                    "theta": _num(r, "call_theta"),
+                    "vega": _num(r, "call_vega"),
+                    "rho": _num(r, "call_rho"),
+                    "iv": _num(r, "call_volatility"),
+                },
+            ),
+            (
+                "PUT",
+                {
+                    "optionSymbol": _text(r, "put_option_symbol"),
+                    "delta": _num(r, "put_delta"),
+                    "gamma": _num(r, "put_gamma"),
+                    "theta": _num(r, "put_theta"),
+                    "vega": _num(r, "put_vega"),
+                    "rho": _num(r, "put_rho"),
+                    "iv": _num(r, "put_volatility"),
+                },
+            ),
+        ]
+        for side, vals in pairs:
+            if vals["delta"] is None and vals["gamma"] is None and vals["iv"] is None:
+                continue
+            out.append(
+                {
+                    "sessionDate": session_date,
+                    "strike": strike,
+                    "expiration": expiration,
+                    "side": side,
+                    **vals,
+                }
+            )
     return out
 
 
@@ -456,7 +553,7 @@ def fetch_symbol_options_intel(ticker: str, effective_date: str | None = None) -
     alerts = fetch_flow_alerts(symbol, session_date)
     darkpool = fetch_darkpool_summary(symbol, session_date)
     chain = fetch_option_chain(symbol, session_date)
-    greeks = fetch_greeks(symbol, session_date)
+    greeks = fetch_greeks(symbol, session_date) if chain else []
     return {
         "ticker": symbol,
         "sessionDate": session_date,

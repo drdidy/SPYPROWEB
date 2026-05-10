@@ -36,6 +36,12 @@ export interface UwGexSummary {
   totalGEX: number;
   regime: "POSITIVE" | "NEGATIVE" | "FLAT" | string;
   flipPoint: number | null;
+  strikeLevels?: Array<{
+    strike: number;
+    callGEX: number | null;
+    putGEX: number | null;
+    netGEX: number;
+  }>;
 }
 
 export interface UwDarkPool {

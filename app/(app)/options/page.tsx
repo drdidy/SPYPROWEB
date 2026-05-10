@@ -177,6 +177,19 @@ function FlowDarkPoolPanel({ intel }: { intel?: UwSymbolIntel }) {
 function GammaPanel({ intel }: { intel?: UwSymbolIntel }) {
   const gex = intel?.gex;
   const greeks = intel?.greeks ?? [];
+  const exposureRows = gex?.strikeLevels ?? [];
+  const rows =
+    greeks.length > 0
+      ? greeks.slice(0, 8).map((r) => ({
+          left: `${r.side} ${fmtPrice(r.strike)}`,
+          mid: `Delta ${fmtGreek(r.delta)}`,
+          right: `Gamma ${fmtGreek(r.gamma)}`,
+        }))
+      : exposureRows.slice(0, 8).map((r) => ({
+          left: `Strike ${fmtPrice(r.strike)}`,
+          mid: `Call ${fmtCompactNumber(r.callGEX)}`,
+          right: `Net ${fmtCompactNumber(r.netGEX)}`,
+        }));
   return (
     <Card className="min-h-[340px]">
       <CardHeader
@@ -201,13 +214,9 @@ function GammaPanel({ intel }: { intel?: UwSymbolIntel }) {
           />
         </div>
         <DataStrip
-          title="Greek rows"
-          rows={greeks.slice(0, 8).map((r) => ({
-            left: `${r.side} ${fmtPrice(r.strike)}`,
-            mid: `Delta ${fmtGreek(r.delta)}`,
-            right: `Gamma ${fmtGreek(r.gamma)}`,
-          }))}
-          empty="No contract-level Greeks returned."
+          title={greeks.length > 0 ? "Contract Greeks" : "Strike exposure"}
+          rows={rows}
+          empty="No GEX or contract-level Greeks returned."
         />
       </CardBody>
     </Card>
