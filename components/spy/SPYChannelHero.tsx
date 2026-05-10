@@ -73,8 +73,12 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <span className="eyebrow text-ink-3">SPY · Anchor Slate</span>
+              {/* v9: slope value hidden — proprietary engine
+                  parameter. The SLOPE_PER_HOUR const remains the
+                  source of truth for the bands' projection math
+                  below; only the display string is suppressed. */}
               <span className="text-[10px] text-ink-4 font-mono">
-                Slope ‑{SLOPE_PER_HOUR.toFixed(2)} pts/hr · session {todayLabel}
+                Session {todayLabel}
               </span>
             </div>
             <StatusPill variant={verdictTone[verdict] ?? "stale"} pulse>
@@ -146,7 +150,11 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
                 {primary.role === "ANCHOR_2" ? "Anchor 2" : "Primary anchor"} ·
                 low <span className="font-mono">{primary.anchorLow.toFixed(2)}</span> ·
                 set <span className="font-mono">{anchorTimeLabel(primary)}</span> CT.
-                Bands at +{BAND_OFFSET}, 0, −{BAND_OFFSET}, all decaying at {SLOPE_PER_HOUR} pts/hr.
+                {/* v9: slope value hidden — proprietary engine
+                    parameter. The bands themselves still render
+                    using the const above. */}
+                Bands offset above and below the anchor; both decay
+                through the session.
               </span>
             )}
           </p>

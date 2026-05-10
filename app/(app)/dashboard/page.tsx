@@ -1,26 +1,31 @@
-import { Card, CardBody, CardHeader } from "@/components/ui/Card";
-import { SectionLabel } from "@/components/ui/SectionLabel";
-import { StateLadder } from "@/components/slate/StateLadder";
+import { CardBody } from "@/components/ui/Card";
 import { TimelineStrip } from "@/components/slate/TimelineStrip";
 import { ConvictionTrack } from "@/components/slate/ConvictionTrack";
 import { EnvelopeBar } from "@/components/slate/EnvelopeBar";
 import { StatusGlyph, type StatusGlyphKind } from "@/components/slate/StatusGlyph";
-import { HelpHint } from "@/components/slate/HelpHint";
-import { AsOfTicker } from "@/components/slate/AsOfTicker";
 import { SetAlertButton } from "@/components/slate/SetAlertButton";
 import { WhyThisStateLink } from "@/components/slate/WhyThisStateLink";
-import { NextEventLine, NextEventCallout } from "@/components/slate/NextEventLine";
-import { Metric } from "@/components/decision-slate/Metric";
-import { LiveCountdown } from "@/components/decision-slate/LiveCountdown";
+import { NextEventCallout } from "@/components/slate/NextEventLine";
+import { MetricSlot } from "@/components/decision-slate/MetricSlot";
 import { WhyChips } from "@/components/decision-slate/WhyChips";
 import { LastSignalRecap } from "@/components/decision-slate/LastSignalRecap";
 import { PreConfigBriefing } from "@/components/decision-slate/PreConfigBriefing";
+import { StatePipeline } from "@/components/decision-slate/StatePipeline";
+import { EngineCard } from "@/components/decision-slate/EngineCard";
+import { RecommendedAction } from "@/components/decision-slate/RecommendedAction";
+import { PreviewState } from "@/components/decision-slate/PreviewState";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import { ErrorState } from "@/components/ui/ErrorState";
+import { SpxProvenanceBadge } from "@/components/decision-slate/SpxProvenance";
+import { deriveProvenance } from "@/lib/spx-provenance";
 import { SLATE_COPY } from "@/content/copy";
 import { loadLiveSnapshot } from "@/lib/snapshot-fetch";
 import { loadSnapshot as loadSpxSnapshot } from "@/lib/spx-fetch";
 import { fetchLastSessionRecaps } from "@/lib/last-session-recap";
 import { fetchTrackRecord } from "@/lib/track-record";
 import { getSessionInfo } from "@/lib/sessions";
+import { relabelDashboardString } from "@/lib/engine-labels";
+import { cn } from "@/lib/utils";
 import type { AdaptedSnapshot } from "@/lib/snapshot-adapter";
 import type { DynamicLine, SPXSnapshot, SPXLine } from "@/lib/types";
 import {
@@ -53,59 +58,273 @@ export default async function Page() {
   const spxSource = spxLoaded.source;
 
   // Source badges intentionally not rendered here — feed health lives
-  // in the TopBar and any error/seed mode degrades the FeedHealthBadge
-  // dot. The State Ladder sits directly under the top bar with the
-  // page's standard top spacing.
+  // in the TopBar and any error/seed mode degrades the FreshnessPill.
   void spySource;
-  void spyError;
   void spxSource;
 
+  const spyState = spy.currentState;
   const spxState = (spx.currentState as EngineState | undefined) ?? "STAND_DOWN";
-  const bothPreConfig = spy.currentState === "PRE_CONFIG" && spxState === "PRE_CONFIG";
+  const bothPreConfig = spyState === "PRE_CONFIG" && spxState === "PRE_CONFIG";
   const now = new Date();
   const spySession = getSessionInfo("SPY", now);
   const spxSession = getSessionInfo("SPX", now);
 
+  // Per-card error state. We render the error inside the engine's
+  // section instead of replacing the whole page so a partial outage
+  // (e.g. SPX up, SPY down) leaves the working side intact.
+  const spyHardError = spyError != null && spy.shellState.spy === 0;
+
   return (
-    <div className="max-w-[1440px] mx-auto pb-16 space-y-8 pt-6">
-      <EngineLadders spyState={spy.currentState} spxState={spxState} />
+    // v10 P1-12: explicit vertical rhythm on the 4 / 8 / 16 / 24 /
+    // 48 token scale. Per the spec:
+    //   header → hero               24 (mt-6 on hero)
+    //   hero → engine row           24 (mt-6 on engines)
+    //   engine row → "Markets quiet" h2 inside briefing  48 (mt-12)
+    //   h2 → first row of briefing cards   16 (handled inside briefing)
+    //   row → row inside briefing   16 (handled inside briefing)
+    //   last card → "What to watch" 24 (handled inside briefing)
+    //   briefing → preview          24 (mt-6 on preview)
+    <div className="max-w-[1200px] mx-auto pb-12 pt-6 anim-rise">
+      <PageHeader />
 
-      {bothPreConfig && (
-        <PreConfigBriefing
-          spy={{
-            label: "SPY",
-            nextSetupISO: spySession.configWindowStart.toISOString(),
-            nextSetupLabel: formatDayHM(spySession.configWindowStart),
-            lastSignal: recaps.spy,
-            trackRecord: spyTrack,
-          }}
-          spx={{
-            label: "SPX",
-            nextSetupISO: spxSession.configWindowStart.toISOString(),
-            nextSetupLabel: formatDayHM(spxSession.configWindowStart),
-            lastSignal: recaps.spx,
-            trackRecord: spxTrack,
-          }}
-        />
-      )}
-
-      <SectionLabel>Today's read</SectionLabel>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <SpyVerdictCard snap={spy} lastSignal={recaps.spy} />
-        <SpxVerdictCard snap={spx} lastSignal={recaps.spx} />
-      </div>
-
-      <TimelineRow
-        spyHistory={spy.stateHistory}
-        spxHistory={spx.stateHistory ?? []}
+      {/* v4 #3 + v10 P1-12: Recommended Action page hero. 24px
+          rhythm between the header and the hero. */}
+      <RecommendedAction
+        className="mt-6"
+        spyState={spyState}
+        spxState={spxState}
+        spyNextEventISO={spySession.nextSignificantEvent.at.toISOString()}
+        spxNextEventISO={spxSession.nextSignificantEvent.at.toISOString()}
+        // v10 P1-8: extract the verb from the session label
+        // ("SPY setup opens" → "setup opens"). Keeps wording in
+        // sync with the engine pipeline countdowns.
+        spyEventVerb={spySession.nextSignificantEvent.label
+          .replace(/^SPY\s+/, "")
+          .toLowerCase()}
+        spxEventVerb={relabelDashboardString(
+          spxSession.nextSignificantEvent.label,
+        )
+          .replace(/^ES\s+/, "")
+          .toLowerCase()}
       />
 
-      <SectionLabel>The read</SectionLabel>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <SpyReadCard snap={spy} />
-        <SpxReadCard snap={spx} />
-      </div>
+      {/* v4 #6 + v5 #8 + v10 P1-12: engines row. 24px rhythm
+          between hero and engine row. Outer padding matches
+          every other top-level section. */}
+      <section
+        aria-label="Engine states"
+        className="mt-6 rounded-card bg-paper-2/30 border border-rule-soft px-5 py-4 md:px-6 md:py-5"
+      >
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4 [grid-template-columns:1fr] lg:[grid-template-columns:1fr_1fr] min-w-0">
+          <StatePipeline
+            engine="SPY"
+            current={spyState}
+            nextEventISO={spySession.nextSignificantEvent.at.toISOString()}
+            nextEventLabel={spySession.nextSignificantEvent.label}
+            explanation={spyExplanation(spyState, spy)}
+          />
+          <StatePipeline
+            engine="SPX"
+            current={spxState}
+            nextEventISO={spxSession.nextSignificantEvent.at.toISOString()}
+            // v8 P1-2: lib/sessions.ts produces "SPX setup opens" /
+            // "SPX RTH closes". /dashboard relabels to "ES" at the
+            // render boundary; the underlying session source stays
+            // as SPX for /spx and other consumers.
+            nextEventLabel={relabelDashboardString(spxSession.nextSignificantEvent.label)}
+            explanation={spxExplanation(spxState, spx)}
+          />
+        </div>
+      </section>
+
+      {bothPreConfig ? (
+        <>
+          {/* v10 P1-12: 48px rhythm between the engine row and the
+              "Markets quiet" briefing heading (mt-12). */}
+          <PreConfigBriefing
+            className="mt-12"
+            spy={{
+              label: "SPY",
+              nextSetupISO: spySession.configWindowStart.toISOString(),
+              nextSetupLabel: formatDayHM(spySession.configWindowStart),
+              lastSignal: recaps.spy,
+              trackRecord: spyTrack,
+            }}
+            spx={{
+              label: "SPX",
+              nextSetupISO: spxSession.configWindowStart.toISOString(),
+              nextSetupLabel: formatDayHM(spxSession.configWindowStart),
+              lastSignal: recaps.spx,
+              trackRecord: spxTrack,
+            }}
+          />
+          {/* v4 #13 + v10 P1-12: PreviewState self-hides via
+              localStorage. 24px rhythm between briefing and preview. */}
+          <PreviewState className="mt-6" />
+        </>
+      ) : (
+        <>
+          <Section title="Today's read">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {spyHardError ? (
+                <ErrorState
+                  title="SPY data unavailable"
+                  message="The live SPY snapshot didn't return. The SPX side is rendering normally below."
+                />
+              ) : (
+                <SpyVerdictCard snap={spy} lastSignal={recaps.spy} />
+              )}
+              <SpxVerdictCard snap={spx} lastSignal={recaps.spx} />
+            </div>
+          </Section>
+
+          <TimelineRow
+            spyHistory={spy.stateHistory}
+            spxHistory={spx.stateHistory ?? []}
+          />
+
+          <Section title="Active levels">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {spyHardError ? null : <SpyReadCard snap={spy} />}
+              <SpxReadCard snap={spx} />
+            </div>
+          </Section>
+        </>
+      )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Page header — v2 #5: small eyebrow + h1 ~24px + About affordance
+// to its right. v1's giant serif "Decision Slate" hero reclaimed
+// ~80px of above-the-fold space for actual data.
+// ---------------------------------------------------------------------
+
+function PageHeader() {
+  // v10 P1-5: date stamp under the H1. Trader needs to know which
+  // session they're looking at without going hunting. Computed at
+  // render time on the server (page is force-dynamic), so the date
+  // matches the current trading day in the user's locale.
+  const dateLabel = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date());
+  return (
+    <header className="flex items-center justify-between gap-4 flex-wrap">
+      <div className="min-w-0">
+        <h1 className="font-serif text-h2 text-ink tracking-tight">
+          Decision Slate
+        </h1>
+        {/* v10 P1-5: subtle session-date stamp directly under the
+            H1. ~14px sans, muted ink. */}
+        <p className="mt-0.5 text-[14px] text-ink-3 leading-snug">
+          {/* "Friday, May 9, 2026" → "Friday · May 9, 2026"
+              (one replace = first comma only). */}
+          {dateLabel.replace(",", " ·")}
+        </p>
+      </div>
+      {/* v10 P1-9: About → ? icon-button at the top-right, matching
+          the search/notification icon language in the TopBar.
+          Single-character ?, circular, ghost surface. */}
+      <InfoTooltip
+        label={SLATE_COPY.helpAboutSlate.title}
+        content={SLATE_COPY.helpAboutSlate.body}
+        placement="bottom"
+      >
+        <span
+          aria-label="About this page"
+          className={cn(
+            "inline-flex items-center justify-center w-7 h-7 rounded-full shrink-0",
+            "bg-paper-2/60 text-ink-3 hover:text-ink hover:bg-paper-2",
+            "border border-rule transition-colors cursor-help",
+            "text-[12px] font-bold tabular-nums",
+          )}
+        >
+          ?
+        </span>
+      </InfoTooltip>
+    </header>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Per-engine plain-English explanation. Pure functions so we can keep
+// the dashboard's main render flat.
+// ---------------------------------------------------------------------
+
+function spyExplanation(state: EngineState, snap: AdaptedSnapshot): string {
+  if (state === "PRE_CONFIG") {
+    return "Lines plot during the 03:00–07:00 CT premarket window. No active triggers yet.";
+  }
+  if (state === "STAND_DOWN") {
+    return "Setup is plotted, but conditions aren't favoring a trade right now.";
+  }
+  if (state === "WATCH") {
+    return "Price is approaching a primary trigger. Watching for a rejection candle.";
+  }
+  if (state === "WAIT") {
+    return "Rejection candle printed. Waiting for confirmation on the next bar.";
+  }
+  if (state === "ARMED") {
+    return "Confirmation in. The entry trigger is armed.";
+  }
+  if (state === "GO") {
+    return "Trigger fired. The setup is live for the rest of the session.";
+  }
+  if (state === "COOLDOWN") {
+    return "Trade has resolved. No new signals until the next session.";
+  }
+  return snap.bias.explanation || "";
+}
+
+function spxExplanation(state: EngineState, snap: SPXSnapshot): string {
+  if (state === "PRE_CONFIG") {
+    return "Channel forms during the 17:00–02:00 CT overnight window. No envelope yet.";
+  }
+  if (state === "STAND_DOWN") {
+    return "Channel is plotted, but price isn't sitting where a setup can qualify.";
+  }
+  if (state === "WATCH") {
+    return "Price is approaching the channel rail. Watching for a rejection.";
+  }
+  if (state === "WAIT") {
+    return "Rejection candle printed. Waiting for confirmation.";
+  }
+  if (state === "ARMED") {
+    return "Confirmation in. The entry trigger is armed at the channel rail.";
+  }
+  if (state === "GO") {
+    return "Trigger fired. The channel trade is live.";
+  }
+  if (state === "COOLDOWN") {
+    return "Trade has resolved. No new signals until the next overnight window.";
+  }
+  return snap.scenarioExplanation || snap.channel.reason || "";
+}
+
+// ---------------------------------------------------------------------
+// Section primitive — one tier of section eyebrow above grids.
+// ---------------------------------------------------------------------
+
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section aria-label={title} className="space-y-4">
+      <div className="flex items-baseline gap-3">
+        <h2 className="font-serif text-h2 text-ink tracking-tight">{title}</h2>
+        <span aria-hidden className="h-px flex-1 bg-rule" />
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -119,10 +338,7 @@ function formatDayHM(d: Date): string {
   }).format(d) + " CT";
 }
 
-// TimelineRow renders one TimelineStrip per engine, side-by-side at lg+
-// and stacked below. Each strip self-hides when its history is empty,
-// so an early-session SPX with no transitions stays out of the way
-// while SPY's timeline appears solo.
+// TimelineRow — one TimelineStrip per engine. Stacks below at <lg.
 function TimelineRow({
   spyHistory,
   spxHistory,
@@ -135,51 +351,6 @@ function TimelineRow({
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
       <TimelineStrip engine="SPY" history={spyHistory} />
       <TimelineStrip engine="SPX" history={spxHistory} />
-    </div>
-  );
-}
-
-// State ladders sit immediately under the page header. Two stacked
-// rows (SPY on top, SPX below) so they read as parallel ladders at
-// a glance. A thin hairline separates them; both share the same
-// bordered container so the pairing is visually contained.
-function EngineLadders({
-  spyState,
-  spxState,
-}: {
-  spyState: EngineState;
-  spxState: EngineState;
-}) {
-  return (
-    <div className="rounded-card border border-rule bg-paper-2/40 divide-y divide-rule">
-      <LadderRow engine="SPY" state={spyState} />
-      <LadderRow engine="SPX" state={spxState} />
-    </div>
-  );
-}
-
-function LadderRow({
-  engine,
-  state,
-}: {
-  engine: "SPY" | "SPX";
-  state: EngineState;
-}) {
-  const labelClass = engine === "SPX" ? "text-violet" : "text-ink-3";
-  return (
-    <div className="flex flex-col gap-1 px-4 py-3">
-      <div className="flex items-center gap-3 overflow-x-auto">
-        <span
-          className={`font-mono text-[10px] tracking-[0.16em] uppercase shrink-0 w-9 ${labelClass}`}
-        >
-          {engine}
-        </span>
-        <StateLadder engine={engine} current={state} />
-      </div>
-      {/* Per-engine countdown line — re-evaluates every 30s. */}
-      <div className="pl-12">
-        <NextEventLine engine={engine} />
-      </div>
     </div>
   );
 }
@@ -206,103 +377,97 @@ function SpyVerdictCard({
   const change = decision.conviction != null ? snap.shellState.change : 0;
 
   return (
-    <Card className="overflow-hidden">
-      <CardHeader
-        eyebrow="SPY"
-        title={
-          <span className="flex items-baseline gap-3 flex-wrap">
-            <span className="font-serif text-display tracking-tight">
-              {headline}
-            </span>
-            {/* P1: in PRE_CONFIG no level is being measured — hide
-                the price entirely from the headline. The TopBar still
-                shows the value with the appropriate stale-close
-                suffix. */}
-            {!isPreConfig && (
-              <PriceWithDelta price={currentPrice} change={change} />
-            )}
+    <EngineCard
+      engine="SPY"
+      section="today's read"
+      title={
+        <span className="flex items-baseline gap-3 flex-wrap">
+          <span className="font-serif text-display tracking-tight">
+            {headline}
           </span>
-        }
-      />
-      <CardBody className="space-y-4 flex flex-col flex-1">
-        {/* One-line subtitle defining the middle metric. */}
-        <p className="font-mono text-[11px] text-ink-3 -mt-2">
-          {SLATE_COPY.spySubtitle}
-        </p>
-        <p className="text-[14px] text-ink-2 leading-relaxed">
-          {isPreConfig
-            ? "Lines plot during the Mon 03:00–07:00 CT configuration window. No active triggers yet."
-            : decision.finalExplanation ||
-              snap.bias.explanation ||
-              "Engine is initializing."}
-        </p>
-        <div className="grid grid-cols-3 gap-3 pt-3 border-t border-rule">
-          <Metric
-            label="Conviction"
-            hint={SLATE_COPY.metric.conviction.spy}
-            example={SLATE_COPY.metricExample.conviction}
-          >
-            {!isPreConfig && (
-              <ConvictionTrack
-                value={decision.conviction}
-                max={5}
-                label={`${decision.conviction}/5`}
-              />
-            )}
-          </Metric>
-          <Metric
-            label="Bias"
-            hint={SLATE_COPY.metric.bias}
-            example={SLATE_COPY.metricExample.bias}
-          >
-            {!isPreConfig && <BiasValue bias={snap.bias.bias} />}
-          </Metric>
-          <Metric
-            label="Grade"
-            hint={SLATE_COPY.metric.grade}
-            example={SLATE_COPY.metricExample.grade}
-          >
-            {!isPreConfig && (
-              <GradeValue grade={signal && quality ? quality.grade : null} />
-            )}
-          </Metric>
-        </div>
-        {/* Phase-aware recap: visible only between sessions. */}
-        {(isPreConfig ||
-          snap.currentState === "STAND_DOWN" ||
-          snap.currentState === "COOLDOWN") && (
-          <LastSignalRecap recap={lastSignal} />
-        )}
-        {isPreConfig ? (
-          <NextEventCallout engine="SPY" />
-        ) : (
-          <>
-            <FlipsLine condition={snap.flipCondition} />
-            <InvalidationLine invalidation={snap.invalidation} />
-          </>
-        )}
-        {/* CTA row: alert button only. The "View SPY Channel" link
-            has been removed per the spec — the channel page didn't
-            have an anchor target to deep-link to. */}
-        <div className="flex flex-wrap items-center gap-2 pt-1">
           {!isPreConfig && (
-            <SetAlertButton symbol="SPY" level={alertLevel} context={alertContext} />
+            <PriceWithDelta price={currentPrice} change={change} />
           )}
-        </div>
-        {/* Top reasons surfaced as chips above the drawer trigger. */}
+        </span>
+      }
+      asOfIso={snap.asOf}
+      footerLeft={
+        <WhyThisStateLink
+          engine="SPY"
+          trace={snap.decisionTrace}
+          flipCondition={snap.flipCondition}
+          currentStateLabel={snap.currentState.replace(/_/g, " ").toLowerCase()}
+        />
+      }
+    >
+      <p className="text-meta text-ink-3 -mt-2">{SLATE_COPY.spySubtitle}</p>
+      <p className="text-body text-ink-2 leading-relaxed">
+        {decision.finalExplanation ||
+          snap.bias.explanation ||
+          (isPreConfig
+            ? "No active triggers yet — bias and conviction populate when the setup window opens."
+            : "Engine is initializing.")}
+      </p>
+      <div className="grid grid-cols-3 gap-3 pt-3 border-t border-rule">
+        <MetricSlot
+          label="Conviction"
+          hint={SLATE_COPY.metric.conviction.spy}
+          example={SLATE_COPY.metricExample.conviction}
+          helperWhenEmpty={SLATE_COPY.metricEmptyHelper.conviction}
+        >
+          {!isPreConfig && (
+            <ConvictionTrack
+              value={decision.conviction}
+              max={5}
+              label={`${decision.conviction}/5`}
+            />
+          )}
+        </MetricSlot>
+        <MetricSlot
+          label="Bias"
+          hint={SLATE_COPY.metric.bias}
+          example={SLATE_COPY.metricExample.bias}
+          helperWhenEmpty={SLATE_COPY.metricEmptyHelper.bias}
+        >
+          {!isPreConfig && <BiasValue bias={snap.bias.bias} />}
+        </MetricSlot>
+        <MetricSlot
+          label="Grade"
+          hint={SLATE_COPY.metric.grade}
+          example={SLATE_COPY.metricExample.grade}
+          helperWhenEmpty={SLATE_COPY.metricEmptyHelper.grade}
+        >
+          {!isPreConfig && (
+            <GradeValue grade={signal && quality ? quality.grade : null} />
+          )}
+        </MetricSlot>
+      </div>
+      {(isPreConfig ||
+        snap.currentState === "STAND_DOWN" ||
+        snap.currentState === "COOLDOWN") && (
+        <LastSignalRecap recap={lastSignal} />
+      )}
+      {isPreConfig ? (
+        <NextEventCallout engine="SPY" />
+      ) : (
+        <>
+          <FlipsLine condition={snap.flipCondition} />
+          <InvalidationLine invalidation={snap.invalidation} />
+        </>
+      )}
+      <div className="flex flex-wrap items-center gap-2 pt-1">
         {!isPreConfig && (
-          <WhyChips trace={snap.decisionTrace} className="pt-2" />
-        )}
-        <CardFooterRow asOfIso={snap.asOf}>
-          <WhyThisStateLink
-            engine="SPY"
-            trace={snap.decisionTrace}
-            flipCondition={snap.flipCondition}
-            currentStateLabel={snap.currentState.replace(/_/g, " ")}
+          <SetAlertButton
+            symbol="SPY"
+            level={alertLevel}
+            context={alertContext}
           />
-        </CardFooterRow>
-      </CardBody>
-    </Card>
+        )}
+      </div>
+      {!isPreConfig && (
+        <WhyChips trace={snap.decisionTrace} className="pt-2" />
+      )}
+    </EngineCard>
   );
 }
 
@@ -313,20 +478,34 @@ function SpyReadCard({ snap }: { snap: AdaptedSnapshot }) {
     .sort((a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice))
     .slice(0, 4);
   return (
-    <Card>
-      <ReadCardHeader
-        engine="SPY"
-        count={armed.length}
-        plottedAt={snap.asOf}
-      />
-      <CardBody className="px-0 pb-0">
-        {/* Reserve a stable height so 0→N transitions don't shift the
-            page layout. The min-height matches roughly four trigger
-            rows so the structure section behaves the same whether
-            empty or populated. */}
+    <EngineCard
+      engine="SPY"
+      section="active levels"
+      title={
+        <span className="flex items-center gap-2 flex-wrap">
+          <span>{armed.length === 0 ? "No active levels" : `${armed.length} active level${armed.length === 1 ? "" : "s"}`}</span>
+          <InfoTooltip
+            label="Primary line"
+            content="A tradable level the engine watches for rejection or break — anchored on prior-day pivots and projected forward."
+          />
+        </span>
+      }
+      headerMeta={
+        <span className="font-mono text-meta tabular-nums text-ink-3">
+          Plotted {formatHM(snap.asOf)} CT
+          <InfoTooltip
+            label="Refresh cadence"
+            content="Lines refresh on each bar close during the engine's session. Between sessions, the last plot stays on screen."
+            className="ml-1.5"
+          />
+        </span>
+      }
+      asOfIso={null}
+    >
+      <div className="-mx-5 -mb-5">
         <div className="min-h-[180px] flex flex-col">
           {armed.length === 0 ? (
-            <div className="px-5 py-8 text-[13px] text-ink-3">
+            <div className="px-5 py-8 text-body text-ink-3">
               {SLATE_COPY.structureEmpty.spy}
             </div>
           ) : (
@@ -349,8 +528,8 @@ function SpyReadCard({ snap }: { snap: AdaptedSnapshot }) {
             </>
           )}
         </div>
-      </CardBody>
-    </Card>
+      </div>
+    </EngineCard>
   );
 }
 
@@ -378,97 +557,106 @@ function SpxVerdictCard({
     : undefined;
 
   return (
-    <Card className="overflow-hidden">
-      <CardHeader
-        eyebrow="SPX"
-        title={
-          <span className="flex items-baseline gap-3 flex-wrap">
-            <span className="font-serif text-display tracking-tight">
-              {headline}
-            </span>
-            {!isPreConfig && isOutside && (
-              <HelpHint
-                label="Outside play"
-                hint="The last print sits outside today's planned play envelope. No qualifying setup until price re-enters the envelope."
-              />
-            )}
-            {/* P1: hide price in headline when PRE_CONFIG. */}
-            {!isPreConfig && (
-              <PriceWithDelta price={snap.price.last} change={change} />
-            )}
+    <EngineCard
+      engine="SPX"
+      section="today's read"
+      title={
+        <span className="flex items-baseline gap-3 flex-wrap">
+          <span className="font-serif text-display tracking-tight">
+            {headline}
           </span>
-        }
-      />
-      <CardBody className="space-y-4 flex flex-col flex-1">
-        <p className="font-mono text-[11px] text-ink-3 -mt-2">
-          {SLATE_COPY.spxSubtitle}
-        </p>
-        <p className="text-[14px] text-ink-2 leading-relaxed">
-          {isPreConfig
-            ? "Envelope plots during the Sun 17:00–Mon 02:00 CT configuration window. No envelope yet."
-            : snap.scenarioExplanation ||
-              snap.channel.reason ||
-              "Channel is initializing."}
-        </p>
-        <div className="grid grid-cols-3 gap-3 pt-3 border-t border-rule">
-          <Metric
-            label="Conviction"
-            hint={SLATE_COPY.metric.conviction.spx}
-            example={SLATE_COPY.metricExample.convictionSpx}
-          >
-            {!isPreConfig && (
-              <ConvictionTrack
-                value={score}
-                max={100}
-                label={`${score}/100`}
-                bands={normalizedBands(snap.scoreBands)}
-              />
-            )}
-          </Metric>
-          <Metric
-            label="Channel"
-            hint={SLATE_COPY.metric.channel}
-            example={SLATE_COPY.metricExample.channel}
-          >
-            {!isPreConfig && <ChannelValue direction={snap.channel.direction} />}
-          </Metric>
-          <Metric
-            label="Grade"
-            hint={SLATE_COPY.metric.grade}
-            example={SLATE_COPY.metricExample.grade}
-          >
-            {!isPreConfig && <SpxGradeValue action={action} />}
-          </Metric>
-        </div>
-        {(isPreConfig || state === "STAND_DOWN" || state === "COOLDOWN") && (
-          <LastSignalRecap recap={lastSignal} />
-        )}
-        {isPreConfig ? (
-          <NextEventCallout engine="SPX" />
-        ) : (
-          <>
-            <FlipsLine condition={snap.flipCondition} />
-            <InvalidationLine invalidation={snap.invalidation ?? null} />
-          </>
-        )}
-        <div className="flex flex-wrap items-center gap-2 pt-1">
-          {!isPreConfig && (
-            <SetAlertButton symbol="SPX" level={alertLevel} context={alertContext} />
+          {!isPreConfig && isOutside && (
+            <InfoTooltip
+              label="Outside play"
+              content="The last print sits outside today's planned play envelope. No qualifying setup until price re-enters the envelope."
+            >
+              <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-3 cursor-help">
+                Outside play
+              </span>
+            </InfoTooltip>
           )}
-        </div>
+          {!isPreConfig && (
+            <PriceWithDelta price={snap.price.last} change={change} />
+          )}
+          {/* P0-4: SPX is synthetic (ES + basis). Surface the
+              derivation tier next to the price so a wrong-looking
+              number is never silent. */}
+          {!isPreConfig && (
+            <SpxProvenanceBadge provenance={deriveProvenance(snap._meta)} />
+          )}
+        </span>
+      }
+      asOfIso={snap.asOf}
+      footerLeft={
+        <WhyThisStateLink
+          engine="SPX"
+          trace={snap.decisionTrace ?? []}
+          flipCondition={snap.flipCondition}
+          currentStateLabel={state.replace(/_/g, " ").toLowerCase()}
+        />
+      }
+    >
+      <p className="text-meta text-ink-3 -mt-2">{SLATE_COPY.spxSubtitle}</p>
+      <p className="text-body text-ink-2 leading-relaxed">
+        {snap.scenarioExplanation ||
+          snap.channel.reason ||
+          (isPreConfig
+            ? "Channel and confluence populate when the overnight window opens."
+            : "Channel is initializing.")}
+      </p>
+      <div className="grid grid-cols-3 gap-3 pt-3 border-t border-rule">
+        <MetricSlot
+          label="Conviction"
+          hint={SLATE_COPY.metric.conviction.spx}
+          example={SLATE_COPY.metricExample.convictionSpx}
+          helperWhenEmpty={SLATE_COPY.metricEmptyHelper.conviction}
+        >
+          {!isPreConfig && (
+            <ConvictionTrack
+              value={score}
+              max={100}
+              label={`${score}/100`}
+              bands={normalizedBands(snap.scoreBands)}
+            />
+          )}
+        </MetricSlot>
+        <MetricSlot
+          label="Channel"
+          hint={SLATE_COPY.metric.channel}
+          example={SLATE_COPY.metricExample.channel}
+          helperWhenEmpty={SLATE_COPY.metricEmptyHelper.channel}
+        >
+          {!isPreConfig && <ChannelValue direction={snap.channel.direction} />}
+        </MetricSlot>
+        <MetricSlot
+          label="Grade"
+          hint={SLATE_COPY.metric.grade}
+          example={SLATE_COPY.metricExample.grade}
+          helperWhenEmpty={SLATE_COPY.metricEmptyHelper.grade}
+        >
+          {!isPreConfig && <SpxGradeValue action={action} />}
+        </MetricSlot>
+      </div>
+      {(isPreConfig || state === "STAND_DOWN" || state === "COOLDOWN") && (
+        <LastSignalRecap recap={lastSignal} />
+      )}
+      {isPreConfig ? (
+        <NextEventCallout engine="SPX" />
+      ) : (
+        <>
+          <FlipsLine condition={snap.flipCondition} />
+          <InvalidationLine invalidation={snap.invalidation ?? null} />
+        </>
+      )}
+      <div className="flex flex-wrap items-center gap-2 pt-1">
         {!isPreConfig && (
-          <WhyChips trace={snap.decisionTrace ?? []} className="pt-2" />
+          <SetAlertButton symbol="SPX" level={alertLevel} context={alertContext} />
         )}
-        <CardFooterRow asOfIso={snap.asOf}>
-          <WhyThisStateLink
-            engine="SPX"
-            trace={snap.decisionTrace ?? []}
-            flipCondition={snap.flipCondition}
-            currentStateLabel={state.replace(/_/g, " ")}
-          />
-        </CardFooterRow>
-      </CardBody>
-    </Card>
+      </div>
+      {!isPreConfig && (
+        <WhyChips trace={snap.decisionTrace ?? []} className="pt-2" />
+      )}
+    </EngineCard>
   );
 }
 
@@ -479,70 +667,88 @@ function SpxReadCard({ snap }: { snap: SPXSnapshot }) {
   const top = sorted.slice(0, 4);
   const empty = top.length === 0;
   return (
-    <Card>
-      <ReadCardHeader
-        engine="SPX"
-        count={snap.lines.length}
-        plottedAt={snap.asOf}
-      />
-      <CardBody className={empty ? "px-5 py-6 min-h-[180px]" : "px-0 pb-0 min-h-[180px]"}>
-        {empty ? (
-          snap.plannedEnvelope ? (
-            <EnvelopeBar
-              low={snap.plannedEnvelope.low}
-              high={snap.plannedEnvelope.high}
-              last={snap.price.last}
-              unit="pts"
-            />
+    <EngineCard
+      engine="SPX"
+      section="active levels"
+      title={
+        <span className="flex items-center gap-2 flex-wrap">
+          <span>{empty ? "No active levels" : `${top.length} active level${top.length === 1 ? "" : "s"}`}</span>
+          <InfoTooltip
+            label="Channel rail"
+            content="A primary rail of the overnight channel projected into RTH — used for rejection / break confirmation."
+          />
+        </span>
+      }
+      headerMeta={
+        <span className="font-mono text-meta tabular-nums text-ink-3">
+          Plotted {formatHM(snap.asOf)} CT
+        </span>
+      }
+      asOfIso={null}
+    >
+      <div className="-mx-5 -mb-5">
+        <CardBody
+          className={empty ? "px-5 py-6 min-h-[180px]" : "px-0 pb-0 min-h-[180px]"}
+        >
+          {empty ? (
+            snap.plannedEnvelope ? (
+              <EnvelopeBar
+                low={snap.plannedEnvelope.low}
+                high={snap.plannedEnvelope.high}
+                last={snap.price.last}
+                unit="pts"
+              />
+            ) : (
+              <p className="text-body text-ink-3">
+                {SLATE_COPY.structureEmpty.spx}
+              </p>
+            )
           ) : (
-            <p className="text-[13px] text-ink-3">
-              {SLATE_COPY.structureEmpty.spx}
-            </p>
-          )
-        ) : (
-          <>
-            <ColumnHeaderRow />
-            <ul className="divide-y divide-rule">
-              {top.map((l) => (
-                <TriggerRow
-                  key={l.kind}
-                  label={spxLineLabel(l.kind)}
-                  fullName={spxLineLabel(l.kind)}
-                  hint={spxLineHint(l.kind)}
-                  level={l.currentValue}
-                  distance={l.distanceFromPrice}
-                  proximity={SPX_DISTANCE_PROXIMITY}
-                  glyph="armed"
-                />
-              ))}
-            </ul>
-          </>
-        )}
-      </CardBody>
-    </Card>
+            <>
+              <ColumnHeaderRow />
+              <ul className="divide-y divide-rule">
+                {top.map((l) => (
+                  <TriggerRow
+                    key={l.kind}
+                    label={spxLineLabel(l.kind)}
+                    fullName={spxLineLabel(l.kind)}
+                    hint={spxLineHint(l.kind)}
+                    level={l.currentValue}
+                    distance={l.distanceFromPrice}
+                    proximity={SPX_DISTANCE_PROXIMITY}
+                    glyph="armed"
+                  />
+                ))}
+              </ul>
+            </>
+          )}
+        </CardBody>
+      </div>
+    </EngineCard>
   );
 }
 
 // ---- shared bits ----
-// MetricCol + PendingMetric were superseded by <Metric /> from
-// components/decision-slate/Metric.tsx — that primitive bakes label,
-// info tooltip, and the faint "e.g. B+" placeholder into a single
-// reusable component used by both engine cards.
 
 function ChannelValue({ direction }: { direction: string }) {
   if (direction === "NONE" || !direction) {
     return (
-      <span
-        title="Channel forms after the first qualifying overnight pivot."
-        className="text-[12px] text-state-neutral italic cursor-help"
+      <InfoTooltip
+        label="Channel"
+        content="The channel forms after the first qualifying overnight pivot."
       >
-        not yet formed
-      </span>
+        <span className="text-meta text-state-neutral italic cursor-help">
+          not yet formed
+        </span>
+      </InfoTooltip>
     );
   }
   return (
-    <span className="font-mono text-[13px] font-semibold text-ink tabular-nums" data-num>
-      {direction}
+    <span
+      className="font-mono text-meta font-semibold text-ink tabular-nums"
+      data-num
+    >
+      {direction.toLowerCase()}
     </span>
   );
 }
@@ -550,16 +756,16 @@ function ChannelValue({ direction }: { direction: string }) {
 function BiasValue({ bias }: { bias: string }) {
   const tone =
     bias === "BULLISH"
-      ? "text-state-bullish"
+      ? "text-bull-ink"
       : bias === "BEARISH"
-        ? "text-state-bearish"
-        : "text-state-neutral";
+        ? "text-bear-ink"
+        : "text-ink-2";
   return (
     <span
-      className={`font-mono text-[13px] font-semibold tabular-nums ${tone}`}
+      className={`font-mono text-meta font-semibold tabular-nums ${tone}`}
       data-num
     >
-      {bias}
+      {bias.toLowerCase()}
     </span>
   );
 }
@@ -567,34 +773,38 @@ function BiasValue({ bias }: { bias: string }) {
 function GradeValue({ grade }: { grade: string | null }) {
   if (!grade || grade === "—") {
     return (
-      <span
-        title="Grade is assigned post-trigger."
-        className="font-mono text-[12px] text-ink-3"
+      <InfoTooltip
+        label="Grade"
+        content="Grade is assigned post-trigger."
       >
-        Grade — pending
-      </span>
+        <span className="font-mono text-meta text-ink-3 cursor-help">
+          pending
+        </span>
+      </InfoTooltip>
     );
   }
   return (
-    <span className="font-mono text-[13px] font-semibold tabular-nums text-ink" data-num>
+    <span
+      className="font-mono text-meta font-semibold tabular-nums text-ink"
+      data-num
+    >
       {grade}
     </span>
   );
 }
 
-// Headline price + signed delta. The delta moved here from the
-// SPX metric grid — it's a price attribute, not a metric. Hidden
-// when zero (never `+0.00`).
 function PriceWithDelta({ price, change }: { price: number; change: number }) {
   const isZero = Math.abs(change) < 0.005;
   return (
     <span className="inline-flex items-baseline gap-2 whitespace-nowrap">
-      <span className="font-mono text-sm text-ink-3 tabular-nums">
+      <span className="font-mono text-meta text-ink-3 tabular-nums">
         {price.toFixed(2)}
       </span>
       {!isZero && (
         <span
-          className={`font-mono text-[11px] tabular-nums ${change > 0 ? "text-state-bullish" : "text-state-bearish"}`}
+          className={`font-mono text-[11px] tabular-nums ${
+            change > 0 ? "text-bull-ink" : "text-bear-ink"
+          }`}
           data-num
         >
           {change > 0 ? "+" : "−"}
@@ -605,12 +815,6 @@ function PriceWithDelta({ price, change }: { price: number; change: number }) {
   );
 }
 
-// Em-dash placeholder used in the metric grid when the engine is in
-// PRE_CONFIG. Shared tooltip explains why the value is blank.
-// SPX side of the "Grade" column. The engine's confluence action
-// (TAKE / SELECTIVE / STAND_DOWN) maps onto a letter grade so the
-// column rhythm matches SPY. NULL action → "Grade — pending" with
-// the same tooltip the SPY side uses.
 function SpxGradeValue({ action }: { action: string }) {
   const grade =
     action === "TAKE"
@@ -622,23 +826,22 @@ function SpxGradeValue({ action }: { action: string }) {
           : null;
   if (!grade) {
     return (
-      <span
-        title="Grade is assigned post-trigger."
-        className="font-mono text-[12px] text-ink-3"
-      >
-        Grade — pending
-      </span>
+      <InfoTooltip label="Grade" content="Grade is assigned post-trigger.">
+        <span className="font-mono text-meta text-ink-3 cursor-help">
+          pending
+        </span>
+      </InfoTooltip>
     );
   }
   const tone =
     grade === "A"
-      ? "text-state-bullish"
+      ? "text-bull-ink"
       : grade === "B"
         ? "text-gold-ink"
-        : "text-state-neutral";
+        : "text-ink-2";
   return (
     <span
-      className={`font-mono text-[13px] font-semibold tabular-nums ${tone}`}
+      className={`font-mono text-meta font-semibold tabular-nums ${tone}`}
       data-num
     >
       {grade}
@@ -650,14 +853,14 @@ function FlipsLine({ condition }: { condition?: string }) {
   if (!condition) return null;
   return (
     <div className="rounded-soft border border-rule bg-paper-2/40 px-3 py-2.5">
-      <span className="eyebrow text-ink-3">Flips to GO on:</span>
-      <p className="text-[13px] text-ink leading-snug mt-1">{condition}</p>
+      <span className="font-mono text-[10px] tracking-[0.16em] uppercase text-ink-3">
+        Flips to go on
+      </span>
+      <p className="text-body text-ink leading-snug mt-1">{condition}</p>
     </div>
   );
 }
 
-// Invalidation line. CRITICAL: this surfaces "where the read is wrong"
-// — not where to place a stop. Phrasing is intentionally indirect.
 function InvalidationLine({
   invalidation,
 }: {
@@ -665,73 +868,33 @@ function InvalidationLine({
 }) {
   if (!invalidation) {
     return (
-      <p className="text-[11px] text-ink-3 font-mono">
+      <p className="text-meta text-ink-3 font-mono">
         Invalidation: pending trigger
       </p>
     );
   }
   return (
-    <p className="text-[11px] text-ink-3 font-mono tabular-nums">
-      Invalidation level: {invalidation.level.toFixed(2)} · Suggested stop reference:
-      {" "}
+    <p className="text-meta text-ink-3 font-mono tabular-nums">
+      Invalidation level {invalidation.level.toFixed(2)} · suggested stop{" "}
       {invalidation.stopOffset.toFixed(2)} below trigger
     </p>
   );
 }
 
-function CardFooterRow({
-  children,
-  asOfIso,
-}: {
-  children: React.ReactNode;
-  asOfIso: string;
-}) {
-  return (
-    // mt-auto pins the footer to the bottom of a flex-col CardBody so
-    // SPY and SPX bottom-align even when their content blocks differ
-    // in height (P2).
-    <div className="mt-auto pt-3 border-t border-rule flex items-center justify-between gap-3">
-      {children}
-      <AsOfTicker iso={asOfIso} />
-    </div>
-  );
-}
-
 // ---- structure list bits ----
-
-function ReadCardHeader({
-  engine,
-  count,
-  plottedAt,
-}: {
-  engine: "SPY" | "SPX";
-  count: number;
-  plottedAt: string;
-}) {
-  const plotted = formatHM(plottedAt);
-  return (
-    <CardHeader
-      eyebrow={`${engine} · structure`}
-      title={
-        <span className="flex items-center gap-2 flex-wrap">
-          <span>{count} line{count === 1 ? "" : "s"} active</span>
-          <HelpHint
-            label="Primary line"
-            hint="A tradable level the engine watches for rejection or break — anchored on prior-day pivots and projected forward."
-          />
-        </span>
-      }
-      meta={`Plotted ${plotted} CT · refreshes on close`}
-    />
-  );
-}
 
 function ColumnHeaderRow() {
   return (
     <div className="grid grid-cols-[1fr_auto_auto] items-center gap-4 border-t border-rule px-5 py-2 bg-paper-2/30">
-      <span className="eyebrow text-ink-3">Level</span>
-      <span className="eyebrow text-ink-3 text-right">Price</span>
-      <span className="eyebrow text-ink-3 text-right min-w-[64px]">Distance</span>
+      <span className="font-mono text-[10px] tracking-[0.16em] uppercase text-ink-3">
+        Level
+      </span>
+      <span className="font-mono text-[10px] tracking-[0.16em] uppercase text-ink-3 text-right">
+        Price
+      </span>
+      <span className="font-mono text-[10px] tracking-[0.16em] uppercase text-ink-3 text-right min-w-[64px]">
+        Distance
+      </span>
     </div>
   );
 }
@@ -754,19 +917,25 @@ function TriggerRow({
   glyph: StatusGlyphKind;
 }) {
   const isClose = Math.abs(distance) <= proximity;
-  const tone = isClose ? "text-state-armed" : "text-state-neutral";
+  const tone = isClose ? "text-state-armed" : "text-ink-2";
   const isZero = Math.abs(distance) < 0.005;
   const sign = isZero ? "" : distance > 0 ? "+" : "−";
   return (
-    <li className="grid grid-cols-[1fr_auto_auto] items-center gap-4 px-5 py-3 text-[13px]">
-      <span className="flex items-center gap-2.5 min-w-0" title={`${fullName} — ${hint}`}>
+    <li className="grid grid-cols-[1fr_auto_auto] items-center gap-4 px-5 py-3 text-body">
+      <span
+        className="flex items-center gap-2.5 min-w-0"
+        title={`${fullName} — ${hint}`}
+      >
         <StatusGlyph kind={glyph} label={`${fullName} ${glyph}`} />
         <span className="font-mono text-ink truncate">{label}</span>
       </span>
       <span className="font-mono tabular-nums text-ink text-right">
         {level.toFixed(2)}
       </span>
-      <span className={`font-mono tabular-nums text-right min-w-[64px] ${tone}`} data-num>
+      <span
+        className={`font-mono tabular-nums text-right min-w-[64px] ${tone}`}
+        data-num
+      >
         {sign}
         {Math.abs(distance).toFixed(2)}
       </span>
@@ -812,35 +981,6 @@ function normalizedBands(
   };
 }
 
-function SourceBadge({
-  label,
-  source,
-  error,
-}: {
-  label: string;
-  source: "live" | "degraded" | "seed" | "mock" | "error";
-  error?: string;
-}) {
-  const live = source === "live";
-  const degraded = source === "degraded";
-  const cls = live
-    ? "bg-bull-tint text-bull-ink shadow-[inset_0_0_0_1px_rgba(14,124,80,0.30)]"
-    : degraded
-      ? "bg-gold-tint text-gold-ink shadow-[inset_0_0_0_1px_rgba(184,130,31,0.30)]"
-      : "bg-paper-2 text-ink-3 shadow-[inset_0_0_0_1px_rgba(20,22,26,0.10)]";
-  return (
-    <span
-      title={error || `${label}: ${source}`}
-      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-pill text-[9px] font-mono font-semibold uppercase tracking-[0.12em] ${cls}`}
-    >
-      <span
-        className={`w-1 h-1 rounded-full ${live ? "bg-bull animate-breathe" : degraded ? "bg-gold" : "bg-ink-4"}`}
-      />
-      {label} {source}
-    </span>
-  );
-}
-
 function formatHM(iso: string): string {
   try {
     const d = new Date(iso);
@@ -876,16 +1016,15 @@ function spxHeadline(state: EngineState, action: string): string {
   return "Watching the channel";
 }
 
-// SPY line-name labels + hover hints. Names from the engine carry forms
-// like "UA-1", "UD-2" — expand to readable English on first render.
+// SPY line-name labels + hover hints.
 function spyLineLabel(name: string): string {
-  if (name.startsWith("UA")) return "Upper Ascending Trendline";
-  if (name.startsWith("UD")) return "Upper Descending Trendline";
-  if (name.startsWith("LA")) return "Lower Ascending Trendline";
-  if (name.startsWith("LD")) return "Lower Descending Trendline";
-  if (name.includes("PDH")) return "Prior Day High";
-  if (name.includes("PDL")) return "Prior Day Low";
-  if (name.includes("OPEN")) return "Day Open";
+  if (name.startsWith("UA")) return "Upper ascending trendline";
+  if (name.startsWith("UD")) return "Upper descending trendline";
+  if (name.startsWith("LA")) return "Lower ascending trendline";
+  if (name.startsWith("LD")) return "Lower descending trendline";
+  if (name.includes("PDH")) return "Prior day high";
+  if (name.includes("PDL")) return "Prior day low";
+  if (name.includes("OPEN")) return "Day open";
   return name;
 }
 
@@ -906,10 +1045,10 @@ function spyLineHint(name: string): string {
 
 function spxLineLabel(kind: string): string {
   const m: Record<string, string> = {
-    CHANNEL_CEILING: "Channel Ceiling",
-    CHANNEL_FLOOR: "Channel Floor",
-    PREV_RTH_HIGH_ASC: "Prev RTH High · Asc",
-    PREV_RTH_LOW_DESC: "Prev RTH Low · Desc",
+    CHANNEL_CEILING: "Channel ceiling",
+    CHANNEL_FLOOR: "Channel floor",
+    PREV_RTH_HIGH_ASC: "Prev RTH high · ascending",
+    PREV_RTH_LOW_DESC: "Prev RTH low · descending",
   };
   return m[kind] || kind;
 }

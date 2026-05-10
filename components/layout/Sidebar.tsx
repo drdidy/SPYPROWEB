@@ -25,7 +25,7 @@ const sections = [
     items: [
       { icon: LineChart, label: "Decision Slate", href: "/dashboard" },
       { icon: Activity, label: "SPY Channel", href: "/spy" },
-      { icon: Columns3, label: "SPX Channel", href: "/spx" },
+      { icon: Columns3, label: "ES Channel", href: "/es" },
       { icon: Rewind, label: "Replay", href: "/replay" },
       { icon: Eye, label: "Foresight", href: "/foresight" },
     ],
@@ -97,17 +97,27 @@ export function Sidebar({
                 <a
                   key={it.href}
                   href={it.href}
+                  // v7 P1-5: stronger active state. The previous
+                  // 2px sidebar-edge accent was easy to miss. Now
+                  // a 3px brand-tinted left bar runs the full row
+                  // height + a 4% paper-2 fill. Both visible at
+                  // WCAG AA on the cream canvas.
+                  aria-current={isActive ? "page" : undefined}
                   className={cn(
                     "flex items-center gap-2.5 mx-3 px-2.5 h-8 rounded-soft text-[13px] transition-all duration-150 ease-swift relative",
+                    "outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper",
                     isActive
                       ? "bg-paper-2 text-ink font-medium"
                       : "text-ink-2 hover:text-ink hover:bg-paper-2/60",
                   )}
                 >
                   {isActive && (
-                    <span className="absolute -left-3 top-1/2 -translate-y-1/2 h-4 w-[2px] bg-gold rounded-r" />
+                    <span
+                      aria-hidden
+                      className="absolute -left-1 top-1 bottom-1 w-[3px] bg-gold rounded-r"
+                    />
                   )}
-                  <Icon size={14} className={cn(isActive ? "text-gold" : "text-ink-3")} />
+                  <Icon size={14} className={cn(isActive ? "text-gold-ink" : "text-ink-3")} />
                   {it.label}
                 </a>
               );
@@ -116,13 +126,16 @@ export function Sidebar({
         ))}
       </nav>
 
+      {/* Beta-status pip moved to the header next to the wordmark
+          (see <Wordmark />). The sidebar avatar slot now reads as
+          plain user identity. */}
       <div className="px-4 py-3 border-t border-rule flex items-center gap-2.5">
         <div className="w-7 h-7 rounded-full bg-gold-tint grid place-items-center text-[11px] font-serif font-semibold text-gold-ink shadow-rule">
           d
         </div>
         <div className="flex-1 min-w-0 leading-tight">
           <div className="text-xs font-medium text-ink truncate">Trader</div>
-          <div className="text-[10px] text-ink-3 truncate font-mono">closed beta</div>
+          <div className="text-[10px] text-ink-3 truncate font-mono">Signed in</div>
         </div>
       </div>
     </aside>

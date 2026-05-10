@@ -72,6 +72,21 @@ function classify(block: ReplayLike | null | undefined): SessionOutcome["outcome
   if (!block || !block.isReplay) return "SKIP";
   const o = block.verdictOutcome;
   if (o === "WIN" || o === "LOSS" || o === "PUSH") return o;
+  // v4 note: the SPX track-record consistently classifies recent
+  // sessions as SKIP while SPY shows graded WIN/LOSS days. Two
+  // possible causes (both backend, none fixable from the FE):
+  //   1) yfinance returns empty for ES=F on the dates being graded;
+  //      the SPX replay path then can't compute open/close → no
+  //      verdictOutcome. PR #73 widened the fetch window but didn't
+  //      eliminate the failure mode.
+  //   2) The SPX engine's qualifying conditions (channel formed,
+  //      rejection candle, confirmation) were genuinely not met on
+  //      those days — in which case SKIP is honest.
+  // TODO(backend): investigate api/spx/snapshot.py
+  // _build_spx_replay_block, specifically whether verdictOutcome
+  // can ever be set without a prior verdictOpen / verdictClose
+  // being computed. If yes, the FE will start reflecting graded
+  // days automatically.
   return "SKIP";
 }
 

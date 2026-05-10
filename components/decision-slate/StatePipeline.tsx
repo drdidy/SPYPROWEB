@@ -1,0 +1,348 @@
+"use client";
+
+// Decision Slate's per-engine state pipeline. Refactored from v1 with:
+//
+//   - WCAG AA contrast on every step tone (>= 4.5:1 on the paper
+//     surface). v1's `text-ink-4` for future steps measured 2.95:1 —
+//     replaced with `text-ink-3` paired with reduced weight to keep
+//     the active step visually dominant.
+//   - sr-only step description per <li>, e.g. "Step 3 of 7: Watch
+//     (current)". AT users get a structured progression read-out.
+//   - Stronger active pill: 2px ring in the brand tint + faint inner
+//     shadow so it reads as "current state", not "button".
+//   - Connector hairline rendered between every consecutive pair (not
+//     only some) — verified via the `!isFirst` predicate plus a
+//     post-render guard test in scripts/test-state-pipeline.ts.
+//
+// Public API is unchanged. Existing call-sites that import
+// `StatePipeline` keep working; consumers preferring the deliverable
+// name can import `PipelineStepper` from the same module.
+
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
+import { ENGINE_STATES, type EngineState } from "@/lib/states";
+import { PHASE_DEFINITIONS } from "@/content/phase-definitions";
+import { Countdown } from "@/components/decision-slate/Countdown";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import { displayEngine } from "@/lib/engine-labels";
+import { cn } from "@/lib/utils";
+
+interface Props {
+  engine: "SPY" | "SPX";
+  current: EngineState;
+  /** ISO timestamp of the next significant transition. Drives the live countdown. */
+  nextEventISO?: string;
+  /** Short human label for the next event ("Setup opens", "RTH closes"). */
+  nextEventLabel?: string;
+  /** One-line plain-English explanation of why the engine is in this state. */
+  explanation?: string;
+  className?: string;
+}
+
+// v10 P1-4: state-color top border. The most consequential change
+// on the dashboard — engine going from Stand-down to Watch to
+// Armed to Go — should never be just a typography swap. A 2px top
+// border on the engine card colored by current state makes the
+// state read at a glance from across the room.
+//
+// Inline-style hex values so the rule is locked at the markup
+// boundary (Tailwind compile chains can't reorder these).
+const STATE_TOP_BORDER: Record<EngineState, string> = {
+  PRE_CONFIG: "#D5CDB9",  // neutral gray
+  STAND_DOWN: "#D5CDB9",  // neutral gray
+  WATCH: "#C9A227",       // amber
+  WAIT: "#C9A227",        // amber
+  ARMED: "#4A6FA5",       // blue
+  GO: "#2F7D3F",          // green
+  COOLDOWN: "#B8B0A0",    // muted gray
+};
+
+// Active-pill palette. ring-2 + inset shadow lifts the active step
+// off the surface so it reads as "this is now", not "this is a
+// clickable button".
+const CURRENT_PILL_TONE: Record<EngineState, string> = {
+  PRE_CONFIG:
+    "bg-state-armed/15 text-state-armed ring-2 ring-state-armed/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]",
+  STAND_DOWN:
+    "bg-paper-2 text-ink ring-2 ring-rule-strong shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]",
+  WATCH:
+    "bg-gold-tint text-gold-ink ring-2 ring-gold/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]",
+  WAIT:
+    "bg-gold-tint text-gold-ink ring-2 ring-gold/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]",
+  ARMED:
+    "bg-state-armed/15 text-state-armed ring-2 ring-state-armed/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]",
+  GO:
+    "bg-bull-tint text-bull-ink ring-2 ring-bull/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]",
+  COOLDOWN:
+    "bg-paper-2 text-ink ring-2 ring-rule-strong shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]",
+};
+
+export function StatePipeline({
+  engine,
+  current,
+  nextEventISO,
+  nextEventLabel,
+  explanation,
+  className,
+}: Props) {
+  const currentIdx = ENGINE_STATES.indexOf(current);
+  const labelTone = engine === "SPX" ? "text-violet" : "text-ink-2";
+
+  return (
+    <section
+      aria-label={`${displayEngine(engine)} engine state pipeline`}
+      // v5 #1: min-w-0 + overflow-hidden on the section is the
+      // overflow guard so the inner stepper can't bully the parent
+      // grid track wider than its column.
+      // v10 P1-3 + P1-4: tier-2 surface (pure white, subtle border)
+      // + a 2px top border colored by the current state. The border
+      // tone is set inline so theme/Tailwind chains can't reorder it.
+      className={cn(
+        "rounded-card border border-rule-tier2 bg-paper-tier2 px-4 py-3 md:px-5 md:py-4",
+        "border-t-[2px]",
+        "min-w-0 overflow-hidden",
+        className,
+      )}
+      style={{ borderTopColor: STATE_TOP_BORDER[current] }}
+    >
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4 min-w-0">
+        {/* v4 #5: drop the serif state-name title that lived next to
+            the ticker. The active pill in the stepper below already
+            names the state — rendering "Pre-config" twice (title +
+            chip) was redundant. The ticker now stands alone. */}
+        <div className="shrink-0 self-start">
+          {/* v8 P1-2: SPX → ES at the render boundary. The `engine`
+              prop stays as the wire-level identifier so the data
+              path (snapshot keys, /api/spx) keeps working unchanged. */}
+          <span
+            className={cn(
+              "font-mono text-[11px] tracking-[0.18em] uppercase font-bold",
+              labelTone,
+            )}
+          >
+            {displayEngine(engine)}
+          </span>
+        </div>
+
+        {/* Stepper. Real <ol> with aria-current="step" on the active
+            <li>. Each step has an sr-only description so screen
+            readers announce position + label + status.
+            v5 #1: overflow-x-hidden (not auto) — the section never
+            scrolls horizontally; instead the stepper switches to a
+            collapsed "current → next" view at <xl widths via the
+            responsive label below. */}
+        <ol
+          role="list"
+          aria-label={`${displayEngine(engine)} state progression`}
+          className="flex items-center gap-0 flex-1 min-w-0 overflow-hidden"
+        >
+          {ENGINE_STATES.map((state, i) => {
+            const phase = PHASE_DEFINITIONS[state];
+            const isCurrent = i === currentIdx;
+            const isPassed = currentIdx >= 0 && i < currentIdx;
+            const isFuture = currentIdx >= 0 && i > currentIdx;
+            const isFirst = i === 0;
+            const stepNum = i + 1;
+            const stepStatus = isCurrent
+              ? "current"
+              : isPassed
+                ? "completed"
+                : "upcoming";
+            return (
+              <li
+                key={state}
+                aria-current={isCurrent ? "step" : undefined}
+                className="flex items-center shrink-0 min-w-0"
+              >
+                {/* Connector hairline. v5 #1: thinner spacing at lg
+                    so seven nodes fit a half-screen card without the
+                    parent grid overflowing. */}
+                {!isFirst && (
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "h-px w-2 md:w-3 xl:w-5",
+                      isPassed || isCurrent
+                        ? "bg-rule-strong"
+                        : "bg-rule",
+                    )}
+                  />
+                )}
+                {/* sr-only structured description for AT. The visual
+                    label below is short to keep the strip scannable;
+                    this span carries the full progression context. */}
+                <span className="sr-only">
+                  Step {stepNum} of {ENGINE_STATES.length}: {phase.label} —{" "}
+                  {stepStatus}.
+                </span>
+                <InfoTooltip
+                  label={phase.label}
+                  content={
+                    <>
+                      <span className="block">{phase.summary}</span>
+                      <span className="block mt-1 opacity-80">
+                        Enter on: {phase.enterOn}
+                      </span>
+                      <span className="block opacity-80">
+                        Exit on: {phase.exitOn}
+                      </span>
+                    </>
+                  }
+                >
+                  {/* v7 P0-3: four-tier responsive label render so the
+                      stepper never overflows its parent grid track:
+                        ≥1440 (xl-plus)  full label  ("Pre-config")
+                        1280-1439 (xl)   short label ("Pre", "Stand", "Watch", "Wait", "Armed", "Go", "Cool")
+                        1024-1279 (lg)   dot for inactive, full label for current
+                        <1024            full label (the row stacks vertically anyway)
+                      The active step always shows the full label. */}
+                  <span
+                    className={cn(
+                      "inline-flex items-center rounded-pill",
+                      "text-[11px] tracking-[0.01em] whitespace-nowrap",
+                      "transition-colors",
+                      // The active pill is always rendered as a labeled
+                      // chip; the dot-mode at lg only applies to non-
+                      // current steps via the `xl-plus:hidden xl:hidden lg:flex`
+                      // dot below.
+                      isCurrent
+                        ? cn(
+                            "px-1.5 py-0.5 font-semibold animate-breathe",
+                            CURRENT_PILL_TONE[state],
+                          )
+                        : isPassed
+                          ? "px-1.5 py-0.5 bg-paper-2/50 text-ink-3 font-medium"
+                          : "px-1.5 py-0.5 text-ink-3 font-normal",
+                    )}
+                  >
+                    {/* < lg: full label (the row stacks vertically) */}
+                    <span className="lg:hidden">{phase.label}</span>
+                    {/* lg–xl-plus: full for the current step only.
+                        Inactive steps at lg render the dot below
+                        instead of this pill — see the dot fallback
+                        block. */}
+                    {isCurrent ? (
+                      <>
+                        {/* lg–xl: full label for current */}
+                        <span className="hidden lg:inline xl:hidden">
+                          {phase.label}
+                        </span>
+                        {/* xl–xl-plus: short abbreviation */}
+                        <span className="hidden xl:inline xl-plus:hidden">
+                          {phase.short}
+                        </span>
+                        {/* xl-plus+: full label */}
+                        <span className="hidden xl-plus:inline">
+                          {phase.label}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        {/* lg: nothing (dot rendered separately) */}
+                        <span className="hidden lg:inline xl:hidden text-[0px] leading-none">
+                          •
+                        </span>
+                        {/* xl–xl-plus: short abbreviation */}
+                        <span className="hidden xl:inline xl-plus:hidden">
+                          {phase.short}
+                        </span>
+                        {/* xl-plus+: full label */}
+                        <span className="hidden xl-plus:inline">
+                          {phase.label}
+                        </span>
+                      </>
+                    )}
+                  </span>
+                </InfoTooltip>
+              </li>
+            );
+          })}
+        </ol>
+
+        {/* Right-rail meta column. v5 #1: dropped the 160px min-width
+            reservation so the stepper has more breathing room at lg
+            widths. The text is whitespace-nowrap, so it stays on
+            one line without the hard floor. */}
+        {(nextEventISO || nextEventLabel) && (
+          <div className="shrink-0 self-start md:self-center md:text-right whitespace-nowrap flex flex-col gap-0.5">
+            {nextEventLabel && (
+              <span className="font-mono text-[10px] tracking-[0.10em] uppercase text-ink-3">
+                {nextEventLabel}
+              </span>
+            )}
+            {nextEventISO && (
+              <span className="font-mono text-meta tabular-nums text-ink">
+                <Countdown to={nextEventISO} verb="in" />
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Plain-English explanation underneath the stepper. */}
+      {explanation && (
+        <p className="mt-3 text-body text-ink-2 leading-snug">{explanation}</p>
+      )}
+    </section>
+  );
+}
+
+// Deliverable alias from the v2 spec — same component, canonical name.
+export { StatePipeline as PipelineStepper };
+
+// ---------------------------------------------------------------------
+// Compact engine-status chip — kept for back-compat callers, but the
+// v2 dashboard no longer renders it (the per-engine pipelines are the
+// single source of truth).
+// ---------------------------------------------------------------------
+
+export function EngineStatusChip({
+  spyState,
+  spxState,
+  href = "/dashboard",
+}: {
+  spyState: EngineState;
+  spxState: EngineState;
+  href?: string;
+}) {
+  const spyLabel = humanState(spyState);
+  const spxLabel = humanState(spxState);
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "inline-flex items-center gap-2 h-7 px-2.5 rounded-pill",
+        "bg-paper-2/60 text-ink-2 hover:text-ink hover:bg-paper-2",
+        "border border-rule transition-colors",
+        "font-mono text-[11px] tracking-[0.06em]",
+        "outline-none focus-visible:ring-2 focus-visible:ring-gold/40",
+      )}
+      aria-label={`Engines: SPY ${spyLabel}, SPX ${spxLabel}`}
+    >
+      <span className="text-ink-3 uppercase tracking-[0.10em] text-[10px]">
+        Engines
+      </span>
+      <span className="font-bold">SPY</span>
+      <span>{spyLabel}</span>
+      <span className="text-ink-4" aria-hidden>
+        ·
+      </span>
+      <span className="font-bold text-violet">SPX</span>
+      <span>{spxLabel}</span>
+      <ArrowRight size={10} className="text-ink-4" aria-hidden />
+    </Link>
+  );
+}
+
+function humanState(s: EngineState): string {
+  const m: Record<EngineState, string> = {
+    PRE_CONFIG: "pre-config",
+    STAND_DOWN: "standing down",
+    WATCH: "watching",
+    WAIT: "waiting",
+    ARMED: "armed",
+    GO: "live",
+    COOLDOWN: "cooldown",
+  };
+  return m[s];
+}

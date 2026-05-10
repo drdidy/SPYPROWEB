@@ -43,12 +43,19 @@ export function ConvictionTrack({
 
   return (
     <div className={cn("flex flex-col gap-1.5 w-full", className)}>
+      {/* v5 #14: bar height bumped from h-1.5 (6px) to h-2 (8px) so
+          it reads as a meter rather than an underline. ARIA progress
+          attributes added so screen readers announce the value. */}
       <div
         title={tooltip}
         tabIndex={0}
+        role="progressbar"
         aria-label={`Conviction ${label}. ${tooltip}`}
+        aria-valuenow={clampedValue}
+        aria-valuemin={0}
+        aria-valuemax={max}
         className={cn(
-          "group relative h-1.5 w-full rounded-full overflow-hidden",
+          "group relative h-2 w-full rounded-full overflow-hidden",
           "outline-none focus-visible:ring-2 focus-visible:ring-gold/40",
         )}
       >

@@ -4,10 +4,37 @@ const config: Config = {
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
+      // 1440 boundary used by the SPX/SPY pipeline stepper to switch
+      // between abbreviated and full step labels. Tailwind's stock
+      // breakpoints jump from 1280 (xl) straight to 1536 (2xl); the
+      // stepper needs a pivot in that gap so trader-screen widths
+      // (1440 / 1600) get the readable full label without the 1280
+      // crowd losing their layout.
+      screens: {
+        "xl-plus": "1440px",
+      },
       colors: {
         canvas: "#FAF8F3",
         paper: "#FFFFFF",
         "paper-2": "#F4EFE3",
+        // Cooler cream-grey surface used to differentiate "preview /
+        // not-live" sections from the warm live-paper palette.
+        "paper-cool": "#EEF0EB",
+        // Branded tint surface for the Recommended Action hero.
+        "paper-brand": "#FAF1DC",
+        // v10 P1-3: three-tier surface system. Each engine card,
+        // section card, and hero gets exactly one tier so the
+        // visual hierarchy reads at a glance.
+        //   tier1 — hero          (warm cream, ochre border)
+        //   tier2 — primary       (pure white, subtle border)
+        //   tier3 — secondary     (faint cream, top divider only)
+        "paper-tier1": "#FAF1DA",
+        "paper-tier2": "#FFFFFF",
+        "paper-tier3": "#FBF7EE",
+        // The two border tones used by tier1 + tier2 respectively.
+        // Defined as colors so they compose with `border-*`.
+        "rule-tier1": "#C9A227",
+        "rule-tier2": "#E8DFCE",
         sunken: "#EFE9DA",
 
         ink: {
@@ -104,6 +131,14 @@ const config: Config = {
         display: ["clamp(32px, 4vw, 44px)", { lineHeight: "1.04", letterSpacing: "-0.025em", fontWeight: "400" }],
         headline: ["clamp(22px, 2.4vw, 28px)", { lineHeight: "1.15", letterSpacing: "-0.015em", fontWeight: "500" }],
         title: ["18px", { lineHeight: "1.25", letterSpacing: "-0.005em", fontWeight: "600" }],
+        // Slate refinement (2026-05): explicit type-scale tiers for
+        // body / meta so consumers stop reaching for arbitrary
+        // text-[12px] / text-[13px] / text-[14px] values. Keeps the
+        // editorial scale honest and lets us audit later by grep.
+        h2: ["18px", { lineHeight: "1.25", letterSpacing: "-0.005em", fontWeight: "600" }],
+        h3: ["15px", { lineHeight: "1.3", letterSpacing: "-0.005em", fontWeight: "600" }],
+        body: ["14px", { lineHeight: "1.55", letterSpacing: "0", fontWeight: "400" }],
+        meta: ["12px", { lineHeight: "1.4", letterSpacing: "0.02em", fontWeight: "500" }],
         eyebrow: ["10px", { lineHeight: "1", letterSpacing: "0.16em", fontWeight: "600" }],
         micro: ["10.5px", { lineHeight: "1.25", letterSpacing: "0.02em", fontWeight: "500" }],
       },
@@ -132,6 +167,11 @@ const config: Config = {
 
       keyframes: {
         breathe: { "0%,100%": { opacity: "1" }, "50%": { opacity: "0.55" } },
+        // Slate skeleton shimmer. Single L→R sweep used by <Skeleton />.
+        shimmer: {
+          "0%": { transform: "translateX(-100%)" },
+          "100%": { transform: "translateX(100%)" },
+        },
         flashUp: {
           "0%": { backgroundColor: "rgba(14,124,80,0.18)" },
           "100%": { backgroundColor: "transparent" },
@@ -155,6 +195,7 @@ const config: Config = {
         "flash-down": "flashDown 600ms ease-out",
         rise: "riseUp 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both",
         ticker: "ticker 60s linear infinite",
+        shimmer: "shimmer 1.6s linear infinite",
       },
 
       backgroundImage: {

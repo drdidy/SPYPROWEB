@@ -119,12 +119,24 @@ def _build_spx_replay_block(payload: dict, replay_date: date | None) -> dict:
     reading verdictOutcome (WIN/LOSS/PUSH/N_A). Without scoring it
     always reads N_A and the dashboard renders "no graded sessions".
 
-    Grading rule for SPX:
-      action == TAKE | SELECTIVE  AND  channel.direction != NONE
-        → engine bet on the channel direction this session.
-        → Compare day's net open→close to the implied side.
-      action == STAND_DOWN  OR  channel.direction == NONE
-        → N/A.
+    Grading rule for SPX (v9 — corrected per trader's strategy):
+      channel.direction != NONE
+        → Engine projected a ceiling and a floor; both rails reach
+          09:00 CT. The trade IS the rail tag — when ES tags either
+          rail at/around 09:00 and moves away, the engine took the
+          play implied by the channel direction (long off the floor
+          for ASCENDING, short off the ceiling for DESCENDING).
+          Compare the day's net open→close to that implied side.
+      channel.direction == NONE
+        → No channel rails were projected, so there is no rail to
+          tag. N_A is the honest read.
+
+    The previous rule also required `action in (TAKE, SELECTIVE)` —
+    a confluence-score gate. That gate is meant to filter
+    low-conviction sessions for *display* purposes ("stand down,
+    don't take this one"), but it shouldn't suppress *grading* of
+    what would have happened if the user had taken the rail tag
+    anyway. Dropped — grading is about what the rails actually did.
 
     Critical detail: the engine plots lines from ES=F bars + an
     offset (SPX_equiv = ES + offset). Grading must walk the same
@@ -149,7 +161,10 @@ def _build_spx_replay_block(payload: dict, replay_date: date | None) -> dict:
     confluence = (payload.get("confluence") or {})
     channel = (payload.get("channel") or {})
     meta = payload.get("_meta") or {}
-    action = confluence.get("action")
+    # `action` retained in the payload contract for the dashboard
+    # display ("TAKE" / "SELECTIVE" / "STAND_DOWN") but is no
+    # longer a grading input — see docstring above.
+    _action = confluence.get("action")
     direction = channel.get("direction")
     applied_offset = meta.get("appliedOffset")
     offset = float(applied_offset) if isinstance(applied_offset, (int, float)) else 0.0
@@ -164,9 +179,8 @@ def _build_spx_replay_block(payload: dict, replay_date: date | None) -> dict:
             "netPts": round(day["close"] - day["open"], 2),
         }
 
-    is_directional = action in ("TAKE", "SELECTIVE")
     has_channel = direction in ("ASCENDING", "DESCENDING")
-    if is_directional and has_channel and day is not None:
+    if has_channel and day is not None:
         net = day["close"] - day["open"]
         bullish_bet = direction == "ASCENDING"
         if bullish_bet:
@@ -292,6 +306,21 @@ class handler(BaseHTTPRequestHandler):
             # Fetcher returned no bars (e.g. weekend, broker out, both
             # backends down). 503 so the frontend can fall back to mock.
             payload = {"error": str(e), "kind": "no_bars"}
+            status = 503
+        except ValueError as e:
+            # Engine raised on a missing-data invariant. The two
+            # known cases:
+            #   - "No ES candles in overnight window" — the lookback
+            #     window didn't cover the prior session's overnight
+            #     bars (e.g. on a Saturday probe with a too-short
+            #     lookback), or the data feed gapped overnight.
+            # Treat the same as no_bars: 503 so the FE renders a
+            # graceful empty state rather than a hard error.
+            payload = {
+                "error": str(e),
+                "kind": "no_bars",
+                "subkind": "missing_overnight_bars",
+            }
             status = 503
         except Exception as e:
             payload = {

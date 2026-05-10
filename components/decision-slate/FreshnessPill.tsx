@@ -61,6 +61,11 @@ export function FreshnessPill({ freshnessISO, source, className }: Props) {
       aria-label={title}
       data-testid="freshness-pill"
       data-tone={tone}
+      // v5 #16: aria-live="polite" so AT users hear the new
+      // timestamp when the snapshot refreshes. atomic so the full
+      // text is re-announced rather than the diff.
+      aria-live="polite"
+      aria-atomic="true"
       className={cn(
         "inline-flex items-center gap-1.5 outline-none",
         "focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-1 rounded-pill",

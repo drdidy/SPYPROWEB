@@ -122,7 +122,7 @@ function buildSpxRecap(snap: SPXSnapshot | null): LastSignalSummary | null {
       triggerAt: snap.asOf,
       exitAt: snap.asOf,
       rMultiple: pnl,
-      oneLine: `engine watched · day ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} pts`,
+      oneLine: `Watched only — day closed ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} pts`,
     };
   }
   return null;
@@ -160,8 +160,12 @@ function shapeSoftRecap(
   ts: string,
 ): LastSignalSummary {
   const pnl = session.netPts;
-  const verdictLabel = verdict ? verdict.toLowerCase().replace(/_/g, " ") : "watched";
-  const oneLine = `engine ${verdictLabel} · day ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} pts (${session.open.toFixed(2)} → ${session.close.toFixed(2)})`;
+  // Sentence-case, human-friendly framing. Verdict labels like
+  // "stand_down" become "stood down"; absent verdict reads "watched".
+  const verdictLabel = verdict
+    ? humanizeVerdict(verdict)
+    : "Watched";
+  const oneLine = `${verdictLabel} — day closed ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} pts (${session.open.toFixed(2)} → ${session.close.toFixed(2)})`;
   return {
     side: pnl >= 0 ? "LONG" : "SHORT",
     triggerAt: ts,
@@ -169,4 +173,24 @@ function shapeSoftRecap(
     rMultiple: pnl,
     oneLine,
   };
+}
+
+// Map raw verdict tokens to a calm, sentence-cased phrase suitable for
+// the last-session line. Unknown tokens fall back to the lowercased
+// raw value so we don't accidentally render code identifiers.
+function humanizeVerdict(verdict: string): string {
+  const normalized = verdict.toUpperCase().replace(/-/g, "_");
+  const map: Record<string, string> = {
+    LONG: "Leaned long",
+    SHORT: "Leaned short",
+    HOLD: "Held position",
+    WAIT: "Waited",
+    STAND_DOWN: "Stood down",
+    TAKE: "Took the channel",
+    SELECTIVE: "Traded selectively",
+    NO_TRADE: "Watched",
+    NA: "Watched",
+    N_A: "Watched",
+  };
+  return map[normalized] ?? verdict.toLowerCase().replace(/_/g, " ");
 }

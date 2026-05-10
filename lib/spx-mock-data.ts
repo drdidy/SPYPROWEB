@@ -2,7 +2,7 @@ import type { SPXSnapshot } from "./types";
 
 // ---------------------------------------------------------------------------
 // SPX mock snapshot — demo scenario: INSIDE_ASCENDING.
-// Numbers are mathematically self-consistent against slope = +1.05/hr so the
+// Numbers are mathematically self-consistent against slope = +1.04/hr so the
 // surface looks honest (channel floor / ceiling project correctly from the
 // overnight anchors to the as-of timestamp).
 //
@@ -10,8 +10,9 @@ import type { SPXSnapshot } from "./types";
 // As-of:             2026-05-08 09:35 CT (5 min into RTH)
 //
 // Channel direction is ASCENDING because Tokyo (21:00–02:00 CT) printed
-// HH + HL versus Sydney (17:00–21:00 CT). Floor anchors at the overnight low,
-// ceiling anchors at the overnight high; both rise at +1.05/hr.
+// HH + HL versus Sydney (17:00–20:00 CT). Floor anchors at the overnight low,
+// ceiling anchors at the overnight high; both rise at +1.04/hr (ascending
+// uses overnight highest-close / lowest-close per the anchor rule).
 // ---------------------------------------------------------------------------
 
 export const spxSnapshot: SPXSnapshot = {
@@ -51,47 +52,47 @@ export const spxSnapshot: SPXSnapshot = {
       "Tokyo printed a higher high (5872.40 vs 5862.10) and higher low (5853.20 vs 5849.00) than Sydney. Range is rising — ascending channel.",
   },
 
-  // Slope = +1.05/hr applied to four lines.
-  // Floor:    5848.20 + 15.95h * 1.05 ≈ 5864.95
-  // Ceiling:  5872.40 + 10.35h * 1.05 ≈ 5883.27
-  // PrevH:    5878.50 + 20.17h * 1.05 ≈ 5899.68 (asc from prev RTH high)
-  // PrevL:    5849.00 - 23.88h * 1.05 ≈ 5823.93 (desc from prev RTH low)
+  // Slope = +1.04/hr applied to four lines.
+  // Floor:    5848.20 + 15.95h *  1.04 ≈ 5864.79
+  // Ceiling:  5872.40 + 10.35h *  1.04 ≈ 5883.16
+  // PrevH:    5878.50 + 20.17h *  1.04 ≈ 5899.48 (asc from prev RTH high)
+  // PrevL:    5849.00 + 23.88h * -1.04 ≈ 5824.16 (desc from prev RTH low)
   lines: [
     {
       kind: "CHANNEL_FLOOR",
       name: "Channel Floor",
       anchorPrice: 5848.20,
       anchorTime: "2026-05-07T17:38:00-05:00",
-      slopePerHour: 1.05,
-      currentValue: 5864.95,
-      distanceFromPrice: -7.05, // price is above floor
+      slopePerHour: 1.04,
+      currentValue: 5864.79,
+      distanceFromPrice: -7.21, // price (5872.00) is above floor
     },
     {
       kind: "CHANNEL_CEILING",
       name: "Channel Ceiling",
       anchorPrice: 5872.40,
       anchorTime: "2026-05-07T23:14:00-05:00",
-      slopePerHour: 1.05,
-      currentValue: 5883.27,
-      distanceFromPrice: 11.27, // price is below ceiling
+      slopePerHour: 1.04,
+      currentValue: 5883.16,
+      distanceFromPrice: 11.16, // price is below ceiling
     },
     {
       kind: "PREV_RTH_HIGH_ASC",
       name: "Prev RTH High · Ascending",
       anchorPrice: 5878.50,
       anchorTime: "2026-05-07T13:25:00-05:00",
-      slopePerHour: 1.05,
-      currentValue: 5899.68,
-      distanceFromPrice: 27.68,
+      slopePerHour: 1.04,
+      currentValue: 5899.48,
+      distanceFromPrice: 27.48,
     },
     {
       kind: "PREV_RTH_LOW_DESC",
       name: "Prev RTH Low · Descending",
       anchorPrice: 5849.00,
       anchorTime: "2026-05-07T09:42:00-05:00",
-      slopePerHour: -1.05,
-      currentValue: 5823.93,
-      distanceFromPrice: -48.07,
+      slopePerHour: -1.04,
+      currentValue: 5824.16,
+      distanceFromPrice: -47.84,
     },
   ],
 
@@ -101,25 +102,25 @@ export const spxSnapshot: SPXSnapshot = {
     changePct: 0.11,
   },
 
-  // 5872.00 is between 5864.95 (floor) and 5883.27 (ceiling) → INSIDE_ASCENDING
+  // 5872.00 is between 5864.79 (floor) and 5883.16 (ceiling) → INSIDE_ASCENDING
   scenario: "INSIDE_ASCENDING",
   scenarioExplanation:
-    "Last print 5872.00 sits inside the ascending channel — 7.05 pts above floor, 11.27 pts below ceiling. Mid-channel: both rails are reachable on the session.",
+    "Last print 5872.00 sits inside the ascending channel — 7.21 pts above floor, 11.16 pts below ceiling. Mid-channel: both rails are reachable on the session.",
 
   plays: {
     primary: {
       side: "BUY",
       entryLine: "CHANNEL_FLOOR",
-      entryPrice: 5864.95,
+      entryPrice: 5864.79,
       exitLine: "CHANNEL_CEILING",
-      exitPrice: 5883.27,
+      exitPrice: 5883.16,
     },
     alternate: {
       side: "SELL",
       entryLine: "CHANNEL_CEILING",
-      entryPrice: 5883.27,
+      entryPrice: 5883.16,
       exitLine: "CHANNEL_FLOOR",
-      exitPrice: 5864.95,
+      exitPrice: 5864.79,
     },
   },
 
@@ -130,14 +131,14 @@ export const spxSnapshot: SPXSnapshot = {
       strike: 5890,
       expiration: "2026-05-08",
       dteLabel: "0DTE",
-      distanceFromSpot: 5890 - 5864.95, // 25.05 OTM from entry
+      distanceFromSpot: 5890 - 5864.79, // 25.21 OTM from entry
     },
     forAlternate: {
       type: "PUT",
       strike: 5860,
       expiration: "2026-05-08",
       dteLabel: "0DTE",
-      distanceFromSpot: 5860 - 5883.27, // -23.27 OTM from entry
+      distanceFromSpot: 5860 - 5883.16, // -23.16 OTM from entry
     },
   },
 

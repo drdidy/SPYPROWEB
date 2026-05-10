@@ -34,7 +34,7 @@ export default function Page({ searchParams }: PageProps) {
           <span className="text-ink-3 italic font-light">replayed.</span>
         </h1>
         <p className="mt-2 text-[13px] text-ink-2 leading-relaxed max-w-xl">
-          Pick a past trading day. We'll rebuild the SPX channel and the
+          Pick a past trading day. We'll rebuild the ES channel and the
           SPY anchor framework as they stood that morning, then play the
           day's tape forward against them — every line touch, every
           verdict outcome.

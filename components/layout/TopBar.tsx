@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Bell, Menu, Search } from "lucide-react";
 import { NumberFlash } from "@/components/ui/NumberFlash";
 import { Kbd } from "@/components/ui/Kbd";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { useLiveSPY, useLiveSPX } from "@/lib/use-live-snapshot";
 import { cn } from "@/lib/utils";
 import { FreshnessPill } from "@/components/decision-slate/FreshnessPill";
@@ -12,15 +13,35 @@ import {
   priceStalenessLabel,
   renderSessionSegment,
 } from "@/lib/sessions";
+import { formatNumber, isLoadedNumber } from "@/lib/format-number";
+import { deriveProvenance } from "@/lib/spx-provenance";
+// v8 P1-3: SpxProvenanceBadge / SpxAsOfMicrotext no longer mounted
+// here — synthesis is gone from the header. SpxDebugOverlay stays;
+// the Cmd+Shift+D diagnostic still has value when investigating
+// engine-state discrepancies on /dashboard.
+import { SpxDebugOverlay } from "@/components/decision-slate/SpxProvenance";
 import type { EngineState } from "@/lib/states";
 
 // ---------------------------------------------------------------------------
-// TopBar layout — three-zone flex (chips · ribbon · meta) on a single
-// overflow-hidden row. Each zone is shrink-0 + whitespace-nowrap so no
-// segment can flex-grow into another. Hide priority below 1024px:
-//   VIX delta → VIX label → prices → session line → state pills
-// State pills are the slate's most important top-bar surface and survive
-// down to 375px.
+// TopBar layout — five-cluster row separated by 1px vertical dividers.
+//
+//   [menu] | [SPY · SPX state]  | [SPY/SPX/VIX prices] | [next setup · freshness] | [search][bell]
+//
+// Each cluster is shrink-0 + whitespace-nowrap so no segment can
+// flex-grow into another. Hide priority below 1024px:
+//   prices ribbon → next-setup line → engines cluster → state pills
+// State chips and freshness pill survive down to 375px.
+//
+// v4 fixes:
+//   - Inline "· Fri close" suffix removed (it clipped to "ri close"
+//     at lg widths). Staleness is now an InfoTooltip on the price
+//     value, with the exact close timestamp as the tooltip content.
+//   - VIX renders a skeleton bar when the value isn't loaded yet,
+//     instead of "1" (the leading character of an unset number that
+//     was getting clipped).
+//   - The two state chips are wrapped in an "Engines" cluster with
+//     a leading label so the row reads as structured groups, not an
+//     unstructured ribbon of metadata.
 // ---------------------------------------------------------------------------
 
 const verbPalette: Record<string, string> = {
@@ -57,26 +78,18 @@ export function TopBar({
   const spxSnapshot = useLiveSPX();
   const decision = spy.decision;
   const t = spy.shell;
-  // FreshnessPill (right cluster) carries the "Updated HH:MM CT" text
-  // now — single source of truth for staleness.
   const sessionLine = useSessionLine();
   const staleness = useStalenessLabel();
+  const stalenessAt = useStalenessTimestamp();
 
   const spyState = spy.currentState;
   const spxState = (spxSnapshot.currentState as EngineState | undefined) ?? "STAND_DOWN";
 
-  // ---- SPY pill -------------------------------------------------------
-  // In PRE_CONFIG the engine has no conviction and no verb yet — pill
-  // reads just "SPY · PRE-CONFIG" with no sub-label. Otherwise show
-  // verb + conviction.
   const spyVerb = spyState === "PRE_CONFIG" ? "PRE-CONFIG" : decision.verdict;
   const spyTone = verbPalette[spyVerb] ?? verbPalette["STAND DOWN"];
   const spyMeta =
     spyState === "PRE_CONFIG" ? null : `conviction ${decision.conviction}/5`;
 
-  // ---- SPX pill -------------------------------------------------------
-  // PRE_CONFIG drops the OUTSIDE / INSIDE scenario tag. There's no
-  // "outside" of a play that hasn't been plotted yet.
   const rawSpxVerb = spxSnapshot.confluence.action.replace(/_/g, " ");
   const spxVerb = spxState === "PRE_CONFIG" ? "PRE-CONFIG" : rawSpxVerb;
   const spxTone = verbPalette[spxVerb] ?? verbPalette["STAND DOWN"];
@@ -85,16 +98,37 @@ export function TopBar({
       ? null
       : SPX_SCENARIO_TAG[spxSnapshot.scenario] ?? spxSnapshot.scenario;
 
+  // v5 #2: routed through isLoadedNumber so the contract for "value
+  // is renderable" lives in one place. 0 is treated as unloaded for
+  // VIX/SPY since 0 is never a real reading on those tickers.
+  const vixLoaded = isLoadedNumber(t.vix);
+  const spyLoaded = isLoadedNumber(t.spy);
+
+  // v8 P1-4: header shows ES front-month directly (the engine's
+  // native data), not the SPX cash equivalent it used to synthesize
+  // via basis offset. Pull from `_meta.esSpot` — the raw ES quote
+  // captured at the basis snapshot. Delta is unavailable at the
+  // snapshot level (the snapshot only carries the SPX price.change
+  // pair), so we fall back to the SPX delta which is identical in
+  // points (basis is a constant). When ES isn't loaded yet, the
+  // value renders an em-dash via formatNumber.
+  const esSpot = spxSnapshot._meta?.esSpot ?? null;
+  const esDelta = spxSnapshot.price.change;
+  const esLoaded = isLoadedNumber(esSpot);
+
+  // v6 P0-4: provenance still computed for the dashboard verdict
+  // card (SpxProvenanceBadge mounted there) and the Cmd+Shift+D
+  // debug overlay. The header chip + microtext are gone (v8
+  // P1-3) — those displayed the synthesis tier, which is no
+  // longer relevant since we show ES directly.
+  const spxProvenance = deriveProvenance(spxSnapshot._meta);
+
   return (
     <header
       className={cn(
         "h-[60px] sticky top-0 z-30 bg-canvas/85 backdrop-blur-md",
         "border-b border-rule",
-        // Single flex row, gap-controlled. overflow-hidden + min-w-0
-        // is the regression guard — without these, a long session line
-        // can push the right cluster off-screen, *visually overlapping*
-        // the prices.
-        "flex items-center gap-3 md:gap-5 px-3 md:px-5 overflow-hidden min-w-0",
+        "flex items-center gap-3 md:gap-4 px-3 md:px-5 overflow-hidden min-w-0",
       )}
       data-testid="topbar"
     >
@@ -107,11 +141,17 @@ export function TopBar({
         <Menu size={17} />
       </button>
 
-      {/* ---- ZONE 1: state pills (always visible, highest priority) -- */}
+      {/* CLUSTER 1: Engines status — the SPY/SPX state chips with a
+          leading "Engines" label so the cluster reads as one
+          structured group rather than two floating chips. */}
       <div
         data-segment="pills"
+        data-cluster="engines"
         className="flex items-center gap-2 shrink-0 whitespace-nowrap"
       >
+        <span className="hidden md:inline font-mono text-[9px] tracking-[0.18em] uppercase text-ink-3">
+          Engines
+        </span>
         <SymbolChip
           href="/dashboard"
           symbol="SPY"
@@ -119,9 +159,14 @@ export function TopBar({
           verbTone={spyTone}
           meta={spyMeta}
         />
+        <span aria-hidden className="text-ink-4 text-[10px]">
+          ·
+        </span>
+        {/* v9: chip displays "ES" and links to /es (route renamed
+            from /spx in this round). */}
         <SymbolChip
-          href="/spx"
-          symbol="SPX"
+          href="/es"
+          symbol="ES"
           verb={spxVerb}
           verbTone={spxTone}
           meta={spxMeta}
@@ -129,57 +174,73 @@ export function TopBar({
         />
       </div>
 
-      {/* ---- ZONE 2: quote ribbon (hidden < md, fluid filler) -------- */}
-      {/* flex-1 so it absorbs slack between zone 1 and zone 3 when
-          there's room; min-w-0 + overflow-hidden lets it truncate
-          gracefully rather than push neighbors. */}
-      <div className="hidden md:flex flex-1 items-center justify-center gap-3 lg:gap-5 min-w-0 overflow-hidden">
+      <Divider className="hidden md:block" />
+
+      {/* CLUSTER 2: Quote ribbon — SPY · ES · VIX. v8 P1-3/P1-4
+          replaced the SPX-from-basis synthetic with the raw ES
+          front-month spot from `_meta.esSpot`. Synthesizing SPX
+          had a real value (one-glance cash-equivalent) but added
+          three failure modes (stale basis, env override, mock
+          fallback) that all rendered identically wrong. ES is the
+          number the engine actually trades on — the trader-aligned
+          read. The SyntheticChip + AsOfMicrotext are gone with
+          the synthesis. */}
+      <div className="hidden md:flex flex-1 items-center justify-center gap-3 lg:gap-4 min-w-0 overflow-hidden">
         <Quote label="SPY" wrapClass="hidden lg:flex">
-          <ValueWithStaleness
+          <ValueWithTooltip
             staleness={staleness}
+            stalenessAt={stalenessAt}
             delta={t.change}
+            pct={t.changePct}
+            loaded={spyLoaded}
             value={
-              <NumberFlash value={t.spy} format={(n) => n.toFixed(2)} />
+              <NumberFlash value={t.spy} format={(n) => formatNumber(n)} />
             }
           />
         </Quote>
-        <Quote label="SPX" wrapClass="hidden lg:flex">
-          <ValueWithStaleness
+        <Quote label="ES" wrapClass="hidden lg:flex" accent="violet">
+          <ValueWithTooltip
             staleness={staleness}
-            delta={spxSnapshot.price.change}
+            stalenessAt={stalenessAt}
+            delta={esDelta}
+            pct={spxSnapshot.price.changePct}
+            loaded={esLoaded}
             value={
               <NumberFlash
-                value={spxSnapshot.price.last}
-                format={(n) => n.toFixed(2)}
+                value={esSpot ?? 0}
+                format={(n) => (esLoaded ? formatNumber(n) : "—")}
               />
             }
           />
         </Quote>
         <Quote label="VIX">
-          <ValueWithStaleness
+          {/* v10 P1-1: VIX delta uses neutral tone — a rising VIX
+              isn't bullish/bearish-relative, so green/red would
+              mislead. No pct (the shell shape doesn't carry it
+              for VIX today). */}
+          <ValueWithTooltip
             staleness={staleness}
+            stalenessAt={stalenessAt}
             delta={t.vixDelta}
-            value={<span data-num>{t.vix.toFixed(2)}</span>}
+            loaded={vixLoaded}
+            neutralDelta
+            value={<span data-num>{formatNumber(t.vix)}</span>}
           />
         </Quote>
       </div>
 
-      {/* ---- ZONE 3: session + freshness pill (lg+ only). The pill is
-           the single source of truth for "how fresh is the slate?" —
-           it replaces the old "Updated HH:MM CT" text + dot, and the
-           per-card as-of stamps now hide unless their data ts diverges
-           from the global one. */}
+      <Divider className="hidden lg:block" />
+
+      {/* CLUSTER 3: session line + freshness pill (lg+). */}
       <div
         data-segment="meta"
+        data-cluster="session"
         className="hidden lg:flex items-center gap-3 shrink-0 whitespace-nowrap"
       >
         {sessionLine && (
-          <>
-            <span className="font-mono text-[10px] text-ink-3 tabular-nums uppercase tracking-[0.06em]">
-              {sessionLine}
-            </span>
-            <span className="h-3 w-px bg-rule" aria-hidden />
-          </>
+          <span className="font-mono text-[10px] text-ink-3 tabular-nums uppercase tracking-[0.06em]">
+            {sessionLine}
+          </span>
         )}
         <FreshnessPill
           freshnessISO={t.feedHealth.lastTickTs}
@@ -187,8 +248,10 @@ export function TopBar({
         />
       </div>
 
-      {/* ---- search + bell (always visible) ------------------------- */}
+      {/* CLUSTER 4: search + bell. ml-auto keeps them flush right when
+          earlier clusters wrap or hide. */}
       <div className="flex items-center gap-2 shrink-0 ml-auto md:ml-0">
+        <Divider className="hidden md:block" />
         <button
           onClick={onOpenPalette}
           aria-label="Search"
@@ -213,54 +276,84 @@ export function TopBar({
           <Bell size={15} />
         </button>
       </div>
+
+      {/* P0-4: dev-only diagnostic, toggled by Cmd/Ctrl + Shift + D.
+          Renders nothing until the keystroke fires, so prod users
+          never see it. Sits in a portal-equivalent fixed wrapper
+          so it isn't clipped by the TopBar's overflow-hidden. */}
+      <SpxDebugOverlay
+        provenance={spxProvenance}
+        // v8 P1-3: synthesis is gone from the header; the debug
+        // overlay still uses `spxSnapshot.price.last` as the
+        // displayed value because /dashboard's SPX verdict card
+        // (when it renders, off-PRE_CONFIG) shows the synthetic
+        // SPX. The overlay's "displayed - computed" delta is
+        // only meaningful against that surface.
+        displayedSpx={
+          isLoadedNumber(spxSnapshot.price.last)
+            ? spxSnapshot.price.last
+            : null
+        }
+      />
     </header>
   );
 }
 
 // ---------------------------------------------------------------------------
 
+function Divider({ className }: { className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={cn("h-4 w-px bg-rule shrink-0", className)}
+    />
+  );
+}
+
 function SymbolChip({
   href,
   symbol,
   verb,
-  verbTone,
   meta,
   accent,
 }: {
   href: string;
   symbol: string;
   verb: string;
-  verbTone: string;
+  // Retained for callers; the chip itself stays tone-agnostic so
+  // engine-state hue lives in the dashboard pipelines.
+  verbTone?: string;
   meta: string | null;
   accent?: "violet";
 }) {
-  const accentClass =
-    accent === "violet" ? "before:bg-violet/55" : "before:bg-ink/30";
+  const symbolTone = accent === "violet" ? "text-violet" : "text-ink-2";
   return (
     <Link
       href={href}
       className={cn(
-        "relative flex items-center gap-2 h-8 pl-3 pr-3 rounded-pill transition-all whitespace-nowrap shrink-0",
-        "before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[2px] before:rounded-full",
-        accentClass,
-        verbTone,
-        "hover:translate-y-[-0.5px] hover:shadow-card",
+        "inline-flex items-center gap-1.5 h-7 px-1.5 rounded-soft whitespace-nowrap shrink-0",
+        "text-ink-2 hover:text-ink transition-colors",
+        "outline-none focus-visible:ring-2 focus-visible:ring-gold/40",
       )}
     >
-      <span className="text-[10px] font-mono font-bold tracking-[0.16em] opacity-70">
+      <span
+        className={cn(
+          "text-[10px] font-mono font-bold tracking-[0.16em]",
+          symbolTone,
+        )}
+      >
         {symbol}
       </span>
-      <span className="opacity-30 text-[10px]">·</span>
-      <span className="text-[11px] font-bold uppercase tracking-[0.12em]">
-        {verb}
+      <span className="text-ink-4 text-[10px]" aria-hidden>
+        ·
+      </span>
+      <span className="text-[11px] tracking-[0.02em] lowercase">
+        {verb.toLowerCase()}
       </span>
       {meta && (
-        <>
-          <span className="opacity-30 text-[10px]">·</span>
-          <span className="text-[10px] font-mono uppercase tracking-[0.06em] opacity-80">
-            {meta}
-          </span>
-        </>
+        <span className="text-[10px] font-mono text-ink-3 lowercase tracking-[0.02em]">
+          · {meta.toLowerCase()}
+        </span>
       )}
     </Link>
   );
@@ -270,11 +363,16 @@ function Quote({
   label,
   children,
   wrapClass,
+  accent,
 }: {
   label: string;
   children: React.ReactNode;
   wrapClass?: string;
+  /** Optional ticker-tone for the label, matching the engine-card
+   *  eyebrow palette (violet for ES, default ink for SPY/VIX). */
+  accent?: "violet";
 }) {
+  const labelTone = accent === "violet" ? "text-violet" : "text-ink-3";
   return (
     <div
       className={cn(
@@ -282,7 +380,7 @@ function Quote({
         wrapClass,
       )}
     >
-      <span className="eyebrow text-ink-3">{label}</span>
+      <span className={cn("eyebrow", labelTone)}>{label}</span>
       <span className="text-[13px] font-mono font-semibold text-ink tabular-nums">
         {children}
       </span>
@@ -290,43 +388,107 @@ function Quote({
   );
 }
 
-// Quote value + either the staleness suffix or the signed delta —
-// never both. A delta against a non-live reading is misleading, so
-// staleness wins when present.
-function ValueWithStaleness({
+// Quote value + delta (signed change). Staleness moves to a tooltip
+// on the value so it can never get clipped at the right edge of the
+// ribbon (the v3 "ri close" bug). The tooltip carries both the
+// human label ("Fri close") and the precise CT timestamp.
+function ValueWithTooltip({
   staleness,
+  stalenessAt,
   delta,
+  pct,
+  loaded,
   value,
+  /** v10 P1-1: VIX uses neutral coloring on its delta — a rising
+   *  VIX is not "good" and a falling one is not "bad", so the
+   *  semantic green/red would miscommunicate. Default false
+   *  (price tickers); pass true on the VIX quote. */
+  neutralDelta = false,
 }: {
   staleness: string | null;
+  stalenessAt: string | null;
   delta: number;
+  pct?: number;
   value: React.ReactNode;
+  loaded: boolean;
+  neutralDelta?: boolean;
 }) {
+  const valueNode = loaded ? (
+    value
+  ) : (
+    // Skeleton placeholder. Width matches a typical 2-decimal price
+    // so the ribbon doesn't reflow on first paint.
+    <span
+      aria-hidden
+      className="inline-block h-3 w-9 rounded-pill bg-paper-2/80 animate-pulse"
+    />
+  );
+
+  // Tooltip body: when stale, show the staleness phrase + CT
+  // timestamp. When live, show "Live · updated <time>".
+  const tooltipBody = staleness
+    ? `Reflects ${staleness}${stalenessAt ? ` (${stalenessAt})` : ""}.`
+    : "Live — last updated moments ago.";
+
   return (
     <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
-      {value}
-      {staleness ? (
-        <span className="hidden xl:inline text-[10px] text-ink-3 italic shrink-0 whitespace-nowrap">
-          · {staleness}
+      <InfoTooltip
+        label={staleness ? "Stale price" : "Live price"}
+        content={tooltipBody}
+      >
+        <span
+          className={cn(
+            "cursor-help",
+            // Visually mark stale prices so the user notices without
+            // needing the tooltip — italic + muted ink.
+            staleness ? "italic text-ink-3" : "text-ink",
+          )}
+        >
+          {valueNode}
         </span>
-      ) : (
+      </InfoTooltip>
+      {/* v8 P0-1: hide the change slot when delta is 0/NaN/non-
+          finite — "+0.00" is indistinguishable from "data not
+          loaded yet". v10 P1-1: when delta IS valid, render it
+          with the percent move alongside, color-toned by sign
+          (or neutral for VIX). */}
+      {!staleness && loaded && Number.isFinite(delta) && delta !== 0 && (
         <span className="hidden xl:inline-flex shrink-0">
-          <DeltaTag value={delta} />
+          <DeltaTag value={delta} pct={pct} neutral={neutralDelta} />
         </span>
       )}
     </span>
   );
 }
 
-function DeltaTag({ value }: { value: number }) {
-  const tone =
-    value > 0
+function DeltaTag({
+  value,
+  pct,
+  neutral = false,
+}: {
+  value: number;
+  pct?: number;
+  /** v10 P1-1: VIX uses neutral coloring — a rising VIX is not
+   *  "good" and a falling one is not "bad", so the green/red
+   *  semantic would mislead. */
+  neutral?: boolean;
+}) {
+  const tone = neutral
+    ? "text-state-neutral"
+    : value > 0
       ? "text-state-bullish"
       : value < 0
         ? "text-state-bearish"
         : "text-state-neutral";
   const sign = value > 0 ? "+" : value < 0 ? "−" : "";
   const mag = Math.abs(value).toFixed(2);
+  // v10 P1-1: render the percent move alongside the points delta
+  // when supplied. Skip when pct is null/NaN/0 — same rule as the
+  // delta itself (visible non-zero only).
+  const pctTxt =
+    pct != null && Number.isFinite(pct) && pct !== 0
+      ? ` (${pct > 0 ? "+" : "−"}${Math.abs(pct).toFixed(2)}%)`
+      : "";
   return (
     <span
       className={cn("text-[11px] font-mono font-semibold tabular-nums", tone)}
@@ -334,6 +496,7 @@ function DeltaTag({ value }: { value: number }) {
     >
       {sign}
       {mag}
+      {pctTxt}
     </span>
   );
 }
@@ -365,3 +528,34 @@ function useStalenessLabel(): string | null {
   return label;
 }
 
+// Renders the precise CT timestamp matching the staleness label, so
+// the tooltip can show "Reflects Fri close (Fri 15:00 CT)" rather
+// than just the human phrase.
+function useStalenessTimestamp(): string | null {
+  const [ts, setTs] = useState<string | null>(null);
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date();
+      const spy = getSessionInfo("SPY", now);
+      // rthClose carries the most recent (or upcoming) RTH close;
+      // when staleness is present, that's the moment the price
+      // reflects. Format in CT for unambiguous reference.
+      try {
+        const formatted = new Intl.DateTimeFormat("en-US", {
+          timeZone: "America/Chicago",
+          weekday: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }).format(spy.rthClose);
+        setTs(`${formatted} CT`);
+      } catch {
+        setTs(null);
+      }
+    };
+    tick();
+    const id = window.setInterval(tick, 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+  return ts;
+}

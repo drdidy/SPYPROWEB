@@ -20,8 +20,17 @@
     color: #14161a;
   }
 
+  /* v10 P1-6: tabular-nums applies wherever a price, R-multiple,
+     percent, score, or countdown is rendered. Three opt-in
+     surfaces:
+       .num            — body utility class
+       [data-num]      — adapter-emitted spans
+       [data-testid="countdown"]  — every <Countdown /> instance
+     Together these cover every numeric on the slate without
+     touching headline copy or label text. */
   .num,
-  [data-num] {
+  [data-num],
+  [data-testid="countdown"] {
     font-variant-numeric: tabular-nums;
     font-family: var(--font-geist-mono);
     letter-spacing: -0.01em;
@@ -32,9 +41,13 @@
     color: #14161a;
   }
 
-  *:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(184, 130, 31, 0.28);
+  /* v7 P1-3: standard focus-visible utility — 2px brand-tint
+     outline + 2px offset. Applied via the `:where()` wrapper at
+     zero specificity so component-level rings (e.g. focus-visible:
+     ring-2 ring-gold/40 on slate buttons) still win when set. */
+  :where(button, a, [role="button"], [tabindex]):focus-visible {
+    outline: 2px solid rgba(184, 130, 31, 0.55);
+    outline-offset: 2px;
     border-radius: 6px;
   }
 
@@ -94,6 +107,32 @@
 }
 
 @layer utilities {
+  /* Slate refinement: a screen-reader-only utility. Tailwind ships
+     `sr-only` by default, but we re-declare for explicitness alongside
+     the slate primitives that use it. */
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* Honor reduced-motion preferences for our breathing / shimmer
+     loops. Anything decorative pauses; layout-meaningful animations
+     keep their first frame so nothing snaps. */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-breathe,
+    .animate-shimmer,
+    .animate-ticker {
+      animation: none !important;
+    }
+  }
+
   .grain {
     background-image: radial-gradient(circle at 1px 1px, rgba(20, 22, 26, 0.04) 1px, transparent 0);
     background-size: 24px 24px;

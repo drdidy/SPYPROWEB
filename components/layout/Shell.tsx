@@ -33,7 +33,13 @@ export function Shell({ children }: { children: ReactNode }) {
           onOpenPalette={() => setPaletteOpen(true)}
           onOpenNav={() => setNavOpen(true)}
         />
-        <main className="flex-1 px-4 md:px-7 py-5 md:py-6">{children}</main>
+        {/* v7 P2-3: overflow-x clip safety net. A bug that escapes
+            into a cell-level overflow (e.g. a stepper that ignores
+            its parent grid track) is contained here so the page
+            itself never gets a horizontal scrollbar. `clip` is
+            preferred over `hidden` because it doesn't establish
+            a new scroll container — sticky descendants keep working. */}
+        <main className="flex-1 px-4 md:px-7 py-5 md:py-6 overflow-x-clip">{children}</main>
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-canvas via-canvas/80 to-transparent" />
       </div>
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />

@@ -181,7 +181,7 @@ def test_build_lines_none_direction_omits_channel_rails():
 def test_project_line_arithmetic():
     from _lib.spx.channel import Line
     anchor_t = datetime(2026, 5, 7, 17, tzinfo=CT)
-    line = Line("CHANNEL_FLOOR", Anchor(5848.20, anchor_t), 1.05)
-    # 16 hours later: 5848.20 + 16 * 1.05 = 5865.00
+    line = Line("CHANNEL_FLOOR", Anchor(5848.20, anchor_t), 1.04)
+    # 16 hours later: 5848.20 + 16 * 1.04 = 5864.84
     later = datetime(2026, 5, 8, 9, tzinfo=CT)
-    assert project_line(line, later) == pytest.approx(5865.00)
+    assert project_line(line, later) == pytest.approx(5864.84)

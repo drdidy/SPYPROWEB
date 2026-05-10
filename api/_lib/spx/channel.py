@@ -9,10 +9,10 @@ This module implements the geometry that defines the SPX session:
        Tokyo LH+LL vs Sydney  -> DESCENDING
        otherwise              -> NONE (expansion or contraction)
   4. Line construction: 4 lines per active session.
-       CHANNEL_FLOOR     anchor=overnight low,  slope=+/-1.05
-       CHANNEL_CEILING   anchor=overnight high, slope=+/-1.05
-       PREV_RTH_HIGH_ASC anchor=prev RTH high,  slope=+1.05
-       PREV_RTH_LOW_DESC anchor=prev RTH low,   slope=-1.05
+       CHANNEL_FLOOR     anchor=overnight low,  slope=+/-1.04
+       CHANNEL_CEILING   anchor=overnight high, slope=+/-1.04
+       PREV_RTH_HIGH_ASC anchor=prev RTH high,  slope=+1.04
+       PREV_RTH_LOW_DESC anchor=prev RTH low,   slope=-1.04
   5. Projection: anchor_price + slope_per_hour * hours_since_anchor.
 """
 from __future__ import annotations

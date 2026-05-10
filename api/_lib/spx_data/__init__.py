@@ -66,10 +66,14 @@ def build_snapshot_from_fetcher(
     fetcher: Fetcher,
     as_of: datetime,
     *,
-    lookback_hours: int = 36,
+    lookback_hours: int = 120,
     **engine_kwargs,
 ):
-    """Pull bars + offset and compute a snapshot in one call."""
+    """Pull bars + offset and compute a snapshot in one call.
+
+    See `build_snapshot_with_provenance` for why the default is
+    120 hours rather than 36.
+    """
     start = as_of - timedelta(hours=lookback_hours)
     bars = fetcher.fetch_es_bars(start, as_of)
     if not bars:
@@ -84,11 +88,19 @@ def build_snapshot_with_provenance(
     fetcher: Fetcher,
     as_of: datetime,
     *,
-    lookback_hours: int = 36,
+    lookback_hours: int = 120,
     offset_override: float | None = None,
     **engine_kwargs,
 ):
     """Like build_snapshot_from_fetcher but returns (snapshot, meta).
+
+    `lookback_hours` defaults to 120 (5 days). The overnight-window
+    anchor lookup needs ES bars 15:00 prev-day → 02:00 today CT,
+    which on a Saturday probe is ~50 hours back from `as_of`. The
+    legacy 36h default left those bars outside the fetch range and
+    `overnight_anchors` raised ValueError → API returned 500. 120h
+    comfortably covers Monday-morning probes too (Mon 03:00 CT
+    looking back to Thu 15:00 = 84h).
 
     `offset_override` (when not None) replaces the offset derived from
     the sync quote. Use this when yfinance's ES=F is showing a
@@ -122,6 +134,13 @@ def build_snapshot_with_provenance(
         "appliedOffset": round(applied_offset, 4),
         "computedOffset": round(computed_offset, 4),
         "offsetSource": "env_override" if offset_override is not None else "computed",
+        # Sub-algorithm that produced the offset when offsetSource is
+        # "computed". One of: "close_anchored" (preferred — daily SPX
+        # close + ES at cash close), "intersection_1m" (last common
+        # ES + SPX 1m tick), "latest_of_each" (defensive). Useful in
+        # the FE debug overlay to confirm the live SPX is anchored
+        # to the trader's expected basis source.
+        "offsetMethod": getattr(fetcher, "last_offset_method", None),
         "spxSpot": round(quote.spx_spot, 2),
         "esSpot": round(quote.es_spot, 2),
         "quoteCapturedAt": quote.captured_at.isoformat(),
