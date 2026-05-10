@@ -84,6 +84,7 @@ export interface UwOptionChain {
   sessionDate?: string;
   chainDate?: string;
   expiration: string | null;
+  atm?: number | null;
   calls: UwOptionContract[];
   puts: UwOptionContract[];
   totals: {

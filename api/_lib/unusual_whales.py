@@ -292,6 +292,7 @@ def _chain_from_broker(ticker: str, session_date: str, require_expiration: str |
         "sessionDate": session_date,
         "chainDate": require_expiration or expiration,
         "expiration": expiration,
+        "atm": chain.get("atm"),
         "calls": sorted(calls, key=lambda c: c["strike"] or 0),
         "puts": sorted(puts, key=lambda c: c["strike"] or 0),
         "totals": {
@@ -362,18 +363,64 @@ def _gex_strike_rows(raw: Any, effective_date: str) -> list[dict]:
     return sorted(out, key=lambda r: r["strike"])
 
 
-def _gamma_flip(strike_rows: list[dict]) -> float | None:
+def _gamma_flip(strike_rows: list[dict], center: float | None = None) -> float | None:
+    rows = strike_rows
+    if center is not None:
+        # A zero-crossing thousands of points away is not a useful
+        # headline "flip" for the trader. Prefer the nearest cross to
+        # the active chain center.
+        band = max(center * 0.12, 12.0)
+        near = [r for r in strike_rows if abs(float(r["strike"]) - center) <= band]
+        rows = near
     prev: dict | None = None
-    for row in strike_rows:
+    crosses: list[float] = []
+    for row in rows:
         if prev is not None:
             a = float(prev.get("netGEX") or 0)
             b = float(row.get("netGEX") or 0)
             if a == 0:
-                return float(prev["strike"])
+                crosses.append(float(prev["strike"]))
             if (a < 0 <= b) or (a > 0 >= b):
-                return float(row["strike"])
+                crosses.append(float(row["strike"]))
         prev = row
-    return None
+    if not crosses:
+        return None
+    if center is None:
+        return crosses[0]
+    return min(crosses, key=lambda x: abs(x - center))
+
+
+def _chain_center(chain: dict | None) -> float | None:
+    if not chain:
+        return None
+    atm = _clean_num(chain.get("atm"))
+    if atm is not None:
+        return atm
+    rows = (chain.get("calls") or []) + (chain.get("puts") or [])
+    delta_candidates = []
+    gamma_candidates = []
+    strikes = []
+    for row in rows:
+        strike = row.get("strike")
+        if strike is None:
+            continue
+        strike_f = float(strike)
+        strikes.append(strike_f)
+        delta = _clean_num(row.get("delta"))
+        if delta is not None:
+            target = 0.50 if row.get("side") == "CALL" else -0.50
+            delta_candidates.append((strike_f, abs(delta - target)))
+        gamma = _clean_num(row.get("gamma"))
+        if gamma is not None and gamma > 0:
+            gamma_candidates.append((strike_f, gamma))
+    if delta_candidates:
+        return min(delta_candidates, key=lambda x: x[1])[0]
+    if gamma_candidates:
+        return max(gamma_candidates, key=lambda x: x[1])[0]
+    if not strikes:
+        return None
+    strikes.sort()
+    return strikes[len(strikes) // 2]
 
 
 def _flow_lean(items: list[dict], ticker: str) -> dict | None:
@@ -445,7 +492,11 @@ def fetch_flow_summary(ticker: str = "SPY", effective_date: str | None = None) -
 
 
 @pc.ttl_cache(ttl_seconds=120.0, maxsize=16)
-def fetch_gex_summary(ticker: str = "SPY", effective_date: str | None = None) -> dict | None:
+def fetch_gex_summary(
+    ticker: str = "SPY",
+    effective_date: str | None = None,
+    center: float | None = None,
+) -> dict | None:
     """Dealer gamma exposure summary."""
     session_date = effective_date or effective_options_date()
     raw = _first_response(
@@ -468,7 +519,7 @@ def fetch_gex_summary(ticker: str = "SPY", effective_date: str | None = None) ->
         ]
     )
     strike_levels = _gex_strike_rows(strike_raw, session_date)
-    flip = _gamma_flip(strike_levels)
+    flip = _gamma_flip(strike_levels, center=center)
     if gex_f > 0:
         regime = "POSITIVE"
     elif gex_f < 0:
@@ -481,7 +532,7 @@ def fetch_gex_summary(ticker: str = "SPY", effective_date: str | None = None) ->
         "totalGEX": round(gex_f, 2),
         "regime": regime,
         "flipPoint": flip,
-        "strikeLevels": strike_levels[:80],
+        "strikeLevels": strike_levels,
     }
 
 
@@ -707,11 +758,12 @@ def fetch_symbol_options_intel(ticker: str, effective_date: str | None = None) -
     symbol = ticker.upper()
     session_date = effective_date or effective_options_date()
     chain_date = effective_chain_date()
+    chain = fetch_option_chain(symbol, session_date, chain_date)
+    center = _chain_center(chain)
     flow = fetch_flow_summary(symbol, session_date)
-    gex = fetch_gex_summary(symbol, session_date)
+    gex = fetch_gex_summary(symbol, session_date, center=center)
     alerts = fetch_flow_alerts(symbol, session_date)
     darkpool = fetch_darkpool_summary(symbol, session_date)
-    chain = fetch_option_chain(symbol, session_date, chain_date)
     greeks = fetch_greeks(symbol, session_date) if chain else []
     return {
         "ticker": symbol,

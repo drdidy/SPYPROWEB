@@ -24,6 +24,7 @@ export default async function Page() {
   const spx = options.data.symbols.SPX;
   const spyChain = spy?.chain;
   const spxChain = spx?.chain;
+  const spyCenter = activeCenter(spyChain, snap.currentPrice);
 
   return (
     <div className="w-full max-w-[1440px] pb-16 space-y-8">
@@ -62,7 +63,7 @@ export default async function Page() {
         <CommandStat
           label="SPY GEX"
           value={spy?.gex?.regime ?? "Waiting"}
-          note={spy?.gex ? `Flip ${fmtPrice(spy.gex.flipPoint)}` : "Gamma feed not populated"}
+          note={spy?.gex ? `Flip ${nearFlipLabel(spy.gex.flipPoint, spyCenter)}` : "Gamma feed not populated"}
           tone={gexTone(spy?.gex?.regime)}
         />
       </div>
@@ -93,9 +94,8 @@ export default async function Page() {
 
       <SectionLabel number="02">Dealer gamma</SectionLabel>
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        {SYMBOLS.map((symbol) => (
-          <GammaPanel key={symbol} intel={options.data.symbols[symbol]} />
-        ))}
+        <GammaPanel intel={spy} chain={spyChain} spot={snap.currentPrice} />
+        <GammaPanel intel={spx} chain={spxChain} />
       </div>
 
       <SectionLabel number="03">Option chains and Greeks</SectionLabel>
@@ -180,18 +180,27 @@ function FlowDarkPoolPanel({ intel }: { intel?: UwSymbolIntel }) {
   );
 }
 
-function GammaPanel({ intel }: { intel?: UwSymbolIntel }) {
+function GammaPanel({
+  intel,
+  chain,
+  spot,
+}: {
+  intel?: UwSymbolIntel;
+  chain?: UwOptionChain | null;
+  spot?: number;
+}) {
   const gex = intel?.gex;
-  const greeks = intel?.greeks ?? [];
-  const exposureRows = gex?.strikeLevels ?? [];
+  const center = activeCenter(chain, spot);
+  const greeks = filterGreekRows(intel?.greeks ?? [], center);
+  const exposureRows = filterExposureRows(gex?.strikeLevels ?? [], center);
   const rows =
     greeks.length > 0
-      ? greeks.slice(0, 8).map((r) => ({
+      ? greeks.map((r) => ({
           left: `${r.side} ${fmtPrice(r.strike)}`,
           mid: `Delta ${fmtGreek(r.delta)}`,
           right: `Gamma ${fmtGreek(r.gamma)}`,
         }))
-      : exposureRows.slice(0, 8).map((r) => ({
+      : exposureRows.map((r) => ({
           left: `Strike ${fmtPrice(r.strike)}`,
           mid: `Call ${fmtCompactNumber(r.callGEX)}`,
           right: `Net ${fmtCompactNumber(r.netGEX)}`,
@@ -208,7 +217,7 @@ function GammaPanel({ intel }: { intel?: UwSymbolIntel }) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <MiniMetric label="Regime" value={gex?.regime ?? "Waiting"} tone={gexTone(gex?.regime)} />
           <MiniMetric label="Total GEX" value={gex ? fmtCompactNumber(gex.totalGEX) : "-"} />
-          <MiniMetric label="Flip point" value={gex ? fmtPrice(gex.flipPoint) : "-"} tone="gold" />
+          <MiniMetric label="Flip point" value={nearFlipLabel(gex?.flipPoint, center)} tone="gold" />
         </div>
         <div className="h-3 rounded-pill bg-paper-2 border border-rule overflow-hidden">
           <div
@@ -478,6 +487,49 @@ function blankRow(strike: number): RowData {
 function nearestStrike(rows: RowData[], spot?: number): number | null {
   if (!Number.isFinite(spot) || !spot || rows.length === 0) return null;
   return rows.reduce((best, row) => (Math.abs(row.strike - spot) < Math.abs(best - spot) ? row.strike : best), rows[0].strike);
+}
+
+function activeCenter(chain?: UwOptionChain | null, spot?: number): number | null {
+  if (Number.isFinite(spot) && spot) return spot;
+  if (Number.isFinite(chain?.atm ?? NaN) && chain?.atm) return chain.atm;
+  const rows = chain ? chainRows(chain, spot) : [];
+  if (rows.length === 0) return null;
+  const atm = rows.find((r) => r.atm);
+  if (atm) return atm.strike;
+  return rows[Math.floor(rows.length / 2)]?.strike ?? null;
+}
+
+function filterGreekRows(rows: UwSymbolIntel["greeks"], center: number | null) {
+  const useful = rows.filter(
+    (r) =>
+      r.strike !== null &&
+      r.side !== "UNKNOWN" &&
+      (r.delta !== null || r.gamma !== null || r.iv !== null),
+  );
+  const near =
+    center === null
+      ? useful
+      : useful
+          .filter((r) => Math.abs((r.strike ?? center) - center) <= Math.max(center * 0.08, 8))
+          .sort((a, b) => Math.abs((a.strike ?? center) - center) - Math.abs((b.strike ?? center) - center));
+  return (near.length > 0 ? near : useful).slice(0, 8);
+}
+
+function filterExposureRows(rows: NonNullable<UwSymbolIntel["gex"]>["strikeLevels"] = [], center: number | null) {
+  const useful = rows.filter((r) => Number.isFinite(r.strike) && Number.isFinite(r.netGEX));
+  const near =
+    center === null
+      ? useful
+      : useful
+          .filter((r) => Math.abs(r.strike - center) <= Math.max(center * 0.08, 8))
+          .sort((a, b) => Math.abs(a.strike - center) - Math.abs(b.strike - center));
+  return (near.length > 0 ? near : useful).slice(0, 8);
+}
+
+function nearFlipLabel(flip: number | null | undefined, center: number | null): string {
+  if (!Number.isFinite(flip ?? NaN) || flip === null || flip === undefined) return "-";
+  if (center !== null && Math.abs(flip - center) > Math.max(center * 0.12, 12)) return "No near flip";
+  return fmtPrice(flip);
 }
 
 function leanTone(lean?: string | null): "ink" | "bull" | "bear" | "gold" {
