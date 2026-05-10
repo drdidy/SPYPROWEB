@@ -1,151 +1,409 @@
 "use client";
+
 import Link from "next/link";
-import { Button } from "@/components/ui/Button";
-import { ArrowRight, ArrowDown } from "lucide-react";
+import { ArrowRight, BookOpen, Gauge, Radio, ShieldCheck } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import type { DecisionState } from "@/lib/types";
-import { HeroVerdictCard } from "./HeroVerdictCard";
+import {
+  StructurePathChart,
+  type StructureChartData,
+} from "@/components/decision-slate/StructurePathChart";
+import { Button } from "@/components/ui/Button";
 import { track } from "@/lib/analytics";
+import { cn } from "@/lib/utils";
 
 interface HeroProps {
   decision?: DecisionState;
   quote?: { spy: number; change: number; changePct: number; vix: number };
   initialLive?: boolean;
+  chart?: StructureChartData | null;
 }
+
+const workspaceNav = [
+  "Decision Slate",
+  "SPY Engine",
+  "ES Engine",
+  "Replays",
+  "Structure Maps",
+];
 
 export function HeroSection({
   decision: serverDecision,
   quote: serverQuote,
   initialLive,
+  chart,
 }: HeroProps = {}) {
-  const isLive = !!initialLive;
-  // prefers-reduced-motion: zero out the y/opacity tweens so hero
-  // content lands instantly for users who've requested reduced motion.
   const reduce = useReducedMotion();
   const fadeUp = (delay = 0) =>
     reduce
       ? { initial: false, animate: { opacity: 1, y: 0 } }
       : {
-          initial: { opacity: 0, y: 14 },
+          initial: { opacity: 0, y: 16 },
           animate: { opacity: 1, y: 0 },
-          transition: { duration: 0.7, delay, ease: [0.2, 0.8, 0.2, 1] },
+          transition: { duration: 0.72, delay, ease: [0.2, 0.8, 0.2, 1] },
         };
+
+  const statusTone =
+    serverDecision?.finalDecision === "TRADE_ALLOWED"
+      ? "bull"
+      : serverDecision?.finalDecision === "STOP_TRADING" ||
+          serverDecision?.finalDecision === "NO_TRADE"
+        ? "bear"
+        : "gold";
+  const decisionLabel = labelize(serverDecision?.finalDecision ?? "WAIT_FOR_CONFIRMATION");
+  const verdict = serverDecision?.verdict ?? "WAIT";
+  const updatedAt = serverDecision?.updatedAt ?? "latest snapshot";
+  const explanation =
+    serverDecision?.finalExplanation ||
+    "The live slate loads from current market structure when the data source is available.";
+
   return (
-    <section className="relative max-w-[1240px] mx-auto px-7 pt-16 pb-20 lg:pt-24 lg:pb-28">
-      {/* eyebrow */}
-      <div className="flex items-center gap-3 mb-10">
-        <span className="font-mono text-[10px] text-ink-3 tracking-[0.22em] uppercase">
-          A trading workspace · invite only
-        </span>
-        {isLive && (
-          <span className="font-mono text-[10px] text-bull-ink tracking-[0.22em] uppercase inline-flex items-center gap-1.5">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="absolute inline-flex h-full w-full rounded-full bg-bull opacity-50 animate-breathe" />
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-bull" />
-            </span>
-            live
-          </span>
-        )}
-      </div>
+    <section className="relative overflow-hidden border-b border-rule/80 bg-[#FBF8EF]">
+      <div
+        aria-hidden
+        className="absolute inset-0 opacity-[0.42]"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(20,22,26,0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(20,22,26,0.04) 1px, transparent 1px)",
+          backgroundSize: "72px 72px",
+        }}
+      />
+      <div className="absolute inset-y-0 right-0 w-[58%] bg-[radial-gradient(circle_at_55%_28%,rgba(184,130,31,0.18),transparent_32%),linear-gradient(135deg,rgba(6,16,22,0)_0%,rgba(6,16,22,0.08)_100%)]" />
 
-      <motion.h1
-        {...fadeUp(0)}
-        // Fluid type: clamps between 48px (~360px viewport) and 112px
-        // (≥1280px viewport) so the H1 reads cleanly at every spec
-        // breakpoint without breakpoint-jumping.
-        style={{ fontSize: "clamp(48px, 8.5vw, 112px)" }}
-        className="font-serif leading-[0.94] tracking-[-0.035em] text-ink max-w-[14ch]"
-      >
-        Discipline,{" "}
-        <span className="italic font-light text-ink-2">before</span>
-        <br />
-        conviction.
-      </motion.h1>
+      <div className="relative mx-auto grid max-w-[1440px] grid-cols-1 gap-8 px-5 pb-14 pt-12 sm:px-7 lg:min-h-[760px] lg:grid-cols-12 lg:items-center lg:pb-16 lg:pt-16">
+        <div className="lg:col-span-5 xl:col-span-4">
+          <motion.div {...fadeUp(0)} className="mb-7 flex items-center gap-3">
+            <CompassMark />
+            <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-gold-ink">
+              Closed beta
+            </div>
+            {initialLive && (
+              <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.22em] text-bull-ink">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="absolute inline-flex h-full w-full animate-breathe rounded-full bg-bull opacity-50" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-bull" />
+                </span>
+                live
+              </span>
+            )}
+          </motion.div>
 
-      <motion.div
-        {...fadeUp(0.15)}
-        className="mt-9 grid grid-cols-12 gap-10 items-end"
-      >
-        <p className="col-span-12 md:col-span-7 lg:col-span-6 text-[18px] md:text-[20px] text-ink-2 leading-[1.55] max-w-2xl">
-          Prophet reads the day before the day reads you. Same setup every
-          morning. Same questions asked of every move. A bar most signals
-          don’t clear. It’s a workspace, not a feed.
-        </p>
-
-        <div className="col-span-12 md:col-span-5 lg:col-span-6 flex flex-col items-start md:items-end gap-3">
-          {/* Single primary CTA — waitlist. The slate preview lives
-              behind a tertiary text link below. cta_click is wired
-              to the analytics dispatch so we can see which path
-              visitors take. */}
-          <a
-            href="#waitlist"
-            onClick={() =>
-              track({ name: "cta_click", location: "hero", label: "join_waitlist" })
-            }
+          <motion.h1
+            {...fadeUp(0.04)}
+            className="max-w-[10.5ch] font-serif text-[clamp(56px,8vw,104px)] font-normal leading-[0.92] tracking-[-0.035em] text-ink"
           >
-            <Button variant="primary" size="lg">
-              Join the waitlist <ArrowRight size={15} />
-            </Button>
-          </a>
-          <Link
-            href="/dashboard"
-            onClick={() =>
-              track({
-                name: "cta_click",
-                location: "hero",
-                label: "read_todays_slate",
-              })
-            }
-            className="text-[13px] text-ink-2 hover:text-ink underline underline-offset-4 decoration-rule hover:decoration-ink-3 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-gold/40 rounded-soft"
+            Structure before{" "}
+            <span className="italic font-light text-gold-ink">conviction.</span>
+          </motion.h1>
+
+          <motion.p
+            {...fadeUp(0.12)}
+            className="mt-7 max-w-[34rem] text-[17px] leading-[1.65] text-ink-2 md:text-[18px]"
           >
-            Read today&apos;s slate →
-          </Link>
+            A decision workspace for SPY and ES traders who wait for the setup,
+            read the rails, and stop when the engine says stand down.
+          </motion.p>
+
+          <motion.div {...fadeUp(0.2)} className="mt-9 flex flex-wrap gap-3">
+            <a
+              href="#waitlist"
+              onClick={() =>
+                track({
+                  name: "cta_click",
+                  location: "hero",
+                  label: "request_beta_access",
+                })
+              }
+            >
+              <Button variant="primary" size="lg">
+                Request beta access <ArrowRight size={15} />
+              </Button>
+            </a>
+            <Link
+              href="/methodology"
+              onClick={() =>
+                track({
+                  name: "cta_click",
+                  location: "hero",
+                  label: "view_methodology",
+                })
+              }
+            >
+              <Button variant="secondary" size="lg">
+                View methodology <BookOpen size={15} />
+              </Button>
+            </Link>
+          </motion.div>
+
+          <motion.div
+            {...fadeUp(0.28)}
+            className="mt-12 grid max-w-xl grid-cols-3 divide-x divide-rule-strong border-y border-rule-strong py-5"
+          >
+            <ProofPoint icon={Gauge} label="Two engines" />
+            <ProofPoint icon={Radio} label="Real structure" />
+            <ProofPoint icon={ShieldCheck} label="Risk first" />
+          </motion.div>
         </div>
-      </motion.div>
 
-      {/* Live verdict card: explicit-state component handles all eight
-          render paths (live/pre-open/closed/weekend/holiday/stale/
-          error/loading) and reserves its own dimensions to avoid CLS. */}
-      <motion.div
-        {...fadeUp(0.3)}
-        role="region"
-        aria-label="Live verdict preview"
-        className="mt-16"
-      >
-        <HeroVerdictCard
-          decision={serverDecision}
-          quote={serverQuote}
-          initialLive={initialLive}
-        />
-      </motion.div>
-
-      {/* Persistent compliance footnote sits directly beneath the
-          live verdict card — required surface, not decorative.
-          "Not investment advice" deep-links to /disclosures. */}
-      <p className="mt-4 text-[11px] text-ink-3 font-sans leading-relaxed">
-        Educational workspace.{" "}
-        <Link
-          href="/disclosures"
-          className="underline underline-offset-2 decoration-rule hover:text-ink hover:decoration-ink-3 transition-colors"
+        <motion.div
+          {...fadeUp(0.16)}
+          className="lg:col-span-7 xl:col-span-8"
+          role="region"
+          aria-label="Live product preview"
         >
-          Not investment advice
-        </Link>
-        . Markets involve risk.
-      </p>
+          <div className="relative mx-auto max-w-[920px] lg:ml-auto">
+            <div className="absolute -bottom-5 left-8 right-8 h-10 rounded-full bg-ink/25 blur-2xl" />
+            <div className="relative overflow-hidden rounded-[18px] border border-paper/10 bg-[#061017] shadow-[0_28px_90px_-40px_rgba(6,16,23,0.9),0_1px_0_rgba(255,255,255,0.08)_inset]">
+              <div className="flex items-center justify-between border-b border-paper/10 px-4 py-3 sm:px-5">
+                <div>
+                  <div className="font-serif text-[17px] leading-none text-paper">
+                    SPY Prophet
+                  </div>
+                  <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.2em] text-gold-soft/60">
+                    Decision Slate
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-paper/45">
+                  <span>Updated {updatedAt}</span>
+                  <span
+                    className={cn(
+                      "rounded-[4px] border px-2 py-1",
+                      initialLive
+                        ? "border-bull/45 text-bull"
+                        : "border-paper/15 text-paper/55",
+                    )}
+                  >
+                    {initialLive ? "Live" : "Latest"}
+                  </span>
+                </div>
+              </div>
 
-      {/* Trust-layer entry point: links to the long-form /methodology
-          page (g12). Replaces the static "scroll hint" div with a
-          real, focusable, keyboard-accessible Link. */}
-      <Link
-        href="/methodology"
-        className="hidden lg:inline-flex items-center gap-2 text-[10px] text-ink-3 hover:text-ink font-mono uppercase tracking-[0.18em] mt-12 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-gold/40 rounded-soft -mx-1 px-1"
-      >
-        <span>Read the methodology</span>
-        <ArrowDown size={12} className="animate-breathe" aria-hidden />
-      </Link>
+              <div className="grid grid-cols-12">
+                <aside className="hidden border-r border-paper/10 p-4 md:col-span-3 md:block">
+                  <div className="space-y-1.5">
+                    {workspaceNav.map((item, index) => (
+                      <div
+                        key={item}
+                        className={cn(
+                          "rounded-[6px] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em]",
+                          index === 0
+                            ? "border border-gold/45 bg-gold/10 text-gold-soft"
+                            : "text-paper/45",
+                        )}
+                      >
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-14 border-t border-paper/10 pt-4">
+                    <PreviewMetric
+                      label="SPY"
+                      value={money(serverQuote?.spy)}
+                      delta={delta(serverQuote?.change, serverQuote?.changePct)}
+                      tone={(serverQuote?.change ?? 0) >= 0 ? "bull" : "bear"}
+                    />
+                    <PreviewMetric label="VIX" value={number(serverQuote?.vix, 2)} />
+                  </div>
+                </aside>
+
+                <div className="col-span-12 p-4 sm:p-5 md:col-span-9">
+                  <div className="grid grid-cols-12 gap-4">
+                    <div className="col-span-12 rounded-[8px] border border-paper/10 bg-paper/[0.035] p-4 lg:col-span-7">
+                      <div className="mb-4 flex items-start justify-between gap-4">
+                        <div>
+                          <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-paper/45">
+                            Recommended next step
+                          </div>
+                          <h2 className="mt-2 font-serif text-[24px] leading-tight tracking-[-0.01em] text-paper">
+                            {verdict}: {decisionLabel}
+                          </h2>
+                        </div>
+                        <StateChip tone={statusTone}>{decisionLabel}</StateChip>
+                      </div>
+                      <p className="line-clamp-3 min-h-[4.6rem] text-[13px] leading-relaxed text-paper/62">
+                        {explanation}
+                      </p>
+                      <div className="mt-4">
+                        <StructurePathChart
+                          data={chart}
+                          variant="dark"
+                          accent={statusTone === "bear" ? "bear" : statusTone === "bull" ? "bull" : "gold"}
+                          height={190}
+                          title="Actual SPY path vs rails"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="col-span-12 rounded-[8px] border border-paper/10 bg-paper/[0.035] p-4 lg:col-span-5">
+                      <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-paper/45">
+                        Today's game plan
+                      </div>
+                      <dl className="mt-4 space-y-3">
+                        <PlanRow label="Verdict" value={verdict} />
+                        <PlanRow label="Decision" value={decisionLabel} />
+                        <PlanRow label="Conviction" value={percent(serverDecision?.conviction)} />
+                        <PlanRow label="Window" value={serverDecision?.windowET ?? "Loading"} />
+                      </dl>
+                      <div className="mt-5 border-t border-paper/10 pt-4">
+                        <Link
+                          href="/dashboard"
+                          onClick={() =>
+                            track({
+                              name: "cta_click",
+                              location: "hero_preview",
+                              label: "open_decision_slate",
+                            })
+                          }
+                          className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.14em] text-gold-soft transition-colors hover:text-paper"
+                        >
+                          Open live slate <ArrowRight size={13} />
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        <div className="mt-2 flex justify-center lg:col-span-12 lg:mt-0">
+          <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-gold-ink/80">
+            A repeatable morning workflow
+          </div>
+        </div>
+      </div>
     </section>
   );
 }
 
-// The legacy <Quote> helper moved into HeroVerdictCard alongside its
-// only consumer.
+function CompassMark() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden className="shrink-0">
+      <defs>
+        <linearGradient id="hero-compass" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#D29A2C" />
+          <stop offset="55%" stopColor="#B8821F" />
+          <stop offset="100%" stopColor="#6E4C0E" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M14 1.8 17.2 10.8 26.2 14 17.2 17.2 14 26.2 10.8 17.2 1.8 14 10.8 10.8 14 1.8Z"
+        fill="none"
+        stroke="url(#hero-compass)"
+        strokeWidth="1.15"
+      />
+      <circle cx="14" cy="14" r="2.1" fill="url(#hero-compass)" />
+    </svg>
+  );
+}
+
+function ProofPoint({
+  icon: Icon,
+  label,
+}: {
+  icon: typeof Gauge;
+  label: string;
+}) {
+  return (
+    <div className="flex items-center justify-center gap-2 px-2 text-center">
+      <Icon size={15} className="shrink-0 text-gold-ink" />
+      <span className="text-[12px] font-medium text-ink-2">{label}</span>
+    </div>
+  );
+}
+
+function StateChip({
+  tone,
+  children,
+}: {
+  tone: "bull" | "bear" | "gold";
+  children: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "shrink-0 rounded-[5px] border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em]",
+        tone === "bull" && "border-bull/45 bg-bull/10 text-bull",
+        tone === "bear" && "border-bear/45 bg-bear/10 text-bear",
+        tone === "gold" && "border-gold/45 bg-gold/10 text-gold-soft",
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+function PreviewMetric({
+  label,
+  value,
+  delta: deltaText,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  delta?: string;
+  tone?: "bull" | "bear" | "neutral";
+}) {
+  return (
+    <div className="mb-4">
+      <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-paper/35">
+        {label}
+      </div>
+      <div className="mt-1 flex items-baseline gap-2">
+        <span className="font-mono text-[18px] text-paper">{value}</span>
+        {deltaText && (
+          <span
+            className={cn(
+              "font-mono text-[10px]",
+              tone === "bull" && "text-bull",
+              tone === "bear" && "text-bear",
+              tone === "neutral" && "text-paper/45",
+            )}
+          >
+            {deltaText}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PlanRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 border-b border-paper/10 pb-2.5 last:border-b-0">
+      <dt className="text-[12px] text-paper/45">{label}</dt>
+      <dd className="text-right font-mono text-[12px] font-semibold uppercase tracking-[0.04em] text-paper/80">
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+function labelize(value: string): string {
+  return value
+    .replaceAll("_", " ")
+    .toLowerCase()
+    .replace(/(^|\s)\S/g, (part) => part.toUpperCase());
+}
+
+function money(value?: number): string {
+  if (!Number.isFinite(value)) return "-";
+  return `$${value!.toFixed(2)}`;
+}
+
+function number(value?: number, digits = 1): string {
+  if (!Number.isFinite(value)) return "-";
+  return value!.toFixed(digits);
+}
+
+function percent(value?: number): string {
+  if (!Number.isFinite(value)) return "Loading";
+  return `${Math.round(value!)}%`;
+}
+
+function delta(change?: number, changePct?: number): string | undefined {
+  if (!Number.isFinite(change) || !Number.isFinite(changePct)) return undefined;
+  const sign = change! > 0 ? "+" : "";
+  return `${sign}${change!.toFixed(2)} (${sign}${changePct!.toFixed(2)}%)`;
+}

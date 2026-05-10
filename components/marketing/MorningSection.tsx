@@ -1,143 +1,111 @@
-import { SectionLabel } from "@/components/ui/SectionLabel";
-import { StatusPill } from "@/components/ui/StatusPill";
+import { CheckCircle2, CircleDashed, DoorClosed, Shield } from "lucide-react";
 
 const moments = [
   {
     time: "Pre-open",
     headline: "The brief publishes",
-    body: "Yesterday's close, what overnight did, where the day looks like it's leaning. Plain English. No chart required.",
+    body: "The engine reads the overnight and premarket structure before the session becomes emotional.",
   },
   {
     time: "Open",
-    headline: "The day's bias settles",
-    body: "By the bell the read settles into bullish, bearish, or neutral, with a number behind it so you know how much to trust it.",
+    headline: "Rails become live",
+    body: "Projected levels are evaluated against live bars. If price is not at the rail, the slate waits.",
   },
   {
-    time: "Mid-morning",
-    headline: "The first signal forms",
-    body: "Price tests one of the day's lines. The workspace says whether the test cleared the bar. Either way, you see why.",
+    time: "Signal",
+    headline: "Confirmation comes first",
+    body: "A touch is not enough. The candle has to close correctly before the next entry can exist.",
   },
   {
-    time: "Mid-day",
-    headline: "Discipline holds",
-    body: "Several gates check the setup before any order goes in. Most days at least one gate is still waiting. We wait too.",
-  },
-  {
-    time: "Afternoon",
-    headline: "Decisions accumulate",
-    body: "Every signal you took, every one you skipped, all of it logged. By the close, the day has basically written itself.",
+    time: "Manage",
+    headline: "Stops and exits stay visible",
+    body: "The workspace keeps the rejected line, stop, target, retest, and chase warning in the same decision frame.",
   },
   {
     time: "Close",
-    headline: "Tomorrow drafts itself",
-    body: "Every decision logged with how it played out and why you took it. Tomorrow's brief starts from there. Not a blank page.",
+    headline: "The day becomes replay data",
+    body: "Replay logic records what actually happened so the next review starts from evidence, not memory.",
   },
+];
+
+const guardrails = [
+  { icon: CircleDashed, title: "No chase", body: "If the move is already gone, the slate says so." },
+  { icon: CheckCircle2, title: "Confirmation", body: "Entries wait for the next-bar pattern." },
+  { icon: DoorClosed, title: "Invalidation", body: "Every trade has a structural line that can fail." },
+  { icon: Shield, title: "Daily stop", body: "The session can stand down before the trader does." },
 ];
 
 export function MorningSection() {
   return (
-    <section className="border-t border-rule bg-paper">
-      <div className="max-w-[1240px] mx-auto px-7 py-20 lg:py-28">
-        <SectionLabel number="02">A typical morning</SectionLabel>
-
-        <div className="mt-8 grid grid-cols-12 gap-10">
-          <div className="col-span-12 lg:col-span-5">
-            <h2 className="font-serif text-display tracking-tight text-ink">
-              How a day actually goes.
-            </h2>
-            <p className="mt-4 text-[16px] text-ink-2 leading-relaxed">
-              Prophet doesn’t replace your judgment. It gives your judgment
-              a better stage. From pre-open through the closing bell you can see
-              what’s true now and what would change it.
-            </p>
-
-            <div className="mt-10 surface rounded-card p-6 relative overflow-hidden">
-              {/* Sample card: shape only. Numbers illustrative; mechanics not
-                  disclosed publicly. */}
-              <div className="flex items-center gap-3 mb-4">
-                <span className="w-9 h-9 rounded-soft bg-paper-2 grid place-items-center font-serif text-[16px] text-ink-3 italic">
-                  ·
-                </span>
-                <div>
-                  <div className="eyebrow text-ink-3">A typical setup</div>
-                  <div className="font-serif text-title text-ink">
-                    Pending decision
-                  </div>
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-3 mb-4">
-                <Stat label="Entry" value="···" />
-                <Stat label="Stop" value="···" tone="bear" />
-                <Stat label="Target" value="···" tone="bull" />
-              </div>
-              <div className="hr-rule mb-3" />
-              <div className="flex items-center justify-between text-[12px]">
-                <span className="text-ink-3">R : R</span>
-                <span className="font-mono text-ink-3 font-semibold">1 : favorable</span>
-              </div>
-              <div className="flex items-center justify-between text-[12px] mt-1.5">
-                <span className="text-ink-3">Confidence</span>
-                <span className="font-mono text-ink-3 font-semibold">high · structural</span>
-              </div>
-              <div className="hr-rule my-3" />
-              <div className="flex items-center justify-between">
-                <span className="text-[12px] text-ink-3">Final decision</span>
-                <StatusPill variant="watching" pulse>
-                  WAIT FOR CONFIRMATION
-                </StatusPill>
-              </div>
-              {/* soft veil so the public sees the shape, not the numbers */}
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-paper/0 via-paper/10 to-paper/30" />
-            </div>
+    <section id="workflow" className="scroll-mt-[88px] border-y border-rule bg-paper">
+      <div className="mx-auto grid max-w-[1240px] grid-cols-1 gap-12 px-5 py-20 sm:px-7 lg:grid-cols-12 lg:py-28">
+        <div className="lg:col-span-4">
+          <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-gold-ink">
+            The morning operating system
           </div>
+          <h2 className="mt-4 font-serif text-display tracking-tight text-ink">
+            Built around the moments where traders usually improvise.
+          </h2>
+          <p className="mt-5 text-[16px] leading-relaxed text-ink-2">
+            The app is not trying to make the market louder. It narrows the
+            day into a few questions that can be answered from actual bars.
+          </p>
+        </div>
 
-          <div className="col-span-12 lg:col-span-7">
-            <ol className="relative">
-              <span className="absolute left-[68px] top-2 bottom-2 w-px bg-rule" />
-              {moments.map((m) => (
-                <li key={m.time} className="grid grid-cols-12 gap-5 py-5 first:pt-0 last:pb-0">
-                  <div className="col-span-2 pt-1.5">
-                    <span className="font-mono text-[12px] text-ink font-semibold uppercase tracking-[0.10em]">
-                      {m.time}
-                    </span>
+        <div className="lg:col-span-8">
+          <ol className="relative">
+            <span className="absolute left-[5.4rem] top-3 hidden h-[calc(100%-24px)] w-px bg-rule-strong sm:block" />
+            {moments.map((moment, index) => (
+              <li
+                key={moment.time}
+                className="grid grid-cols-12 gap-5 border-b border-rule py-6 first:pt-0 last:border-b-0 last:pb-0"
+              >
+                <div className="col-span-12 sm:col-span-2">
+                  <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-gold-ink">
+                    {moment.time}
+                  </span>
+                </div>
+                <div className="hidden sm:col-span-1 sm:flex sm:justify-center">
+                  <span className="relative z-10 grid h-8 w-8 place-items-center rounded-full border border-gold/55 bg-paper font-mono text-[10px] text-gold-ink">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                </div>
+                <div className="col-span-12 sm:col-span-9">
+                  <h3 className="font-serif text-[25px] leading-tight tracking-tight text-ink">
+                    {moment.headline}
+                  </h3>
+                  <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-ink-2">
+                    {moment.body}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+
+        <div className="lg:col-span-12">
+          <div className="grid grid-cols-1 divide-y divide-rule-strong border-y border-rule-strong md:grid-cols-4 md:divide-x md:divide-y-0">
+            {guardrails.map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.title} className="flex gap-4 px-5 py-6">
+                  <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-gold/45 text-gold-ink">
+                    <Icon size={19} strokeWidth={1.5} />
                   </div>
-                  <div className="col-span-1 flex flex-col items-center pt-3.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-paper border-[1.5px] border-gold shadow-rule relative z-10" />
-                  </div>
-                  <div className="col-span-9">
-                    <h3 className="font-serif text-title text-ink mb-1">
-                      {m.headline}
+                  <div>
+                    <h3 className="font-serif text-[18px] leading-tight text-ink">
+                      {item.title}
                     </h3>
-                    <p className="text-[14px] text-ink-2 leading-relaxed">
-                      {m.body}
+                    <p className="mt-1 text-[13px] leading-relaxed text-ink-2">
+                      {item.body}
                     </p>
                   </div>
-                </li>
-              ))}
-            </ol>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
     </section>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  tone = "ink",
-}: {
-  label: string;
-  value: string;
-  tone?: "ink" | "bull" | "bear";
-}) {
-  const cls = tone === "bull" ? "text-bull-ink" : tone === "bear" ? "text-bear-ink" : "text-ink";
-  return (
-    <div className="px-2 py-1.5 rounded-soft bg-paper-2">
-      <div className="eyebrow text-ink-3">{label}</div>
-      <div className={`font-mono text-sm font-semibold tabular-nums mt-0.5 ${cls}`} data-num>
-        {value}
-      </div>
-    </div>
   );
 }

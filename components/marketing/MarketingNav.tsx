@@ -1,20 +1,23 @@
 "use client";
+
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { ArrowRight } from "lucide-react";
 import { Wordmark } from "@/components/brand/Wordmark";
 import { Button } from "@/components/ui/Button";
-import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const links = [
   { label: "Methodology", href: "#methodology" },
-  { label: "Surfaces", href: "#surfaces" },
-  { label: "Discipline", href: "#manifesto" },
+  { label: "Engines", href: "#surfaces" },
+  { label: "Workflow", href: "#workflow" },
+  { label: "Dashboard", href: "/dashboard" },
   { label: "FAQ", href: "#faq" },
 ];
 
 export function MarketingNav() {
   const [scrolled, setScrolled] = useState(false);
+
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
     onScroll();
@@ -25,49 +28,36 @@ export function MarketingNav() {
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 transition-all duration-200 ease-swift",
+        "sticky top-0 z-40 border-b transition-all duration-200 ease-swift",
         scrolled
-          ? "bg-canvas/85 backdrop-blur-md border-b border-rule"
-          : "bg-transparent border-b border-transparent",
+          ? "border-rule bg-[#FBF8EF]/88 backdrop-blur-md"
+          : "border-rule/70 bg-[#FBF8EF]",
       )}
     >
-      <div className="max-w-[1240px] mx-auto px-7 h-[72px] flex items-center gap-8">
+      <div className="mx-auto flex h-[72px] max-w-[1440px] items-center gap-8 px-5 sm:px-7">
         <Link href="/" className="shrink-0">
           <Wordmark />
         </Link>
 
         <nav
           aria-label="Marketing site sections"
-          className="hidden md:flex items-center gap-7 ml-2"
+          className="hidden items-center gap-7 md:flex"
         >
-          {links.map((l) => (
-            <a
-              key={l.href}
-              href={l.href}
-              className="text-[13px] text-ink-2 hover:text-ink transition-colors outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-4 focus-visible:ring-offset-canvas rounded-soft -mx-1 px-1"
+          {links.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="rounded-soft px-1 text-[13px] font-medium text-ink-2 transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-gold/40"
             >
-              {l.label}
-            </a>
+              {link.label}
+            </Link>
           ))}
         </nav>
 
         <div className="ml-auto flex items-center gap-3">
-          {/* "Sign in" link removed for logged-out visitors — there's
-              no auth wall on /dashboard yet, so showing a Sign in
-              link is misleading.
-              TODO(auth): once /dashboard is gated by a real auth
-              check, re-render this link conditional on
-              !session?.user. Until then, the only path into the
-              workspace from the marketing site is the waitlist. */}
           <a href="#waitlist">
-            {/* min-h ensures the tap target meets the 44×44 spec on
-                touch devices even though the visual size stays sm. */}
-            <Button
-              variant="primary"
-              size="sm"
-              className="min-h-[44px] sm:min-h-0"
-            >
-              Join the waitlist <ArrowRight size={13} />
+            <Button variant="secondary" size="sm" className="min-h-[44px] sm:min-h-0">
+              Request beta access <ArrowRight size={13} />
             </Button>
           </a>
         </div>

@@ -19,8 +19,8 @@ export function FAQ() {
     <section id="faq" className="max-w-[1240px] mx-auto px-7 py-20 lg:py-28 scroll-mt-[88px]">
       <SectionLabel number="05">Frequently asked</SectionLabel>
 
-      <div className="mt-8 grid grid-cols-12 gap-10">
-        <div className="col-span-12 lg:col-span-4">
+      <div className="mt-8 grid grid-cols-1 gap-10 lg:grid-cols-12">
+        <div className="lg:col-span-4">
           <h2 className="font-serif text-display tracking-tight text-ink leading-tight">
             Honest answers.
           </h2>
@@ -29,7 +29,7 @@ export function FAQ() {
           </p>
         </div>
 
-        <div className="col-span-12 lg:col-span-8">
+        <div className="lg:col-span-8">
           <ul className="border-y border-rule">
             {faqs.map((f, i) => {
               const isOpen = open === i;

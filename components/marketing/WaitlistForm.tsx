@@ -1,18 +1,10 @@
 "use client";
-// Closed-beta waitlist form. Posts to /api/waitlist which is a
-// scaffold endpoint — see that file for the env vars that wire up
-// rate limiting, Turnstile, and the email-provider double opt-in.
-//
-// The form captures UTM params + referrer, includes a hidden
-// honeypot, surfaces success / error / pending states explicitly,
-// and links the Privacy Policy adjacent to the input.
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import Script from "next/script";
+import { AlertCircle, ArrowRight, Check, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { ArrowRight, Check, AlertCircle } from "lucide-react";
-import { SectionLabel } from "@/components/ui/SectionLabel";
 import { track } from "@/lib/analytics";
 
 type SubmitState =
@@ -25,35 +17,31 @@ export function WaitlistForm() {
   const [email, setEmail] = useState("");
   const [state, setState] = useState<SubmitState>({ kind: "idle" });
   const [utm, setUtm] = useState<Record<string, string>>({});
-  const [referrer, setReferrer] = useState<string>("");
+  const [referrer, setReferrer] = useState("");
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const honeypotRef = useRef<HTMLInputElement | null>(null);
 
-  // Capture UTM params + referrer once at mount. We persist these
-  // alongside the lead so attribution survives signup → invite.
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
       const out: Record<string, string> = {};
-      for (const k of [
+      for (const key of [
         "utm_source",
         "utm_medium",
         "utm_campaign",
         "utm_term",
         "utm_content",
       ]) {
-        const v = params.get(k);
-        if (v) out[k] = v;
+        const value = params.get(key);
+        if (value) out[key] = value;
       }
       setUtm(out);
       setReferrer(document.referrer || "");
     } catch {
-      // SSR-safe no-op
+      // SSR-safe no-op.
     }
   }, []);
 
-  // Cloudflare Turnstile callback — populated when the widget
-  // mounts. Wire NEXT_PUBLIC_TURNSTILE_SITEKEY in Vercel to enable.
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).onTurnstileSuccess = (token: string) => {
@@ -63,13 +51,11 @@ export function WaitlistForm() {
 
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITEKEY;
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
     if (state.kind === "pending") return;
     track({ name: "waitlist_submit_attempt" });
 
-    // HTML5 validation already ran (type=email + required); this is
-    // a belt-and-braces check.
     if (!email.includes("@")) {
       setState({ kind: "error", message: "Please enter a valid email." });
       track({ name: "waitlist_submit_error", reason: "client_validation" });
@@ -78,7 +64,7 @@ export function WaitlistForm() {
 
     setState({ kind: "pending" });
     try {
-      const res = await fetch("/api/waitlist", {
+      const response = await fetch("/api/waitlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -89,11 +75,11 @@ export function WaitlistForm() {
           turnstileToken,
         }),
       });
-      const data = (await res.json().catch(() => ({}))) as {
+      const data = (await response.json().catch(() => ({}))) as {
         ok?: boolean;
         error?: string;
       };
-      if (!res.ok || !data.ok) {
+      if (!response.ok || !data.ok) {
         const message =
           data.error ??
           "Something went wrong on our side. Please try again in a minute.";
@@ -105,7 +91,7 @@ export function WaitlistForm() {
       track({ name: "waitlist_submit_success" });
     } catch {
       const message =
-        "We couldn't reach the server. Please check your connection and try again.";
+        "We could not reach the server. Please check your connection and try again.";
       setState({ kind: "error", message });
       track({ name: "waitlist_submit_error", reason: "network" });
     }
@@ -114,7 +100,7 @@ export function WaitlistForm() {
   return (
     <section
       id="waitlist"
-      className="border-t border-rule bg-paper scroll-mt-[88px]"
+      className="scroll-mt-[88px] overflow-hidden border-t border-gold/40 bg-[#061017] text-paper"
     >
       {turnstileSiteKey && (
         <Script
@@ -124,41 +110,52 @@ export function WaitlistForm() {
           defer
         />
       )}
-      <div className="max-w-[1240px] mx-auto px-7 py-20 lg:py-28">
-        <SectionLabel number="06">Join the closed beta</SectionLabel>
 
-        <div className="mt-10 grid grid-cols-12 gap-10 items-end">
-          <div className="col-span-12 lg:col-span-7">
-            <h2 className="font-serif text-display lg:text-[56px] lg:leading-[1.04] tracking-tight text-ink max-w-2xl">
-              We open the workspace to a few traders at a time.
+      <div className="relative mx-auto max-w-[1240px] px-5 py-20 sm:px-7 lg:py-28">
+        <div className="absolute -right-32 bottom-0 h-[430px] w-[430px] rounded-full border border-paper/10 bg-[radial-gradient(circle_at_50%_45%,rgba(244,228,192,0.12),transparent_62%)]" />
+        <div className="relative grid grid-cols-1 items-end gap-10 lg:grid-cols-12">
+          <div className="lg:col-span-7">
+            <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-gold-soft">
+              Closed beta access
+            </div>
+            <h2 className="mt-5 max-w-2xl font-serif text-display tracking-tight text-paper lg:text-[56px] lg:leading-[1.04]">
+              Built for traders who protect first.
             </h2>
-            <p className="mt-5 text-[16px] text-ink-2 leading-relaxed max-w-2xl">
-              Leave your email and we&apos;ll send an invite when the next
-              cohort opens. You&apos;ll also get the weekly Daily Brief in
-              the meantime: yesterday&apos;s close, tomorrow&apos;s setup, so
-              you can read along before you&apos;re in.
+            <p className="mt-5 max-w-2xl text-[16px] leading-relaxed text-paper/64">
+              Leave your email and we will send an invite when the next cohort
+              opens. You will also get the weekly Daily Brief in the meantime:
+              yesterday's close, tomorrow's setup, so you can read along before
+              you are in.
             </p>
+
+            <div className="mt-9 grid max-w-xl grid-cols-3 divide-x divide-paper/15 border-y border-paper/15 py-4">
+              <TrustItem label="Real-time structure" />
+              <TrustItem label="Transparent logic" />
+              <TrustItem label="Discipline first" />
+            </div>
           </div>
 
-          <div className="col-span-12 lg:col-span-5">
+          <div className="lg:col-span-5">
             {state.kind === "success" ? (
               <SuccessCard />
             ) : (
               <form
                 onSubmit={handleSubmit}
                 noValidate
-                className="surface rounded-card p-6 space-y-4"
+                className="space-y-4 rounded-[10px] border border-paper/14 bg-paper/[0.045] p-6 shadow-[0_24px_80px_-44px_rgba(0,0,0,0.9)]"
               >
                 <label className="block">
-                  <span className="eyebrow text-ink-3">Email</span>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-paper/50">
+                    Email
+                  </span>
                   <input
                     type="email"
                     name="email"
                     required
                     autoComplete="email"
                     value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value);
+                    onChange={(event) => {
+                      setEmail(event.target.value);
                       if (state.kind === "error") setState({ kind: "idle" });
                     }}
                     placeholder="you@firm.com"
@@ -166,15 +163,13 @@ export function WaitlistForm() {
                     aria-describedby={
                       state.kind === "error" ? "waitlist-error" : "waitlist-privacy"
                     }
-                    className="mt-2 w-full h-11 px-3 bg-paper-2 rounded-soft text-[15px] text-ink placeholder:text-ink-4 outline-none shadow-rule focus:shadow-[0_0_0_2px_rgba(184,130,31,0.32)] transition-shadow"
+                    className="mt-2 h-11 w-full rounded-[6px] border border-paper/10 bg-[#07141C] px-3 text-[15px] text-paper outline-none transition-shadow placeholder:text-paper/28 focus:shadow-[0_0_0_2px_rgba(184,130,31,0.38)]"
                   />
                 </label>
 
-                {/* Honeypot — visually hidden + aria-hidden so a real
-                    user can't stumble into it; bots will fill it. */}
                 <div
                   aria-hidden="true"
-                  className="absolute -left-[9999px] w-px h-px overflow-hidden"
+                  className="absolute -left-[9999px] h-px w-px overflow-hidden"
                 >
                   <label>
                     Website
@@ -189,9 +184,6 @@ export function WaitlistForm() {
                   </label>
                 </div>
 
-                {/* Cloudflare Turnstile widget — only renders when the
-                    site key is configured. Until then the captcha
-                    check on the server is a no-op (dev/preview). */}
                 {turnstileSiteKey && (
                   <div
                     className="cf-turnstile"
@@ -204,7 +196,7 @@ export function WaitlistForm() {
                   <div
                     id="waitlist-error"
                     role="alert"
-                    className="flex items-start gap-2 text-[12px] text-state-bearish"
+                    className="flex items-start gap-2 text-[12px] text-bear"
                   >
                     <AlertCircle size={13} className="mt-0.5 shrink-0" />
                     <span>{state.message}</span>
@@ -215,25 +207,25 @@ export function WaitlistForm() {
                   type="submit"
                   variant="primary"
                   size="lg"
-                  className="w-full"
+                  className="w-full justify-center"
                   disabled={state.kind === "pending"}
                 >
-                  {state.kind === "pending" ? "Adding…" : "Request invite"}
+                  {state.kind === "pending" ? "Adding..." : "Request invite"}
                   {state.kind !== "pending" && <ArrowRight size={15} />}
                 </Button>
 
                 <p
                   id="waitlist-privacy"
-                  className="text-[11px] text-ink-3 text-center"
+                  className="text-center text-[11px] text-paper/42"
                 >
                   We use your email per our{" "}
                   <Link
                     href="/privacy"
-                    className="underline underline-offset-2 hover:text-ink"
+                    className="underline underline-offset-2 hover:text-paper"
                   >
                     Privacy Policy
                   </Link>
-                  . No spam — one Daily Brief per morning + an invite when
+                  . No spam - one Daily Brief per morning plus an invite when
                   ready.
                 </p>
               </form>
@@ -245,24 +237,35 @@ export function WaitlistForm() {
   );
 }
 
+function TrustItem({ label }: { label: string }) {
+  return (
+    <div className="flex items-center justify-center gap-2 px-4 text-center">
+      <ShieldCheck size={14} className="shrink-0 text-gold-soft" />
+      <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-gold-soft">
+        {label}
+      </span>
+    </div>
+  );
+}
+
 function SuccessCard() {
   return (
     <div
       role="status"
       aria-live="polite"
-      className="surface rounded-card p-7 flex items-start gap-4"
+      className="flex items-start gap-4 rounded-[10px] border border-paper/14 bg-paper/[0.045] p-7"
     >
-      <div className="w-10 h-10 rounded-soft bg-bull-tint grid place-items-center text-bull-ink shrink-0">
+      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[6px] bg-bull/15 text-bull">
         <Check size={18} />
       </div>
       <div>
-        <h3 className="font-serif text-title text-ink mb-1">
+        <h3 className="mb-1 font-serif text-title text-paper">
           Check your inbox.
         </h3>
-        <p className="text-[14px] text-ink-2 leading-relaxed">
-          We sent a confirmation email. Click the link inside to finish
-          joining the waitlist. Until then, expect the Daily Brief in your
-          inbox each morning at 6:30 AM ET.
+        <p className="text-[14px] leading-relaxed text-paper/64">
+          We sent a confirmation email. Click the link inside to finish joining
+          the waitlist. Until then, expect the Daily Brief in your inbox each
+          morning at 6:30 AM ET.
         </p>
       </div>
     </div>

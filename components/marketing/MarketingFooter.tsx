@@ -6,17 +6,14 @@ const cols = [
     label: "Workspace",
     items: [
       { label: "Decision Slate", href: "/dashboard" },
-      { label: "SPY Channel", href: "/spy" },
-      { label: "ES Channel", href: "/es" },
+      { label: "SPY Engine", href: "/spy" },
+      { label: "ES Engine", href: "/es" },
       { label: "Foresight", href: "/foresight" },
     ],
   },
   {
     label: "Read",
     items: [
-      // Methodology now points at the long-form /methodology page
-      // (g12) instead of the home-page anchor — the long-form has
-      // the closed-beta cohort note + the engine description.
       { label: "Methodology", href: "/methodology" },
       { label: "Discipline", href: "/#manifesto" },
       { label: "FAQ", href: "/#faq" },
@@ -29,8 +26,6 @@ const cols = [
       { label: "About", href: "/about" },
       { label: "Contact", href: "/contact" },
       { label: "Careers", href: "/careers" },
-      // "Press" intentionally removed per g12 — no published press
-      // exists yet. The /press route still exists for direct access.
     ],
   },
   {
@@ -46,38 +41,38 @@ const cols = [
 
 export function MarketingFooter() {
   return (
-    <footer className="border-t border-rule mt-32 bg-paper">
-      <div className="max-w-[1240px] mx-auto px-7 py-14">
-        <div className="grid grid-cols-12 gap-8">
-          <div className="col-span-12 md:col-span-4">
+    <footer className="border-t border-rule bg-paper">
+      <div className="mx-auto max-w-[1240px] px-5 py-14 sm:px-7">
+        <div className="grid grid-cols-2 gap-8 md:grid-cols-12">
+          <div className="col-span-2 md:col-span-4">
             <Wordmark />
-            <p className="mt-5 text-[13px] text-ink-2 leading-relaxed max-w-sm">
+            <p className="mt-5 max-w-sm text-[13px] leading-relaxed text-ink-2">
               SPY Prophet is a decision workspace for serious retail traders.
               The structure stays the same. What you do with it is on you.
             </p>
             <div className="mt-6 flex items-center gap-2">
-              <span className="font-mono text-[10px] text-ink-3 tracking-[0.18em] uppercase">
+              <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3">
                 Status
               </span>
               <span className="relative flex h-1.5 w-1.5">
-                <span className="absolute inline-flex h-full w-full rounded-full bg-bull opacity-50 animate-breathe" />
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-bull" />
+                <span className="absolute inline-flex h-full w-full animate-breathe rounded-full bg-bull opacity-50" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-bull" />
               </span>
-              <span className="text-[12px] text-ink-2">All systems operational</span>
+              <span className="text-[12px] text-ink-2">Closed beta</span>
             </div>
           </div>
 
-          {cols.map((c) => (
-            <div key={c.label} className="col-span-6 md:col-span-2">
-              <div className="eyebrow text-ink-3 mb-4">{c.label}</div>
+          {cols.map((col) => (
+            <div key={col.label} className="col-span-1 md:col-span-2">
+              <div className="eyebrow mb-4 text-ink-3">{col.label}</div>
               <ul className="space-y-2.5">
-                {c.items.map((it) => (
-                  <li key={it.label}>
+                {col.items.map((item) => (
+                  <li key={item.label}>
                     <Link
-                      href={it.href}
-                      className="text-[13px] text-ink-2 hover:text-ink transition-colors outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-paper rounded-soft -mx-1 px-1"
+                      href={item.href}
+                      className="rounded-soft px-1 text-[13px] text-ink-2 transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-gold/40"
                     >
-                      {it.label}
+                      {item.label}
                     </Link>
                   </li>
                 ))}
@@ -88,12 +83,12 @@ export function MarketingFooter() {
 
         <div className="hr-rule mt-10" />
 
-        <div className="mt-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-[11px] text-ink-3 font-mono uppercase tracking-[0.16em]">
-          <span>© 2026 SPY Prophet · All rights reserved</span>
-          <span className="text-ink-4 normal-case tracking-normal max-w-2xl text-[10.5px] font-sans leading-relaxed">
-            Not investment advice. Trading futures, equities, and options carries
-            substantial risk and is not suitable for every investor. Past
-            performance does not guarantee future results.
+        <div className="mt-6 flex flex-col items-start justify-between gap-4 font-mono text-[11px] uppercase tracking-[0.16em] text-ink-3 md:flex-row md:items-center">
+          <span>(C) 2026 SPY Prophet - All rights reserved</span>
+          <span className="max-w-2xl font-sans text-[10.5px] normal-case leading-relaxed tracking-normal text-ink-4">
+            Not investment advice. Trading futures, equities, and options
+            carries substantial risk and is not suitable for every investor.
+            Past performance does not guarantee future results.
           </span>
         </div>
       </div>
