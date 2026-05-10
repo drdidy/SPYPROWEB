@@ -87,13 +87,9 @@ def effective_options_date(now: datetime | None = None) -> str:
 def _date_params(effective_date: str | None, extra: dict | None = None) -> dict:
     params = dict(extra or {})
     if effective_date:
-        # UW endpoints that support historical reads use `date`; a few
-        # adjacent APIs accept start/end naming. Supplying all three is
-        # harmless for endpoints that ignore unknown filters and lets the
-        # client stay defensive across schema variants.
+        # UW historical endpoints use `date`. Keep this exact; some
+        # endpoints reject unknown query names with 422.
         params.setdefault("date", effective_date)
-        params.setdefault("start_date", effective_date)
-        params.setdefault("end_date", effective_date)
     return params
 
 
