@@ -19,7 +19,7 @@ export default async function Page() {
   const ctx = snap.marketContext;
 
   return (
-    <div className="max-w-[1200px] mx-auto pb-16 space-y-8">
+    <div className="w-full max-w-[1440px] pb-16 space-y-8">
       <PageHeader
         eyebrow="Intelligence · 08"
         title="Market Context"

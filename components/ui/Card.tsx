@@ -24,10 +24,11 @@ export function Card({
         // h-full + flex-col lets the card fill its grid cell vertically,
         // and CardBody can use flex-1 to push the footer to the bottom
         // so two adjacent cards bottom-align cleanly (P2 polish).
-        "rounded-card shadow-card relative flex flex-col h-full",
+        "rounded-card border border-rule-tier2 shadow-card relative flex flex-col h-full overflow-hidden",
+        "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-gold/45 before:to-transparent",
         toneCls,
         interactive &&
-          "transition-shadow duration-200 ease-swift hover:shadow-card-hover cursor-pointer",
+          "transition-all duration-200 ease-swift hover:-translate-y-0.5 hover:border-rule-strong hover:shadow-card-hover cursor-pointer",
         className,
       )}
     >
@@ -60,8 +61,14 @@ export function CardHeader({
       )}
     >
       <div>
-        {eyebrow && <div className="eyebrow text-ink-3 mb-1.5">{eyebrow}</div>}
-        <div className="text-title font-serif tracking-tight text-ink">{title}</div>
+        {eyebrow && (
+          <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-gold-ink/80 mb-1.5">
+            {eyebrow}
+          </div>
+        )}
+        <div className="text-title font-serif tracking-tight text-ink">
+          {title}
+        </div>
         {meta && <div className="text-xs text-ink-3 mt-1">{meta}</div>}
       </div>
       {action && <div className="flex items-center gap-2 shrink-0">{action}</div>}

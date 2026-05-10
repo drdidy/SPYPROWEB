@@ -36,11 +36,12 @@ export function PageHeader({
 }) {
   const s = source ? sourcePalette[source] : null;
   return (
-    <header className="pt-2">
+    <header className="pt-4 pb-1">
       <div className="flex items-center gap-3 mb-3">
-        <span className="font-mono text-[10px] text-ink-3 tracking-[0.20em] uppercase">
+        <span className="font-mono text-[10px] text-gold-ink/80 tracking-[0.20em] uppercase">
           {eyebrow}
         </span>
+        <span aria-hidden className="h-px w-10 bg-rule-strong" />
         {s && source && (
           <span
             className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-pill text-[9px] font-mono font-semibold uppercase tracking-[0.12em] ${s.cls}`}
@@ -50,9 +51,13 @@ export function PageHeader({
           </span>
         )}
       </div>
-      <h1 className="text-headline font-serif text-ink tracking-tight">{title}</h1>
+      <h1 className="font-serif text-[42px] leading-none text-ink tracking-tight">
+        {title}
+      </h1>
       {lede && (
-        <p className="mt-3 text-base text-ink-2 max-w-2xl leading-relaxed">{lede}</p>
+        <p className="mt-3 text-[15px] text-ink-2 max-w-2xl leading-relaxed">
+          {lede}
+        </p>
       )}
     </header>
   );

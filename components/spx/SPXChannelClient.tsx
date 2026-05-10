@@ -102,7 +102,7 @@ export function SPXChannelClient({ replayDate }: Props) {
 
   if (state.status === "loading") {
     return (
-      <div className="max-w-[1440px] mx-auto space-y-10 pb-16 pt-6">
+      <div className="w-full max-w-[1440px] space-y-10 pb-16 pt-6">
         {replayDate && <ReplayBanner date={replayDate} />}
         <Skeleton className="h-10 w-2/3" />
         <Skeleton className="h-72 w-full" />
@@ -120,7 +120,7 @@ export function SPXChannelClient({ replayDate }: Props) {
     // data-feed gap). This is the honest "channel is between
     // sessions" state — render it as such, not as a hard error.
     return (
-      <div className="max-w-[1440px] mx-auto space-y-6 pb-16 pt-6">
+      <div className="w-full max-w-[1440px] space-y-6 pb-16 pt-6">
         {replayDate && <ReplayBanner date={replayDate} />}
         <div
           role="status"
@@ -156,7 +156,7 @@ export function SPXChannelClient({ replayDate }: Props) {
     // the API error body inline so the failure mode is diagnosable
     // from the browser.
     return (
-      <div className="max-w-[1440px] mx-auto space-y-6 pb-16 pt-6">
+      <div className="w-full max-w-[1440px] space-y-6 pb-16 pt-6">
         {replayDate && <ReplayBanner date={replayDate} />}
         <ErrorState
           title={
@@ -179,7 +179,7 @@ export function SPXChannelClient({ replayDate }: Props) {
   const meta = snap._meta;
 
   return (
-    <div className="max-w-[1440px] mx-auto space-y-10 pb-16">
+    <div className="w-full max-w-[1440px] space-y-10 pb-16">
       {replayDate && <ReplayBanner date={replayDate} />}
       {/* Editorial header */}
       <header className="flex items-end justify-between pt-2 pb-1">

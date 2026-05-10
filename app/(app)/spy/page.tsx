@@ -24,7 +24,7 @@ export default async function Page() {
   } = snap;
 
   return (
-    <div className="max-w-[1440px] mx-auto space-y-10 pb-16">
+    <div className="w-full max-w-[1440px] space-y-10 pb-16">
       {/* Editorial header — matches /spx */}
       <header className="flex flex-col gap-3 pt-2 pb-1 md:flex-row md:items-end md:justify-between">
         <div>

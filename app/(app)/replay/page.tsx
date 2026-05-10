@@ -18,7 +18,7 @@ export default function Page({ searchParams }: PageProps) {
       : null;
 
   return (
-    <div className="max-w-[1440px] mx-auto space-y-8 pb-16">
+    <div className="w-full max-w-[1440px] space-y-8 pb-16">
       <header className="pt-2 pb-1">
         <div className="flex items-center gap-3 flex-wrap">
           <span className="font-mono text-[10px] text-ink-3 tracking-[0.20em] uppercase">

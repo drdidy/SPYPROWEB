@@ -17,6 +17,7 @@ import { spxSnapshot as mockSpx } from "./spx-mock-data";
 import type { DecisionState, SPXSnapshot } from "./types";
 
 const POLL_MS = 30_000;
+const STABLE_SEED_TS = "1970-01-01T00:00:00.000Z";
 
 export interface LiveSPYView {
   decision: DecisionState;
@@ -46,7 +47,11 @@ export function useLiveSPY(initial?: LiveSPYInitial): LiveSPYView {
       isLive: false,
       sessionLabel: mockShell.sessionLabel,
       sessionCloses: mockShell.sessionCloses,
-      feedHealth: { lastTickTs: new Date().toISOString(), source: "seed" },
+      // Keep SSR and client hydration identical. The first poll below
+      // replaces this deterministic seed with the actual snapshot
+      // timestamp; using `new Date()` here creates hydration drift on
+      // static pages.
+      feedHealth: { lastTickTs: STABLE_SEED_TS, source: "seed" },
     },
     source: initial?.source ?? "seed",
     currentState: initial?.currentState ?? "WAIT",

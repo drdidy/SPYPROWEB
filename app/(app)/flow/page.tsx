@@ -22,7 +22,7 @@ export default async function Page() {
   const gex = snap.gex;
 
   return (
-    <div className="max-w-[1200px] mx-auto pb-16 space-y-8">
+    <div className="w-full max-w-[1440px] pb-16 space-y-8">
       <PageHeader
         eyebrow="Intelligence · 09"
         title="Order Flow"
