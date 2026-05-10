@@ -309,7 +309,7 @@ export function HeroSection({
                         </div>
                         <StateChip tone={statusTone}>{decisionLabel}</StateChip>
                       </div>
-                      <p className="line-clamp-3 min-h-[4.6rem] text-[13px] leading-relaxed text-paper/62">
+                      <p className="line-clamp-3 min-h-[4.6rem] text-[13px] leading-relaxed !text-[#EDE6D7] [text-shadow:0_1px_14px_rgba(0,0,0,0.35)] [&_*]:!text-inherit">
                         {explanation}
                       </p>
                       <DecisionFlowPanel
