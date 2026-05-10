@@ -36,6 +36,12 @@ export default async function Page() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
         <CommandStat
+          label="Options session"
+          value={options.data.sessionDate ?? "Waiting"}
+          note={options.data.isHistoricalSession ? "Most recent completed session" : "Current options session"}
+          tone="gold"
+        />
+        <CommandStat
           label="SPY flow"
           value={spy?.flow?.lean ?? "Waiting"}
           note={spy?.flow ? `${fmtCompact(spy.flow.premiumNet)} net premium` : "Flow feed not populated"}
@@ -52,12 +58,6 @@ export default async function Page() {
           value={spy?.gex?.regime ?? "Waiting"}
           note={spy?.gex ? `Flip ${fmtPrice(spy.gex.flipPoint)}` : "Gamma feed not populated"}
           tone={gexTone(spy?.gex?.regime)}
-        />
-        <CommandStat
-          label="SPX chain"
-          value={spxChain?.expiration ?? "Waiting"}
-          note={spxChain ? `${spxChain.calls.length + spxChain.puts.length} contracts with Greeks` : "Chain not loaded"}
-          tone="gold"
         />
       </div>
 

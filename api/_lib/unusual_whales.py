@@ -14,15 +14,19 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timedelta, timezone
 import urllib.error
 import urllib.parse
 import urllib.request
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from . import prophet_core as pc
 
 BASE = "https://api.unusualwhales.com/api"
+CT = ZoneInfo("America/Chicago")
+OPTIONS_SESSION_START = time(8, 30)
+OPTIONS_SESSION_END = time(15, 15)
 
 
 def _has_key() -> bool:
@@ -51,6 +55,69 @@ def _first_response(candidates: list[tuple[str, dict | None]]) -> Any:
         if raw:
             return raw
     return None
+
+
+def _previous_weekday(d: date) -> date:
+    d = d - timedelta(days=1)
+    while d.weekday() >= 5:
+        d = d - timedelta(days=1)
+    return d
+
+
+def effective_options_date(now: datetime | None = None) -> str:
+    """Date used for session-scoped options intelligence.
+
+    During an open weekday session we request today's data. Before the
+    open, after the close, and on weekends, the freshest honest read is
+    the most recent completed weekday. This keeps Sunday from rendering
+    partial/empty current-day flow as if it were real.
+    """
+    now_ct = (now or datetime.now(CT)).astimezone(CT)
+    today = now_ct.date()
+    if today.weekday() >= 5:
+        d = today
+        while d.weekday() >= 5:
+            d = d - timedelta(days=1)
+        return d.isoformat()
+    if OPTIONS_SESSION_START <= now_ct.time() <= OPTIONS_SESSION_END:
+        return today.isoformat()
+    return _previous_weekday(today).isoformat()
+
+
+def _date_params(effective_date: str | None, extra: dict | None = None) -> dict:
+    params = dict(extra or {})
+    if effective_date:
+        # UW endpoints that support historical reads use `date`; a few
+        # adjacent APIs accept start/end naming. Supplying all three is
+        # harmless for endpoints that ignore unknown filters and lets the
+        # client stay defensive across schema variants.
+        params.setdefault("date", effective_date)
+        params.setdefault("start_date", effective_date)
+        params.setdefault("end_date", effective_date)
+    return params
+
+
+def _row_date(row: dict) -> str | None:
+    raw = _text(row, "executed_at", "timestamp", "created_at", "time", "ts", "date")
+    if not raw:
+        return None
+    if len(raw) >= 10 and raw[4:5] == "-" and raw[7:8] == "-":
+        return raw[:10]
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00")).astimezone(CT).date().isoformat()
+    except (TypeError, ValueError):
+        return None
+
+
+def _filter_rows_for_date(rows: list[dict], effective_date: str | None) -> list[dict]:
+    if not effective_date:
+        return rows
+    dated = [r for r in rows if _row_date(r) == effective_date]
+    # If the endpoint returns rows without timestamps, keep them rather
+    # than discarding useful chain/Greek payloads. If it returns dated
+    # rows from the wrong session, render no-read instead of stale data.
+    undated = [r for r in rows if _row_date(r) is None]
+    return dated if dated else undated
 
 
 def _data(raw: Any) -> Any:
@@ -183,25 +250,30 @@ def _flow_lean(items: list[dict], ticker: str) -> dict | None:
     }
 
 
-@pc.ttl_cache(ttl_seconds=60.0, maxsize=8)
-def fetch_flow_summary(ticker: str = "SPY") -> dict | None:
+@pc.ttl_cache(ttl_seconds=60.0, maxsize=16)
+def fetch_flow_summary(ticker: str = "SPY", effective_date: str | None = None) -> dict | None:
     """Recent options flow rolled into a directional lean."""
+    session_date = effective_date or effective_options_date()
     raw = _first_response(
         [
-            (f"/stock/{ticker}/flow-recent", {"limit": 50}),
-            (f"/stock/{ticker}/flow-alerts", {"limit": 50}),
+            (f"/stock/{ticker}/flow-recent", _date_params(session_date, {"limit": 50})),
+            (f"/stock/{ticker}/flow-alerts", _date_params(session_date, {"limit": 50})),
         ]
     )
-    return _flow_lean(_rows(raw), ticker.upper())
+    flow = _flow_lean(_filter_rows_for_date(_rows(raw), session_date), ticker.upper())
+    if flow:
+        flow["sessionDate"] = session_date
+    return flow
 
 
-@pc.ttl_cache(ttl_seconds=120.0, maxsize=8)
-def fetch_gex_summary(ticker: str = "SPY") -> dict | None:
+@pc.ttl_cache(ttl_seconds=120.0, maxsize=16)
+def fetch_gex_summary(ticker: str = "SPY", effective_date: str | None = None) -> dict | None:
     """Dealer gamma exposure summary."""
+    session_date = effective_date or effective_options_date()
     raw = _first_response(
         [
-            (f"/stock/{ticker}/greek-exposure", None),
-            (f"/stock/{ticker}/greeks", None),
+            (f"/stock/{ticker}/greek-exposure", _date_params(session_date)),
+            (f"/stock/{ticker}/greeks", _date_params(session_date)),
         ]
     )
     if not raw:
@@ -222,25 +294,28 @@ def fetch_gex_summary(ticker: str = "SPY") -> dict | None:
         regime = "FLAT"
     return {
         "ticker": ticker.upper(),
+        "sessionDate": session_date,
         "totalGEX": round(gex_f, 2),
         "regime": regime,
         "flipPoint": flip,
     }
 
 
-@pc.ttl_cache(ttl_seconds=60.0, maxsize=8)
-def fetch_flow_alerts(ticker: str = "SPY") -> list[dict]:
+@pc.ttl_cache(ttl_seconds=60.0, maxsize=16)
+def fetch_flow_alerts(ticker: str = "SPY", effective_date: str | None = None) -> list[dict]:
+    session_date = effective_date or effective_options_date()
     raw = _first_response(
         [
-            (f"/stock/{ticker}/flow-alerts", {"limit": 20}),
-            (f"/stock/{ticker}/flow-recent", {"limit": 20}),
+            (f"/stock/{ticker}/flow-alerts", _date_params(session_date, {"limit": 20})),
+            (f"/stock/{ticker}/flow-recent", _date_params(session_date, {"limit": 20})),
         ]
     )
     alerts = []
-    for r in _rows(raw)[:20]:
+    for r in _filter_rows_for_date(_rows(raw), session_date)[:20]:
         alerts.append(
             {
                 "ticker": ticker.upper(),
+                "sessionDate": session_date,
                 "optionSymbol": _text(r, "option_symbol", "optionSymbol", "contract", "symbol"),
                 "side": _side(r),
                 "strike": _num(r, "strike", "strike_price"),
@@ -254,16 +329,17 @@ def fetch_flow_alerts(ticker: str = "SPY") -> list[dict]:
     return alerts
 
 
-@pc.ttl_cache(ttl_seconds=120.0, maxsize=8)
-def fetch_darkpool_summary(ticker: str = "SPY") -> dict | None:
+@pc.ttl_cache(ttl_seconds=120.0, maxsize=16)
+def fetch_darkpool_summary(ticker: str = "SPY", effective_date: str | None = None) -> dict | None:
+    session_date = effective_date or effective_options_date()
     raw = _first_response(
         [
-            (f"/darkpool/{ticker}", {"limit": 50}),
-            (f"/darkpool/{ticker}/recent", {"limit": 50}),
-            (f"/stock/{ticker}/darkpool", {"limit": 50}),
+            (f"/darkpool/{ticker}", _date_params(session_date, {"limit": 50})),
+            (f"/darkpool/{ticker}/recent", _date_params(session_date, {"limit": 50})),
+            (f"/stock/{ticker}/darkpool", _date_params(session_date, {"limit": 50})),
         ]
     )
-    rows = _rows(raw)
+    rows = _filter_rows_for_date(_rows(raw), session_date)
     if not rows:
         return None
     total_premium = 0.0
@@ -293,6 +369,7 @@ def fetch_darkpool_summary(ticker: str = "SPY") -> dict | None:
     avg_price = weighted_notional / total_volume if total_volume > 0 else None
     return {
         "ticker": ticker.upper(),
+        "sessionDate": session_date,
         "count": len(rows),
         "totalPremium": round(total_premium, 0),
         "totalVolume": round(total_volume, 0),
@@ -301,13 +378,14 @@ def fetch_darkpool_summary(ticker: str = "SPY") -> dict | None:
     }
 
 
-@pc.ttl_cache(ttl_seconds=120.0, maxsize=8)
-def fetch_option_chain(ticker: str = "SPY") -> dict | None:
+@pc.ttl_cache(ttl_seconds=120.0, maxsize=16)
+def fetch_option_chain(ticker: str = "SPY", effective_date: str | None = None) -> dict | None:
+    session_date = effective_date or effective_options_date()
     raw = _first_response(
         [
-            (f"/stock/{ticker}/option-chains", None),
-            (f"/stock/{ticker}/option-chain", None),
-            (f"/stock/{ticker}/options", None),
+            (f"/stock/{ticker}/option-chains", _date_params(session_date)),
+            (f"/stock/{ticker}/option-chain", _date_params(session_date)),
+            (f"/stock/{ticker}/options", _date_params(session_date)),
         ]
     )
     contracts = [_normalize_contract(r) for r in _rows(raw)]
@@ -328,6 +406,7 @@ def fetch_option_chain(ticker: str = "SPY") -> dict | None:
     put_vol = sum(int(c.get("volume") or 0) for c in puts)
     return {
         "ticker": ticker.upper(),
+        "sessionDate": session_date,
         "expiration": expiration,
         "calls": calls,
         "puts": puts,
@@ -341,18 +420,20 @@ def fetch_option_chain(ticker: str = "SPY") -> dict | None:
     }
 
 
-@pc.ttl_cache(ttl_seconds=120.0, maxsize=8)
-def fetch_greeks(ticker: str = "SPY") -> list[dict]:
+@pc.ttl_cache(ttl_seconds=120.0, maxsize=16)
+def fetch_greeks(ticker: str = "SPY", effective_date: str | None = None) -> list[dict]:
+    session_date = effective_date or effective_options_date()
     raw = _first_response(
         [
-            (f"/stock/{ticker}/greeks", {"limit": 50}),
-            (f"/stock/{ticker}/greek-exposure", {"limit": 50}),
+            (f"/stock/{ticker}/greeks", _date_params(session_date, {"limit": 50})),
+            (f"/stock/{ticker}/greek-exposure", _date_params(session_date, {"limit": 50})),
         ]
     )
     out = []
-    for r in _rows(raw)[:50]:
+    for r in _filter_rows_for_date(_rows(raw), session_date)[:50]:
         out.append(
             {
+                "sessionDate": session_date,
                 "strike": _num(r, "strike", "strike_price"),
                 "expiration": _text(r, "expiration", "expiry", "expiry_date", "expiration_date"),
                 "side": _side(r),
@@ -367,16 +448,18 @@ def fetch_greeks(ticker: str = "SPY") -> list[dict]:
     return out
 
 
-def fetch_symbol_options_intel(ticker: str) -> dict:
+def fetch_symbol_options_intel(ticker: str, effective_date: str | None = None) -> dict:
     symbol = ticker.upper()
-    flow = fetch_flow_summary(symbol)
-    gex = fetch_gex_summary(symbol)
-    alerts = fetch_flow_alerts(symbol)
-    darkpool = fetch_darkpool_summary(symbol)
-    chain = fetch_option_chain(symbol)
-    greeks = fetch_greeks(symbol)
+    session_date = effective_date or effective_options_date()
+    flow = fetch_flow_summary(symbol, session_date)
+    gex = fetch_gex_summary(symbol, session_date)
+    alerts = fetch_flow_alerts(symbol, session_date)
+    darkpool = fetch_darkpool_summary(symbol, session_date)
+    chain = fetch_option_chain(symbol, session_date)
+    greeks = fetch_greeks(symbol, session_date)
     return {
         "ticker": symbol,
+        "sessionDate": session_date,
         "available": bool(flow or gex or alerts or darkpool or chain or greeks),
         "flow": flow,
         "gex": gex,
@@ -387,12 +470,16 @@ def fetch_symbol_options_intel(ticker: str) -> dict:
     }
 
 
-@pc.ttl_cache(ttl_seconds=45.0, maxsize=4)
-def fetch_options_bundle(tickers: tuple[str, ...] = ("SPY", "SPX")) -> dict:
+@pc.ttl_cache(ttl_seconds=45.0, maxsize=8)
+def fetch_options_bundle(tickers: tuple[str, ...] = ("SPY", "SPX"), effective_date: str | None = None) -> dict:
     clean = tuple(dict.fromkeys(t.upper().strip() for t in tickers if t and t.strip()))
-    symbols = {ticker: fetch_symbol_options_intel(ticker) for ticker in clean}
+    session_date = effective_date or effective_options_date()
+    today_ct = datetime.now(CT).date().isoformat()
+    symbols = {ticker: fetch_symbol_options_intel(ticker, session_date) for ticker in clean}
     return {
         "available": any(v.get("available") for v in symbols.values()),
         "asOf": datetime.now(timezone.utc).isoformat(),
+        "sessionDate": session_date,
+        "isHistoricalSession": session_date != today_ct,
         "symbols": symbols,
     }

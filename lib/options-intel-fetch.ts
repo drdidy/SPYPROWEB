@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 
 export interface UwFlowSummary {
   ticker: string;
+  sessionDate?: string;
   bullishCount: number;
   bearishCount: number;
   premiumNet: number;
@@ -18,6 +19,7 @@ export interface UwFlowPrint {
 
 export interface UwFlowAlert {
   ticker: string;
+  sessionDate?: string;
   optionSymbol: string | null;
   side: "CALL" | "PUT" | "UNKNOWN" | string;
   strike: number | null;
@@ -30,6 +32,7 @@ export interface UwFlowAlert {
 
 export interface UwGexSummary {
   ticker: string;
+  sessionDate?: string;
   totalGEX: number;
   regime: "POSITIVE" | "NEGATIVE" | "FLAT" | string;
   flipPoint: number | null;
@@ -37,6 +40,7 @@ export interface UwGexSummary {
 
 export interface UwDarkPool {
   ticker: string;
+  sessionDate?: string;
   count: number;
   totalPremium: number;
   totalVolume: number;
@@ -50,6 +54,7 @@ export interface UwDarkPool {
 }
 
 export interface UwOptionContract {
+  sessionDate?: string;
   optionSymbol: string | null;
   expiration: string | null;
   dte: number | null;
@@ -70,6 +75,7 @@ export interface UwOptionContract {
 
 export interface UwOptionChain {
   ticker: string;
+  sessionDate?: string;
   expiration: string | null;
   calls: UwOptionContract[];
   puts: UwOptionContract[];
@@ -83,6 +89,7 @@ export interface UwOptionChain {
 }
 
 export interface UwGreekRow {
+  sessionDate?: string;
   strike: number | null;
   expiration: string | null;
   side: "CALL" | "PUT" | "UNKNOWN" | string;
@@ -96,6 +103,7 @@ export interface UwGreekRow {
 
 export interface UwSymbolIntel {
   ticker: string;
+  sessionDate?: string;
   available: boolean;
   flow: UwFlowSummary | null;
   gex: UwGexSummary | null;
@@ -108,6 +116,8 @@ export interface UwSymbolIntel {
 export interface OptionsIntelBundle {
   available: boolean;
   asOf: string;
+  sessionDate?: string;
+  isHistoricalSession?: boolean;
   symbols: Record<string, UwSymbolIntel>;
 }
 
@@ -174,6 +184,7 @@ function buildFetchHeaders(): HeadersInit {
 
 export async function loadOptionsIntelBundle(
   symbols: string[] = ["SPY", "SPX"],
+  sessionDate?: string,
 ): Promise<LoadedOptionsIntel> {
   const clean = Array.from(new Set(symbols.map((s) => s.trim().toUpperCase()).filter(Boolean)));
   const fetchedAt = new Date().toISOString();
@@ -181,7 +192,9 @@ export async function loadOptionsIntelBundle(
   if (!base) {
     return { data: emptyBundle(clean), source: "error", fetchedAt, error: "no request host" };
   }
-  const target = `${base}/api/options/intel?symbols=${encodeURIComponent(clean.join(","))}`;
+  const params = new URLSearchParams({ symbols: clean.join(",") });
+  if (sessionDate) params.set("date", sessionDate);
+  const target = `${base}/api/options/intel?${params.toString()}`;
   try {
     const res = await fetch(target, { cache: "no-store", headers: buildFetchHeaders() });
     if (!res.ok) {

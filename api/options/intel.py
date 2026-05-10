@@ -28,10 +28,23 @@ def _symbols_from_path(path: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys(allowed or ["SPY", "SPX"]))
 
 
+def _date_from_path(path: str) -> str | None:
+    qs = parse_qs(urlparse(path).query)
+    raw = (qs.get("date") or [None])[0]
+    if raw and len(raw) == 10:
+        return raw
+    return None
+
+
 class handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802 - Vercel contract
-        body = json.dumps(unusual_whales.fetch_options_bundle(_symbols_from_path(self.path))).encode(
-            "utf-8"
+        body = json.dumps(
+            unusual_whales.fetch_options_bundle(
+                _symbols_from_path(self.path),
+                effective_date=_date_from_path(self.path),
+            )
+        ).encode(
+            "utf-8",
         )
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
