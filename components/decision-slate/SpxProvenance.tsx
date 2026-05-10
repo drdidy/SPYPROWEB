@@ -18,6 +18,7 @@ import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import { Chip, CHIP_TONES } from "@/components/ui/Chip";
 import {
   type SpxProvenance,
   provenanceLabel,
@@ -40,50 +41,35 @@ export function SpxProvenanceBadge({
   if (!provenance) return null;
   if (provenance.trust === "live" && !showWhenLive) return null;
 
-  // v7 P0-5: muted amber palette so "synthetic" reads as a flag,
-  // not a neutral chip the eye glides past. Stale gets a brighter
-  // amber + a pulsing dot so the basis-age problem is impossible
-  // to miss.
+  // v7 P0-5 + v10 P1-10: muted amber for synthetic, brighter amber
+  // + pulsing dot for stale. Routed through the shared <Chip />
+  // primitive so the chip reads as a one-family pip alongside
+  // BETA and the engine state chips.
   const isStale = provenance.trust === "stale";
+  const tone = isStale ? CHIP_TONES.stale : CHIP_TONES.synthetic;
   return (
     <InfoTooltip
       label={provenanceLabel(provenance)}
       content={provenanceDetail(provenance)}
     >
-      <span
-        data-testid="spx-provenance-badge"
-        data-trust={provenance.trust}
-        className={cn(
-          "inline-flex items-center gap-1 px-1.5 py-px rounded-pill",
-          "text-[9px] font-mono font-semibold uppercase tracking-[0.10em]",
-          "cursor-help",
-          className,
-        )}
-        // Inline style with explicit hex so theme overrides /
-        // Tailwind compile chains can't render the chip neutral
-        // gray (the v6 user complaint).
-        style={
-          isStale
-            ? {
-                backgroundColor: "#F4D9A2",
-                color: "#5C3F0B",
-                border: "1px solid #B8821F",
-              }
-            : {
-                backgroundColor: "#F4E4BC",
-                color: "#6B4F2A",
-                border: "1px solid #C9B58C",
-              }
+      <Chip
+        tone={tone}
+        className={cn("cursor-help", className)}
+        ariaLabel={provenanceLabel(provenance)}
+        leading={
+          isStale ? (
+            <span
+              aria-hidden
+              data-testid="spx-provenance-pulse"
+              className="inline-block h-1.5 w-1.5 rounded-full bg-gold animate-breathe"
+            />
+          ) : undefined
         }
       >
-        {isStale && (
-          <span
-            aria-hidden
-            className="inline-block h-1.5 w-1.5 rounded-full bg-gold animate-breathe"
-          />
-        )}
-        {isStale ? "stale" : "synthetic"}
-      </span>
+        <span data-testid="spx-provenance-badge" data-trust={provenance.trust}>
+          {isStale ? "stale" : "synthetic"}
+        </span>
+      </Chip>
     </InfoTooltip>
   );
 }

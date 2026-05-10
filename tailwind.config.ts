@@ -18,14 +18,23 @@ const config: Config = {
         paper: "#FFFFFF",
         "paper-2": "#F4EFE3",
         // Cooler cream-grey surface used to differentiate "preview /
-        // not-live" sections from the warm live-paper palette. Slight
-        // sage cast keeps it inside the cream family but unambiguously
-        // not the same surface as paper / paper-2.
+        // not-live" sections from the warm live-paper palette.
         "paper-cool": "#EEF0EB",
-        // Branded tint surface for the Recommended Action hero — a
-        // desaturated gold that picks up the brand chip without
-        // competing with the data cards beneath.
+        // Branded tint surface for the Recommended Action hero.
         "paper-brand": "#FAF1DC",
+        // v10 P1-3: three-tier surface system. Each engine card,
+        // section card, and hero gets exactly one tier so the
+        // visual hierarchy reads at a glance.
+        //   tier1 — hero          (warm cream, ochre border)
+        //   tier2 — primary       (pure white, subtle border)
+        //   tier3 — secondary     (faint cream, top divider only)
+        "paper-tier1": "#FAF1DA",
+        "paper-tier2": "#FFFFFF",
+        "paper-tier3": "#FBF7EE",
+        // The two border tones used by tier1 + tier2 respectively.
+        // Defined as colors so they compose with `border-*`.
+        "rule-tier1": "#C9A227",
+        "rule-tier2": "#E8DFCE",
         sunken: "#EFE9DA",
 
         ink: {

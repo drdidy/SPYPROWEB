@@ -34,11 +34,14 @@ const DOT_TONE: Record<SessionOutcome["outcome"], string> = {
   WIN: "bg-bull ring-1 ring-bull-ink/20",
   LOSS: "bg-bear ring-1 ring-bear-ink/20",
   PUSH: "bg-state-neutral ring-1 ring-ink/15",
-  // v7 P1-7: SKIP renders as a hollow ring (1.5px stroke, no
-  // fill) so a "no graded sessions" lookback reads as "engine
-  // watched but didn't qualify a setup" rather than five
-  // neutral results.
-  SKIP: "bg-transparent ring-[1.5px] ring-ink-4/60",
+  // v10 P1-7: SKIP is a real outcome (engine watched, didn't
+  // qualify) — not the same as "no data". Render as a filled
+  // amber dot so it visually parses alongside green wins and
+  // red losses. Hollow rings are reserved for the genuine "no
+  // graded data yet" empty state below.
+  // Amber-tan #C9A227 at 60% alpha — visually parses with the
+  // green/red of WIN/LOSS without colliding with either.
+  SKIP: "bg-[#C9A227]/60 ring-1 ring-[#8E6F19]/40",
 };
 
 const OUTCOME_LABEL: Record<SessionOutcome["outcome"], string> = {
@@ -82,7 +85,11 @@ export function EngineTrackRecord({ record, className }: Props) {
   return (
     <div
       className={cn(
-        "rounded-soft border border-rule bg-paper px-3 py-3 space-y-2",
+        // v10 P1-3: tier-3 surface (faint cream, top divider only,
+        // no border). Last-5 cards live below the page hero so
+        // they shouldn't compete for attention with the engine
+        // pipeline cards above (tier 2).
+        "rounded-soft bg-paper-tier3 border-t border-rule px-3 py-3 space-y-2",
         className,
       )}
     >
@@ -143,7 +150,23 @@ export function EngineTrackRecord({ record, className }: Props) {
         </span>
       </div>
       {record.sessions.length === 0 ? (
-        <p className="text-meta text-ink-3">No replay data yet.</p>
+        // v10 P1-7: hollow rings reserved for the genuine "no
+        // graded data" empty state. Filled dots are real outcomes.
+        <>
+          <ol
+            className="flex items-center gap-1.5"
+            aria-label="No graded data yet"
+          >
+            {Array.from({ length: 5 }, (_, i) => (
+              <li
+                key={i}
+                aria-hidden
+                className="h-3 w-3 rounded-full bg-transparent ring-[1.5px] ring-ink-4/60"
+              />
+            ))}
+          </ol>
+          <p className="text-meta text-ink-3">No replay data yet.</p>
+        </>
       ) : (
         <>
           <ol className="flex items-center gap-1.5">
@@ -172,7 +195,7 @@ export function EngineTrackRecord({ record, className }: Props) {
           >
             <Swatch className="bg-bull ring-1 ring-bull-ink/20" /> win
             <Swatch className="bg-bear ring-1 ring-bear-ink/20 ml-2" /> loss
-            <Swatch className="bg-transparent ring-[1.5px] ring-ink-4/60 ml-2" /> skip
+            <Swatch className="bg-[#C9A227]/60 ring-1 ring-[#8E6F19]/40 ml-2" /> skip
           </p>
         </>
       )}

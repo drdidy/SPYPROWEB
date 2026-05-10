@@ -20,8 +20,17 @@
     color: #14161a;
   }
 
+  /* v10 P1-6: tabular-nums applies wherever a price, R-multiple,
+     percent, score, or countdown is rendered. Three opt-in
+     surfaces:
+       .num            — body utility class
+       [data-num]      — adapter-emitted spans
+       [data-testid="countdown"]  — every <Countdown /> instance
+     Together these cover every numeric on the slate without
+     touching headline copy or label text. */
   .num,
-  [data-num] {
+  [data-num],
+  [data-testid="countdown"] {
     font-variant-numeric: tabular-nums;
     font-family: var(--font-geist-mono);
     letter-spacing: -0.01em;

@@ -75,26 +75,45 @@ export default async function Page() {
   const spyHardError = spyError != null && spy.shellState.spy === 0;
 
   return (
-    // v4 #15: 4 / 8 / 16 / 24 / 48 spacing scale. Outer rhythm is
-    // gap-6 (24px) between top-level sections. Max content width
-    // 1200px (v2). Composition: compact header → Recommended Action
-    // hero → Engines pipelines → either Markets-quiet briefing +
-    // Preview, or the live "Today's read" + active levels grids.
-    <div className="max-w-[1200px] mx-auto pb-12 space-y-6 pt-6 anim-rise">
+    // v10 P1-12: explicit vertical rhythm on the 4 / 8 / 16 / 24 /
+    // 48 token scale. Per the spec:
+    //   header → hero               24 (mt-6 on hero)
+    //   hero → engine row           24 (mt-6 on engines)
+    //   engine row → "Markets quiet" h2 inside briefing  48 (mt-12)
+    //   h2 → first row of briefing cards   16 (handled inside briefing)
+    //   row → row inside briefing   16 (handled inside briefing)
+    //   last card → "What to watch" 24 (handled inside briefing)
+    //   briefing → preview          24 (mt-6 on preview)
+    <div className="max-w-[1200px] mx-auto pb-12 pt-6 anim-rise">
       <PageHeader />
 
-      {/* v4 #3: Recommended Action restored as the page hero — first
-          element under the header, branded tint surface, always
-          above the fold. */}
-      <RecommendedAction spyState={spyState} spxState={spxState} />
+      {/* v4 #3 + v10 P1-12: Recommended Action page hero. 24px
+          rhythm between the header and the hero. */}
+      <RecommendedAction
+        className="mt-6"
+        spyState={spyState}
+        spxState={spxState}
+        spyNextEventISO={spySession.nextSignificantEvent.at.toISOString()}
+        spxNextEventISO={spxSession.nextSignificantEvent.at.toISOString()}
+        // v10 P1-8: extract the verb from the session label
+        // ("SPY setup opens" → "setup opens"). Keeps wording in
+        // sync with the engine pipeline countdowns.
+        spyEventVerb={spySession.nextSignificantEvent.label
+          .replace(/^SPY\s+/, "")
+          .toLowerCase()}
+        spxEventVerb={relabelDashboardString(
+          spxSession.nextSignificantEvent.label,
+        )
+          .replace(/^ES\s+/, "")
+          .toLowerCase()}
+      />
 
-      {/* v4 #6 + v5 #8: engines row sits on a slightly stronger
-          surface (paper-2/40). Outer padding matches every other
-          top-level section (px-5 / md:px-6) so the visible content
-          edge is identical to the Recommended Action above. */}
+      {/* v4 #6 + v5 #8 + v10 P1-12: engines row. 24px rhythm
+          between hero and engine row. Outer padding matches
+          every other top-level section. */}
       <section
         aria-label="Engine states"
-        className="rounded-card bg-paper-2/30 border border-rule-soft px-5 py-4 md:px-6 md:py-5"
+        className="mt-6 rounded-card bg-paper-2/30 border border-rule-soft px-5 py-4 md:px-6 md:py-5"
       >
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4 [grid-template-columns:1fr] lg:[grid-template-columns:1fr_1fr] min-w-0">
           <StatePipeline
@@ -120,7 +139,10 @@ export default async function Page() {
 
       {bothPreConfig ? (
         <>
+          {/* v10 P1-12: 48px rhythm between the engine row and the
+              "Markets quiet" briefing heading (mt-12). */}
           <PreConfigBriefing
+            className="mt-12"
             spy={{
               label: "SPY",
               nextSetupISO: spySession.configWindowStart.toISOString(),
@@ -136,8 +158,9 @@ export default async function Page() {
               trackRecord: spxTrack,
             }}
           />
-          {/* v4 #13: PreviewState now self-hides via localStorage. */}
-          <PreviewState />
+          {/* v4 #13 + v10 P1-12: PreviewState self-hides via
+              localStorage. 24px rhythm between briefing and preview. */}
+          <PreviewState className="mt-6" />
         </>
       ) : (
         <>
@@ -179,32 +202,49 @@ export default async function Page() {
 // ---------------------------------------------------------------------
 
 function PageHeader() {
+  // v10 P1-5: date stamp under the H1. Trader needs to know which
+  // session they're looking at without going hunting. Computed at
+  // render time on the server (page is force-dynamic), so the date
+  // matches the current trading day in the user's locale.
+  const dateLabel = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date());
   return (
     <header className="flex items-center justify-between gap-4 flex-wrap">
-      {/* v8 P1-1: WORKSPACE eyebrow dropped — the H1 stands alone.
-          v2 added the eyebrow to anchor the slate inside the
-          broader app, but the sidebar already does that work. */}
-      <h1 className="font-serif text-h2 text-ink tracking-tight min-w-0">
-        Decision Slate
-      </h1>
+      <div className="min-w-0">
+        <h1 className="font-serif text-h2 text-ink tracking-tight">
+          Decision Slate
+        </h1>
+        {/* v10 P1-5: subtle session-date stamp directly under the
+            H1. ~14px sans, muted ink. */}
+        <p className="mt-0.5 text-[14px] text-ink-3 leading-snug">
+          {/* "Friday, May 9, 2026" → "Friday · May 9, 2026"
+              (one replace = first comma only). */}
+          {dateLabel.replace(",", " ·")}
+        </p>
+      </div>
+      {/* v10 P1-9: About → ? icon-button at the top-right, matching
+          the search/notification icon language in the TopBar.
+          Single-character ?, circular, ghost surface. */}
       <InfoTooltip
         label={SLATE_COPY.helpAboutSlate.title}
         content={SLATE_COPY.helpAboutSlate.body}
         placement="bottom"
       >
-        {/* v4 #8: dropped the leading "?" so this affordance matches
-            the rest of the slate's secondary CTAs (sentence case,
-            no leading glyph). The arrow remains as the affordance
-            cue. */}
         <span
+          aria-label="About this page"
           className={cn(
-            "inline-flex items-center gap-1 h-7 px-2.5 rounded-pill",
-            "bg-paper-2/60 text-ink-2 hover:text-ink hover:bg-paper-2",
-            "border border-rule transition-colors",
-            "text-[11px] tracking-[0.02em] font-medium cursor-help",
+            "inline-flex items-center justify-center w-7 h-7 rounded-full shrink-0",
+            "bg-paper-2/60 text-ink-3 hover:text-ink hover:bg-paper-2",
+            "border border-rule transition-colors cursor-help",
+            "text-[12px] font-bold tabular-nums",
           )}
         >
-          About this page
+          ?
         </span>
       </InfoTooltip>
     </header>

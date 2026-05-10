@@ -33,18 +33,17 @@ interface Engine {
 interface Props {
   spy: Engine;
   spx: Engine;
+  className?: string;
 }
 
-export function PreConfigBriefing({ spy, spx }: Props) {
+export function PreConfigBriefing({ spy, spx, className }: Props) {
   return (
     <section
       aria-labelledby="pre-config-briefing-title"
       data-testid="pre-config-briefing"
-      className="space-y-4"
+      className={cn(className)}
     >
-      {/* Section header — heading + one-line subtitle + hairline. The
-          countdown chip that lived here in v1 was redundant with the
-          state pipelines above and has been removed. */}
+      {/* Section header — heading + one-line subtitle + hairline. */}
       <header className="space-y-1">
         <div className="flex items-baseline gap-3">
           <h2
@@ -60,23 +59,26 @@ export function PreConfigBriefing({ spy, spx }: Props) {
         </p>
       </header>
 
-      {/* Per-engine track record. Lets the user see at a glance how
-          the engine has been performing across recent sessions. */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      {/* v10 P1-12: 16px rhythm — h2 → first row of cards. */}
+      <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
         <EngineTrackRecord record={spy.trackRecord} />
         <EngineTrackRecord record={spx.trackRecord} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      {/* v10 P1-12: 16px rhythm — row → next row. */}
+      <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
         <EngineBriefing engine={spy} />
         <EngineBriefing engine={spx} />
       </div>
 
-      {/* Teaching callout. Sentence case heading per the v2 copy pass. */}
-      <div className="rounded-soft border border-rule bg-paper px-4 py-3 flex items-start gap-3">
+      {/* v10 P1-12: 24px rhythm — last card row → "What to watch".
+          v10 P1-3: tier-3 surface (faint cream, top divider only,
+          no border). */}
+      <div className="mt-6 pt-4 border-t border-rule bg-paper-tier3 px-4 py-4 rounded-soft flex items-start gap-3">
         <BookOpen size={14} className="mt-0.5 shrink-0 text-ink-3" aria-hidden />
         <div className="space-y-1">
-          <p className="text-h3 text-ink">What to watch at the open</p>
+          {/* v10 P1-11: editorial section title → serif. */}
+          <p className="font-serif text-h3 text-ink tracking-tight">What to watch at the open</p>
           <p className="text-body text-ink-2 leading-snug">
             {SLATE_COPY.preConfig.watchAtOpen}
           </p>
@@ -93,7 +95,8 @@ function EngineBriefing({ engine }: { engine: Engine }) {
   // path keeps working.
   const display = displayEngine(engine.label);
   return (
-    <div className="rounded-soft border border-rule bg-paper px-4 py-3 space-y-3">
+    // v10 P1-3: tier-3 surface — faint cream, top divider only.
+    <div className="rounded-soft bg-paper-tier3 border-t border-rule px-4 py-3 space-y-3">
       <div className="flex items-baseline justify-between gap-3">
         <span
           className={cn(

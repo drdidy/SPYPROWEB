@@ -6,6 +6,106 @@ entries grow newest-first.
 
 ## [Unreleased]
 
+### Decision Slate — presentation upgrade (P1)
+
+Twelve P1 items, all landed.
+
+**Header**
+- **P1-1 Change indicators with %.** `<DeltaTag />` now renders
+  `+0.85 (+0.12%)` alongside the price. Tone: bullish-green for
+  positive, bearish-red for negative, neutral for zero.
+  `formatNumber` skips the slot entirely on null/0/NaN. **VIX
+  uses neutral coloring** because a rising VIX isn't bullish/
+  bearish-relative — green/red would mislead.
+- **P1-2 Live-data pulse + aria-live.** `<FreshnessPill />`
+  already had both; verified in place.
+
+**Surface system**
+- **P1-3 Three-tier surface tokens.** New Tailwind colors
+  `paper-tier1` / `paper-tier2` / `paper-tier3` plus border tones
+  `rule-tier1` / `rule-tier2`. Applied:
+    - tier 1 (warm cream + ochre border) → Recommended Action hero
+    - tier 2 (pure white + subtle border) → Engine pipelines
+    - tier 3 (faint cream + top divider only) → EngineTrackRecord,
+      EngineBriefing, "What to watch at the open" callout.
+- **P1-4 Engine state color top border.** New `STATE_TOP_BORDER`
+  map (inline-styled hex) on each `<StatePipeline />`: gray for
+  pre-config / stand-down / cooldown, amber for watch / wait,
+  blue for armed, green for go. The most consequential state
+  change is no longer a typography swap.
+
+**Header content**
+- **P1-5 Date stamp under H1.** "Friday · May 9, 2026" rendered
+  in CT below the "Decision Slate" headline via
+  `Intl.DateTimeFormat`. ~14px sans, muted ink-3.
+- **P1-9 About → ? icon-button.** Converted from a wide ghost
+  pill ("About this page") to a 28px circular `?` icon-button
+  at the top-right, matching the search/notification icon
+  language.
+
+**Numerics + dots**
+- **P1-6 Global tabular-nums.** `app/globals.css` extended its
+  numeric rule to also cover `[data-testid="countdown"]`. Every
+  price, R-multiple, percent, score, and countdown locks to the
+  same tabular grid; live-updating values don't shift siblings.
+- **P1-7 Skip dot fill.** SKIP outcomes now render as a filled
+  amber-tan `#C9A227` dot at 60% alpha — visually parses
+  alongside green wins and red losses. **Hollow rings reserved
+  exclusively for the genuine "no graded data yet" empty state**
+  (rendered as 5 placeholder rings under `aria-label="No graded
+  data yet"`).
+
+**Hero card**
+- **P1-8 Stronger anchor.** Padding bumped from `px-5 py-4
+  md:px-6 md:py-5` to `px-6 py-5 md:px-7 md:py-6` (+25%
+  vertical). Dropped the v5 inline reason chip
+  ("· both engines pre-config"). Replaced with a live context
+  line beneath the headline: `SPY opens in 1d 6h · ES opens in
+  20h 50m`, both countdowns ticking via the shared
+  `<Countdown />` primitive. Hero now sits on `paper-tier1` +
+  `rule-tier1`.
+
+**Chip primitive**
+- **P1-10 Unified `<Chip />`.** New `components/ui/Chip.tsx`
+  exports a single shape primitive plus a `CHIP_TONES` palette
+  covering `beta`, every engine state, and `synthetic` /
+  `stale`. Routed through:
+    - `Wordmark` BETA pip → `CHIP_TONES.beta`
+    - `SpxProvenanceBadge` synthetic / stale chips
+  All chips now share the same shape (rounded-pill, px-1.5
+  py-px, 9px font, weight 500, 1px border) and differ only in
+  inline-styled colors — a v5 lesson kept in place so no
+  theme/Tailwind compile chain can reorder them.
+
+**Typography**
+- **P1-11 Serif/sans audit.** "What to watch at the open" was
+  sans-default; switched to `font-serif text-h3` to match
+  "Markets quiet" (h2) and "Decision Slate" (h1). Every
+  editorial section title now reads as serif; UI labels +
+  prices + buttons stay sans.
+
+**Spacing**
+- **P1-12 Vertical rhythm.** Replaced blanket `space-y-6` with
+  per-element margins matching the 4/8/16/24/48 token scale:
+    - hero `mt-6` (24)
+    - engine row `mt-6` (24)
+    - briefing `mt-12` (48)
+    - inside briefing: card row `mt-4` (16), next row `mt-4`
+      (16), "What to watch" `mt-6` (24)
+    - preview `mt-6` (24)
+
+**Verification**
+
+- `tsc --noEmit` clean. `next build` clean.
+  `/dashboard` 12.1 kB / 117 kB.
+  `/es` 14.5 kB / 153 kB.
+- 13 / 13 FE static-analysis scripts pass.
+- 31 / 31 pytest cases pass on the SPX engine + grading suite.
+  (16 pre-existing yfinance/numpy import failures in the sandbox
+  are unrelated to this PR — same pattern as every prior round.)
+
+---
+
 ### ES replay grader — drop the confluence-action filter
 
 Bug fix from the trader: "no way ES never gave a trade in the

@@ -191,6 +191,7 @@ export function TopBar({
             staleness={staleness}
             stalenessAt={stalenessAt}
             delta={t.change}
+            pct={t.changePct}
             loaded={spyLoaded}
             value={
               <NumberFlash value={t.spy} format={(n) => formatNumber(n)} />
@@ -202,6 +203,7 @@ export function TopBar({
             staleness={staleness}
             stalenessAt={stalenessAt}
             delta={esDelta}
+            pct={spxSnapshot.price.changePct}
             loaded={esLoaded}
             value={
               <NumberFlash
@@ -212,11 +214,16 @@ export function TopBar({
           />
         </Quote>
         <Quote label="VIX">
+          {/* v10 P1-1: VIX delta uses neutral tone — a rising VIX
+              isn't bullish/bearish-relative, so green/red would
+              mislead. No pct (the shell shape doesn't carry it
+              for VIX today). */}
           <ValueWithTooltip
             staleness={staleness}
             stalenessAt={stalenessAt}
             delta={t.vixDelta}
             loaded={vixLoaded}
+            neutralDelta
             value={<span data-num>{formatNumber(t.vix)}</span>}
           />
         </Quote>
@@ -389,14 +396,22 @@ function ValueWithTooltip({
   staleness,
   stalenessAt,
   delta,
-  value,
+  pct,
   loaded,
+  value,
+  /** v10 P1-1: VIX uses neutral coloring on its delta — a rising
+   *  VIX is not "good" and a falling one is not "bad", so the
+   *  semantic green/red would miscommunicate. Default false
+   *  (price tickers); pass true on the VIX quote. */
+  neutralDelta = false,
 }: {
   staleness: string | null;
   stalenessAt: string | null;
   delta: number;
+  pct?: number;
   value: React.ReactNode;
   loaded: boolean;
+  neutralDelta?: boolean;
 }) {
   const valueNode = loaded ? (
     value
@@ -432,29 +447,48 @@ function ValueWithTooltip({
           {valueNode}
         </span>
       </InfoTooltip>
-      {/* v8 P0-1: hide the change slot when the delta is 0, NaN,
-          or otherwise non-renderable. Rendering "+0.00" looked
-          like a real read of "no change" but was actually the
-          fallback for "value not yet available" — visually
-          indistinguishable from a flat market. */}
+      {/* v8 P0-1: hide the change slot when delta is 0/NaN/non-
+          finite — "+0.00" is indistinguishable from "data not
+          loaded yet". v10 P1-1: when delta IS valid, render it
+          with the percent move alongside, color-toned by sign
+          (or neutral for VIX). */}
       {!staleness && loaded && Number.isFinite(delta) && delta !== 0 && (
         <span className="hidden xl:inline-flex shrink-0">
-          <DeltaTag value={delta} />
+          <DeltaTag value={delta} pct={pct} neutral={neutralDelta} />
         </span>
       )}
     </span>
   );
 }
 
-function DeltaTag({ value }: { value: number }) {
-  const tone =
-    value > 0
+function DeltaTag({
+  value,
+  pct,
+  neutral = false,
+}: {
+  value: number;
+  pct?: number;
+  /** v10 P1-1: VIX uses neutral coloring — a rising VIX is not
+   *  "good" and a falling one is not "bad", so the green/red
+   *  semantic would mislead. */
+  neutral?: boolean;
+}) {
+  const tone = neutral
+    ? "text-state-neutral"
+    : value > 0
       ? "text-state-bullish"
       : value < 0
         ? "text-state-bearish"
         : "text-state-neutral";
   const sign = value > 0 ? "+" : value < 0 ? "−" : "";
   const mag = Math.abs(value).toFixed(2);
+  // v10 P1-1: render the percent move alongside the points delta
+  // when supplied. Skip when pct is null/NaN/0 — same rule as the
+  // delta itself (visible non-zero only).
+  const pctTxt =
+    pct != null && Number.isFinite(pct) && pct !== 0
+      ? ` (${pct > 0 ? "+" : "−"}${Math.abs(pct).toFixed(2)}%)`
+      : "";
   return (
     <span
       className={cn("text-[11px] font-mono font-semibold tabular-nums", tone)}
@@ -462,6 +496,7 @@ function DeltaTag({ value }: { value: number }) {
     >
       {sign}
       {mag}
+      {pctTxt}
     </span>
   );
 }

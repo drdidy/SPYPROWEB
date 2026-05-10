@@ -3,6 +3,8 @@
 // header — replacing the prior "closed beta" line tucked under the
 // user avatar, which was easy to miss.
 
+import { Chip, CHIP_TONES } from "@/components/ui/Chip";
+
 export function Wordmark({ collapsed = false }: { collapsed?: boolean }) {
   return (
     <div className="flex items-center gap-2.5 select-none">
@@ -29,25 +31,13 @@ export function Wordmark({ collapsed = false }: { collapsed?: boolean }) {
               Prophet
             </div>
           </div>
-          {/* v8 P2-2: muted ochre per the cleanup spec — the v5 fully-
-              saturated brand-gold solid was reading "loud" against the
-              cream canvas. New tokens (bg #E8DCC2, fg #6B4F2A, border
-              #C9B58C) are still unambiguously warm but sit one tier
-              quieter so the chip reads as a status pip, not a CTA.
-              Inline style keeps the v5 lesson — no theme-var or
-              Tailwind-compile chain can override what's baked into the
-              markup. */}
-          <span
-            className="rounded-pill px-1.5 py-px text-[9px] font-mono font-bold tracking-[0.10em] uppercase"
-            style={{
-              backgroundColor: "#E8DCC2",
-              color: "#6B4F2A",
-              border: "1px solid #C9B58C",
-            }}
-            aria-label="Closed beta"
-          >
+          {/* v10 P1-10: routed through the shared <Chip /> primitive
+              so BETA, engine state chips, and provenance chips all
+              read as one family — same shape, same weight, only the
+              color tones differ. */}
+          <Chip tone={CHIP_TONES.beta} ariaLabel="Closed beta">
             Beta
-          </span>
+          </Chip>
         </div>
       )}
     </div>

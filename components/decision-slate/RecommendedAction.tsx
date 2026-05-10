@@ -1,13 +1,13 @@
-// State-aware "Recommended next step" rail. v4 restores it as the
-// page hero (first element under the page header), with a branded
-// tint surface so it visually anchors the eye above the engine
-// pipelines.
+// State-aware "Recommended next step" rail. Page hero — first
+// element under the page header — with a tier-1 surface so it
+// visually anchors the eye above the engine pipelines.
 //
-// Anatomy:
-//   eyebrow "Recommended next step"
-//   state context chip ("Both engines · pre-config")
-//   headline = the action sentence
-//   primary button right-aligned (drops below the text on narrow
+// Anatomy (v10):
+//   eyebrow         "Recommended next step"
+//   headline        the action sentence (rec.description)
+//   context line    "SPY opens in 1d 6h · ES opens in 20h 50m"
+//                   — replaces the v5 reason chip
+//   primary button  right-aligned (drops below text on narrow
 //                                  widths via flex-wrap)
 //
 // All state mapping lives in lib/recommendations.ts so this file
@@ -27,6 +27,7 @@ import {
   recommendationFor,
   type Recommendation,
 } from "@/lib/recommendations";
+import { Countdown } from "@/components/decision-slate/Countdown";
 import type { EngineState } from "@/lib/states";
 
 const ICONS: Record<Recommendation["id"], LucideIcon> = {
@@ -40,57 +41,87 @@ const ICONS: Record<Recommendation["id"], LucideIcon> = {
 interface Props {
   spyState: EngineState;
   spxState: EngineState;
+  /** Next significant event ISOs for the inline context line.
+   *  When omitted (e.g. older callers), the context line hides. */
+  spyNextEventISO?: string;
+  spxNextEventISO?: string;
+  /** Short verb for each engine's countdown ("opens", "closes",
+   *  "RTH closes"). Falls back to "opens" when not supplied. */
+  spyEventVerb?: string;
+  spxEventVerb?: string;
   className?: string;
 }
 
-export function RecommendedAction({ spyState, spxState, className }: Props) {
+export function RecommendedAction({
+  spyState,
+  spxState,
+  spyNextEventISO,
+  spxNextEventISO,
+  spyEventVerb = "opens",
+  spxEventVerb = "opens",
+  className,
+}: Props) {
   const rec = recommendationFor(spyState, spxState);
   const Icon = ICONS[rec.id];
+  const showContext = !!(spyNextEventISO || spxNextEventISO);
 
   return (
     <section
       aria-labelledby="recommended-action-heading"
       data-testid="recommended-action"
       className={cn(
-        // v5 #10: softer tint than v4. The previous bg-paper-brand
-        // (#FAF1DC) read as "warning state" yellow on calibrated
-        // monitors. paper-2 (the warm cream surface used elsewhere)
-        // anchors the eye via a faint contrast against the canvas
-        // without implying caution. A 1px ink-tinted top stripe via
-        // shadow-inset replaces the gold border so the hero still
-        // reads as "primary surface" rather than "another card".
-        "rounded-card bg-paper-2 border border-rule",
-        "shadow-[inset_0_2px_0_rgba(20,22,26,0.04),0_1px_0_rgba(20,22,26,0.02)]",
-        "px-5 py-4 md:px-6 md:py-5",
+        // v10 P1-3 + P1-8: tier-1 surface (warm cream + ochre
+        // border). Padding bumped by ~25% over v5 so the hero
+        // reads as the page anchor rather than a banner.
+        "rounded-card bg-paper-tier1 border border-rule-tier1",
+        "shadow-[inset_0_2px_0_rgba(255,255,255,0.40),0_1px_0_rgba(20,22,26,0.03)]",
+        "px-6 py-5 md:px-7 md:py-6",
         "flex items-center justify-between gap-4 flex-wrap",
         className,
       )}
     >
       <div className="min-w-0 flex-1">
-        <div className="flex items-baseline gap-2 flex-wrap">
-          {/* v5 #7: settled rule — section eyebrows use tracked-caps
-              consistently (WORKSPACE / ENGINES / RECOMMENDED NEXT
-              STEP / LAST SESSION / PREVIEW). The state-context line
-              moves down to plain text below. */}
-          <p
-            id="recommended-action-heading"
-            className="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-2 font-semibold"
-          >
-            Recommended next step
-          </p>
-          {/* v5 #9: state-context demoted from a chip-styled pill
-              (which looked clickable but wasn't) to plain inline
-              text with a leading middot. */}
-          <span
-            data-testid="recommended-action-state"
-            className="text-[11px] tracking-[0.02em] text-ink-3 italic"
-          >
-            · {rec.reason}
-          </span>
-        </div>
-        <p className="text-body text-ink leading-snug max-w-2xl mt-1 font-medium">
+        {/* v5 #7: section eyebrow uses the tracked-caps utility
+            consistently across the slate. */}
+        <p
+          id="recommended-action-heading"
+          className="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-2 font-semibold"
+        >
+          Recommended next step
+        </p>
+        <p className="text-body text-ink leading-snug max-w-2xl mt-1.5 font-medium">
           {rec.description}
         </p>
+        {showContext && (
+          // v10 P1-8: replaces the v5 "· both engines pre-config"
+          // reason chip. Live countdowns to each engine's next
+          // significant event in muted text. Pure text — no chip
+          // styling, no clickable affordance.
+          <p
+            data-testid="recommended-action-context"
+            className="text-meta text-ink-3 mt-1.5 font-mono tabular-nums"
+          >
+            {spyNextEventISO && (
+              <>
+                <span className="font-semibold text-ink-2">SPY</span>{" "}
+                {spyEventVerb}{" "}
+                <Countdown to={spyNextEventISO} verb="in" />
+              </>
+            )}
+            {spyNextEventISO && spxNextEventISO && (
+              <span className="mx-2 text-ink-4" aria-hidden>
+                ·
+              </span>
+            )}
+            {spxNextEventISO && (
+              <>
+                <span className="font-semibold text-violet">ES</span>{" "}
+                {spxEventVerb}{" "}
+                <Countdown to={spxNextEventISO} verb="in" />
+              </>
+            )}
+          </p>
+        )}
       </div>
       <Link
         href={rec.href}

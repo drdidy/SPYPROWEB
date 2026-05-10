@@ -39,6 +39,24 @@ interface Props {
   className?: string;
 }
 
+// v10 P1-4: state-color top border. The most consequential change
+// on the dashboard — engine going from Stand-down to Watch to
+// Armed to Go — should never be just a typography swap. A 2px top
+// border on the engine card colored by current state makes the
+// state read at a glance from across the room.
+//
+// Inline-style hex values so the rule is locked at the markup
+// boundary (Tailwind compile chains can't reorder these).
+const STATE_TOP_BORDER: Record<EngineState, string> = {
+  PRE_CONFIG: "#D5CDB9",  // neutral gray
+  STAND_DOWN: "#D5CDB9",  // neutral gray
+  WATCH: "#C9A227",       // amber
+  WAIT: "#C9A227",        // amber
+  ARMED: "#4A6FA5",       // blue
+  GO: "#2F7D3F",          // green
+  COOLDOWN: "#B8B0A0",    // muted gray
+};
+
 // Active-pill palette. ring-2 + inset shadow lifts the active step
 // off the surface so it reads as "this is now", not "this is a
 // clickable button".
@@ -74,16 +92,18 @@ export function StatePipeline({
     <section
       aria-label={`${displayEngine(engine)} engine state pipeline`}
       // v5 #1: min-w-0 + overflow-hidden on the section is the
-      // overflow guard. Without it, the inner stepper's intrinsic
-      // width (7 step pills + 6 connectors) bullies the parent grid
-      // track wider than its allotted minmax(0, 1fr) column, which
-      // pushes the page past the 1200px container and forces a
-      // horizontal scrollbar (the v4 SPX "Wai…" clip).
+      // overflow guard so the inner stepper can't bully the parent
+      // grid track wider than its column.
+      // v10 P1-3 + P1-4: tier-2 surface (pure white, subtle border)
+      // + a 2px top border colored by the current state. The border
+      // tone is set inline so theme/Tailwind chains can't reorder it.
       className={cn(
-        "rounded-card border border-rule bg-paper px-4 py-3 md:px-5 md:py-4",
+        "rounded-card border border-rule-tier2 bg-paper-tier2 px-4 py-3 md:px-5 md:py-4",
+        "border-t-[2px]",
         "min-w-0 overflow-hidden",
         className,
       )}
+      style={{ borderTopColor: STATE_TOP_BORDER[current] }}
     >
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4 min-w-0">
         {/* v4 #5: drop the serif state-name title that lived next to
