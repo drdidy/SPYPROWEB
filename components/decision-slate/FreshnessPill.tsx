@@ -52,7 +52,8 @@ export function FreshnessPill({ freshnessISO, source, className }: Props) {
   const utcLabel = Number.isFinite(ts) ? formatUTC(ts) : "—";
 
   // Title carries the rich tooltip; visible label stays compact.
-  const title = `Updated ${ctLabel} · ${utcLabel} UTC · feed: ${source}`;
+  void source;
+  const title = `Updated ${ctLabel} · ${utcLabel} UTC · market data feed`;
 
   return (
     <span

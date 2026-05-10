@@ -61,8 +61,8 @@ export default function DisclosuresPage() {
       <h2>Data sources</h2>
       <p>
         Quotes shown on the Service may be delayed, sourced from third
-        parties (including yfinance / Yahoo Finance, Tastytrade, and
-        Unusual Whales), and may differ from your broker&apos;s feed.
+        parties or broker/data-provider feeds, and may differ from your
+        broker&apos;s feed.
         Always confirm critical figures against your own broker before
         acting.
       </p>

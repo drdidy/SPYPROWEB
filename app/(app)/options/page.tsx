@@ -47,7 +47,7 @@ export default async function Page() {
       <SectionLabel number="01">Strike ladder</SectionLabel>
       <Card>
         <CardHeader
-          eyebrow="Tastytrade chain"
+          eyebrow="Broker chain"
           title={chain ? `Expiration ${chain.expiration} - ATM ${fmtPrice(chain.atm)}` : "Chain unavailable"}
           meta={chain ? `${chain.calls.length} calls - ${chain.puts.length} puts` : undefined}
         />
@@ -57,9 +57,9 @@ export default async function Page() {
               <CommandEmptyState
                 eyebrow="Broker chain standby"
                 title="No option chain is loaded."
-                body="Tastytrade did not return the active expiration for this snapshot. The cockpit will populate the ladder, walls, volume, and open interest as soon as the broker response is available."
+                body="The broker feed did not return the active expiration for this snapshot. The cockpit will populate the ladder, walls, volume, and open interest as soon as the response is available."
                 rows={[
-                  { label: "Source", value: "Tastytrade" },
+                  { label: "Source", value: "Broker feed" },
                   { label: "Display", value: "No synthetic rows" },
                   { label: "Fallback", value: "Honest empty state" },
                 ]}

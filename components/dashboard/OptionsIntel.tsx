@@ -31,8 +31,8 @@ export function OptionsIntelPanel({
             Options chain not yet loaded.
           </div>
           <p className="text-[13px] text-ink-3 leading-relaxed max-w-md">
-            Tastytrade returned no chain for the active expiration (likely
-            outside market hours, or the broker auth is still warming up).
+            The broker feed returned no chain for the active expiration (likely
+            outside market hours, or the connection is still warming up).
             This panel populates once the chain arrives.
           </p>
         </CardBody>

@@ -209,12 +209,11 @@ export function SPXChannelClient({ replayDate }: Props) {
           {meta && (
             <div className="mt-3 flex flex-wrap items-center gap-3 text-[10px] font-mono text-paper/48 tracking-[0.04em] [&_.text-ink-2]:!text-paper/78 [&_.text-ink-4]:!text-paper/32">
               <span>
-                Bars <span className="text-ink-2">{meta.barsSource}</span>
-                <span className="text-ink-4 ml-1">({meta.barsCount})</span>
+                Bars <span className="text-ink-2">{meta.barsCount}</span>
               </span>
               <span className="text-ink-4">·</span>
               <span>
-                Quote <span className="text-ink-2">{meta.quoteSource}</span>
+                Quote <span className="text-ink-2">synced</span>
               </span>
               <span className="text-ink-4">·</span>
               <span>
@@ -250,16 +249,6 @@ export function SPXChannelClient({ replayDate }: Props) {
               <span>
                 ES <span className="text-ink-2 tabular-nums">{meta.esSpot.toFixed(2)}</span>
               </span>
-              {meta.barsError && (
-                <span className="text-bear-ink">
-                  · bars-fallback: {meta.barsError}
-                </span>
-              )}
-              {meta.quoteError && (
-                <span className="text-bear-ink">
-                  · quote-fallback: {meta.quoteError}
-                </span>
-              )}
             </div>
           )}
         </div>

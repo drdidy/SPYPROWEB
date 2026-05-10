@@ -5,9 +5,9 @@ import { PageHeader } from "@/components/layout/PageHeader";
 export const dynamic = "force-static";
 
 const integrations = [
-  { name: "Tastytrade", detail: "OAuth refresh token; options chain and sync quote", lane: "Broker" },
+  { name: "Broker feed", detail: "Server-side credentials; options chain and sync quote", lane: "Broker" },
   { name: "Unusual Whales", detail: "REST flow and GEX", lane: "Flow" },
-  { name: "Yahoo Finance", detail: "ES/SPY hourly bars plus VIX/DXY/^TNX", lane: "Market data" },
+  { name: "Market data feed", detail: "ES/SPY hourly bars plus VIX/DXY/^TNX", lane: "Market data" },
   { name: "OpenAI", detail: "Reserved for daily-brief generation", lane: "Brief" },
 ];
 

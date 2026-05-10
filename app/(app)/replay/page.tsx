@@ -35,7 +35,7 @@ export default function Page({ searchParams }: PageProps) {
           </span>
           <span className="h-px w-10 bg-gold/45" />
           <span className="font-mono text-[10px] text-paper/48 tracking-[0.20em] uppercase">
-            yfinance · 5-minute resolution
+            Historical bars · 5-minute resolution
           </span>
         </div>
         <h1 className="mt-3 text-[36px] font-serif leading-none tracking-tight text-paper md:text-[46px]">

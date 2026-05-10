@@ -288,7 +288,7 @@ export function ReplayWorkspace({ initialDate }: Props) {
                     <>
                       {" "}
                       <span className="text-ink-4">
-                        (yfinance 5m history is limited to ~60 days)
+                        (5-minute history is limited to the provider window)
                       </span>
                     </>
                   )}
