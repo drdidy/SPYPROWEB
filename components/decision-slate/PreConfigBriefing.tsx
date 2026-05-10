@@ -16,8 +16,10 @@ import { Countdown } from "./Countdown";
 import { SLATE_COPY } from "@/content/copy";
 import { displayEngine } from "@/lib/engine-labels";
 import { cn } from "@/lib/utils";
+import { FeedHeartbeat } from "./FeedHealthProvider";
 import type { LastSignalSummary } from "@/types/decision-slate";
 import type { EngineTrackRecord as TrackRecord } from "@/lib/track-record";
+import type { FeedId } from "@/lib/feed-health";
 
 interface Engine {
   label: "SPY" | "SPX";
@@ -28,6 +30,8 @@ interface Engine {
   lastSignal: LastSignalSummary | null;
   /** Last N sessions' outcomes from replay endpoints. */
   trackRecord: TrackRecord;
+  trackFeedId?: FeedId;
+  lastSessionFeedId?: FeedId;
 }
 
 interface Props {
@@ -61,8 +65,8 @@ export function PreConfigBriefing({ spy, spx, className }: Props) {
 
       {/* v10 P1-12: 16px rhythm — h2 → first row of cards. */}
       <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <EngineTrackRecord record={spy.trackRecord} />
-        <EngineTrackRecord record={spx.trackRecord} />
+        <EngineTrackRecord record={spy.trackRecord} feedId={spy.trackFeedId} />
+        <EngineTrackRecord record={spx.trackRecord} feedId={spx.trackFeedId} />
       </div>
 
       {/* v10 P1-12: 16px rhythm — row → next row. */}
@@ -78,7 +82,12 @@ export function PreConfigBriefing({ spy, spx, className }: Props) {
         <BookOpen size={14} className="mt-0.5 shrink-0 text-ink-3" aria-hidden />
         <div className="space-y-1">
           {/* v10 P1-11: editorial section title → serif. */}
-          <p className="font-serif text-h3 text-ink tracking-tight">What to watch at the open</p>
+          <div className="flex items-center gap-2">
+            <p className="font-serif text-h3 text-ink tracking-tight">
+              What to watch at the open
+            </p>
+            <FeedHeartbeat feedId="daily-brief-preview" />
+          </div>
           <p className="text-body text-ink-2 leading-snug">
             {SLATE_COPY.preConfig.watchAtOpen}
           </p>
@@ -106,7 +115,10 @@ function EngineBriefing({ engine }: { engine: Engine }) {
         >
           {display}
         </span>
-        <span className="font-mono text-meta text-ink-3 tabular-nums">
+        <span className="inline-flex items-center gap-1.5 font-mono text-meta text-ink-3 tabular-nums">
+          {engine.lastSessionFeedId && (
+            <FeedHeartbeat feedId={engine.lastSessionFeedId} />
+          )}
           Setup {engine.nextSetupLabel} ·{" "}
           <Countdown to={engine.nextSetupISO} verb="in" />
         </span>

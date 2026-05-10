@@ -26,6 +26,8 @@ import { Countdown } from "@/components/decision-slate/Countdown";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { displayEngine } from "@/lib/engine-labels";
 import { cn } from "@/lib/utils";
+import type { FeedId } from "@/lib/feed-health";
+import { FeedHeartbeat } from "./FeedHealthProvider";
 import {
   StructurePathChart,
   type StructureChartData,
@@ -42,6 +44,7 @@ interface Props {
   explanation?: string;
   structureLevels?: StructureLevels;
   structureChart?: StructureChartData | null;
+  feedId?: FeedId;
   className?: string;
 }
 
@@ -97,6 +100,7 @@ export function StatePipeline({
   explanation,
   structureLevels,
   structureChart,
+  feedId,
   className,
 }: Props) {
   const currentIdx = ENGINE_STATES.indexOf(current);
@@ -130,14 +134,17 @@ export function StatePipeline({
               prop stays as the wire-level identifier so the data
               path (snapshot keys, /api/spx) keeps working unchanged. */}
           <div className="min-w-0">
-            <h2
-              className={cn(
-                "font-serif text-[40px] leading-none tracking-tight",
-                labelTone,
-              )}
-            >
-              {displayEngine(engine)}
-            </h2>
+            <div className="flex items-start justify-between gap-2">
+              <h2
+                className={cn(
+                  "font-serif text-[40px] leading-none tracking-tight",
+                  labelTone,
+                )}
+              >
+                {displayEngine(engine)}
+              </h2>
+              {feedId && <FeedHeartbeat feedId={feedId} className="mt-1" />}
+            </div>
             <span
               className={cn(
                 "mt-2 inline-flex h-6 items-center rounded-[4px] px-2 font-mono text-[10px] font-bold uppercase tracking-[0.10em]",
