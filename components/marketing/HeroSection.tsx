@@ -2,7 +2,21 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { ArrowRight, BookOpen, Gauge, Radio, ShieldCheck } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import {
+  Activity,
+  ArrowRight,
+  Bell,
+  BookOpen,
+  CalendarDays,
+  ChevronDown,
+  Crosshair,
+  Gauge,
+  Layers3,
+  LineChart,
+  Radio,
+  ShieldCheck,
+} from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import type { DecisionState } from "@/lib/types";
 import {
@@ -23,12 +37,12 @@ interface HeroProps {
   chartDate?: string;
 }
 
-const workspaceNav = [
-  "Decision Slate",
-  "SPY Engine",
-  "ES Engine",
-  "Replays",
-  "Structure Maps",
+const workspaceNav: Array<{ label: string; icon: LucideIcon }> = [
+  { label: "Decision Slate", icon: Crosshair },
+  { label: "SPY Engine", icon: LineChart },
+  { label: "ES Engine", icon: Activity },
+  { label: "Replays", icon: CalendarDays },
+  { label: "Structure Maps", icon: Layers3 },
 ];
 
 export function HeroSection({
@@ -170,48 +184,90 @@ export function HeroSection({
               <div className="absolute left-1/2 top-1 h-1 w-20 -translate-x-1/2 rounded-full bg-paper/12" />
               <div className="absolute right-3 top-1/2 h-16 w-1 -translate-y-1/2 rounded-full bg-paper/10" />
               <div className="relative overflow-hidden rounded-[22px] border border-paper/10 bg-[#061017] shadow-[0_1px_0_rgba(255,255,255,0.08)_inset]">
-              <div className="flex items-center justify-between border-b border-paper/10 px-4 py-3 sm:px-5">
-                <div>
-                  <div className="font-serif text-[17px] leading-none text-paper">
-                    SPY Prophet
+                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_72%_18%,rgba(184,130,31,0.16),transparent_24%),linear-gradient(115deg,rgba(255,255,255,0.04),transparent_36%)]" />
+                <div className="relative flex h-7 items-center justify-between border-b border-paper/10 bg-[#030A0F] px-4 font-mono text-[9px] uppercase tracking-[0.14em] text-paper/38">
+                  <div className="flex items-center gap-2">
+                    <span className="h-1.5 w-1.5 rounded-full bg-bear/70" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-gold/80" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-bull/75" />
                   </div>
-                  <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.2em] text-gold-soft/60">
-                    Decision Slate
+                  <span>SPY Prophet OS</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-1.5 w-4 rounded-full bg-paper/18" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-bull/70" />
                   </div>
                 </div>
-                <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-paper/45">
-                  <span>{previewLabel}</span>
-                  <span
-                    className={cn(
-                      "rounded-[4px] border px-2 py-1",
-                      initialLive
-                        ? "border-bull/45 text-bull"
-                        : "border-paper/15 text-paper/55",
-                    )}
-                  >
-                    {initialLive ? "Live" : "Replay"}
-                  </span>
+                <div className="relative flex items-center justify-between border-b border-paper/10 bg-[#081219]/92 px-4 py-3 sm:px-5">
+                  <div className="flex items-center gap-3">
+                    <div className="grid h-9 w-9 place-items-center rounded-[9px] border border-gold/35 bg-gold/10 text-gold-soft">
+                      <Crosshair size={17} />
+                    </div>
+                    <div>
+                      <div className="font-serif text-[17px] leading-none text-paper">
+                        SPY Prophet
+                      </div>
+                      <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.2em] text-gold-soft/60">
+                        Decision Slate
+                      </div>
+                    </div>
+                  </div>
+                  <div className="hidden items-center gap-2 md:flex">
+                    <div className="flex rounded-[7px] border border-paper/10 bg-paper/[0.035] p-1 font-mono text-[9px] uppercase tracking-[0.12em] text-paper/42">
+                      {["Slate", "SPY", "ES"].map((tabName, index) => (
+                        <span
+                          key={tabName}
+                          className={cn(
+                            "rounded-[5px] px-3 py-1.5",
+                            index === 0 && "bg-gold/14 text-gold-soft",
+                          )}
+                        >
+                          {tabName}
+                        </span>
+                      ))}
+                    </div>
+                    <span
+                      className={cn(
+                        "rounded-[6px] border px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em]",
+                        initialLive
+                          ? "border-bull/45 bg-bull/10 text-bull"
+                          : "border-paper/15 bg-paper/[0.035] text-paper/55",
+                      )}
+                    >
+                      {initialLive ? "Live" : "Replay"}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label="Preview notifications"
+                      className="grid h-8 w-8 place-items-center rounded-[7px] border border-paper/10 bg-paper/[0.035] text-paper/48"
+                    >
+                      <Bell size={14} />
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-[170px_1fr]">
-                <aside className="hidden border-r border-paper/10 p-4 md:block">
-                  <div className="space-y-1.5">
-                    {workspaceNav.map((item, index) => (
+                <div className="relative grid grid-cols-1 md:grid-cols-[190px_1fr]">
+                  <aside className="hidden border-r border-paper/10 bg-[#071017]/72 p-3 md:block">
+                    <div className="rounded-[9px] border border-paper/10 bg-[#0B171E] p-1.5">
+                      {workspaceNav.map(({ label, icon: Icon }, index) => (
                       <div
-                        key={item}
+                        key={label}
                         className={cn(
-                          "rounded-[6px] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em]",
+                          "flex items-center gap-2 rounded-[7px] px-2.5 py-2 font-mono text-[9px] uppercase tracking-[0.1em]",
                           index === 0
-                            ? "border border-gold/45 bg-gold/10 text-gold-soft"
+                            ? "border border-gold/45 bg-gold/10 text-gold-soft shadow-[0_0_22px_-16px_rgba(184,130,31,0.9)]"
                             : "text-paper/45",
                         )}
                       >
-                        {item}
+                        <Icon size={13} />
+                        <span>{label}</span>
                       </div>
                     ))}
                   </div>
-                  <div className="mt-14 border-t border-paper/10 pt-4">
+                    <div className="mt-4 rounded-[9px] border border-paper/10 bg-paper/[0.035] p-3">
+                      <div className="mb-3 flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.14em] text-paper/35">
+                        <span>{previewLabel}</span>
+                        <ChevronDown size={12} />
+                      </div>
                     <PreviewMetric
                       label="SPY"
                       value={money(serverQuote?.spy)}
@@ -222,9 +278,35 @@ export function HeroSection({
                   </div>
                 </aside>
 
-                <div className="p-4 sm:p-5">
+                  <div className="p-4 sm:p-5">
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-paper/10 bg-paper/[0.035] px-3 py-2.5">
+                      <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-paper/45">
+                        <span className="grid h-6 w-6 place-items-center rounded-[6px] bg-gold/12 text-gold-soft">
+                          <Radio size={12} />
+                        </span>
+                        <span>{chartDate ?? chart?.date ?? "Latest"}</span>
+                      </div>
+                      <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.12em] text-paper/45">
+                        <span className="rounded-[5px] border border-paper/10 px-2 py-1">
+                          SPY
+                        </span>
+                        <span className="rounded-[5px] border border-paper/10 px-2 py-1">
+                          ES
+                        </span>
+                        <span className="rounded-[5px] border border-gold/30 bg-gold/10 px-2 py-1 text-gold-soft">
+                          Structure
+                        </span>
+                      </div>
+                    </div>
+                    <WorkflowStrip
+                      tone={statusTone}
+                      date={chartDate ?? chart?.date ?? "Latest"}
+                      decision={decisionLabel}
+                      verdict={verdict}
+                    />
                   <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_260px]">
-                    <div className="rounded-[8px] border border-paper/10 bg-paper/[0.035] p-4">
+                    <div className="relative overflow-hidden rounded-[10px] border border-paper/10 bg-[linear-gradient(145deg,rgba(255,255,255,0.055),rgba(255,255,255,0.018))] p-4 shadow-[0_18px_40px_-34px_rgba(244,228,192,0.5)]">
+                      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold/45 to-transparent" />
                       <div className="mb-4 flex items-start justify-between gap-4">
                         <div>
                           <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-paper/45">
@@ -246,7 +328,8 @@ export function HeroSection({
                       />
                     </div>
 
-                    <div className="rounded-[8px] border border-paper/10 bg-paper/[0.035] p-4">
+                    <div className="relative overflow-hidden rounded-[10px] border border-paper/10 bg-[linear-gradient(145deg,rgba(255,255,255,0.05),rgba(255,255,255,0.018))] p-4 shadow-[0_18px_40px_-36px_rgba(244,228,192,0.35)]">
+                      <div className="pointer-events-none absolute inset-y-4 left-0 w-px bg-gradient-to-b from-transparent via-gold/45 to-transparent" />
                       <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-paper/45">
                         Today's game plan
                       </div>
@@ -413,6 +496,56 @@ function PreviewMetric({
   );
 }
 
+function WorkflowStrip({
+  tone,
+  date,
+  decision,
+  verdict,
+}: {
+  tone: "bull" | "bear" | "gold";
+  date: string;
+  decision: string;
+  verdict: string;
+}) {
+  const steps = [
+    { label: "Session", value: date, icon: CalendarDays },
+    { label: "Decision", value: decision, icon: Crosshair },
+    { label: "Verdict", value: verdict, icon: ShieldCheck },
+  ];
+
+  return (
+    <div className="mb-4 grid grid-cols-3 overflow-hidden rounded-[10px] border border-paper/10 bg-[#09151C] shadow-[0_1px_0_rgba(255,255,255,0.05)_inset]">
+      {steps.map(({ label, value, icon: Icon }, index) => (
+        <div
+          key={label}
+          className={cn(
+            "relative min-w-0 border-r border-paper/10 px-3 py-3 last:border-r-0",
+            index === 1 && "bg-paper/[0.035]",
+          )}
+        >
+          {index === 1 && (
+            <span
+              className={cn(
+                "absolute inset-x-3 top-0 h-px",
+                tone === "bull" && "bg-bull/60",
+                tone === "bear" && "bg-bear/60",
+                tone === "gold" && "bg-gold/70",
+              )}
+            />
+          )}
+          <div className="flex items-center gap-2 font-mono text-[9px] uppercase tracking-[0.14em] text-paper/35">
+            <Icon size={12} />
+            <span>{label}</span>
+          </div>
+          <div className="mt-1 truncate font-mono text-[10px] uppercase tracking-[0.08em] text-paper/70">
+            {value}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function DecisionFlowPanel({
   tone,
   date,
@@ -538,28 +671,48 @@ function PreviewChartCard({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-[8px] border border-paper/10 bg-paper/[0.035] p-4">
+    <div className="relative overflow-hidden rounded-[10px] border border-paper/10 bg-[linear-gradient(145deg,rgba(255,255,255,0.052),rgba(255,255,255,0.018))] p-4 shadow-[0_18px_42px_-38px_rgba(244,228,192,0.42)]">
+      <div
+        className={cn(
+          "pointer-events-none absolute inset-x-0 top-0 h-px",
+          tone === "bull" && "bg-bull/50",
+          tone === "bear" && "bg-bear/50",
+          tone === "neutral" && "bg-gold/45",
+        )}
+      />
       <div className="mb-3 flex items-start justify-between gap-3">
-        <div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-paper/45">
-            {title}
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="font-mono text-[18px] font-semibold text-paper">
-              {value}
-            </span>
-            {deltaText && (
-              <span
-                className={cn(
-                  "font-mono text-[10px]",
-                  tone === "bull" && "text-bull",
-                  tone === "bear" && "text-bear",
-                  tone === "neutral" && "text-paper/45",
-                )}
-              >
-                {deltaText}
-              </span>
+        <div className="flex items-start gap-2">
+          <span
+            className={cn(
+              "mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-[7px] border",
+              tone === "bull" && "border-bull/25 bg-bull/10 text-bull",
+              tone === "bear" && "border-bear/25 bg-bear/10 text-bear",
+              tone === "neutral" && "border-gold/25 bg-gold/10 text-gold-soft",
             )}
+          >
+            <LineChart size={13} />
+          </span>
+          <div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-paper/45">
+              {title}
+            </div>
+            <div className="mt-2 flex items-baseline gap-2">
+              <span className="font-mono text-[18px] font-semibold text-paper">
+                {value}
+            </span>
+              {deltaText && (
+                <span
+                  className={cn(
+                    "font-mono text-[10px]",
+                    tone === "bull" && "text-bull",
+                    tone === "bear" && "text-bear",
+                    tone === "neutral" && "text-paper/45",
+                  )}
+                >
+                  {deltaText}
+                </span>
+              )}
+            </div>
           </div>
         </div>
         <span className="rounded-[4px] border border-gold/35 bg-gold/10 px-2 py-1 font-mono text-[9px] uppercase tracking-[0.12em] text-gold-soft">
