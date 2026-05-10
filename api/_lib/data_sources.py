@@ -158,6 +158,65 @@ def _fetch_spy_intraday_for_date(session_day: date, interval: str = "5m") -> pd.
     return df[(df.index >= start_ct) & (df.index <= end_ct)].sort_index()
 
 
+def _replay_entry_frame(
+    rth_today: pd.DataFrame,
+    intraday_5m: pd.DataFrame | None,
+) -> pd.DataFrame:
+    if intraday_5m is not None and not intraday_5m.empty:
+        return intraday_5m.sort_index()
+    if rth_today is not None and not rth_today.empty:
+        return rth_today.sort_index()
+    return pd.DataFrame()
+
+
+def _forced_one_hour_exit(
+    *,
+    entry_time: pd.Timestamp,
+    rth_today: pd.DataFrame,
+    intraday_5m: pd.DataFrame | None,
+) -> tuple[pd.Timestamp, float]:
+    exit_time = entry_time + pd.Timedelta(hours=1)
+    frame = _replay_entry_frame(rth_today, intraday_5m)
+    if not frame.empty:
+        future = frame[frame.index >= exit_time]
+        row = future.iloc[0] if not future.empty else frame.iloc[-1]
+        return exit_time, float(row["Close"])
+    future_hourly = rth_today[rth_today.index >= exit_time]
+    row = future_hourly.iloc[0] if not future_hourly.empty else rth_today.iloc[-1]
+    return exit_time, float(row["Close"])
+
+
+def _open_zone_replay_entry(
+    *,
+    primary_lines: list[pc.DynamicLine],
+    rth_today: pd.DataFrame,
+    intraday_5m: pd.DataFrame | None,
+) -> dict | None:
+    """Replay-only continuation entry when RTH opens beyond structure."""
+    frame = _replay_entry_frame(rth_today, intraday_5m)
+    if frame.empty or not primary_lines:
+        return None
+    entry_time = pd.Timestamp(frame.index[0])
+    row = frame.iloc[0]
+    entry_price = float(row["Open"])
+    values: list[float] = []
+    for line in primary_lines:
+        if not getattr(line, "is_primary", False):
+            continue
+        v = line.tradable_value_at(entry_time)
+        if not pd.isna(v):
+            values.append(float(v))
+    if len(values) < 2:
+        return None
+    upper = max(values)
+    lower = min(values)
+    if entry_price > upper:
+        return {"side": "LONG", "signal_type": "CALL", "entry_time": entry_time, "entry_price": entry_price}
+    if entry_price < lower:
+        return {"side": "SHORT", "signal_type": "PUT", "entry_time": entry_time, "entry_price": entry_price}
+    return None
+
+
 @pc.ttl_cache(ttl_seconds=60.0, maxsize=8)
 def fetch_last_close(symbol: str) -> float:
     try:
@@ -981,13 +1040,15 @@ def _build_replay_block(
     signal_day,
     rth_today: pd.DataFrame,
     decision: dict,
+    primary_lines: list[pc.DynamicLine] | None = None,
     signals: list[pc.TradeSignal] | None = None,
     intraday_5m: pd.DataFrame | None = None,
 ) -> dict:
     """OHLC + verdict-outcome card for backtest mode.
 
     Scoring rule: first confirmed engine entry, force-close after one hour.
-    No confirmed entry is N/A.
+    If no rejection entry confirmed, grade the replay-only RTH open-zone
+    continuation when the open is already outside the primary structure.
     """
     block: dict = {
         "isReplay": is_replay,
@@ -1016,30 +1077,39 @@ def _build_replay_block(
         if s.status == "CONFIRMED" and s.entry_time is not None and not pd.isna(s.entry_price)
     ]
     if not confirmed:
-        block["verdictOutcome"] = "N_A"
-        block["verdictPnl"] = None
-        return block
+        open_zone = _open_zone_replay_entry(
+            primary_lines=primary_lines or [],
+            rth_today=rth_today,
+            intraday_5m=intraday_5m,
+        )
+        if open_zone is None:
+            block["verdictOutcome"] = "N_A"
+            block["verdictPnl"] = None
+            return block
+        entry_time = pd.Timestamp(open_zone["entry_time"])
+        entry_price = float(open_zone["entry_price"])
+        signal_type = str(open_zone["signal_type"])
+        side = str(open_zone["side"])
+        entry_rule = "OPEN_ZONE_CONTINUATION"
+    else:
+        sig = min(confirmed, key=lambda s: pd.Timestamp(s.entry_time))
+        entry_time = pd.Timestamp(sig.entry_time)
+        entry_price = float(sig.entry_price)
+        signal_type = sig.signal_type
+        side = "LONG" if sig.signal_type == "CALL" else "SHORT"
+        entry_rule = "CONFIRMED_REJECTION"
 
-    sig = min(confirmed, key=lambda s: pd.Timestamp(s.entry_time))
-    entry_time = pd.Timestamp(sig.entry_time)
-    entry_price = float(sig.entry_price)
-    exit_time = entry_time + pd.Timedelta(hours=1)
-    exit_price = None
-    if intraday_5m is not None and not intraday_5m.empty:
-        frame = intraday_5m.sort_index()
-        future = frame[frame.index >= exit_time]
-        row = future.iloc[0] if not future.empty else frame.iloc[-1]
-        exit_price = float(row["Close"])
-    if exit_price is None:
-        future_hourly = rth_today[rth_today.index >= exit_time]
-        row = future_hourly.iloc[0] if not future_hourly.empty else rth_today.iloc[-1]
-        exit_price = float(row["Close"])
-
-    pnl = (exit_price - entry_price) if sig.signal_type == "CALL" else (entry_price - exit_price)
+    exit_time, exit_price = _forced_one_hour_exit(
+        entry_time=entry_time,
+        rth_today=rth_today,
+        intraday_5m=intraday_5m,
+    )
+    pnl = (exit_price - entry_price) if signal_type == "CALL" else (entry_price - exit_price)
     block["entry"] = {
         "time": entry_time.isoformat(),
         "price": round(entry_price, 2),
-        "side": "LONG" if sig.signal_type == "CALL" else "SHORT",
+        "side": side,
+        "rule": entry_rule,
     }
     block["exit"] = {
         "time": exit_time.isoformat(),
@@ -1249,6 +1319,7 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
         signal_day=signal_day,
         rth_today=rth_today,
         decision=decision,
+        primary_lines=primary_lines,
         signals=raw_signals,
         intraday_5m=intraday,
     ) if is_replay else None
