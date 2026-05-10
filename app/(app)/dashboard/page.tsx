@@ -18,6 +18,10 @@ import {
 import { EngineCard } from "@/components/decision-slate/EngineCard";
 import { RecommendedAction } from "@/components/decision-slate/RecommendedAction";
 import { PreviewState } from "@/components/decision-slate/PreviewState";
+import {
+  DegradedModeBanner,
+  FeedHealthProvider,
+} from "@/components/decision-slate/FeedHealthProvider";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { SpxProvenanceBadge } from "@/components/decision-slate/SpxProvenance";
@@ -30,6 +34,11 @@ import { fetchLastSessionRecaps } from "@/lib/last-session-recap";
 import { fetchTrackRecord } from "@/lib/track-record";
 import { getSessionInfo } from "@/lib/sessions";
 import { relabelDashboardString } from "@/lib/engine-labels";
+import {
+  FEED_DEFAULTS,
+  buildFeedSeed,
+  type FeedHealthSeed,
+} from "@/lib/feed-health";
 import { cn } from "@/lib/utils";
 import type { AdaptedSnapshot } from "@/lib/snapshot-adapter";
 import type { DynamicLine, SPXSnapshot, SPXLine } from "@/lib/types";
@@ -85,6 +94,19 @@ export default async function Page() {
   const bothPreConfig = spyState === "PRE_CONFIG" && spxState === "PRE_CONFIG";
   const spySession = getSessionInfo("SPY", now);
   const spxSession = getSessionInfo("SPX", now);
+  const serverNowISO = now.toISOString();
+  const feedHealth = buildDashboardFeedHealth({
+    serverNowISO,
+    spy,
+    spx,
+    spyError: spyError ?? null,
+    spxError: spxLoaded.error ?? null,
+    spySession,
+    spxSession,
+    spyTrackFetchedAt: serverNowISO,
+    spxTrackFetchedAt: serverNowISO,
+    recapsFetchedAt: serverNowISO,
+  });
   const spyChart = buildSpyStructureChart(
     chartSpyLoaded.data,
     intraday?.spy ?? null,
@@ -111,8 +133,10 @@ export default async function Page() {
     //   row → row inside briefing   16 (handled inside briefing)
     //   last card → "What to watch" 24 (handled inside briefing)
     //   briefing → preview          24 (mt-6 on preview)
+    <FeedHealthProvider serverNowISO={serverNowISO} feeds={feedHealth}>
     <div className="w-full max-w-[1440px] pb-12 pt-6 anim-rise">
       <PageHeader />
+      <DegradedModeBanner className="mt-3" />
 
       {/* v4 #3 + v10 P1-12: Recommended Action page hero. 24px
           rhythm between the header and the hero. */}
@@ -147,6 +171,7 @@ export default async function Page() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4 [grid-template-columns:1fr] lg:[grid-template-columns:1fr_1fr] min-w-0">
           <StatePipeline
             engine="SPY"
+            feedId="spy-rails"
             current={spyState}
             nextEventISO={spySession.nextSignificantEvent.at.toISOString()}
             nextEventLabel={spySession.nextSignificantEvent.label}
@@ -156,6 +181,7 @@ export default async function Page() {
           />
           <StatePipeline
             engine="SPX"
+            feedId="spx-rails"
             current={spxState}
             nextEventISO={spxSession.nextSignificantEvent.at.toISOString()}
             // v8 P1-2: lib/sessions.ts produces "SPX setup opens" /
@@ -182,6 +208,8 @@ export default async function Page() {
               nextSetupLabel: formatDayHM(spySession.configWindowStart),
               lastSignal: recaps.spy,
               trackRecord: spyTrack,
+              trackFeedId: "spy-hit-rate",
+              lastSessionFeedId: "spy-last-session",
             }}
             spx={{
               label: "SPX",
@@ -189,6 +217,8 @@ export default async function Page() {
               nextSetupLabel: formatDayHM(spxSession.configWindowStart),
               lastSignal: recaps.spx,
               trackRecord: spxTrack,
+              trackFeedId: "spx-hit-rate",
+              lastSessionFeedId: "spx-last-session",
             }}
           />
           {/* v4 #13 + v10 P1-12: PreviewState self-hides via
@@ -224,8 +254,8 @@ export default async function Page() {
                 </span>
               </div>
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <EngineTrackRecord record={spyTrack} />
-                <EngineTrackRecord record={spxTrack} />
+                <EngineTrackRecord record={spyTrack} feedId="spy-hit-rate" />
+                <EngineTrackRecord record={spxTrack} feedId="spx-hit-rate" />
               </div>
             </div>
           </Section>
@@ -244,7 +274,93 @@ export default async function Page() {
         </>
       )}
     </div>
+    </FeedHealthProvider>
   );
+}
+
+function buildDashboardFeedHealth({
+  serverNowISO,
+  spy,
+  spx,
+  spyError,
+  spxError,
+  spySession,
+  spxSession,
+  spyTrackFetchedAt,
+  spxTrackFetchedAt,
+  recapsFetchedAt,
+}: {
+  serverNowISO: string;
+  spy: AdaptedSnapshot;
+  spx: SPXSnapshot;
+  spyError: string | null;
+  spxError: string | null;
+  spySession: ReturnType<typeof getSessionInfo>;
+  spxSession: ReturnType<typeof getSessionInfo>;
+  spyTrackFetchedAt: string;
+  spxTrackFetchedAt: string;
+  recapsFetchedAt: string;
+}): FeedHealthSeed[] {
+  const spyRailsThreshold =
+    spySession.phase === "RTH_OPEN"
+      ? FEED_DEFAULTS.railsDuringSessionMs
+      : FEED_DEFAULTS.railsOffSessionMs;
+  const spxRailsThreshold =
+    spxSession.phase === "RTH_OPEN"
+      ? FEED_DEFAULTS.railsDuringSessionMs
+      : FEED_DEFAULTS.railsOffSessionMs;
+
+  return [
+    buildFeedSeed("spy-rails", {
+      lastUpdatedAt: spy.asOf,
+      nextExpectedAt: spySession.nextSignificantEvent.at.toISOString(),
+      staleAfterMs: spyRailsThreshold,
+      critical: true,
+      failedAt: spyError ? serverNowISO : null,
+      initialStatus: spyError ? "failed" : undefined,
+    }),
+    buildFeedSeed("spx-rails", {
+      lastUpdatedAt: spx.asOf,
+      nextExpectedAt: spxSession.nextSignificantEvent.at.toISOString(),
+      staleAfterMs: spxRailsThreshold,
+      critical: true,
+      failedAt: spxError ? serverNowISO : null,
+      initialStatus: spxError ? "failed" : undefined,
+    }),
+    buildFeedSeed("spy-hit-rate", {
+      lastUpdatedAt: spyTrackFetchedAt,
+      staleAfterMs: FEED_DEFAULTS.hitRateMs,
+    }),
+    buildFeedSeed("spx-hit-rate", {
+      lastUpdatedAt: spxTrackFetchedAt,
+      staleAfterMs: FEED_DEFAULTS.hitRateMs,
+    }),
+    buildFeedSeed("spy-last-session", {
+      lastUpdatedAt: recapsFetchedAt,
+      staleAfterMs: FEED_DEFAULTS.lastSessionMs,
+    }),
+    buildFeedSeed("spx-last-session", {
+      lastUpdatedAt: recapsFetchedAt,
+      staleAfterMs: FEED_DEFAULTS.lastSessionMs,
+    }),
+    buildFeedSeed("daily-brief-preview", {
+      lastUpdatedAt: serverNowISO,
+      nextExpectedAt: spySession.configWindowStart.toISOString(),
+      staleAfterMs: FEED_DEFAULTS.briefPreviewMs,
+    }),
+    buildFeedSeed("market-clock", {
+      lastUpdatedAt: serverNowISO,
+      nextExpectedAt: earliest(
+        spySession.nextSignificantEvent.at,
+        spxSession.nextSignificantEvent.at,
+      ).toISOString(),
+      staleAfterMs: FEED_DEFAULTS.marketClockMs,
+    }),
+  ];
+}
+
+function earliest(a: Date, b: Date): Date {
+  return a.getTime() <= b.getTime() ? a : b;
 }
 
 // ---------------------------------------------------------------------
@@ -700,7 +816,7 @@ function SpyVerdictCard({
       {(isPreConfig ||
         snap.currentState === "STAND_DOWN" ||
         snap.currentState === "COOLDOWN") && (
-        <LastSignalRecap recap={lastSignal} />
+        <LastSignalRecap recap={lastSignal} feedId="spy-last-session" />
       )}
       {isPreConfig ? (
         <NextEventCallout engine="SPY" />
@@ -893,7 +1009,7 @@ function SpxVerdictCard({
         </MetricSlot>
       </div>
       {(isPreConfig || state === "STAND_DOWN" || state === "COOLDOWN") && (
-        <LastSignalRecap recap={lastSignal} />
+        <LastSignalRecap recap={lastSignal} feedId="spx-last-session" />
       )}
       {isPreConfig ? (
         <NextEventCallout engine="SPX" />

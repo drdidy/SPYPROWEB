@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 import { displayEngine } from "@/lib/engine-labels";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { SLATE_COPY } from "@/content/copy";
+import { FeedHeartbeat } from "./FeedHealthProvider";
+import type { FeedId } from "@/lib/feed-health";
 import type {
   EngineTrackRecord as EngineTrackRecordData,
   SessionOutcome,
@@ -11,6 +13,7 @@ import type {
 
 interface Props {
   record: EngineTrackRecordData;
+  feedId?: FeedId;
   className?: string;
 }
 
@@ -28,7 +31,7 @@ const OUTCOME_LABEL: Record<SessionOutcome["outcome"], string> = {
   SKIP: "Skip",
 };
 
-export function EngineTrackRecord({ record, className }: Props) {
+export function EngineTrackRecord({ record, feedId, className }: Props) {
   const pct =
     record.hitRate == null ? null : Math.round(record.hitRate * 100);
   const labelTone = record.engine === "SPX" ? "text-violet" : "text-ink-2";
@@ -71,20 +74,23 @@ export function EngineTrackRecord({ record, className }: Props) {
           </div>
         </div>
 
-        <InfoTooltip
-          label={pct == null ? "No graded sessions yet" : "Graded sessions"}
-          content={
-            summaryNeedsTooltip
-              ? `Engine watched the last ${record.sessions.length} session${
-                  record.sessions.length === 1 ? "" : "s"
-                } but did not qualify a setup. A graded session is one the engine took to a confirmed entry trigger or replay open-zone continuation and tracked through to its exit.`
-              : "Sessions where the engine took a confirmed entry or replay open-zone continuation and tracked through exit. Skipped sessions are excluded from the percentage."
-          }
-        >
-          <span className="cursor-help font-mono text-meta tabular-nums text-ink-2">
-            {summary}
-          </span>
-        </InfoTooltip>
+        <div className="flex items-center gap-2">
+          {feedId && <FeedHeartbeat feedId={feedId} />}
+          <InfoTooltip
+            label={pct == null ? "No graded sessions yet" : "Graded sessions"}
+            content={
+              summaryNeedsTooltip
+                ? `Engine watched the last ${record.sessions.length} session${
+                    record.sessions.length === 1 ? "" : "s"
+                  } but did not qualify a setup. A graded session is one the engine took to a confirmed entry trigger or replay open-zone continuation and tracked through to its exit.`
+                : "Sessions where the engine took a confirmed entry or replay open-zone continuation and tracked through exit. Skipped sessions are excluded from the percentage."
+            }
+          >
+            <span className="cursor-help font-mono text-meta tabular-nums text-ink-2">
+              {summary}
+            </span>
+          </InfoTooltip>
+        </div>
       </div>
 
       <div className="mt-4 grid grid-cols-[76px_1fr] items-center gap-4">

@@ -21,14 +21,20 @@ import { cn } from "@/lib/utils";
 import { displayEngine } from "@/lib/engine-labels";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { ConvictionTrack } from "@/components/slate/ConvictionTrack";
+import { FeedHeartbeat } from "./FeedHealthProvider";
+import type { FeedId } from "@/lib/feed-health";
 
 const STORAGE_KEY = "slate.preview.hidden";
 
 interface Props {
+  feedId?: FeedId;
   className?: string;
 }
 
-export function PreviewState({ className }: Props) {
+export function PreviewState({
+  feedId = "daily-brief-preview",
+  className,
+}: Props) {
   const [hidden, setHidden] = useHiddenPref();
 
   if (hidden) {
@@ -82,6 +88,7 @@ export function PreviewState({ className }: Props) {
         <span className="eyebrow text-ink-3">
           What you'll see at setup
         </span>
+        <FeedHeartbeat feedId={feedId} />
         {/* v5 #16: aria-expanded mirrors the disclosure relationship
             with the collapsed Show button. */}
         <button

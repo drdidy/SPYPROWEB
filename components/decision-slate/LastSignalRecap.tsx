@@ -20,6 +20,8 @@ import { AlertTriangle } from "lucide-react";
 import type { LastSignalSummary } from "@/types/decision-slate";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { cn } from "@/lib/utils";
+import { FeedHeartbeat } from "./FeedHealthProvider";
+import type { FeedId } from "@/lib/feed-health";
 
 // v7 P1-10: a single trade rarely produces |R| > 20. When it does
 // (~1% of sessions), the value is almost always evidence of a mis-
@@ -31,6 +33,7 @@ const R_OUTLIER_THRESHOLD = 20;
 
 interface Props {
   recap: LastSignalSummary | null;
+  feedId?: FeedId;
   className?: string;
 }
 
@@ -39,7 +42,7 @@ interface Props {
 // we can render it as the body without the duplicated phrase.
 const WATCHED_PREFIX = /^\s*watched only\s*(?:[—–\-·:]\s*)?/i;
 
-export function LastSignalRecap({ recap, className }: Props) {
+export function LastSignalRecap({ recap, feedId, className }: Props) {
   if (!recap) return null;
   const sideTone =
     recap.side === "LONG" ? "text-state-bullish" : "text-state-bearish";
@@ -65,7 +68,10 @@ export function LastSignalRecap({ recap, className }: Props) {
 
   return (
     <div className={className}>
-      <div className="eyebrow text-ink-3 mb-1">Last session</div>
+      <div className="mb-1 flex items-center gap-1.5">
+        <span className="eyebrow text-ink-3">Last session</span>
+        {feedId && <FeedHeartbeat feedId={feedId} />}
+      </div>
       <div className="flex items-baseline gap-2 flex-wrap text-[12px] font-mono tabular-nums">
         {isWatched ? (
           <InfoTooltip
