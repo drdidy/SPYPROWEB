@@ -119,6 +119,22 @@ function resolveBase(): string | null {
   return null;
 }
 
+function buildFetchHeaders(): HeadersInit {
+  const out: Record<string, string> = {};
+  try {
+    const cookie = headers().get("cookie");
+    if (cookie) out.cookie = cookie;
+  } catch {
+    // headers() is only available during request-time renders.
+  }
+  const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  if (bypass) {
+    out["x-vercel-protection-bypass"] = bypass;
+    out["x-vercel-set-bypass-cookie"] = "samesitenone";
+  }
+  return out;
+}
+
 export async function loadLiveSnapshot(
   replayDate?: string,
 ): Promise<LoadedLiveSnapshot> {
@@ -139,19 +155,9 @@ export async function loadLiveSnapshot(
       : `${base}/api/snapshot`;
 
   try {
-    // Forward the deployment-protection bypass on Vercel previews
-    // so server-to-server fetches don't 401. See lib/spx-fetch.ts
-    // for the full explanation. No-op on production where the env
-    // var is absent.
-    const fetchHeaders: Record<string, string> = {};
-    const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-    if (bypass) {
-      fetchHeaders["x-vercel-protection-bypass"] = bypass;
-      fetchHeaders["x-vercel-set-bypass-cookie"] = "samesitenone";
-    }
     const res = await fetch(target, {
       cache: "no-store",
-      headers: fetchHeaders,
+      headers: buildFetchHeaders(),
     });
     if (!res.ok) {
       return {

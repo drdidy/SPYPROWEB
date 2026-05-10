@@ -61,6 +61,12 @@ function resolveBase(): string | null {
  */
 function buildFetchHeaders(): HeadersInit {
   const out: Record<string, string> = {};
+  try {
+    const cookie = headers().get("cookie");
+    if (cookie) out.cookie = cookie;
+  } catch {
+    // headers() is only available during request-time renders.
+  }
   const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
   if (bypass) {
     out["x-vercel-protection-bypass"] = bypass;
