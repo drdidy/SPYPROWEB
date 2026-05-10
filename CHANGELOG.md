@@ -6,6 +6,65 @@ entries grow newest-first.
 
 ## [Unreleased]
 
+### ES replay grader — drop the confluence-action filter
+
+Bug fix from the trader: "no way ES never gave a trade in the
+last 5 days." The SPX/ES replay grader in
+`api/spx/snapshot.py:_build_spx_replay_block` was emitting
+`verdictOutcome === "N_A"` whenever `action ∈ (STAND_DOWN, …)`,
+which meant any session where the confluence score didn't clear
+the TAKE/SELECTIVE threshold went un-graded — even if the
+channel had a clean direction and price tagged a rail.
+
+**The trader's actual rule**: "we extend the channel ceiling and
+floor to 9am and note the price at 9am. When ES tags that price
+and moves away — either up or down — that is the trade. Either
+the ceiling or the floor of the channel at 9am. So it is not
+possible to say no trade."
+
+The `action` field is a *display-side* recommendation gate (it
+suppresses the dashboard CTA on low-conviction sessions). It is
+not — and never should have been — a *grading-side* filter. The
+question grading answers is "what would have happened if the
+user took the rail tag?", and that's a function of the channel
+direction, not the confluence score.
+
+**Fix.** Dropped the `is_directional = action in ("TAKE",
+"SELECTIVE")` predicate. The grader now grades every session
+where `channel.direction != NONE`. NONE-direction sessions
+still emit `N_A` because no rails were projected, so there's no
+rail to tag — that's the only honest no-trade case.
+
+**New pytest cases** (`api/tests/spx/test_replay_grading.py`,
+8 cases all passing):
+
+  - STAND_DOWN + ASCENDING + positive day-net → WIN (was N_A)
+  - STAND_DOWN + DESCENDING + negative day-net → WIN (was N_A)
+  - TAKE + ASCENDING grading unchanged from the old behavior
+  - LOSS path for direction-against-day moves
+  - PUSH for flat closes
+  - NONE direction stays N_A
+  - The `session` block (open/close/netPts) populates even when
+    `verdictOutcome === "N_A"` — the dashboard recap line
+    ("Watched only — day closed +79.00 pts") now has graded
+    sessions populating from the same data path.
+  - replay_date=None returns a skeleton block.
+
+**Verification**
+
+- `python -m pytest api/tests/spx/` — 31/31 pass.
+- 13 / 13 FE static-analysis scripts pass.
+- `tsc --noEmit` clean. `next build` clean.
+
+After this lands, the existing /dashboard "ES last 5" dot row
+will populate with WIN/LOSS/PUSH dots for the recent
+ASCENDING/DESCENDING sessions that were previously hidden
+behind N_A. NONE-direction sessions (the rare ones where Sydney
++ Tokyo didn't print a clean HH+HL or LH+LL) keep showing as
+hollow rings — no rails projected.
+
+---
+
 ### Full SPX → ES rename + slope-value redaction
 
 **Scope expansion.** v8 renamed SPX → ES on /dashboard only. v9
