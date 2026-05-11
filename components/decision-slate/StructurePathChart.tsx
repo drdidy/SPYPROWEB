@@ -29,6 +29,7 @@ export function StructurePathChart({
   className,
   height = 170,
   title = "Actual path vs rails",
+  frameless = false,
 }: {
   data?: StructureChartData | null;
   variant?: "paper" | "dark";
@@ -36,6 +37,7 @@ export function StructurePathChart({
   className?: string;
   height?: number;
   title?: string;
+  frameless?: boolean;
 }) {
   const W = 620;
   const H = 230;
@@ -54,9 +56,11 @@ export function StructurePathChart({
       <div
         className={cn(
           "relative overflow-hidden rounded-[8px] border px-3 text-center font-mono text-[11px]",
-          variant === "dark"
-            ? "border-paper/10 bg-paper/[0.035] text-paper/45"
-            : "border-rule-soft bg-paper text-ink-3",
+          frameless
+            ? "border-transparent bg-transparent text-paper/45"
+            : variant === "dark"
+              ? "border-paper/10 bg-paper/[0.035] text-paper/45"
+              : "border-rule-soft bg-paper text-ink-3",
           className,
         )}
         style={{ minHeight: height }}
@@ -153,9 +157,11 @@ export function StructurePathChart({
     <div
       className={cn(
         "relative overflow-hidden rounded-[6px] border",
-        variant === "dark"
-          ? "border-paper/10 bg-paper/[0.035]"
-          : "border-rule-soft bg-paper shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]",
+        frameless
+          ? "border-transparent bg-transparent"
+          : variant === "dark"
+            ? "border-paper/10 bg-paper/[0.035]"
+            : "border-rule-soft bg-paper shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]",
         className,
       )}
       style={{ minHeight: height }}
@@ -163,7 +169,11 @@ export function StructurePathChart({
       <div
         className={cn(
           "relative z-10 flex items-start justify-between gap-3 border-b px-3 py-2",
-          variant === "dark" ? "border-paper/10 bg-[#071218]/88" : "border-rule-soft bg-paper/80",
+          frameless
+            ? "border-transparent bg-transparent"
+            : variant === "dark"
+              ? "border-paper/10 bg-[#071218]/88"
+              : "border-rule-soft bg-paper/80",
         )}
       >
         <div>

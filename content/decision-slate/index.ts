@@ -93,6 +93,7 @@ export const SLATE_COPY = {
   helpAboutSlate: {
     title: "About the Decision Slate",
     body:
+      "SPY and ES stay separate until the slate asks for a decision. " +
       "The Decision Slate is your daily 'should I trade?' command center. " +
       "Each engine — SPY (intraday premarket) and SPX (overnight channel) — " +
       "moves through a fixed pipeline: Pre-config → Stand down → Watch → " +

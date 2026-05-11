@@ -18,6 +18,7 @@ import {
   type Recommendation,
 } from "@/lib/recommendations";
 import { Countdown } from "@/components/decision-slate/Countdown";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import type { EngineState } from "@/lib/states";
 import {
   StructurePathChart,
@@ -25,6 +26,7 @@ import {
 } from "./StructurePathChart";
 import { ContractProjectionCard } from "@/components/options/ContractProjection";
 import type { ContractProjection } from "@/lib/contract-projection";
+import { SLATE_COPY } from "@/content/copy";
 
 const ICONS: Record<Recommendation["id"], LucideIcon> = {
   "live-spy": Activity,
@@ -53,6 +55,10 @@ interface Props {
   spxChart?: StructureChartData | null;
   spyProjection?: ContractProjection | null;
   spxProjection?: ContractProjection | null;
+  compactHeader?: boolean;
+  slateDateLabel?: string;
+  unifiedChrome?: boolean;
+  entryCostInScorecard?: boolean;
   className?: string;
 }
 
@@ -67,6 +73,10 @@ export function RecommendedAction({
   spxChart,
   spyProjection,
   spxProjection,
+  compactHeader = false,
+  slateDateLabel,
+  unifiedChrome = false,
+  entryCostInScorecard = false,
   className,
 }: Props) {
   const rec = recommendationFor(spyState, spxState);
@@ -124,9 +134,38 @@ export function RecommendedAction({
             <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-paper/48">
               Decision Slate
             </span>
+            {compactHeader && slateDateLabel && (
+              <>
+                <span aria-hidden className="h-px w-6 bg-paper/18" />
+                <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-paper/46">
+                  {slateDateLabel}
+                </span>
+              </>
+            )}
           </div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-paper/46">
-            Discipline before conviction
+          <div className="flex items-center gap-3">
+            {compactHeader && (
+              <InfoTooltip
+                label={SLATE_COPY.helpAboutSlate.title}
+                content={SLATE_COPY.helpAboutSlate.body}
+                placement="bottom"
+              >
+                <span
+                  aria-label="About the Decision Slate"
+                  className={cn(
+                    "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
+                    "border border-paper/12 bg-paper/[0.045] text-[11px] font-bold text-paper/70",
+                    "transition-colors hover:bg-paper/[0.08] hover:text-paper",
+                    "outline-none focus-visible:ring-2 focus-visible:ring-gold/60",
+                  )}
+                >
+                  ?
+                </span>
+              </InfoTooltip>
+            )}
+            <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-paper/46">
+              Discipline before conviction
+            </div>
           </div>
         </div>
       </div>
@@ -163,19 +202,38 @@ export function RecommendedAction({
             <ArrowRight size={12} className="opacity-70" aria-hidden />
           </Link>
 
-          <div className="mt-7 grid max-w-2xl grid-cols-2 gap-2 md:grid-cols-4">
+          <div
+            className={cn(
+              "mt-7 grid max-w-2xl grid-cols-2 gap-2",
+              entryCostInScorecard
+                ? "md:grid-cols-3 xl:grid-cols-5"
+                : "md:grid-cols-4",
+            )}
+          >
             <HeroMetric label="Confidence" value={`${confidence}%`} tone="text-gold-soft" />
             <HeroMetric label="Risk exposure" value="Low" tone="text-bull-soft" />
             <HeroMetric label="Reward setup" value="Neutral" tone="text-gold-soft" />
             <HeroMetric label="Trend context" value="Range" tone="text-paper" />
+            {entryCostInScorecard && (
+              <HeroMetric
+                label="Entry cost"
+                value={entryCostValue(activeProjection)}
+                tone={
+                  activeProjection
+                    ? "text-gold-soft"
+                    : "text-paper/68 text-[17px] leading-tight"
+                }
+                tooltip="Estimates the option debit at the planned entry line from the live chain and Greeks. It stays pending until the chain is usable; no placeholder debit is shown."
+              />
+            )}
           </div>
-          {activeProjection ? (
+          {!entryCostInScorecard && activeProjection ? (
             <ContractProjectionCard
               projection={activeProjection}
               compact
               className="mt-5 border-paper/15 bg-paper/[0.06] text-paper [&_.text-ink]:!text-paper [&_.text-ink-3]:!text-paper/58 [&_.text-ink-4]:!text-paper/42 [&_.bg-paper]:!bg-paper/[0.08] [&_.bg-paper-2\\/55]:!bg-paper/[0.08]"
             />
-          ) : (
+          ) : !entryCostInScorecard ? (
             <div className="mt-5 rounded-soft border border-paper/10 bg-paper/[0.045] px-3 py-2.5">
               <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-paper/42">
                 Entry cost model
@@ -184,10 +242,14 @@ export function RecommendedAction({
                 Publishes when the live option chain has usable Greeks. No placeholder debit is shown.
               </p>
             </div>
-          )}
+          ) : null}
         </div>
 
-        <CommandRailDiagram chart={activeChart} accent={chartAccent} />
+        <CommandRailDiagram
+          chart={activeChart}
+          accent={chartAccent}
+          frameless={unifiedChrome}
+        />
 
         <aside className="border-t border-paper/10 px-6 py-5 lg:border-l lg:border-t-0 lg:px-5 lg:py-7">
           <div className="flex items-center gap-2 text-gold-soft">
@@ -247,15 +309,27 @@ function HeroMetric({
   label,
   value,
   tone,
+  tooltip,
 }: {
   label: string;
   value: string;
   tone: string;
+  tooltip?: string;
 }) {
   return (
     <div className="rounded-soft border border-paper/10 bg-paper/[0.045] px-3 py-2.5">
-      <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-paper/42">
-        {label}
+      <div className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.16em] text-paper/42">
+        <span>{label}</span>
+        {tooltip && (
+          <InfoTooltip label={label} content={tooltip} placement="top">
+            <span
+              aria-label={`${label} details`}
+              className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-paper/12 text-[9px] text-paper/58 outline-none focus-visible:ring-2 focus-visible:ring-gold/60"
+            >
+              ?
+            </span>
+          </InfoTooltip>
+        )}
       </div>
       <div className={cn("mt-1 font-serif text-[23px] leading-none", tone)}>
         {value}
@@ -267,14 +341,23 @@ function HeroMetric({
 function CommandRailDiagram({
   chart,
   accent,
+  frameless = false,
 }: {
   chart?: StructureChartData | null;
   accent: "bull" | "gold" | "violet" | "neutral";
+  frameless?: boolean;
 }) {
   if (!chart) {
     return (
       <div className="hidden min-h-[238px] border-t border-paper/10 px-4 py-7 lg:block lg:border-t-0">
-        <div className="flex h-full min-h-[190px] items-center justify-center rounded-[10px] border border-paper/10 bg-paper/[0.035] px-6 text-center">
+        <div
+          className={cn(
+            "flex h-full min-h-[190px] items-center justify-center px-6 text-center",
+            frameless
+              ? "rounded-none border-0 bg-transparent"
+              : "rounded-[10px] border border-paper/10 bg-paper/[0.035]",
+          )}
+        >
           <div className="max-w-sm">
             <div className="mx-auto grid h-11 w-11 place-items-center rounded-[10px] border border-gold/25 bg-gold-soft/10 text-gold-soft">
               <span className="h-2.5 w-2.5 rounded-full bg-current animate-breathe" />
@@ -311,8 +394,14 @@ function CommandRailDiagram({
           accent={accent}
           height={190}
           title="recommended path"
+          frameless={frameless}
         />
       </div>
     </div>
   );
+}
+
+function entryCostValue(projection?: ContractProjection | null): string {
+  if (!projection) return "Pending live chain";
+  return `$${projection.projectedEntry.debitPerContract}`;
 }

@@ -37,6 +37,7 @@ import { getSessionInfo } from "@/lib/sessions";
 import { buildSpyContractProjection } from "@/lib/spy-contract-projection";
 import { buildSpxContractProjection } from "@/lib/spx-contract-projection";
 import { relabelDashboardString } from "@/lib/engine-labels";
+import { isEnabled } from "@/lib/feature-flags";
 import {
   FEED_DEFAULTS,
   buildFeedSeed,
@@ -59,9 +60,17 @@ import {
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function Page() {
+export default async function Page({
+  searchParams,
+}: {
+  searchParams?: Record<string, string | string[] | undefined>;
+}) {
   const now = new Date();
   const chartDate = chartSessionDateISO(now);
+  const flagContext = { query: searchParams ?? null };
+  const slateHeroV2 = isEnabled("slate_hero_v2", flagContext);
+  const slateVerdictChrome = isEnabled("slate_verdict_chrome", flagContext);
+  const slateEntryCostTile = isEnabled("slate_entry_cost_tile", flagContext);
   // Both engines are independent fetches. Run them in parallel — the
   // slate is meant to be read in one glance, so a slow side shouldn't
   // hold up the other.
@@ -145,13 +154,13 @@ export default async function Page() {
     //   briefing → preview          24 (mt-6 on preview)
     <FeedHealthProvider serverNowISO={serverNowISO} feeds={feedHealth}>
     <div className="w-full max-w-[1440px] pb-12 pt-6 anim-rise">
-      <PageHeader />
+      {!slateHeroV2 && <PageHeader />}
       <DegradedModeBanner className="mt-3" />
 
       {/* v4 #3 + v10 P1-12: Recommended Action page hero. 24px
           rhythm between the header and the hero. */}
       <RecommendedAction
-        className="mt-4"
+        className={slateHeroV2 ? "mt-0" : "mt-4"}
         spyState={spyState}
         spxState={spxState}
         spyNextEventISO={spySession.nextSignificantEvent.at.toISOString()}
@@ -171,6 +180,10 @@ export default async function Page() {
         spxChart={spxChart}
         spyProjection={spyProjection}
         spxProjection={spxProjection}
+        compactHeader={slateHeroV2}
+        slateDateLabel={formatSlateDate(now)}
+        unifiedChrome={slateVerdictChrome}
+        entryCostInScorecard={slateEntryCostTile}
       />
 
       {/* v4 #6 + v5 #8 + v10 P1-12: engines row. 24px rhythm
@@ -1390,6 +1403,16 @@ function spxHeadline(state: EngineState, action: string): string {
   if (state === "ARMED") return "Armed for entry";
   if (state === "STAND_DOWN" || action === "STAND_DOWN") return "Standing down";
   return "Watching the channel";
+}
+
+function formatSlateDate(d: Date): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(d);
 }
 
 function cleanActionableExplanation(text: string, spot: number): string {
