@@ -1262,7 +1262,10 @@ function buildVerdictEvents(
       engine: "SPY",
       at: spy.asOf,
       label: spy.decision.verdict,
-      detail: spy.decision.finalExplanation || "SPY replay verdict resolved from the selected snapshot.",
+      detail: cleanReplayExplanation(
+        spy.decision.finalExplanation || "SPY replay verdict resolved from the selected snapshot.",
+        spy.currentPrice,
+      ),
     });
     for (const item of spy.stateHistory ?? []) {
       events.push({
@@ -1325,6 +1328,17 @@ function buildPresets(now: Date): Array<{ label: string; value: string | "custom
     { label: "Last CPI", value: nearestPastEvent(now, CPI_DATES) ?? lastSession, title: "Load the most recent configured CPI session." },
     { label: "Custom...", value: "custom", title: "Focus the date picker." },
   ];
+}
+
+function cleanReplayExplanation(text: string, spot: number): string {
+  if (!Number.isFinite(spot) || spot <= 0) return text;
+  const gammaFlip = /(?:\s*)dealer gamma (?:positive|negative|flat) with flip near ([0-9]+(?:\.[0-9]+)?)(?:\.|,)?/i;
+  const match = text.match(gammaFlip);
+  if (!match) return text;
+  const flip = Number(match[1]);
+  if (!Number.isFinite(flip)) return text;
+  if (Math.abs(flip - spot) / spot <= 0.12) return text;
+  return text.replace(gammaFlip, "").replace(/\s{2,}/g, " ").trim();
 }
 
 const FOMC_DATES = [
