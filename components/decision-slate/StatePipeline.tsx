@@ -126,7 +126,7 @@ export function StatePipeline({
       )}
       style={{ borderTopColor: STATE_TOP_BORDER[current] }}
     >
-      <div className="grid gap-4 border-b border-rule pb-4 md:grid-cols-[200px_1fr_170px] md:items-start">
+      <div className="grid gap-4 border-b border-rule pb-4 xl:grid-cols-[200px_1fr_170px] xl:items-start">
         {/* v4 #5: drop the serif state-name title that lived next to
             the ticker. The active pill in the stepper below already
             names the state — rendering "Pre-config" twice (title +
@@ -160,7 +160,7 @@ export function StatePipeline({
           </div>
         </div>
 
-        <div className="min-w-0 border-rule md:border-l md:pl-6">
+        <div className="min-w-0 border-rule xl:border-l xl:pl-6">
           <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3">
             Current state
           </div>
@@ -175,7 +175,7 @@ export function StatePipeline({
         </div>
 
         {(nextEventISO || nextEventLabel) && (
-          <div className="shrink-0 border-rule md:border-l md:pl-6 md:text-right">
+          <div className="shrink-0 border-rule xl:border-l xl:pl-6 xl:text-right">
             {nextEventLabel && (
               <span className="font-mono text-[10px] tracking-[0.10em] uppercase text-ink-3">
                 Time to next state
@@ -462,13 +462,13 @@ function EngineFooterMetrics({
       ];
 
   return (
-    <div className="mt-3 grid grid-cols-4 divide-x divide-rule-soft rounded-[6px] border border-rule-soft bg-paper-tier3">
+    <div className="mt-3 grid grid-cols-2 divide-x divide-y divide-rule-soft rounded-[6px] border border-rule-soft bg-paper-tier3 sm:grid-cols-4 sm:divide-y-0">
       {metrics.map(([label, value]) => (
         <div key={label} className="min-w-0 px-2.5 py-2">
           <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-4">
             {label}
           </div>
-          <div className="mt-1 truncate font-serif text-[18px] leading-none text-ink">
+          <div className="mt-1 font-serif text-[18px] leading-none text-ink">
             {value}
           </div>
         </div>
@@ -540,7 +540,7 @@ function StateRailRow({
       <ol
         role="list"
         aria-label={`${displayEngine(engine)} seven-step state progression`}
-        className="grid grid-cols-7 gap-1.5"
+        className="grid grid-cols-7 gap-1 sm:gap-1.5"
       >
         {ENGINE_STATES.map((state, index) => {
           const phase = PHASE_DEFINITIONS[state];
@@ -551,7 +551,7 @@ function StateRailRow({
               key={state}
               aria-current={isCurrent ? "step" : undefined}
               className={cn(
-                "relative min-w-0 rounded-soft border px-2 py-2 text-center",
+                "relative min-w-0 rounded-soft border px-1 py-2 text-center sm:px-2",
                 "transition-colors",
                 isCurrent
                   ? "border-gold bg-gold text-paper shadow-glow motion-safe:animate-breathe"
@@ -577,7 +577,7 @@ function StateRailRow({
               >
                 {isComplete ? "✓" : index + 1}
               </span>
-              <span className="block truncate font-mono text-[9px] uppercase tracking-[0.08em]">
+              <span className="hidden font-mono text-[9px] uppercase tracking-[0.08em] sm:block">
                 {phase.short}
               </span>
             </li>

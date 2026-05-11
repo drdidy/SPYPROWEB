@@ -325,6 +325,7 @@ export default async function Page({
         <SlateCompliance
           environment={process.env.NEXT_PUBLIC_VERCEL_ENV ?? process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "development"}
           ruleVersion="v1.0.0"
+          requireAcknowledgement={false}
         />
       )}
     </div>
@@ -1318,7 +1319,7 @@ function InvalidationLine({
 
 function ColumnHeaderRow() {
   return (
-    <div className="grid grid-cols-[1fr_auto_auto] items-center gap-4 border-t border-rule px-5 py-2 bg-paper-2/30">
+    <div className="hidden grid-cols-[1fr_auto_auto] items-center gap-4 border-t border-rule bg-paper-2/30 px-5 py-2 sm:grid">
       <span className="font-mono text-[10px] tracking-[0.16em] uppercase text-ink-3">
         Level
       </span>
@@ -1354,21 +1355,27 @@ function TriggerRow({
   const isZero = Math.abs(distance) < 0.005;
   const sign = isZero ? "" : distance > 0 ? "+" : "−";
   return (
-    <li className="grid grid-cols-[1fr_auto_auto] items-center gap-4 px-5 py-3 text-body">
+    <li className="grid grid-cols-2 gap-x-3 gap-y-1 px-5 py-3 text-body sm:grid-cols-[1fr_auto_auto] sm:items-center sm:gap-4">
       <span
-        className="flex items-center gap-2.5 min-w-0"
+        className="col-span-2 flex min-w-0 items-center gap-2.5 sm:col-span-1"
         title={`${fullName} — ${hint}`}
       >
         <StatusGlyph kind={glyph} label={`${fullName} ${glyph}`} />
-        <span className="font-mono text-ink truncate">{label}</span>
+        <span className="font-mono text-ink">{label}</span>
       </span>
-      <span className="font-mono tabular-nums text-ink text-right">
+      <span className="font-mono tabular-nums text-ink sm:text-right">
+        <span className="mr-2 text-[10px] uppercase tracking-[0.12em] text-ink-4 sm:hidden">
+          Price
+        </span>
         {level.toFixed(2)}
       </span>
       <span
-        className={`font-mono tabular-nums text-right min-w-[64px] ${tone}`}
+        className={`min-w-[64px] text-right font-mono tabular-nums ${tone}`}
         data-num
       >
+        <span className="mr-2 text-[10px] uppercase tracking-[0.12em] text-ink-4 sm:hidden">
+          Distance
+        </span>
         {sign}
         {Math.abs(distance).toFixed(2)}
       </span>

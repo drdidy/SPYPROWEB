@@ -127,10 +127,6 @@ export function RecommendedAction({
           backgroundSize: "48px 48px",
         }}
       />
-      <div
-        aria-hidden
-        className="absolute -right-20 -top-28 h-80 w-80 rounded-full border border-gold/18"
-      />
       <div className="relative border-b border-paper/10 px-5 py-3 md:px-7">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
@@ -216,7 +212,7 @@ export function RecommendedAction({
             sessionDate={sessionDate ?? new Date().toISOString().slice(0, 10)}
           />
 
-          <div className="mt-7 grid max-w-2xl grid-cols-2 gap-2 md:grid-cols-4">
+          <div className="mt-7 grid max-w-2xl grid-cols-2 gap-2">
             <HeroMetric label="Confidence" value={`${confidence}%`} tone="text-gold-soft" />
             <HeroMetric label="Risk exposure" value="Low" tone="text-bull-soft" />
             <HeroMetric label="Reward setup" value="Neutral" tone="text-gold-soft" />

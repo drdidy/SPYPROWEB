@@ -9,22 +9,25 @@ export function SlateCompliance({
   build = "Build 0.9.7",
   environment = "production",
   ruleVersion = "v1.0.0",
+  requireAcknowledgement = false,
 }: {
   build?: string;
   environment?: string;
   ruleVersion?: string;
+  requireAcknowledgement?: boolean;
 }) {
   const userId = useAnonymousUserId();
   const [needsAck, setNeedsAck] = useState(false);
 
   useEffect(() => {
+    if (!requireAcknowledgement) return;
     const localKey = `spyprophet.slate.ack.${TERMS_VERSION}`;
     if (window.localStorage.getItem(localKey) === "1") return;
     fetch(`/api/slate/compliance?userId=${encodeURIComponent(userId)}`)
       .then((res) => res.json())
       .then((data) => setNeedsAck(!data.acknowledged))
       .catch(() => setNeedsAck(true));
-  }, [userId]);
+  }, [requireAcknowledgement, userId]);
 
   async function acknowledge() {
     await fetch("/api/slate/compliance", {
