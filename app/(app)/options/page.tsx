@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 const SYMBOLS = ["SPY", "SPX"];
+const DISPLAY_STRIKE_WINGS = 5;
 
 export default async function Page() {
   const [{ data: snap, source }, options] = await Promise.all([
@@ -245,7 +246,7 @@ function ChainPanel({ symbol, chain, spot }: { symbol: string; chain?: UwOptionC
       <CardHeader
         eyebrow={symbol}
         title={chain ? `Expiration ${chain.expiration ?? "active"}` : "Chain waiting"}
-        meta={chain ? `${chain.calls.length} calls - ${chain.puts.length} puts - PCR ${fmtRatio(chain.totals.pcr)}` : undefined}
+        meta={chain ? `ATM ±${DISPLAY_STRIKE_WINGS} strikes shown - PCR ${fmtRatio(chain.totals.pcr)}` : undefined}
         action={<IconBadge icon={<Layers3 className="h-4 w-4" />} />}
       />
       <CardBody className="px-0 pb-0">
@@ -282,7 +283,7 @@ function ChainPanel({ symbol, chain, spot }: { symbol: string; chain?: UwOptionC
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-rule">
-                  {rows.slice(0, 34).map((r) => (
+                  {rows.map((r) => (
                     <tr key={r.strike} className={r.atm ? "bg-gold-tint/45" : ""}>
                       <td className="text-right px-3 py-2 font-mono text-ink-2">{fmtInt(r.callVol)}</td>
                       <td className="text-right px-3 py-2 font-mono text-bull-ink">{fmtInt(r.callOi)}</td>
@@ -312,7 +313,7 @@ function ChainPanel({ symbol, chain, spot }: { symbol: string; chain?: UwOptionC
               </div>
               <div className="mt-6 grid grid-cols-2 gap-2">
                 <SideStat label="PCR" value={fmtRatio(chain.totals.pcr)} />
-                <SideStat label="Rows" value={`${rows.length}`} />
+                <SideStat label="Shown" value={`${rows.length}`} />
               </div>
             </div>
           </div>
@@ -464,7 +465,7 @@ function chainRows(chain: UwOptionChain, spot?: number): RowData[] {
   const center = atm ?? rows[Math.floor(rows.length / 2)]?.strike ?? null;
   if (center === null) return rows;
   const centerIdx = rows.findIndex((x) => x.strike === center);
-  return rows.filter((_, idx) => Math.abs(idx - centerIdx) <= 17);
+  return rows.filter((_, idx) => Math.abs(idx - centerIdx) <= DISPLAY_STRIKE_WINGS);
 }
 
 function blankRow(strike: number): RowData {
@@ -506,24 +507,41 @@ function filterGreekRows(rows: UwSymbolIntel["greeks"], center: number | null) {
       r.side !== "UNKNOWN" &&
       (r.delta !== null || r.gamma !== null || r.iv !== null),
   );
-  const near =
-    center === null
-      ? useful
-      : useful
-          .filter((r) => Math.abs((r.strike ?? center) - center) <= Math.max(center * 0.08, 8))
-          .sort((a, b) => Math.abs((a.strike ?? center) - center) - Math.abs((b.strike ?? center) - center));
-  return (near.length > 0 ? near : useful).slice(0, 8);
+  if (center === null) return useful.slice(0, DISPLAY_STRIKE_WINGS * 2 + 1);
+  const selected = strikeWindow(
+    Array.from(new Set(useful.map((r) => r.strike).filter((s): s is number => s !== null))),
+    center,
+  );
+  const selectedSet = new Set(selected);
+  const near = useful
+    .filter((r) => r.strike !== null && selectedSet.has(r.strike))
+    .sort((a, b) => {
+      const strikeDiff = (a.strike ?? 0) - (b.strike ?? 0);
+      if (strikeDiff !== 0) return strikeDiff;
+      return String(a.side).localeCompare(String(b.side));
+    });
+  return near.length > 0 ? near : useful.slice(0, DISPLAY_STRIKE_WINGS * 2 + 1);
 }
 
 function filterExposureRows(rows: NonNullable<UwSymbolIntel["gex"]>["strikeLevels"] = [], center: number | null) {
   const useful = rows.filter((r) => Number.isFinite(r.strike) && Number.isFinite(r.netGEX));
-  const near =
-    center === null
-      ? useful
-      : useful
-          .filter((r) => Math.abs(r.strike - center) <= Math.max(center * 0.08, 8))
-          .sort((a, b) => Math.abs(a.strike - center) - Math.abs(b.strike - center));
-  return (near.length > 0 ? near : useful).slice(0, 8);
+  if (center === null) return useful.slice(0, DISPLAY_STRIKE_WINGS * 2 + 1);
+  const selectedSet = new Set(strikeWindow(useful.map((r) => r.strike), center));
+  const near = useful
+    .filter((r) => selectedSet.has(r.strike))
+    .sort((a, b) => a.strike - b.strike);
+  return near.length > 0 ? near : useful.slice(0, DISPLAY_STRIKE_WINGS * 2 + 1);
+}
+
+function strikeWindow(strikes: number[], center: number): number[] {
+  const sorted = Array.from(new Set(strikes.filter((s) => Number.isFinite(s)))).sort((a, b) => a - b);
+  if (sorted.length === 0) return [];
+  const centerStrike = sorted.reduce(
+    (best, strike) => (Math.abs(strike - center) < Math.abs(best - center) ? strike : best),
+    sorted[0],
+  );
+  const centerIdx = sorted.indexOf(centerStrike);
+  return sorted.filter((_, idx) => Math.abs(idx - centerIdx) <= DISPLAY_STRIKE_WINGS);
 }
 
 function nearFlipLabel(flip: number | null | undefined, center: number | null): string {
