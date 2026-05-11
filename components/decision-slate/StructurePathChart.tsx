@@ -40,11 +40,12 @@ export function StructurePathChart({
   frameless?: boolean;
 }) {
   const W = 620;
-  const H = 230;
+  const largeCanvas = height >= 320;
+  const H = largeCanvas ? 420 : 230;
   const PAD_L = 48;
   const PAD_R = 86;
-  const PAD_T = 22;
-  const PAD_B = 28;
+  const PAD_T = largeCanvas ? 34 : 22;
+  const PAD_B = largeCanvas ? 40 : 28;
   const bars = (data?.bars ?? []).filter(validBar);
   const lines = (data?.lines ?? []).filter(validLine);
   const hasData = bars.length >= 2 && lines.length > 0;

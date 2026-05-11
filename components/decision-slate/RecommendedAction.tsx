@@ -173,8 +173,8 @@ export function RecommendedAction({
           </div>
         </div>
       </div>
-      <div className="relative grid gap-0 lg:grid-cols-[minmax(250px,0.78fr)_minmax(0,1.48fr)_220px] xl:grid-cols-[minmax(280px,0.82fr)_minmax(440px,1.55fr)_230px]">
-        <div className="px-6 py-6 md:px-7 md:py-7">
+      <div className="relative grid gap-0 lg:grid-cols-[210px_minmax(0,1fr)_180px] xl:grid-cols-[230px_minmax(0,1fr)_190px]">
+        <div className="px-5 py-6 md:px-6 md:py-7">
           <p
             id="recommended-action-heading"
             className="font-mono text-[10px] tracking-[0.20em] uppercase text-gold-soft font-semibold"
@@ -195,7 +195,7 @@ export function RecommendedAction({
             href={rec.href}
             data-recommendation-id={rec.id}
             className={cn(
-              "mt-6 inline-flex h-10 items-center gap-2 rounded-pill px-4",
+              "mt-6 inline-flex h-10 items-center gap-1.5 rounded-pill px-3 whitespace-nowrap",
               "bg-paper text-ink transition-colors hover:bg-gold-soft",
               "font-mono text-[12px] tracking-[0.06em] font-semibold",
               "outline-none focus-visible:ring-2 focus-visible:ring-gold/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#071116]",
@@ -257,7 +257,7 @@ export function RecommendedAction({
           frameless={unifiedChrome}
         />
 
-        <aside className="border-t border-paper/10 px-6 py-5 lg:border-l lg:border-t-0 lg:px-5 lg:py-7">
+        <aside className="border-t border-paper/10 px-6 py-5 lg:border-l lg:border-t-0 lg:px-4 lg:py-7">
           <div className="flex items-center gap-2 text-gold-soft">
             <Hourglass size={15} aria-hidden />
             <span className="font-mono text-[10px] tracking-[0.18em] uppercase font-semibold">
@@ -357,27 +357,100 @@ function CommandRailDiagram({
 }) {
   if (!chart) {
     return (
-      <div className="hidden min-h-[430px] border-t border-paper/10 px-5 py-7 lg:block lg:border-t-0">
+      <div className="hidden min-h-[560px] border-t border-paper/10 px-3 py-6 lg:block lg:border-t-0">
         <div
           className={cn(
-            "flex h-full min-h-[360px] items-center justify-center px-7 text-center",
+            "relative flex h-full min-h-[508px] overflow-hidden px-7 py-7 text-center",
             frameless
-              ? "rounded-none border-0 bg-transparent"
+              ? "rounded-none border-0 bg-paper/[0.018]"
               : "rounded-[10px] border border-paper/10 bg-paper/[0.035]",
           )}
         >
-          <div className="max-w-md">
-            <div className="mx-auto grid h-16 w-16 place-items-center rounded-[14px] border border-gold/25 bg-gold-soft/10 text-gold-soft">
-              <span className="h-3.5 w-3.5 rounded-full bg-current animate-breathe" />
+          <EmptyWorkspaceChart />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="hidden min-h-[560px] border-t border-paper/10 px-3 py-6 lg:block lg:border-t-0">
+      <div className="relative h-full min-h-[508px]">
+        <StructurePathChart
+          data={chart}
+          variant="dark"
+          accent={accent}
+          height={500}
+          title="recommended path"
+          frameless={frameless}
+        />
+      </div>
+    </div>
+  );
+}
+
+function EmptyWorkspaceChart() {
+  return (
+    <div className="relative flex h-full min-h-[454px] w-full flex-col">
+      <div className="flex items-center justify-between gap-3 border-b border-paper/10 pb-3">
+        <div className="text-left">
+          <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-paper/42">
+            Recommended path
+          </p>
+          <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.16em] text-gold-soft/72">
+            Awaiting bars and rails
+          </p>
+        </div>
+        <span className="rounded-[4px] border border-paper/10 bg-paper/[0.035] px-2 py-1 font-mono text-[8px] uppercase tracking-[0.14em] text-paper/42">
+          No synthetic chart
+        </span>
+      </div>
+
+      <div className="relative flex-1">
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.07)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:52px_52px] opacity-55"
+        />
+        <svg
+          aria-hidden
+          className="absolute inset-0 h-full w-full"
+          viewBox="0 0 720 420"
+          preserveAspectRatio="none"
+        >
+          {[80, 180, 280, 360].map((y, index) => (
+            <line
+              key={y}
+              x1="36"
+              x2="684"
+              y1={y}
+              y2={y}
+              stroke="rgba(244,228,192,0.18)"
+              strokeWidth={index === 1 ? 1.6 : 1}
+              strokeDasharray={index === 1 ? "none" : "8 10"}
+            />
+          ))}
+          <path
+            d="M 54 314 C 156 286 218 272 304 288 S 468 304 652 244"
+            fill="none"
+            stroke="rgba(244,228,192,0.24)"
+            strokeWidth="2.2"
+            strokeDasharray="10 14"
+          />
+          <circle cx="54" cy="314" r="4" fill="rgba(244,228,192,0.45)" />
+          <circle cx="652" cy="244" r="4" fill="rgba(244,228,192,0.45)" />
+        </svg>
+        <div className="absolute inset-0 grid place-items-center">
+          <div className="max-w-md rounded-[12px] border border-paper/10 bg-[#071116]/88 px-6 py-5 shadow-[0_18px_50px_-35px_rgba(0,0,0,0.9)]">
+            <div className="mx-auto grid h-14 w-14 place-items-center rounded-[14px] border border-gold/25 bg-gold-soft/10 text-gold-soft">
+              <span className="h-3 w-3 rounded-full bg-current animate-breathe" />
             </div>
-            <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.18em] text-gold-soft/72">
+            <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.18em] text-gold-soft/76">
               Workspace chart awaiting bars
             </p>
-            <p className="mx-auto mt-3 max-w-sm text-[14px] leading-relaxed text-paper/64">
-              The slate will draw the actual price path against the active rails
-              as soon as replay bars and structure lines resolve.
+            <p className="mx-auto mt-3 max-w-sm text-[14px] leading-relaxed text-paper/68">
+              Actual price path, rails, and line touches will fill this canvas
+              when the data feed resolves. Until then, no fake levels are drawn.
             </p>
-            <div className="mx-auto mt-6 grid max-w-sm grid-cols-3 gap-2 font-mono text-[9px] uppercase tracking-[0.12em] text-paper/46">
+            <div className="mx-auto mt-5 grid max-w-sm grid-cols-3 gap-2 font-mono text-[9px] uppercase tracking-[0.12em] text-paper/48">
               <span className="rounded-soft border border-paper/10 bg-paper/[0.04] px-2 py-2">
                 No fake chart
               </span>
@@ -390,21 +463,6 @@ function CommandRailDiagram({
             </div>
           </div>
         </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="hidden min-h-[430px] border-t border-paper/10 px-5 py-7 lg:block lg:border-t-0">
-      <div className="relative h-full min-h-[360px]">
-        <StructurePathChart
-          data={chart}
-          variant="dark"
-          accent={accent}
-          height={340}
-          title="recommended path"
-          frameless={frameless}
-        />
       </div>
     </div>
   );
