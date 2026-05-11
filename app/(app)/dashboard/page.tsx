@@ -151,7 +151,7 @@ export default async function Page() {
       {/* v4 #3 + v10 P1-12: Recommended Action page hero. 24px
           rhythm between the header and the hero. */}
       <RecommendedAction
-        className="mt-6"
+        className="mt-4"
         spyState={spyState}
         spxState={spxState}
         spyNextEventISO={spySession.nextSignificantEvent.at.toISOString()}
@@ -394,32 +394,23 @@ function PageHeader() {
     year: "numeric",
   }).format(new Date());
   return (
-    <header className="relative overflow-hidden rounded-[18px] border border-[#D6BC75]/45 bg-[#071116] px-5 py-5 text-paper shadow-[0_24px_60px_-42px_rgba(7,17,22,0.95)] md:px-7 md:py-6">
-      <div
-        aria-hidden
-        className="absolute inset-0 opacity-[0.18] bg-[linear-gradient(rgba(244,228,192,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(244,228,192,0.10)_1px,transparent_1px)] bg-[size:42px_42px]"
-      />
-      <div
-        aria-hidden
-        className="absolute -right-16 -top-24 h-72 w-72 rounded-full border border-gold/20"
-      />
-      <div className="relative flex items-start justify-between gap-4">
+    <header className="flex items-end justify-between gap-4 px-1">
       <div className="min-w-0">
-        <div className="mb-3 flex flex-wrap items-center gap-3">
-          <span className="font-mono text-[10px] uppercase tracking-[0.20em] text-gold-soft/82">
+        <div className="mb-2 flex flex-wrap items-center gap-3">
+          <span className="font-mono text-[10px] uppercase tracking-[0.20em] text-gold-ink">
             Command workspace
           </span>
-          <span aria-hidden className="h-px w-10 bg-gold/45" />
-          <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-paper/48">
+          <span aria-hidden className="h-px w-10 bg-rule-strong" />
+          <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-3">
             {dateLabel}
           </span>
         </div>
-        <h1 className="font-serif text-[36px] leading-none text-paper tracking-tight md:text-[46px]">
+        <h1 className="font-serif text-[28px] leading-none text-ink tracking-tight md:text-[34px]">
           Decision Slate
         </h1>
         {/* v10 P1-5: subtle session-date stamp directly under the
             H1. ~14px sans, muted ink. */}
-        <p className="mt-3 max-w-2xl text-[14px] leading-relaxed text-paper/68">
+        <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-ink-3">
           {/* "Friday, May 9, 2026" → "Friday · May 9, 2026"
               (one replace = first comma only). */}
           SPY and ES stay separate until the slate asks for a decision.
@@ -437,15 +428,14 @@ function PageHeader() {
           aria-label="About this page"
           className={cn(
             "inline-flex items-center justify-center w-8 h-8 rounded-full shrink-0",
-            "bg-paper/[0.06] text-paper/66 hover:text-paper hover:bg-paper/10",
-            "border border-paper/15 transition-colors cursor-help",
+            "bg-paper text-ink-3 hover:text-ink hover:bg-paper-2",
+            "border border-rule transition-colors cursor-help shadow-card",
             "text-[12px] font-bold tabular-nums",
           )}
         >
           ?
         </span>
       </InfoTooltip>
-      </div>
     </header>
   );
 }
@@ -785,11 +775,14 @@ function SpyVerdictCard({
     >
       <p className="text-meta text-ink-3 -mt-2">{SLATE_COPY.spySubtitle}</p>
       <p className="text-body text-ink-2 leading-relaxed">
-        {decision.finalExplanation ||
-          snap.bias.explanation ||
-          (isPreConfig
-            ? "No active triggers yet — bias and conviction populate when the setup window opens."
-            : "Engine is initializing.")}
+        {cleanActionableExplanation(
+          decision.finalExplanation ||
+            snap.bias.explanation ||
+            (isPreConfig
+              ? "No active triggers yet — bias and conviction populate when the setup window opens."
+              : "Engine is initializing."),
+          currentPrice,
+        )}
       </p>
       <div className="grid grid-cols-3 gap-3 pt-3 border-t border-rule">
         <MetricSlot
@@ -1397,6 +1390,25 @@ function spxHeadline(state: EngineState, action: string): string {
   if (state === "ARMED") return "Armed for entry";
   if (state === "STAND_DOWN" || action === "STAND_DOWN") return "Standing down";
   return "Watching the channel";
+}
+
+function cleanActionableExplanation(text: string, spot: number): string {
+  if (!Number.isFinite(spot) || spot <= 0) return text;
+
+  const gammaFlip = /(?:\s*)dealer gamma (?:positive|negative|flat) with flip near ([0-9]+(?:\.[0-9]+)?)(?:\.|,)?/i;
+  const match = text.match(gammaFlip);
+  if (!match) return text;
+
+  const flip = Number(match[1]);
+  if (!Number.isFinite(flip)) return text;
+
+  const distance = Math.abs(flip - spot) / spot;
+  if (distance <= 0.12) return text;
+
+  const cleaned = text.replace(gammaFlip, "").replace(/\s{2,}/g, " ").trim();
+  return cleaned.length > 0
+    ? cleaned
+    : "Engine has a structural read, but options context is withheld until the live chain is inside a realistic spot range.";
 }
 
 // SPY line-name labels + hover hints.

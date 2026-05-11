@@ -9,7 +9,7 @@ import {
   Rewind,
   Activity,
   Target,
-  CalendarClock,
+  Hourglass,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -96,8 +96,8 @@ export function RecommendedAction({
       aria-labelledby="recommended-action-heading"
       data-testid="recommended-action"
       className={cn(
-        "relative overflow-hidden rounded-card border border-[#C9A227]/70 bg-[#071116] text-paper",
-        "shadow-[0_18px_45px_-28px_rgba(20,22,26,0.75),inset_0_1px_0_rgba(255,255,255,0.08)]",
+        "relative overflow-hidden rounded-[22px] border border-[#C9A227]/75 bg-[#071116] text-paper",
+        "shadow-[0_26px_70px_-34px_rgba(7,17,22,0.95),inset_0_1px_0_rgba(255,255,255,0.08)]",
         className,
       )}
     >
@@ -110,7 +110,27 @@ export function RecommendedAction({
           backgroundSize: "48px 48px",
         }}
       />
-      <div className="relative grid lg:grid-cols-[1.05fr_1.2fr_220px]">
+      <div
+        aria-hidden
+        className="absolute -right-20 -top-28 h-80 w-80 rounded-full border border-gold/18"
+      />
+      <div className="relative border-b border-paper/10 px-5 py-3 md:px-7">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-gold-soft">
+              Command workspace
+            </span>
+            <span aria-hidden className="h-px w-10 bg-gold/45" />
+            <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-paper/48">
+              Decision Slate
+            </span>
+          </div>
+          <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-paper/46">
+            Discipline before conviction
+          </div>
+        </div>
+      </div>
+      <div className="relative grid gap-0 lg:grid-cols-[minmax(0,0.92fr)_minmax(360px,1.1fr)_230px]">
         <div className="px-6 py-6 md:px-7 md:py-7">
           <p
             id="recommended-action-heading"
@@ -118,7 +138,7 @@ export function RecommendedAction({
           >
             Recommended next step
           </p>
-          <h2 className="mt-2 font-serif text-[42px] leading-none text-paper md:text-[48px]">
+          <h2 className="mt-2 font-serif text-[46px] leading-none text-paper md:text-[58px]">
             {command.title}
           </h2>
           <p className="mt-2 font-mono text-[11px] tracking-[0.12em] uppercase text-paper/70">
@@ -143,24 +163,35 @@ export function RecommendedAction({
             <ArrowRight size={12} className="opacity-70" aria-hidden />
           </Link>
 
-          <div className="mt-7 grid max-w-2xl grid-cols-2 gap-y-4 border-l-2 border-gold pl-4 md:grid-cols-4 md:divide-x md:divide-paper/20">
+          <div className="mt-7 grid max-w-2xl grid-cols-2 gap-2 md:grid-cols-4">
             <HeroMetric label="Confidence" value={`${confidence}%`} tone="text-gold-soft" />
             <HeroMetric label="Risk exposure" value="Low" tone="text-bull-soft" />
             <HeroMetric label="Reward setup" value="Neutral" tone="text-gold-soft" />
             <HeroMetric label="Trend context" value="Range" tone="text-paper" />
           </div>
-          <ContractProjectionCard
-            projection={activeProjection ?? null}
-            compact
-            className="mt-5 border-paper/15 bg-paper/[0.06] text-paper [&_.text-ink]:!text-paper [&_.text-ink-3]:!text-paper/58 [&_.text-ink-4]:!text-paper/42 [&_.bg-paper]:!bg-paper/[0.08] [&_.bg-paper-2\\/55]:!bg-paper/[0.08]"
-          />
+          {activeProjection ? (
+            <ContractProjectionCard
+              projection={activeProjection}
+              compact
+              className="mt-5 border-paper/15 bg-paper/[0.06] text-paper [&_.text-ink]:!text-paper [&_.text-ink-3]:!text-paper/58 [&_.text-ink-4]:!text-paper/42 [&_.bg-paper]:!bg-paper/[0.08] [&_.bg-paper-2\\/55]:!bg-paper/[0.08]"
+            />
+          ) : (
+            <div className="mt-5 rounded-soft border border-paper/10 bg-paper/[0.045] px-3 py-2.5">
+              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-paper/42">
+                Entry cost model
+              </p>
+              <p className="mt-1 text-[12px] leading-snug text-paper/58">
+                Publishes when the live option chain has usable Greeks. No placeholder debit is shown.
+              </p>
+            </div>
+          )}
         </div>
 
         <CommandRailDiagram chart={activeChart} accent={chartAccent} />
 
         <aside className="border-t border-paper/10 px-6 py-5 lg:border-l lg:border-t-0 lg:px-5 lg:py-7">
           <div className="flex items-center gap-2 text-gold-soft">
-            <CalendarClock size={15} aria-hidden />
+            <Hourglass size={15} aria-hidden />
             <span className="font-mono text-[10px] tracking-[0.18em] uppercase font-semibold">
               Next event
             </span>
@@ -200,7 +231,7 @@ export function RecommendedAction({
               </div>
               <div className="border-t border-paper/10 pt-4">
                 <div className="text-[10px] uppercase tracking-[0.16em] text-gold-soft">
-                  Hold filter
+                  Session posture
                 </div>
                 <div className="mt-1 text-paper">Neutral</div>
               </div>
@@ -222,8 +253,8 @@ function HeroMetric({
   tone: string;
 }) {
   return (
-    <div className="md:px-5 first:md:pl-0">
-      <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-gold-soft/80">
+    <div className="rounded-soft border border-paper/10 bg-paper/[0.045] px-3 py-2.5">
+      <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-paper/42">
         {label}
       </div>
       <div className={cn("mt-1 font-serif text-[23px] leading-none", tone)}>
@@ -240,6 +271,37 @@ function CommandRailDiagram({
   chart?: StructureChartData | null;
   accent: "bull" | "gold" | "violet" | "neutral";
 }) {
+  if (!chart) {
+    return (
+      <div className="hidden min-h-[238px] border-t border-paper/10 px-4 py-7 lg:block lg:border-t-0">
+        <div className="flex h-full min-h-[190px] items-center justify-center rounded-[10px] border border-paper/10 bg-paper/[0.035] px-6 text-center">
+          <div className="max-w-sm">
+            <div className="mx-auto grid h-11 w-11 place-items-center rounded-[10px] border border-gold/25 bg-gold-soft/10 text-gold-soft">
+              <span className="h-2.5 w-2.5 rounded-full bg-current animate-breathe" />
+            </div>
+            <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.18em] text-gold-soft/72">
+              Chart withheld
+            </p>
+            <p className="mt-2 text-[13px] leading-relaxed text-paper/58">
+              The slate is standing aside until replay bars and rails resolve into an auditable path.
+            </p>
+            <div className="mt-4 grid grid-cols-3 gap-2 font-mono text-[9px] uppercase tracking-[0.12em] text-paper/42">
+              <span className="rounded-soft border border-paper/10 bg-paper/[0.04] px-2 py-2">
+                No fake chart
+              </span>
+              <span className="rounded-soft border border-paper/10 bg-paper/[0.04] px-2 py-2">
+                No entry
+              </span>
+              <span className="rounded-soft border border-paper/10 bg-paper/[0.04] px-2 py-2">
+                Brief first
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="hidden min-h-[238px] border-t border-paper/10 px-4 py-7 lg:block lg:border-t-0">
       <div className="relative h-full min-h-[190px]">
