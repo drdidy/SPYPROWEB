@@ -328,9 +328,12 @@ function SymbolChip({
   accent?: "violet";
 }) {
   const symbolTone = accent === "violet" ? "text-violet-soft" : "text-paper";
+  const title = symbolChipTitle(symbol, verb, meta);
   return (
     <Link
       href={href}
+      title={title}
+      aria-label={title}
       className={cn(
         "inline-flex items-center gap-1.5 h-7 px-1.5 rounded-soft whitespace-nowrap shrink-0",
         "text-paper/70 hover:text-paper transition-colors",
@@ -358,6 +361,25 @@ function SymbolChip({
       )}
     </Link>
   );
+}
+
+function symbolChipTitle(
+  symbol: string,
+  verb: string,
+  meta: string | null,
+): string {
+  const normalized = verb.toUpperCase();
+  const explanations: Record<string, string> = {
+    "PRE-CONFIG": "Pre-config: setup window has not finished building levels yet.",
+    "STAND DOWN": "Stand down: no trade is qualified under the current engine rules.",
+    TAKE: "Take: the ES channel conditions are actionable under the current rules.",
+    SELECTIVE: "Selective: conditions are mixed, so size and discretion matter.",
+    WAIT: "Wait: a setup exists, but confirmation has not arrived.",
+    LONG: "Long: SPY engine is biased toward calls.",
+    SHORT: "Short: SPY engine is biased toward puts.",
+  };
+  const base = explanations[normalized] ?? `${verb}: current ${symbol} state.`;
+  return meta ? `${symbol} ${base} ${meta}.` : `${symbol} ${base}`;
 }
 
 function Quote({
