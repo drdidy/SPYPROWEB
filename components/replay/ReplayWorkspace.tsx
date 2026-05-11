@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
@@ -13,9 +21,18 @@ import {
   Play,
   SkipBack,
   SkipForward,
+  Target,
+  Zap,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { replayCopy } from "@/content/replay/copy";
+import {
+  PLAYBACK_SPEEDS,
+  RECENT_REPLAY_STORAGE_KEY,
+  REPLAY_PRESET_EVENTS,
+  type PlaybackSpeed,
+} from "@/lib/replay/config";
 import {
   adaptSnapshot,
   type AdaptedSnapshot,
@@ -32,6 +49,7 @@ export interface IntradayBar {
   h: number;
   l: number;
   c: number;
+  v?: number;
 }
 
 export interface IntradayResponse {
@@ -46,14 +64,13 @@ interface Props {
 }
 
 type ReplayState = "empty" | "loading" | "success" | "partial" | "error";
-type Speed = 1 | 2 | 4;
 
 interface TouchEvent {
   engine: "SPY" | "ES";
   line: string;
   at: string;
   price: number;
-  side: "touch" | "break";
+  side: "touch" | "break" | "reject" | "retest";
 }
 
 interface VerdictEvent {
@@ -61,6 +78,7 @@ interface VerdictEvent {
   at: string;
   label: string;
   detail: string;
+  kind: "state" | "rule" | "note" | "touch" | "risk" | "trade";
 }
 
 interface ProjectedLine {
@@ -69,7 +87,6 @@ interface ProjectedLine {
   valueAt: (ms: number) => number;
 }
 
-const RECENT_KEY = "spyprophet.replay.recentDates.v1";
 const SPY_BAND_OFFSET = 3.4;
 const DEFAULT_SPY_SLOPE = 0.2;
 
@@ -92,7 +109,9 @@ export function ReplayWorkspace({ initialDate }: Props) {
 
   const [playhead, setPlayhead] = useState(1);
   const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState<Speed>(1);
+  const [speed, setSpeed] = useState<PlaybackSpeed>(() =>
+    parseSpeed(searchParams?.get("speed")),
+  );
   const [jumpDraft, setJumpDraft] = useState("");
 
   useEffect(() => {
@@ -102,30 +121,15 @@ export function ReplayWorkspace({ initialDate }: Props) {
 
   useEffect(() => {
     try {
-      const parsed = JSON.parse(window.localStorage.getItem(RECENT_KEY) ?? "[]");
+      const parsed = JSON.parse(
+        window.localStorage.getItem(RECENT_REPLAY_STORAGE_KEY) ?? "[]",
+      );
       if (Array.isArray(parsed)) {
         setRecentDates(parsed.filter(isISODate).slice(0, 5));
       }
     } catch {
       setRecentDates([]);
     }
-  }, []);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      const isTyping =
-        target?.tagName === "INPUT" ||
-        target?.tagName === "TEXTAREA" ||
-        target?.isContentEditable;
-      if (isTyping) return;
-      if (event.key.toLowerCase() === "r") {
-        event.preventDefault();
-        inputRef.current?.focus();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
   const applyDate = (next: string | null) => {
@@ -185,19 +189,24 @@ export function ReplayWorkspace({ initialDate }: Props) {
       setIntraday(nextIntraday);
       setError(errs.length ? errs.join(" ") : null);
       setLoading(false);
-      setPlayhead(1);
+      const initialTime = searchParams?.get("t");
+      const initialPlayhead =
+        initialTime && nextIntraday
+          ? playheadForTime(nextIntraday.es.length ? nextIntraday.es : nextIntraday.spy, initialTime)
+          : null;
+      setPlayhead(initialPlayhead ?? 1);
       rememberDate(date);
     });
 
     return () => {
       abort = true;
     };
-  }, [date]);
+  }, [date, searchParams]);
 
   const rememberDate = (loadedDate: string) => {
     setRecentDates((existing) => {
       const next = [loadedDate, ...existing.filter((item) => item !== loadedDate)].slice(0, 5);
-      window.localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+      window.localStorage.setItem(RECENT_REPLAY_STORAGE_KEY, JSON.stringify(next));
       return next;
     });
   };
@@ -246,13 +255,94 @@ export function ReplayWorkspace({ initialDate }: Props) {
     () => buildTouchEvents(spy, spx, intraday).slice(0, 32),
     [spy, spx, intraday],
   );
-  const playheadTime = useMemo(
-    () => timeAtPlayhead(intraday?.es ?? intraday?.spy ?? [], playhead),
-    [intraday, playhead],
+  const activeBars = useMemo(
+    () => (intraday?.es.length ? intraday.es : intraday?.spy ?? []),
+    [intraday],
   );
+  const cursorIndex = useMemo(
+    () => barIndexAtPlayhead(activeBars, playhead),
+    [activeBars, playhead],
+  );
+  const cursorAt = activeBars[cursorIndex]?.t ?? null;
+  const playheadTime = useMemo(
+    () => (cursorAt ? shortTime(cursorAt) : null),
+    [cursorAt],
+  );
+  const seekToIso = useCallback(
+    (iso: string) => {
+      const next = playheadForIso(activeBars, iso);
+      if (next != null) {
+        setPlaying(false);
+        setPlayhead(next);
+      }
+    },
+    [activeBars],
+  );
+
   useEffect(() => {
     if (playheadTime) setJumpDraft(playheadTime);
   }, [playheadTime]);
+
+  useEffect(() => {
+    if (!date || !cursorAt || typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    sp.set("date", date);
+    sp.set("t", shortTime(cursorAt));
+    sp.set("speed", `${speed}x`);
+    window.history.replaceState(null, "", `${pathname}?${sp.toString()}`);
+  }, [cursorAt, date, pathname, speed]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const isTyping =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable;
+      if (isTyping) return;
+      const key = event.key.toLowerCase();
+      if (key === "r") {
+        event.preventDefault();
+        inputRef.current?.focus();
+        return;
+      }
+      if (!hasBars) return;
+      if (event.code === "Space" || key === "k") {
+        event.preventDefault();
+        setPlaying((current) => !current);
+        return;
+      }
+      if (key === "arrowleft" || key === "j") {
+        event.preventDefault();
+        setPlaying(false);
+        setPlayhead((current) =>
+          stepPlayhead(activeBars, current, event.shiftKey || key === "j" ? -10 : -1),
+        );
+        return;
+      }
+      if (key === "arrowright" || key === "l") {
+        event.preventDefault();
+        setPlaying(key === "l");
+        setPlayhead((current) =>
+          stepPlayhead(activeBars, current, event.shiftKey || key === "l" ? 10 : 1),
+        );
+        return;
+      }
+      if (key === "home") {
+        event.preventDefault();
+        setPlaying(false);
+        setPlayhead(0);
+        return;
+      }
+      if (key === "end") {
+        event.preventDefault();
+        setPlaying(false);
+        setPlayhead(1);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [activeBars, hasBars]);
   const todayISO = new Date().toISOString().slice(0, 10);
   const presets = useMemo(() => buildPresets(new Date()), []);
   const marketOpen = useMemo(() => isMarketOpenNow(new Date()), []);
@@ -295,9 +385,13 @@ export function ReplayWorkspace({ initialDate }: Props) {
       >
         <DarkPanel className="min-h-[520px]">
           <PanelHeader
-            eyebrow="ES channel chart"
-            title="Tape against the channel"
-            meta={date ? `${date} · ${playheadTime ?? "session close"}` : "No date loaded"}
+            eyebrow="Replay chart"
+            title={replayCopy.chart.title}
+            meta={
+              date
+                ? `${date} · bar ${Math.min(cursorIndex + 1, activeBars.length || 1)} of ${Math.max(activeBars.length, 1)} · ${playheadTime ?? "session close"}`
+                : "No date loaded"
+            }
           />
           <div className="px-4 pb-4 md:px-5 md:pb-5">
             {state === "loading" ? (
@@ -307,7 +401,11 @@ export function ReplayWorkspace({ initialDate }: Props) {
                 spx={spx}
                 intraday={intraday}
                 playhead={playhead}
+                cursorAt={cursorAt}
                 state={state}
+                events={eventLog}
+                touches={touchEvents}
+                onSeek={seekToIso}
               />
             )}
             <Transport
@@ -322,7 +420,7 @@ export function ReplayWorkspace({ initialDate }: Props) {
               }}
               onStep={(delta) => {
                 setPlaying(false);
-                setPlayhead((current) => clamp(current + delta, 0, 1));
+                setPlayhead((current) => stepPlayhead(activeBars, current, delta));
               }}
               onScrub={(value) => {
                 setPlaying(false);
@@ -333,20 +431,37 @@ export function ReplayWorkspace({ initialDate }: Props) {
               jumpDraft={jumpDraft}
               onJumpDraft={setJumpDraft}
               onJump={() => {
-                const next = playheadForTime(intraday?.es ?? intraday?.spy ?? [], jumpDraft);
+                const next = playheadForTime(activeBars, jumpDraft);
                 if (next != null) {
                   setPlaying(false);
                   setPlayhead(next);
                 }
               }}
             />
+            <EngineTapeStrip
+              bars={activeBars}
+              events={eventLog}
+              touches={touchEvents}
+              cursorAt={cursorAt}
+              onSeek={seekToIso}
+            />
           </div>
         </DarkPanel>
 
         <div className="flex gap-4 overflow-x-auto pb-1 lg:block lg:space-y-4 lg:overflow-visible lg:pb-0 [&>*]:min-w-[320px] lg:[&>*]:min-w-0">
           <AnchorPanel state={state} spy={spy} />
-          <VerdictLogPanel state={state} events={eventLog} />
-          <LineTouchPanel state={state} events={touchEvents} />
+          <VerdictLogPanel
+            state={state}
+            events={eventLog}
+            cursorAt={cursorAt}
+            onSeek={seekToIso}
+          />
+          <LineTouchPanel
+            state={state}
+            events={touchEvents}
+            cursorAt={cursorAt}
+            onSeek={seekToIso}
+          />
         </div>
       </section>
 
@@ -594,18 +709,26 @@ function ChannelChart({
   spx,
   intraday,
   playhead,
+  cursorAt,
   state,
+  events,
+  touches,
+  onSeek,
 }: {
   spx: SPXSnapshot | null;
   intraday: IntradayResponse | null;
   playhead: number;
+  cursorAt: string | null;
   state: ReplayState;
+  events: VerdictEvent[];
+  touches: TouchEvent[];
+  onSeek: (iso: string) => void;
 }) {
   const bars = intraday?.es ?? [];
   const lines = useMemo(() => buildEsLines(spx), [spx]);
 
   if (state === "empty") {
-    return <QuietChartState title="No date picked" body="Choose Yesterday or Last Session to load the replay workspace." />;
+    return <QuietChartState title="No date picked" body={replayCopy.chart.empty} />;
   }
   if (state === "error") {
     return <QuietChartState title="Replay failed" body="The replay endpoints did not return a usable session." tone="error" />;
@@ -620,17 +743,35 @@ function ChannelChart({
     );
   }
 
-  return <ReplaySvg bars={bars} lines={lines} playhead={playhead} />;
+  return (
+    <ReplaySvg
+      bars={bars}
+      lines={lines}
+      playhead={playhead}
+      cursorAt={cursorAt}
+      events={events}
+      touches={touches.filter((touch) => touch.engine === "ES")}
+      onSeek={onSeek}
+    />
+  );
 }
 
 function ReplaySvg({
   bars,
   lines,
   playhead,
+  cursorAt,
+  events,
+  touches,
+  onSeek,
 }: {
   bars: IntradayBar[];
   lines: ProjectedLine[];
   playhead: number;
+  cursorAt: string | null;
+  events: VerdictEvent[];
+  touches: TouchEvent[];
+  onSeek: (iso: string) => void;
 }) {
   const width = 980;
   const height = 500;
@@ -665,6 +806,15 @@ function ReplaySvg({
     .join(" ");
   const lastVisible = visibleBars.at(-1) ?? bars[0];
   const playheadX = xOf(new Date(lastVisible.t).getTime());
+  const volumeTop = height - pad.b + 8;
+  const volumeHeight = 36;
+  const volumeMax = Math.max(...bars.map((bar) => Math.max(0, bar.v ?? 0)), 1);
+  const barWidth = Math.max(
+    2,
+    ((width - pad.l - pad.r) / Math.max(1, bars.length)) * 0.56,
+  );
+  const ceiling = lines.find((line) => line.tone === "ceiling");
+  const floor = lines.find((line) => line.tone === "floor");
 
   return (
     <div className="rounded-[12px] border border-paper/10 bg-paper/[0.035]">
@@ -690,6 +840,18 @@ function ReplaySvg({
             strokeDasharray="4 8"
           />
         ))}
+        {ceiling && floor && (
+          <path
+            d={[
+              `M ${pad.l.toFixed(1)},${yOf(ceiling.valueAt(t0)).toFixed(1)}`,
+              `L ${(width - pad.r).toFixed(1)},${yOf(ceiling.valueAt(t1)).toFixed(1)}`,
+              `L ${(width - pad.r).toFixed(1)},${yOf(floor.valueAt(t1)).toFixed(1)}`,
+              `L ${pad.l.toFixed(1)},${yOf(floor.valueAt(t0)).toFixed(1)}`,
+              "Z",
+            ].join(" ")}
+            fill="rgba(184,130,31,0.08)"
+          />
+        )}
         {lines.map((line) => {
           const yStart = yOf(line.valueAt(t0));
           const yEnd = yOf(line.valueAt(t1));
@@ -721,11 +883,90 @@ function ReplaySvg({
         <path
           d={path}
           fill="none"
-          stroke="#F4E4C0"
-          strokeWidth="2.4"
+          stroke="rgba(244,228,192,0.22)"
+          strokeWidth="1.2"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
+        {bars.map((bar) => {
+          const ms = new Date(bar.t).getTime();
+          const x = xOf(ms);
+          const isFuture = ms > tNow;
+          const up = bar.c >= bar.o;
+          const bodyY = Math.min(yOf(bar.o), yOf(bar.c));
+          const bodyH = Math.max(2, Math.abs(yOf(bar.o) - yOf(bar.c)));
+          const wickColor = up ? "#0E7C50" : "#B5301E";
+          const volumeH = (Math.max(0, bar.v ?? 0) / volumeMax) * volumeHeight;
+          return (
+            <g key={bar.t} opacity={isFuture ? 0.22 : 0.94}>
+              <line
+                x1={x}
+                x2={x}
+                y1={yOf(bar.h)}
+                y2={yOf(bar.l)}
+                stroke={wickColor}
+                strokeWidth="1"
+              />
+              <rect
+                x={x - barWidth / 2}
+                y={bodyY}
+                width={barWidth}
+                height={bodyH}
+                rx="1.5"
+                fill={up ? "#D9EFE3" : "#F4D9D3"}
+                stroke={wickColor}
+                strokeWidth="0.8"
+              />
+              <rect
+                x={x - barWidth / 2}
+                y={volumeTop + volumeHeight - volumeH}
+                width={barWidth}
+                height={Math.max(1, volumeH)}
+                fill={up ? "rgba(14,124,80,0.34)" : "rgba(181,48,30,0.34)"}
+              />
+            </g>
+          );
+        })}
+        {touches.map((touch) => {
+          const ms = new Date(touch.at).getTime();
+          if (ms < t0 || ms > t1) return null;
+          return (
+            <circle
+              key={`${touch.engine}-${touch.line}-${touch.at}`}
+              role="button"
+              tabIndex={0}
+              aria-label={`${touch.engine} ${touch.side} ${touch.line} at ${shortTime(touch.at)}`}
+              onClick={() => onSeek(touch.at)}
+              cx={xOf(ms)}
+              cy={yOf(touch.price)}
+              r={touch.side === "break" ? 5 : 4}
+              fill={touch.side === "break" ? "#B5301E" : "#B8821F"}
+              stroke="#F4E4C0"
+              strokeWidth="1.2"
+              className="cursor-pointer outline-none"
+            />
+          );
+        })}
+        {events.map((event, index) => {
+          const ms = new Date(event.at).getTime();
+          if (ms < t0 || ms > t1) return null;
+          const x = xOf(ms);
+          const y = height - 24 - (index % 3) * 9;
+          return (
+            <path
+              key={`${event.engine}-${event.at}-${index}`}
+              role="button"
+              tabIndex={0}
+              aria-label={`${event.engine} ${event.label} at ${shortTime(event.at)}`}
+              onClick={() => onSeek(event.at)}
+              d={`M ${x} ${y - 4} l 4 4 l -4 4 l -4 -4 Z`}
+              fill={event.engine === "SPY" ? "#0A7589" : "#7E5BAE"}
+              stroke="#F4E4C0"
+              strokeWidth="0.8"
+              className="cursor-pointer outline-none"
+            />
+          );
+        })}
         <line
           x1={playheadX}
           x2={playheadX}
@@ -752,6 +993,29 @@ function ReplaySvg({
         <text x={width - 18} y={22} fill="rgba(244,228,192,0.72)" fontSize="12" fontFamily="var(--font-geist-mono)" textAnchor="end">
           {lastVisible.c.toFixed(0)}
         </text>
+        {cursorAt && (
+          <g>
+            <rect
+              x={Math.min(width - pad.r - 96, playheadX + 8)}
+              y={pad.t + 8}
+              width="90"
+              height="28"
+              rx="7"
+              fill="rgba(7,17,22,0.92)"
+              stroke="rgba(201,162,39,0.65)"
+            />
+            <text
+              x={Math.min(width - pad.r - 51, playheadX + 53)}
+              y={pad.t + 26}
+              fill="#F4E4C0"
+              fontSize="12"
+              fontFamily="var(--font-geist-mono)"
+              textAnchor="middle"
+            >
+              {shortTime(cursorAt)} · {lastVisible.c.toFixed(0)}
+            </text>
+          </g>
+        )}
       </svg>
     </div>
   );
@@ -774,13 +1038,13 @@ function Transport({
   disabled: boolean;
   playing: boolean;
   playhead: number;
-  speed: Speed;
+  speed: PlaybackSpeed;
   jumpValue: string | null;
   jumpDraft: string;
   onToggle: () => void;
   onStep: (delta: number) => void;
   onScrub: (value: number) => void;
-  onSpeed: (value: Speed) => void;
+  onSpeed: (value: PlaybackSpeed) => void;
   onJump: () => void;
   onJumpDraft: (value: string) => void;
 }) {
@@ -788,14 +1052,14 @@ function Transport({
     <div className="mt-4 rounded-[12px] border border-paper/10 bg-paper/[0.04] px-3 py-3">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
         <div className="flex items-center gap-2">
-          <TransportButton disabled={disabled} label="Step back" onClick={() => onStep(-0.04)}>
+          <TransportButton disabled={disabled} label="Step back one bar" onClick={() => onStep(-1)}>
             <SkipBack size={14} />
           </TransportButton>
           <TransportButton disabled={disabled} label={playing ? "Pause" : "Play"} primary onClick={onToggle}>
             {playing ? <Pause size={14} /> : <Play size={14} />}
             <span>{playing ? "Pause" : "Play"}</span>
           </TransportButton>
-          <TransportButton disabled={disabled} label="Step forward" onClick={() => onStep(0.04)}>
+          <TransportButton disabled={disabled} label="Step forward one bar" onClick={() => onStep(1)}>
             <SkipForward size={14} />
           </TransportButton>
         </div>
@@ -843,12 +1107,12 @@ function Transport({
         </div>
 
         <div className="flex items-center gap-1 rounded-pill border border-paper/10 p-1">
-          {[1, 2, 4].map((item) => (
+          {PLAYBACK_SPEEDS.map((item) => (
             <button
               key={item}
               type="button"
               disabled={disabled}
-              onClick={() => onSpeed(item as Speed)}
+              onClick={() => onSpeed(item)}
               className={cn(
                 "h-7 rounded-pill px-3 font-mono text-[12px] tabular-nums transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:cursor-not-allowed disabled:opacity-40",
                 speed === item ? "bg-paper text-ink" : "text-paper/64 hover:text-paper",
@@ -859,6 +1123,112 @@ function Transport({
           ))}
           <Gauge size={13} className="mx-1 text-paper/35" />
         </div>
+      </div>
+    </div>
+  );
+}
+
+function EngineTapeStrip({
+  bars,
+  events,
+  touches,
+  cursorAt,
+  onSeek,
+}: {
+  bars: IntradayBar[];
+  events: VerdictEvent[];
+  touches: TouchEvent[];
+  cursorAt: string | null;
+  onSeek: (iso: string) => void;
+}) {
+  if (bars.length < 2) {
+    return (
+      <div className="mt-4 rounded-[12px] border border-paper/10 bg-paper/[0.04] p-4">
+        <div className="font-mono text-[12px] uppercase tracking-[0.08em] text-gold-soft">
+          {replayCopy.tapeStrip.title}
+        </div>
+        <p className="mt-2 text-[13px] leading-relaxed text-paper/62">
+          {replayCopy.tapeStrip.empty}
+        </p>
+      </div>
+    );
+  }
+
+  const t0 = Date.parse(bars[0].t);
+  const t1 = Date.parse(bars[bars.length - 1].t);
+  const cursorMs = cursorAt ? Date.parse(cursorAt) : t1;
+  const markers = [
+    ...events.map((event) => ({
+      id: `${event.engine}-${event.at}-${event.label}`,
+      at: event.at,
+      label: `${event.engine} ${event.label}`,
+      tone: event.engine === "SPY" ? "spy" : "es",
+      kind: event.kind,
+    })),
+    ...touches.map((touch) => ({
+      id: `${touch.engine}-${touch.line}-${touch.at}`,
+      at: touch.at,
+      label: `${touch.engine} ${touch.side} ${touch.line}`,
+      tone: touch.side === "break" ? "break" : "touch",
+      kind: touch.side,
+    })),
+  ].filter((marker) => {
+    const ms = Date.parse(marker.at);
+    return Number.isFinite(ms) && ms >= t0 && ms <= t1;
+  });
+
+  return (
+    <div className="mt-4 rounded-[12px] border border-paper/10 bg-paper/[0.04] p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="font-mono text-[12px] uppercase tracking-[0.08em] text-gold-soft">
+            {replayCopy.tapeStrip.title}
+          </div>
+          <p className="mt-1 text-[12px] text-paper/55">
+            State changes, rule hits, and line touches on the same clock as the chart.
+          </p>
+        </div>
+        <span className="font-mono text-[12px] tabular-nums text-paper/55">
+          {cursorAt ? shortTime(cursorAt) : "--:--"} CT
+        </span>
+      </div>
+      <div className="relative mt-5 h-16 rounded-[10px] border border-paper/10 bg-[#050C10] px-3">
+        <div className="absolute left-3 right-3 top-1/2 h-px bg-paper/16" />
+        <div
+          className="absolute top-2 h-12 w-px bg-gold"
+          style={{
+            left: `${3 + ((cursorMs - t0) / Math.max(1, t1 - t0)) * 94}%`,
+          }}
+        />
+        {markers.map((marker, index) => {
+          const ms = Date.parse(marker.at);
+          const left = `${3 + ((ms - t0) / Math.max(1, t1 - t0)) * 94}%`;
+          const tone =
+            marker.tone === "spy"
+              ? "bg-teal"
+              : marker.tone === "es"
+                ? "bg-violet"
+                : marker.tone === "break"
+                  ? "bg-bear"
+                  : "bg-gold";
+          return (
+            <button
+              key={`${marker.id}-${index}`}
+              type="button"
+              title={`${marker.label} · ${shortTime(marker.at)}`}
+              onClick={() => onSeek(marker.at)}
+              className={cn(
+                "absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-paper/70 outline-none transition hover:scale-125 focus-visible:ring-2 focus-visible:ring-gold",
+                tone,
+              )}
+              style={{ left }}
+            >
+              <span className="sr-only">
+                Jump to {marker.label} at {shortTime(marker.at)}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -909,9 +1279,13 @@ function AnchorPanel({
 function VerdictLogPanel({
   state,
   events,
+  cursorAt,
+  onSeek,
 }: {
   state: ReplayState;
   events: VerdictEvent[];
+  cursorAt: string | null;
+  onSeek: (iso: string) => void;
 }) {
   return (
     <DarkPanel>
@@ -920,11 +1294,19 @@ function VerdictLogPanel({
         {state === "loading" ? (
           <StackSkeleton rows={5} />
         ) : events.length > 0 ? (
-          <ol className="space-y-2">
-            {events.map((event, index) => (
+          <ol className="space-y-2" aria-live="polite">
+            {events.map((event, index) => {
+              const active = isSameReplayMinute(event.at, cursorAt);
+              return (
               <li
                 key={`${event.engine}-${event.at}-${index}`}
-                className="rounded-[10px] border border-paper/10 bg-paper/[0.04] p-3"
+                className={cn(
+                  "rounded-[10px] border p-3 cursor-pointer",
+                  active
+                    ? "border-gold/70 bg-gold/12"
+                    : "border-paper/10 bg-paper/[0.04]",
+                )}
+                onClick={() => onSeek(event.at)}
               >
                 <div className="flex items-center justify-between gap-3">
                   <span className="font-mono text-[12px] uppercase tracking-[0.08em] text-gold-soft">
@@ -936,7 +1318,8 @@ function VerdictLogPanel({
                 </div>
                 <p className="mt-1 text-[13px] leading-snug text-paper/72">{event.detail}</p>
               </li>
-            ))}
+              );
+            })}
           </ol>
         ) : (
           <EmptyPanelCopy
@@ -952,9 +1335,13 @@ function VerdictLogPanel({
 function LineTouchPanel({
   state,
   events,
+  cursorAt,
+  onSeek,
 }: {
   state: ReplayState;
   events: TouchEvent[];
+  cursorAt: string | null;
+  onSeek: (iso: string) => void;
 }) {
   return (
     <DarkPanel>
@@ -964,10 +1351,18 @@ function LineTouchPanel({
           <StackSkeleton rows={6} />
         ) : events.length > 0 ? (
           <ol className="max-h-[380px] space-y-2 overflow-y-auto pr-1">
-            {events.map((event, index) => (
+            {events.map((event, index) => {
+              const active = isSameReplayMinute(event.at, cursorAt);
+              return (
               <li
                 key={`${event.engine}-${event.line}-${event.at}-${index}`}
-                className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-[10px] border border-paper/10 bg-paper/[0.04] p-3"
+                className={cn(
+                  "grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-[10px] border p-3 cursor-pointer",
+                  active
+                    ? "border-gold/70 bg-gold/12"
+                    : "border-paper/10 bg-paper/[0.04]",
+                )}
+                onClick={() => onSeek(event.at)}
               >
                 <span
                   className={cn(
@@ -987,7 +1382,8 @@ function LineTouchPanel({
                   {shortTime(event.at)}
                 </span>
               </li>
-            ))}
+              );
+            })}
           </ol>
         ) : (
           <EmptyPanelCopy
@@ -997,6 +1393,25 @@ function LineTouchPanel({
         )}
       </div>
     </DarkPanel>
+  );
+}
+
+function TrailKindIcon({ kind }: { kind: VerdictEvent["kind"] }) {
+  const cls = "h-3.5 w-3.5 shrink-0";
+  if (kind === "rule") return <Target className={cls} aria-hidden />;
+  if (kind === "touch") return <CircleDotIcon className={cls} />;
+  if (kind === "risk") return <AlertTriangle className={cls} aria-hidden />;
+  if (kind === "trade") return <Check className={cls} aria-hidden />;
+  if (kind === "state") return <SkipForward className={cls} aria-hidden />;
+  return <Zap className={cls} aria-hidden />;
+}
+
+function CircleDotIcon({ className }: { className: string }) {
+  return (
+    <span
+      className={cn("inline-block rounded-full border border-current", className)}
+      aria-hidden
+    />
   );
 }
 
@@ -1262,6 +1677,7 @@ function buildVerdictEvents(
       engine: "SPY",
       at: spy.asOf,
       label: spy.decision.verdict,
+      kind: "state",
       detail: cleanReplayExplanation(
         spy.decision.finalExplanation || "SPY replay verdict resolved from the selected snapshot.",
         spy.currentPrice,
@@ -1272,6 +1688,7 @@ function buildVerdictEvents(
         engine: "SPY",
         at: item.ts,
         label: item.state.replace(/_/g, " ").toLowerCase(),
+        kind: "state",
         detail: "State transition recorded by the SPY engine.",
       });
     }
@@ -1280,6 +1697,7 @@ function buildVerdictEvents(
         engine: "SPY",
         at: trace.ts,
         label: trace.weight === "key" ? "Rule hit" : "Rule note",
+        kind: trace.weight === "key" ? "rule" : "note",
         detail: trace.event,
       });
     }
@@ -1289,6 +1707,7 @@ function buildVerdictEvents(
       engine: "ES",
       at: spx.asOf,
       label: spx.confluence.action.replace(/_/g, " ").toLowerCase(),
+      kind: "state",
       detail: spx.scenarioExplanation || spx.channel.reason,
     });
     for (const item of spx.stateHistory ?? []) {
@@ -1296,6 +1715,7 @@ function buildVerdictEvents(
         engine: "ES",
         at: item.ts,
         label: item.state.replace(/_/g, " ").toLowerCase(),
+        kind: "state",
         detail: "State transition recorded by the ES channel engine.",
       });
     }
@@ -1304,6 +1724,7 @@ function buildVerdictEvents(
         engine: "ES",
         at: trace.ts,
         label: trace.weight === "key" ? "Rule hit" : "Rule note",
+        kind: trace.weight === "key" ? "rule" : "note",
         detail: trace.event,
       });
     }
@@ -1313,6 +1734,7 @@ function buildVerdictEvents(
       engine: "SPY",
       at: `${date}T08:30:00-05:00`,
       label: "Awaiting replay",
+      kind: "note",
       detail: "No verdict trail returned for this date.",
     });
   }
@@ -1324,8 +1746,8 @@ function buildPresets(now: Date): Array<{ label: string; value: string | "custom
   return [
     { label: "Yesterday", value: lastSession, title: "Load the most recent completed trading session." },
     { label: "Last Session", value: lastSession, title: "Load the last completed market session." },
-    { label: "Last FOMC", value: nearestPastEvent(now, FOMC_DATES) ?? lastSession, title: "Load the most recent configured FOMC session." },
-    { label: "Last CPI", value: nearestPastEvent(now, CPI_DATES) ?? lastSession, title: "Load the most recent configured CPI session." },
+    { label: "Last FOMC", value: nearestPastEvent(now, [...REPLAY_PRESET_EVENTS.fomc]) ?? lastSession, title: "Load the most recent configured FOMC session." },
+    { label: "Last CPI", value: nearestPastEvent(now, [...REPLAY_PRESET_EVENTS.cpi]) ?? lastSession, title: "Load the most recent configured CPI session." },
     { label: "Custom...", value: "custom", title: "Focus the date picker." },
   ];
 }
@@ -1340,32 +1762,6 @@ function cleanReplayExplanation(text: string, spot: number): string {
   if (Math.abs(flip - spot) / spot <= 0.12) return text;
   return text.replace(gammaFlip, "").replace(/\s{2,}/g, " ").trim();
 }
-
-const FOMC_DATES = [
-  "2026-01-28",
-  "2026-03-18",
-  "2026-04-29",
-  "2026-06-17",
-  "2026-07-29",
-  "2026-09-16",
-  "2026-11-04",
-  "2026-12-16",
-];
-
-const CPI_DATES = [
-  "2026-01-13",
-  "2026-02-12",
-  "2026-03-11",
-  "2026-04-10",
-  "2026-05-12",
-  "2026-06-10",
-  "2026-07-14",
-  "2026-08-12",
-  "2026-09-11",
-  "2026-10-13",
-  "2026-11-12",
-  "2026-12-10",
-];
 
 function nearestPastEvent(now: Date, dates: string[]): string | null {
   const today = isoDate(now);
@@ -1400,8 +1796,45 @@ function isMarketOpenNow(now: Date): boolean {
 
 function timeAtPlayhead(bars: IntradayBar[], playhead: number): string | null {
   if (bars.length === 0) return null;
-  const index = Math.min(bars.length - 1, Math.max(0, Math.round((bars.length - 1) * playhead)));
+  const index = barIndexAtPlayhead(bars, playhead);
   return shortTime(bars[index].t);
+}
+
+function barIndexAtPlayhead(bars: IntradayBar[], playhead: number): number {
+  if (bars.length === 0) return 0;
+  return Math.min(
+    bars.length - 1,
+    Math.max(0, Math.round((bars.length - 1) * playhead)),
+  );
+}
+
+function stepPlayhead(
+  bars: IntradayBar[],
+  playhead: number,
+  deltaBars: number,
+): number {
+  if (bars.length < 2) return clamp(playhead, 0, 1);
+  const nextIndex = Math.min(
+    bars.length - 1,
+    Math.max(0, barIndexAtPlayhead(bars, playhead) + deltaBars),
+  );
+  return nextIndex / Math.max(1, bars.length - 1);
+}
+
+function playheadForIso(bars: IntradayBar[], iso: string): number | null {
+  if (bars.length < 2) return null;
+  const target = Date.parse(iso);
+  if (!Number.isFinite(target)) return null;
+  let bestIndex = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < bars.length; i++) {
+    const distance = Math.abs(Date.parse(bars[i].t) - target);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = i;
+    }
+  }
+  return bestIndex / Math.max(1, bars.length - 1);
 }
 
 function playheadForTime(bars: IntradayBar[], value: string): number | null {
@@ -1418,6 +1851,21 @@ function playheadForTime(bars: IntradayBar[], value: string): number | null {
     }
   }
   return bestIndex / Math.max(1, bars.length - 1);
+}
+
+function parseSpeed(value: string | null | undefined): PlaybackSpeed {
+  const normalized = Number(String(value ?? "").replace("x", ""));
+  return PLAYBACK_SPEEDS.includes(normalized as PlaybackSpeed)
+    ? (normalized as PlaybackSpeed)
+    : 1;
+}
+
+function isSameReplayMinute(a: string, b: string | null): boolean {
+  if (!b) return false;
+  const aMs = Date.parse(a);
+  const bMs = Date.parse(b);
+  if (!Number.isFinite(aMs) || !Number.isFinite(bMs)) return false;
+  return Math.abs(aMs - bMs) < 2.5 * 60_000;
 }
 
 function lineColor(tone: ProjectedLine["tone"]): string {
