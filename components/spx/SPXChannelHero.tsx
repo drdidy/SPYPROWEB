@@ -260,8 +260,16 @@ function RailStat({
       : tone === "bear"
         ? "text-bear-ink"
         : "text-ink";
+  const isBlank = value === "â€”" || value === "—";
   return (
-    <div className="px-2.5 py-1.5 rounded-soft bg-paper shadow-rule">
+    <div
+      className="px-2.5 py-1.5 rounded-soft bg-paper shadow-rule"
+      title={
+        isBlank
+          ? "These populate once Sydney and Tokyo produce a qualifying overnight pivot."
+          : undefined
+      }
+    >
       <div className="eyebrow text-ink-3 mb-0.5">{label}</div>
       <div className="flex items-baseline gap-1">
         <span
@@ -274,6 +282,11 @@ function RailStat({
           <span className="font-mono text-[9px] text-ink-4">{suffix}</span>
         )}
       </div>
+      {isBlank && (
+        <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.08em] text-ink-4">
+          Why blank?
+        </div>
+      )}
     </div>
   );
 }
@@ -477,6 +490,36 @@ function ChannelDiagram({ snap }: { snap: SPXSnapshot }) {
       )}
 
       {/* channel band fill */}
+      {snap.channel.direction === "NONE" && (
+        <g className="spx-ghost-channel">
+          <path
+            d={`M ${PAD_L},${PAD_T + 58} L ${W - PAD_R},${PAD_T + 42} L ${W - PAD_R},${H - PAD_B - 42} L ${PAD_L},${H - PAD_B - 58} Z`}
+            fill="rgba(20,22,26,0.045)"
+            stroke="#D4CBB6"
+            strokeWidth={0.8}
+            strokeDasharray="4 4"
+          />
+          <line
+            x1={PAD_L}
+            y1={H / 2}
+            x2={W - PAD_R}
+            y2={H / 2}
+            stroke="#D4CBB6"
+            strokeWidth={0.7}
+            strokeDasharray="2 5"
+          />
+          <text
+            x={PAD_L + 6}
+            y={PAD_T + 20}
+            fontSize="8.5"
+            fontFamily="var(--font-geist-mono)"
+            fill="#5A5A5A"
+            letterSpacing="0.08em"
+          >
+            CHANNEL FORMS ON FIRST QUALIFYING OVERNIGHT PIVOT
+          </text>
+        </g>
+      )}
       {bandPath && <path d={bandPath} fill={railFill} className="spx-band" />}
 
       {/* prev-day RTH high asc — dashed violet reference */}

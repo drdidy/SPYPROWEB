@@ -7,18 +7,19 @@ const lineMeta: Record<SPXLineKind, { dot: string; label: string; group: string 
   CHANNEL_CEILING: { dot: "bg-bear", label: "Channel Ceiling", group: "Active channel" },
   CHANNEL_FLOOR: { dot: "bg-bull", label: "Channel Floor", group: "Active channel" },
   PREV_RTH_HIGH_ASC: {
-    dot: "bg-violet",
+    dot: "bg-ink-4",
     label: "Prev RTH High · Asc",
     group: "Reference",
   },
   PREV_RTH_LOW_DESC: {
-    dot: "bg-violet",
+    dot: "bg-ink-4",
     label: "Prev RTH Low · Desc",
     group: "Reference",
   },
 };
 
-function lineState(distance: number): "armed" | "watching" | "stale" {
+function lineState(kind: SPXLineKind, distance: number): "armed" | "watching" | "stale" | "reference" {
+  if (lineMeta[kind].group === "Reference") return "reference";
   const a = Math.abs(distance);
   if (a <= 3) return "armed";
   if (a <= 15) return "watching";
@@ -48,8 +49,14 @@ export function SPXLineLadder({ lines, price }: { lines: SPXLine[]; price: numbe
                 Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice),
             )
             .map((l, idx) => {
-              const state = lineState(l.distanceFromPrice);
+              const state = lineState(l.kind, l.distanceFromPrice);
               const m = lineMeta[l.kind];
+              const pct =
+                price !== 0 && Number.isFinite(price)
+                  ? (Math.abs(l.distanceFromPrice) / Math.abs(price)) * 100
+                  : null;
+              const pillVariant = state === "reference" ? "stale" : state;
+              const stateLabel = state === "reference" ? "REFERENCE" : state;
               return (
                 <li
                   key={l.kind}
@@ -77,10 +84,15 @@ export function SPXLineLadder({ lines, price }: { lines: SPXLine[]; price: numbe
                   >
                     {l.distanceFromPrice >= 0 ? "+" : ""}
                     {l.distanceFromPrice.toFixed(2)}
+                    {pct !== null && (
+                      <span className="ml-1 text-[10px] text-ink-4">
+                        {pct.toFixed(2)}%
+                      </span>
+                    )}
                   </div>
                   <div className="col-span-1 flex justify-end">
-                    <StatusPill variant={state} pulse={state === "armed"}>
-                      {state}
+                    <StatusPill variant={pillVariant} pulse={state === "armed"}>
+                      {stateLabel}
                     </StatusPill>
                   </div>
                 </li>
