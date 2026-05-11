@@ -16,7 +16,9 @@ export type FeedId =
   | "options-chain"
   | "signal-tape"
   | "risk-guardrails"
-  | "session-clock";
+  | "session-clock"
+  | "projection-engine"
+  | "calibration-store";
 
 export const FEED_IDS = [
   "spy-rails",
@@ -35,6 +37,8 @@ export const FEED_IDS = [
   "signal-tape",
   "risk-guardrails",
   "session-clock",
+  "projection-engine",
+  "calibration-store",
 ] as const satisfies readonly FeedId[];
 
 export interface FeedHealthSeed {
@@ -77,6 +81,8 @@ export const FEED_LABELS: Record<FeedId, string> = {
   "signal-tape": "Signal tape",
   "risk-guardrails": "Risk guardrails",
   "session-clock": "Session clock",
+  "projection-engine": "Projection engine",
+  "calibration-store": "Calibration store",
 };
 
 export const FEED_DEFAULTS = {

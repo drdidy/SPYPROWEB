@@ -204,6 +204,8 @@ export function DegradedModeBanner({ className }: { className?: string }) {
     useFeedHealth("signal-tape"),
     useFeedHealth("risk-guardrails"),
     useFeedHealth("session-clock"),
+    useFeedHealth("projection-engine"),
+    useFeedHealth("calibration-store"),
   ];
   const failed = feeds
     .filter(
