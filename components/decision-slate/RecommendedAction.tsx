@@ -3,6 +3,7 @@
 // structure rails, and countdowns in one glance.
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
   ArrowRight,
   BookOpen,
@@ -212,27 +213,11 @@ export function RecommendedAction({
             sessionDate={sessionDate ?? new Date().toISOString().slice(0, 10)}
           />
 
-          <div className="mt-7 grid max-w-2xl grid-cols-2 gap-2">
-            <HeroMetric label="Confidence" value={`${confidence}%`} tone="text-gold-soft" />
-            <HeroMetric label="Risk exposure" value="Low" tone="text-bull-soft" />
-            <HeroMetric label="Reward setup" value="Neutral" tone="text-gold-soft" />
-            <HeroMetric label="Trend context" value="Range" tone="text-paper" />
-          </div>
-          {entryCostInScorecard && (
-            <div className="mt-2 max-w-2xl">
-              <HeroMetric
-                label="Entry cost"
-                value={entryCostValue(activeProjection)}
-                tone={
-                  activeProjection
-                    ? "text-gold-soft"
-                    : "text-paper/72 text-[19px] leading-tight"
-                }
-                tooltip="Estimates the option debit at the planned entry line from the live chain and Greeks. It stays pending until the chain is usable; no placeholder debit is shown."
-                className="min-h-[70px]"
-              />
-            </div>
-          )}
+          <ScorecardMetrics
+            confidence={confidence}
+            activeProjection={activeProjection}
+            className="mt-7 lg:hidden"
+          />
           {!entryCostInScorecard && activeProjection ? (
             <ContractProjectionCard
               projection={activeProjection}
@@ -255,6 +240,13 @@ export function RecommendedAction({
           chart={activeChart}
           accent={chartAccent}
           frameless={unifiedChrome}
+          metricRail={
+            <ScorecardMetrics
+              confidence={confidence}
+              activeProjection={activeProjection}
+              compact
+            />
+          }
         />
 
         <aside className="border-t border-paper/10 px-6 py-5 lg:border-l lg:border-t-0 lg:px-4 lg:py-7">
@@ -316,17 +308,32 @@ function HeroMetric({
   value,
   tone,
   tooltip,
+  compact = false,
   className,
 }: {
   label: string;
   value: string;
   tone: string;
   tooltip?: string;
+  compact?: boolean;
   className?: string;
 }) {
   return (
-    <div className={cn("rounded-soft border border-paper/10 bg-paper/[0.045] px-3 py-2.5", className)}>
-      <div className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.16em] text-paper/42">
+    <div
+      className={cn(
+        "rounded-soft border border-paper/10 bg-paper/[0.045]",
+        compact ? "min-h-[74px] px-3 py-2" : "px-3 py-2.5",
+        className,
+      )}
+    >
+      <div
+        className={cn(
+          "flex items-center gap-1.5 font-mono uppercase text-paper/42",
+          compact
+            ? "text-[8px] tracking-[0.13em]"
+            : "text-[9px] tracking-[0.16em]",
+        )}
+      >
         <span>{label}</span>
         {tooltip && (
           <InfoTooltip label={label} content={tooltip} placement="top">
@@ -339,8 +346,75 @@ function HeroMetric({
           </InfoTooltip>
         )}
       </div>
-      <div className={cn("mt-1 font-serif text-[23px] leading-none", tone)}>
+      <div
+        className={cn(
+          "mt-1 font-serif leading-none",
+          compact ? "text-[19px]" : "text-[23px]",
+          tone,
+        )}
+      >
         {value}
+      </div>
+    </div>
+  );
+}
+
+function ScorecardMetrics({
+  confidence,
+  activeProjection,
+  compact = false,
+  className,
+}: {
+  confidence: number;
+  activeProjection?: ContractProjection | null;
+  compact?: boolean;
+  className?: string;
+}) {
+  const entryTone = activeProjection
+    ? "text-gold-soft"
+    : compact
+      ? "text-paper/76 text-[15px] leading-tight"
+      : "text-paper/72 text-[19px] leading-tight";
+
+  if (compact) {
+    return (
+      <div
+        className={cn(
+          "grid grid-cols-5 gap-2 rounded-[12px] border border-paper/10 bg-[#071116]/88 p-2 shadow-[0_18px_50px_-38px_rgba(0,0,0,0.95)]",
+          className,
+        )}
+      >
+        <HeroMetric compact label="Confidence" value={`${confidence}%`} tone="text-gold-soft" />
+        <HeroMetric compact label="Risk exposure" value="Low" tone="text-bull-soft" />
+        <HeroMetric compact label="Reward setup" value="Neutral" tone="text-gold-soft" />
+        <HeroMetric compact label="Trend context" value="Range" tone="text-paper" />
+        <HeroMetric
+          compact
+          label="Entry cost"
+          value={entryCostValue(activeProjection)}
+          tone={entryTone}
+          tooltip="Estimates the option debit at the planned entry line from the live chain and Greeks. It stays pending until the chain is usable; no placeholder debit is shown."
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("max-w-2xl", className)}>
+      <div className="grid grid-cols-2 gap-2">
+        <HeroMetric label="Confidence" value={`${confidence}%`} tone="text-gold-soft" />
+        <HeroMetric label="Risk exposure" value="Low" tone="text-bull-soft" />
+        <HeroMetric label="Reward setup" value="Neutral" tone="text-gold-soft" />
+        <HeroMetric label="Trend context" value="Range" tone="text-paper" />
+      </div>
+      <div className="mt-2">
+        <HeroMetric
+          label="Entry cost"
+          value={entryCostValue(activeProjection)}
+          tone={entryTone}
+          tooltip="Estimates the option debit at the planned entry line from the live chain and Greeks. It stays pending until the chain is usable; no placeholder debit is shown."
+          className="min-h-[70px]"
+        />
       </div>
     </div>
   );
@@ -350,23 +424,26 @@ function CommandRailDiagram({
   chart,
   accent,
   frameless = false,
+  metricRail,
 }: {
   chart?: StructureChartData | null;
   accent: "bull" | "gold" | "violet" | "neutral";
   frameless?: boolean;
+  metricRail?: ReactNode;
 }) {
   if (!chart) {
     return (
       <div className="hidden min-h-[560px] border-t border-paper/10 px-3 py-6 lg:block lg:border-t-0">
         <div
           className={cn(
-            "relative flex h-full min-h-[508px] overflow-hidden px-7 py-7 text-center",
+            "relative flex h-full min-h-[508px] flex-col gap-4 overflow-hidden px-7 py-7 text-center",
             frameless
               ? "rounded-none border-0 bg-paper/[0.018]"
               : "rounded-[10px] border border-paper/10 bg-paper/[0.035]",
           )}
         >
           <EmptyWorkspaceChart />
+          {metricRail}
         </div>
       </div>
     );
@@ -374,15 +451,16 @@ function CommandRailDiagram({
 
   return (
     <div className="hidden min-h-[560px] border-t border-paper/10 px-3 py-6 lg:block lg:border-t-0">
-      <div className="relative h-full min-h-[508px]">
+      <div className="relative flex h-full min-h-[508px] flex-col gap-4">
         <StructurePathChart
           data={chart}
           variant="dark"
           accent={accent}
-          height={500}
+          height={388}
           title="recommended path"
           frameless={frameless}
         />
+        {metricRail}
       </div>
     </div>
   );
@@ -390,7 +468,7 @@ function CommandRailDiagram({
 
 function EmptyWorkspaceChart() {
   return (
-    <div className="relative flex h-full min-h-[454px] w-full flex-col">
+    <div className="relative flex min-h-[376px] w-full flex-1 flex-col">
       <div className="flex items-center justify-between gap-3 border-b border-paper/10 pb-3">
         <div className="text-left">
           <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-paper/42">
