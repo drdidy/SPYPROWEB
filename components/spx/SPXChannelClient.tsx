@@ -210,7 +210,7 @@ export function SPXChannelClient({ replayDate }: Props) {
           </div>
           <h1 className="mt-3 text-[36px] font-serif leading-none tracking-tight text-paper md:text-[46px]">
             The corridor,{" "}
-            <span className="text-gold-soft/72 italic font-light">read aloud.</span>
+            <span className="text-gold-soft/72 italic font-light">mapped live.</span>
           </h1>
           {meta && (
             <div className="mt-3 flex flex-wrap items-center gap-3 text-[10px] font-mono text-paper/48 tracking-[0.04em] [&_.text-ink-2]:!text-paper/78 [&_.text-ink-4]:!text-paper/32">
