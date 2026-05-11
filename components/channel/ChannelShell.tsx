@@ -1,5 +1,6 @@
 import { AnchorSlate } from "@/components/channel/AnchorSlate";
-import { ChannelLiveBadge, LastUpdatedAge } from "@/components/channel/ChannelLiveBadge";
+import { ChannelLiveBadge } from "@/components/channel/ChannelLiveBadge";
+import { ChannelStateRail } from "@/components/channel/ChannelStateRail";
 import { OptionsIntelligence } from "@/components/channel/OptionsIntelligence";
 import { PreOpenBias } from "@/components/channel/PreOpenBias";
 import { RiskGuardrails } from "@/components/channel/RiskGuardrails";
@@ -23,6 +24,7 @@ import { getSessionInfo } from "@/lib/sessions";
 import type { AdaptedSnapshot } from "@/lib/snapshot-adapter";
 import type { LiveSnapshotSource } from "@/lib/snapshot-fetch";
 import type { ReactNode } from "react";
+import Link from "next/link";
 
 export interface ChannelShellData {
   snap: AdaptedSnapshot;
@@ -54,6 +56,7 @@ export function ChannelShell({
   const now = new Date();
   const serverNowISO = now.toISOString();
   const session = getSessionInfo(engine === "spy" ? "SPY" : "SPX", now);
+  const displayedState = displayedChannelState(data.snap);
   const feeds = buildChannelFeedSeeds(
     data,
     serverNowISO,
@@ -63,17 +66,14 @@ export function ChannelShell({
   return (
     <FeedHealthProvider serverNowISO={serverNowISO} feeds={feeds}>
       <div className="w-full max-w-[1440px] space-y-10 pb-16">
-      {/* Editorial header - matches the previous /spy surface exactly. */}
-      <header className="relative overflow-hidden rounded-[18px] border border-[#D6BC75]/45 bg-[#071116] px-5 py-5 text-paper shadow-[0_24px_60px_-42px_rgba(7,17,22,0.95)] md:px-7 md:py-6">
+      {engine === "spy" && <EsContextStrip snap={data.snap} />}
+
+      <header className="relative overflow-hidden rounded-[22px] border border-[#C9A227]/55 bg-[#071116] px-5 py-5 text-paper shadow-[0_24px_60px_-42px_rgba(7,17,22,0.95)] md:px-7 md:py-6">
         <div
           aria-hidden
           className="absolute inset-0 opacity-[0.18] bg-[linear-gradient(rgba(244,228,192,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(244,228,192,0.10)_1px,transparent_1px)] bg-[size:42px_42px]"
         />
-        <div
-          aria-hidden
-          className="absolute -right-16 -top-24 h-72 w-72 rounded-full border border-gold/20"
-        />
-        <div className="relative flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+        <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
           <div>
             <div className="flex items-center gap-3 flex-wrap">
               <span className="font-mono text-[10px] text-gold-soft/82 tracking-[0.20em] uppercase">
@@ -84,7 +84,6 @@ export function ChannelShell({
                 {todayLabel()}
               </span>
               <ChannelLiveBadge />
-              <SourceBadge source={data.source} error={data.error} />
             </div>
             <h1 className="mt-3 text-[36px] font-serif leading-none tracking-tight text-paper md:text-[46px]">
               {copy.hero.titleLead}{" "}
@@ -92,6 +91,12 @@ export function ChannelShell({
                 {copy.hero.titleEmphasis}
               </span>
             </h1>
+            <p className="mt-4 max-w-3xl text-[15px] leading-relaxed text-paper/72">
+              {heroSynthesis(data.snap)}
+            </p>
+            <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.12em] text-paper/46 tabular-nums">
+              {freshnessLine(data.snap.asOf, session.nextSignificantEvent.at)}
+            </p>
           </div>
           <div className="hidden md:flex items-center gap-6 text-right">
             <Stat label="Bias" value={bias.bias} highlight={bias.bias} />
@@ -99,13 +104,20 @@ export function ChannelShell({
             <Stat
               label="Last"
               value={currentPrice.toFixed(2)}
-              support={<LastUpdatedAge />}
             />
           </div>
         </div>
       </header>
 
       <DegradedModeBanner className="-mt-6" />
+
+      <ChannelStateRail
+        engine={engine === "spy" ? "SPY" : "ES"}
+        current={displayedState}
+        nextEventISO={session.nextSignificantEvent.at.toISOString()}
+        nextEventLabel={session.nextSignificantEvent.label}
+        condition={data.snap.flipCondition}
+      />
 
       <AnchorSlate engine={engine} snap={data.snap} />
 
@@ -151,13 +163,92 @@ export function ChannelShell({
         </div>
       </section>
 
-      <footer className="pt-6 mt-6 border-t border-rule flex items-center justify-between text-[10px] text-ink-3 font-mono uppercase tracking-[0.18em]">
-        <span>{copy.footer.left}</span>
-        <span>{copy.footer.right}</span>
+      <footer className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-6 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-3">
+        <span>Not financial advice · Historical and live outputs are decision-support only.</span>
+        <span className="flex flex-wrap items-center gap-3">
+          <Link href="/terms" className="hover:text-ink">Terms</Link>
+          <Link href="/privacy" className="hover:text-ink">Privacy</Link>
+          <Link href="/risk" className="hover:text-ink">Options risk</Link>
+          <span>Build 0.9.7</span>
+          <span>Rules v1.0.0</span>
+          <Link href="/contact" className="hover:text-ink">Report an issue</Link>
+        </span>
       </footer>
       </div>
     </FeedHealthProvider>
   );
+}
+
+function EsContextStrip({ snap }: { snap: AdaptedSnapshot }) {
+  return (
+    <Link
+      href="/es"
+      className="block rounded-card border border-rule bg-paper px-4 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3 shadow-card transition-colors hover:border-rule-strong hover:text-ink"
+      title="Open the ES Channel for the companion overnight-channel read."
+    >
+      ES context · open ES Channel · SPY decisions should be checked against the futures read
+      <span className="ml-2 text-ink-4">SPY {displayedChannelState(snap).replace(/_/g, " ")}</span>
+    </Link>
+  );
+}
+
+function heroSynthesis(snap: AdaptedSnapshot): string {
+  const bias = snap.bias.bias.toLowerCase();
+  const state = statePhrase(displayedChannelState(snap));
+  const closest = snap.lines
+    .slice()
+    .sort((a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice))[0];
+  const lineText = closest
+    ? `${closest.name} (${closest.currentValue.toFixed(2)})`
+    : "a qualified SPY rail";
+  const explanation = cleanSpyExplanation(
+    snap.decision.finalExplanation || snap.bias.explanation || "",
+    snap.currentPrice,
+  );
+  if (explanation) return explanation;
+  return `${capitalize(bias)} lean, engine ${state} because ${lineText} has not produced a qualified trigger yet.`;
+}
+
+function cleanSpyExplanation(text: string, spot: number): string {
+  if (!text || !Number.isFinite(spot) || spot <= 0) return text;
+  const gammaFlip = /(?:\s*)dealer gamma (?:positive|negative|flat) with flip near ([0-9]+(?:\.[0-9]+)?)(?:\.|,)?/i;
+  const match = text.match(gammaFlip);
+  if (!match) return text;
+  const flip = Number(match[1]);
+  if (!Number.isFinite(flip)) return text;
+  if (Math.abs(flip - spot) / spot <= 0.12) return text;
+  const cleaned = text.replace(gammaFlip, "").replace(/\s{2,}/g, " ").trim();
+  return cleaned || "Options context is withheld until the live chain is inside a realistic SPY range.";
+}
+
+function freshnessLine(asOf: string, next: Date): string {
+  return `live | updated ${formatHM(asOf)} CT | next ${formatHM(next.toISOString())} CT`;
+}
+
+function formatHM(iso: string): string {
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return "--:--";
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(ms));
+}
+
+function statePhrase(state: string): string {
+  return state.replace(/_/g, " ").toLowerCase();
+}
+
+function displayedChannelState(snap: AdaptedSnapshot): AdaptedSnapshot["currentState"] {
+  if (snap.currentState === "PRE_CONFIG") return "PRE_CONFIG";
+  if (snap.decision.verdict === "WAIT") return "WAIT";
+  if (snap.decision.verdict === "LONG" || snap.decision.verdict === "SHORT") return "GO";
+  return snap.currentState;
+}
+
+function capitalize(value: string): string {
+  return value.slice(0, 1).toUpperCase() + value.slice(1);
 }
 
 function buildChannelFeedSeeds(

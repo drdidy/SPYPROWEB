@@ -2,6 +2,7 @@
 import { PanelHeartbeat } from "@/components/channel/ChannelLiveBadge";
 import { Card } from "@/components/ui/Card";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { WhyThisStateLink } from "@/components/slate/WhyThisStateLink";
 import type { AdaptedSnapshot, AnchorGroup } from "@/lib/snapshot-adapter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowDownRight } from "lucide-react";
@@ -21,12 +22,19 @@ const headlineByVerdict: Record<string, string> = {
   "STAND DOWN": "Standing down today",
 };
 
-const SLOPE_PER_HOUR = 0.2;        // engine constant (descending only)
-const BAND_OFFSET = 3.4;           // SPY pts above/below the anchor low
+const SLOPE_PER_HOUR = 0.2;        // display fallback only; engine projects live values upstream
 
 export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
   const verdict = snap.decision.verdict;
   const bias = snap.bias.bias;
+  const displayedState =
+    snap.currentState === "PRE_CONFIG"
+      ? "PRE_CONFIG"
+      : verdict === "WAIT"
+        ? "WAIT"
+        : verdict === "LONG" || verdict === "SHORT"
+          ? "GO"
+          : snap.currentState;
 
   const directionTone =
     bias === "BULLISH"
@@ -99,6 +107,17 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
               <StatusPill variant={verdictTone[verdict] ?? "stale"} pulse>
                 {verdict}
               </StatusPill>
+              <WhyThisStateLink
+                engine="SPY"
+                trace={snap.decisionTrace.map((event) => ({
+                  ts: event.ts,
+                  event: event.event,
+                  weight: event.weight,
+                }))}
+                flipCondition={snap.flipCondition}
+                currentStateLabel={displayedState.replace(/_/g, " ")}
+                className="hidden h-7 items-center gap-1.5 rounded-pill border border-rule bg-paper px-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-2 transition-colors hover:border-rule-strong hover:bg-paper-2 sm:inline-flex"
+              />
             </div>
           </div>
 
@@ -117,6 +136,10 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
               </motion.h1>
             </AnimatePresence>
           </div>
+
+          <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-ink-2">
+            {synthesisLine(snap, nearestRead, displayedState)}
+          </p>
 
           <div className="mt-3 inline-flex items-center gap-2 px-2 py-0.5 rounded-pill bg-paper-2 shadow-rule">
             <span className="font-mono text-[10px] tracking-[0.14em] text-ink-2 font-semibold">
@@ -159,13 +182,16 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
             ) : (
               <span className="block mt-2 text-ink-3 text-[13.5px]">
                 No qualifying premarket anchor is active. The slate is using
-                current structural context only until a qualified line arms.
+                current structural context until a qualified line arms.
               </span>
             )}
           </div>
 
           <p className="mt-7 text-[15px] text-ink-2 leading-relaxed max-w-xl">
-            {snap.decision.finalExplanation || snap.bias.explanation || "Engine is initializing today's read."}
+            {cleanSpyExplanation(
+              snap.decision.finalExplanation || snap.bias.explanation || "Engine is initializing today's read.",
+              snap.currentPrice,
+            )}
             {primary ? (
               <span className="block mt-2 text-ink-3 text-[13.5px]">
                 {primary.role === "ANCHOR_2" ? "Anchor 2" : "Primary anchor"} ·
@@ -179,8 +205,7 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
               </span>
             ) : (
               <span className="block mt-2 text-ink-3 text-[13.5px]">
-                No qualifying premarket anchor is active. The slate is using
-                current structural context only until a qualified line arms.
+                A qualified rejection, break, or retest will update this read.
               </span>
             )}
           </p>
@@ -206,21 +231,26 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
           </div>
 
           {primary ? (
-            <div className="grid grid-cols-3 gap-2 mb-4">
+            <div className="grid grid-cols-2 gap-2 mb-4">
               <BandStat
-                label="Upper"
+                label="UA"
                 value={primary.bands.upper.currentValue}
                 price={snap.currentPrice}
               />
               <BandStat
-                label="Main"
+                label="ANCHOR"
                 value={primary.bands.main.currentValue}
                 price={snap.currentPrice}
                 emphasized
               />
               <BandStat
-                label="Lower"
+                label="LA"
                 value={primary.bands.lower.currentValue}
+                price={snap.currentPrice}
+              />
+              <BandStat
+                label="UD"
+                value={nearestStructural?.currentValue ?? null}
                 price={snap.currentPrice}
               />
             </div>
@@ -254,6 +284,36 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
       </div>
     </Card>
   );
+}
+
+function synthesisLine(
+  snap: AdaptedSnapshot,
+  nearestRead: { label: string; dist: number; value: number } | null,
+  displayedState: string,
+): string {
+  const bias = snap.bias.bias.toLowerCase();
+  const state = displayedState.replace(/_/g, " ").toLowerCase();
+  if (nearestRead) {
+    const relation = nearestRead.dist >= 0 ? "above LAST" : "below LAST";
+    return `${capitalize(bias)} lean, but no qualified rejection yet - engine ${state} because ${nearestRead.label} (${nearestRead.value.toFixed(2)}) remains ${Math.abs(nearestRead.dist).toFixed(2)} pts ${relation}.`;
+  }
+  return `${capitalize(bias)} lean, but no qualified rejection yet - engine ${state} until a SPY anchor or structural rail becomes actionable.`;
+}
+
+function cleanSpyExplanation(text: string, spot: number): string {
+  if (!text || !Number.isFinite(spot) || spot <= 0) return text;
+  const gammaFlip = /(?:\s*)dealer gamma (?:positive|negative|flat) with flip near ([0-9]+(?:\.[0-9]+)?)(?:\.|,)?/i;
+  const match = text.match(gammaFlip);
+  if (!match) return text;
+  const flip = Number(match[1]);
+  if (!Number.isFinite(flip)) return text;
+  if (Math.abs(flip - spot) / spot <= 0.12) return text;
+  const cleaned = text.replace(gammaFlip, "").replace(/\s{2,}/g, " ").trim();
+  return cleaned || "Options context is withheld until the live chain is inside a realistic SPY range.";
+}
+
+function capitalize(value: string): string {
+  return value.slice(0, 1).toUpperCase() + value.slice(1);
 }
 
 function anchorTimeLabel(g: AnchorGroup): string {

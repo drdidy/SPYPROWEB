@@ -32,6 +32,10 @@ export function TriggerMap({
   lines: DynamicLine[];
   healthAction?: ReactNode;
 }) {
+  const sorted = lines
+    .slice()
+    .sort((a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice));
+
   if (lines.length === 0) {
     return (
       <Card>
@@ -66,6 +70,47 @@ export function TriggerMap({
         action={healthAction}
       />
       <CardBody className="px-0 pb-0">
+        {sorted.length <= 4 ? (
+          <div className="grid gap-3 px-5 pb-5 sm:grid-cols-2">
+            {sorted.map((l) => {
+              const state = lineState(l.distanceFromPrice);
+              const meta = lineStyle[l.kind] ?? { dot: "bg-ink-3", label: l.kind };
+              return (
+                <div
+                  key={l.name}
+                  className="rounded-soft border border-rule bg-paper-2 px-4 py-3 shadow-rule"
+                >
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className={`h-2 w-2 rounded-full ${meta.dot}`} />
+                      <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-ink">
+                        {l.name}
+                      </span>
+                    </div>
+                    <StatusPill variant={state} pulse={state === "armed"}>
+                      {state}
+                    </StatusPill>
+                  </div>
+                  <div className="font-mono text-[22px] font-semibold tabular-nums text-ink" data-num>
+                    {l.currentValue.toFixed(2)}
+                  </div>
+                  <div className="mt-1 flex items-center justify-between gap-3 text-[12px] text-ink-3">
+                    <span>{meta.label}</span>
+                    <span
+                      className={`font-mono tabular-nums ${
+                        l.distanceFromPrice >= 0 ? "text-bull-ink" : "text-bear-ink"
+                      }`}
+                    >
+                      {l.distanceFromPrice >= 0 ? "+" : ""}
+                      {l.distanceFromPrice.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <>
         <div className="grid grid-cols-12 px-5 pb-2 eyebrow text-ink-3">
           <div className="col-span-3">Line</div>
           <div className="col-span-3">Type</div>
@@ -74,10 +119,7 @@ export function TriggerMap({
           <div className="col-span-2 text-right">Status</div>
         </div>
         <ul className="divide-y divide-rule border-t border-rule">
-          {lines
-            .slice()
-            .sort((a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice))
-            .map((l) => {
+          {sorted.map((l) => {
               const state = lineState(l.distanceFromPrice);
               const meta = lineStyle[l.kind] ?? { dot: "bg-ink-3", label: l.kind };
               return (
@@ -119,6 +161,8 @@ export function TriggerMap({
               );
             })}
         </ul>
+          </>
+        )}
       </CardBody>
     </Card>
   );
