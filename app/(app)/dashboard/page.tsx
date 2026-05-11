@@ -12,12 +12,14 @@ import { LastSignalRecap } from "@/components/decision-slate/LastSignalRecap";
 import { EngineTrackRecord } from "@/components/decision-slate/EngineTrackRecord";
 import { PreConfigBriefing } from "@/components/decision-slate/PreConfigBriefing";
 import {
+  SlateStateRail,
   StatePipeline,
   type StructureLevels,
 } from "@/components/decision-slate/StatePipeline";
 import { EngineCard } from "@/components/decision-slate/EngineCard";
 import { RecommendedAction } from "@/components/decision-slate/RecommendedAction";
 import { PreviewState } from "@/components/decision-slate/PreviewState";
+import { SlateCompliance } from "@/components/decision-slate/SlateCompliance";
 import {
   DegradedModeBanner,
   FeedHealthProvider,
@@ -71,6 +73,8 @@ export default async function Page({
   const slateHeroV2 = isEnabled("slate_hero_v2", flagContext);
   const slateVerdictChrome = isEnabled("slate_verdict_chrome", flagContext);
   const slateEntryCostTile = isEnabled("slate_entry_cost_tile", flagContext);
+  const slateStateRail = isEnabled("slate_state_rail", flagContext);
+  const slateCompliance = isEnabled("slate_compliance", flagContext);
   // Both engines are independent fetches. Run them in parallel — the
   // slate is meant to be read in one glance, so a slow side shouldn't
   // hold up the other.
@@ -120,6 +124,8 @@ export default async function Page({
     spyTrackFetchedAt: serverNowISO,
     spxTrackFetchedAt: serverNowISO,
     recapsFetchedAt: serverNowISO,
+    optionsFetchedAt: optionBundle.fetchedAt,
+    optionsError: optionBundle.source === "error" ? optionBundle.error ?? "options unavailable" : null,
   });
   const spyChart = buildSpyStructureChart(
     chartSpyLoaded.data,
@@ -182,9 +188,22 @@ export default async function Page({
         spxProjection={spxProjection}
         compactHeader={slateHeroV2}
         slateDateLabel={formatSlateDate(now)}
+        sessionDate={chartDate}
         unifiedChrome={slateVerdictChrome}
         entryCostInScorecard={slateEntryCostTile}
+        feedId="market-clock"
       />
+
+      {slateStateRail && (
+        <div className="mt-4">
+          <SlateStateRail
+            spyState={spyState}
+            spxState={spxState}
+            spyHistory={spy.stateHistory}
+            spxHistory={spx.stateHistory ?? []}
+          />
+        </div>
+      )}
 
       {/* v4 #6 + v5 #8 + v10 P1-12: engines row. 24px rhythm
           between hero and engine row. Outer padding matches
@@ -203,6 +222,7 @@ export default async function Page({
             explanation={spyExplanation(spyState, spy)}
             structureLevels={spyStructureLevels(spy)}
             structureChart={spyChart}
+            showProgression={!slateStateRail}
           />
           <StatePipeline
             engine="SPX"
@@ -217,6 +237,7 @@ export default async function Page({
             explanation={spxExplanation(spxState, spx)}
             structureLevels={spxStructureLevels(spx)}
             structureChart={spxChart}
+            showProgression={!slateStateRail}
           />
         </div>
       </section>
@@ -285,10 +306,12 @@ export default async function Page({
             </div>
           </Section>
 
-          <TimelineRow
-            spyHistory={spy.stateHistory}
-            spxHistory={spx.stateHistory ?? []}
-          />
+          {!slateStateRail && (
+            <TimelineRow
+              spyHistory={spy.stateHistory}
+              spxHistory={spx.stateHistory ?? []}
+            />
+          )}
 
           <Section title="Active levels">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
@@ -297,6 +320,12 @@ export default async function Page({
             </div>
           </Section>
         </>
+      )}
+      {slateCompliance && (
+        <SlateCompliance
+          environment={process.env.NEXT_PUBLIC_VERCEL_ENV ?? process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "development"}
+          ruleVersion="v1.0.0"
+        />
       )}
     </div>
     </FeedHealthProvider>
@@ -314,6 +343,8 @@ function buildDashboardFeedHealth({
   spyTrackFetchedAt,
   spxTrackFetchedAt,
   recapsFetchedAt,
+  optionsFetchedAt,
+  optionsError,
 }: {
   serverNowISO: string;
   spy: AdaptedSnapshot;
@@ -325,6 +356,8 @@ function buildDashboardFeedHealth({
   spyTrackFetchedAt: string;
   spxTrackFetchedAt: string;
   recapsFetchedAt: string;
+  optionsFetchedAt: string;
+  optionsError: string | null;
 }): FeedHealthSeed[] {
   const spyRailsThreshold =
     spySession.phase === "RTH_OPEN"
@@ -380,6 +413,13 @@ function buildDashboardFeedHealth({
         spxSession.nextSignificantEvent.at,
       ).toISOString(),
       staleAfterMs: FEED_DEFAULTS.marketClockMs,
+    }),
+    buildFeedSeed("options-chain", {
+      lastUpdatedAt: optionsFetchedAt,
+      staleAfterMs: FEED_DEFAULTS.channelPanelMs,
+      critical: true,
+      failedAt: optionsError ? serverNowISO : null,
+      initialStatus: optionsError ? "failed" : undefined,
     }),
   ];
 }
@@ -766,6 +806,7 @@ function SpyVerdictCard({
     <EngineCard
       engine="SPY"
       section="today's read"
+      feedId="spy-rails"
       title={
         <span className="flex items-baseline gap-3 flex-wrap">
           <span className="font-serif text-display tracking-tight">
@@ -804,13 +845,13 @@ function SpyVerdictCard({
           example={SLATE_COPY.metricExample.conviction}
           helperWhenEmpty={SLATE_COPY.metricEmptyHelper.conviction}
         >
-          {!isPreConfig && (
+          {!isPreConfig && typeof decision.conviction === "number" ? (
             <ConvictionTrack
               value={decision.conviction}
               max={5}
               label={`${decision.conviction}/5`}
             />
-          )}
+          ) : null}
         </MetricSlot>
         <MetricSlot
           label="Bias"
@@ -818,7 +859,7 @@ function SpyVerdictCard({
           example={SLATE_COPY.metricExample.bias}
           helperWhenEmpty={SLATE_COPY.metricEmptyHelper.bias}
         >
-          {!isPreConfig && <BiasValue bias={snap.bias.bias} />}
+          {!isPreConfig && snap.bias.bias ? <BiasValue bias={snap.bias.bias} /> : null}
         </MetricSlot>
         <MetricSlot
           label="Grade"
@@ -826,9 +867,9 @@ function SpyVerdictCard({
           example={SLATE_COPY.metricExample.grade}
           helperWhenEmpty={SLATE_COPY.metricEmptyHelper.grade}
         >
-          {!isPreConfig && (
+          {!isPreConfig && signal && quality ? (
             <GradeValue grade={signal && quality ? quality.grade : null} />
-          )}
+          ) : null}
         </MetricSlot>
       </div>
       {(isPreConfig ||
@@ -870,6 +911,7 @@ function SpyReadCard({ snap }: { snap: AdaptedSnapshot }) {
     <EngineCard
       engine="SPY"
       section="active levels"
+      feedId="spy-rails"
       title={
         <span className="flex items-center gap-2 flex-wrap">
           <span>{armed.length === 0 ? "No active levels" : `${armed.length} active level${armed.length === 1 ? "" : "s"}`}</span>
@@ -949,6 +991,7 @@ function SpxVerdictCard({
     <EngineCard
       engine="SPX"
       section="today's read"
+      feedId="spx-rails"
       title={
         <span className="flex items-baseline gap-3 flex-wrap">
           <span className="font-serif text-display tracking-tight">
@@ -1059,6 +1102,7 @@ function SpxReadCard({ snap }: { snap: SPXSnapshot }) {
     <EngineCard
       engine="SPX"
       section="active levels"
+      feedId="spx-rails"
       title={
         <span className="flex items-center gap-2 flex-wrap">
           <span>{empty ? "No active levels" : `${top.length} active level${top.length === 1 ? "" : "s"}`}</span>

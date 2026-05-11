@@ -21,8 +21,10 @@
 import { type ReactNode } from "react";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { AsOfTicker } from "@/components/slate/AsOfTicker";
+import { FeedHeartbeat } from "@/components/decision-slate/FeedHealthProvider";
 import { displayEngine } from "@/lib/engine-labels";
 import { cn } from "@/lib/utils";
+import type { FeedId } from "@/lib/feed-health";
 
 export interface EngineCardProps {
   engine: "SPY" | "SPX";
@@ -32,6 +34,8 @@ export interface EngineCardProps {
   title: ReactNode;
   /** Optional cluster of meta nodes to the right of the title. */
   headerMeta?: ReactNode;
+  /** Panel feed represented by the heartbeat dot in the header. */
+  feedId?: FeedId;
   /** Body content (paragraph, metrics, callouts). */
   children: ReactNode;
   /** ISO timestamp for the footer "Updated …" stamp. Pass null to hide. */
@@ -51,6 +55,7 @@ export function EngineCard({
   section,
   title,
   headerMeta,
+  feedId,
   children,
   asOfIso,
   footerLeft,
@@ -82,7 +87,12 @@ export function EngineCard({
           </span>
         }
         title={title}
-        action={headerMeta}
+        action={
+          <span className="inline-flex items-center gap-2">
+            {headerMeta}
+            {feedId && <FeedHeartbeat feedId={feedId} />}
+          </span>
+        }
       />
       <CardBody className="space-y-4 flex flex-col flex-1">
         {children}

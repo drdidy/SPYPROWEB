@@ -45,6 +45,7 @@ interface Props {
   structureLevels?: StructureLevels;
   structureChart?: StructureChartData | null;
   feedId?: FeedId;
+  showProgression?: boolean;
   className?: string;
 }
 
@@ -101,6 +102,7 @@ export function StatePipeline({
   structureLevels,
   structureChart,
   feedId,
+  showProgression = false,
   className,
 }: Props) {
   const currentIdx = ENGINE_STATES.indexOf(current);
@@ -193,6 +195,7 @@ export function StatePipeline({
         )}
       </div>
 
+      {showProgression && (
       <div className="mt-3 min-w-0">
         {/* Stepper. Real <ol> with aria-current="step" on the active
             <li>. Each step has an sr-only description so screen
@@ -343,6 +346,7 @@ export function StatePipeline({
         </ol>
 
       </div>
+      )}
 
       <MiniStructureMap
         engine={engine}
@@ -474,6 +478,139 @@ function EngineFooterMetrics({
 }
 
 export { StatePipeline as PipelineStepper };
+
+export function SlateStateRail({
+  spyState,
+  spxState,
+  spyHistory,
+  spxHistory,
+}: {
+  spyState: EngineState;
+  spxState: EngineState;
+  spyHistory: { ts: string; state: EngineState }[];
+  spxHistory: { ts: string; state: EngineState }[];
+}) {
+  return (
+    <section
+      aria-label="Engine state progression"
+      className="rounded-card border border-rule bg-paper-tier2 p-4 shadow-card"
+    >
+      <div className="mb-4 flex items-baseline justify-between gap-3">
+        <div>
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3">
+            State rail
+          </p>
+          <h2 className="mt-1 font-serif text-h2 text-ink">
+            Discipline sequence
+          </h2>
+        </div>
+        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-4">
+          One rail per engine
+        </span>
+      </div>
+      <div className="space-y-4">
+        <StateRailRow engine="SPY" current={spyState} history={spyHistory} />
+        <StateRailRow engine="SPX" current={spxState} history={spxHistory} />
+      </div>
+    </section>
+  );
+}
+
+function StateRailRow({
+  engine,
+  current,
+  history,
+}: {
+  engine: "SPY" | "SPX";
+  current: EngineState;
+  history: { ts: string; state: EngineState }[];
+}) {
+  const currentIdx = ENGINE_STATES.indexOf(current);
+  const visibleHistory = history.slice(-4);
+  return (
+    <div className="min-w-0">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-ink-2">
+          {displayEngine(engine)}
+        </span>
+        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-3">
+          {PHASE_DEFINITIONS[current]?.label ?? current.replace(/_/g, " ")}
+        </span>
+      </div>
+      <ol
+        role="list"
+        aria-label={`${displayEngine(engine)} seven-step state progression`}
+        className="grid grid-cols-7 gap-1.5"
+      >
+        {ENGINE_STATES.map((state, index) => {
+          const phase = PHASE_DEFINITIONS[state];
+          const isCurrent = state === current;
+          const isComplete = index < currentIdx;
+          return (
+            <li
+              key={state}
+              aria-current={isCurrent ? "step" : undefined}
+              className={cn(
+                "relative min-w-0 rounded-soft border px-2 py-2 text-center",
+                "transition-colors",
+                isCurrent
+                  ? "border-gold bg-gold text-paper shadow-glow motion-safe:animate-breathe"
+                  : isComplete
+                    ? "border-bull/30 bg-bull-tint text-bull-ink"
+                    : "border-rule bg-paper text-ink-3",
+              )}
+            >
+              <span className="sr-only">
+                Step {index + 1} of {ENGINE_STATES.length}: {phase.label}
+                {isCurrent ? ", current" : isComplete ? ", completed" : ", upcoming"}.
+              </span>
+              <span
+                aria-hidden
+                className={cn(
+                  "mx-auto mb-1 inline-flex h-5 w-5 items-center justify-center rounded-full font-mono text-[10px] font-bold",
+                  isCurrent
+                    ? "bg-paper text-gold-ink"
+                    : isComplete
+                      ? "bg-bull text-paper"
+                      : "bg-paper-2 text-ink-3",
+                )}
+              >
+                {isComplete ? "✓" : index + 1}
+              </span>
+              <span className="block truncate font-mono text-[9px] uppercase tracking-[0.08em]">
+                {phase.short}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+      {visibleHistory.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-2 font-mono text-[10px] text-ink-3">
+          <span className="uppercase tracking-[0.14em] text-ink-4">Recent</span>
+          {visibleHistory.map((entry, index) => (
+            <span key={`${entry.ts}-${index}`} className="inline-flex items-center gap-1">
+              <span className="tabular-nums">{formatHM(entry.ts)}</span>
+              <span className="uppercase tracking-[0.08em] text-ink-2">
+                {PHASE_DEFINITIONS[entry.state]?.short ?? entry.state}
+              </span>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function formatHM(iso: string): string {
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return "--:--";
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(ms));
+}
 
 // ---------------------------------------------------------------------
 // Compact engine-status chip — kept for back-compat callers, but the

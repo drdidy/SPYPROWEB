@@ -27,6 +27,9 @@ import {
 import { ContractProjectionCard } from "@/components/options/ContractProjection";
 import type { ContractProjection } from "@/lib/contract-projection";
 import { SLATE_COPY } from "@/content/copy";
+import { FeedHeartbeat } from "./FeedHealthProvider";
+import type { FeedId } from "@/lib/feed-health";
+import { VerdictActions } from "./VerdictActions";
 
 const ICONS: Record<Recommendation["id"], LucideIcon> = {
   "live-spy": Activity,
@@ -57,8 +60,10 @@ interface Props {
   spxProjection?: ContractProjection | null;
   compactHeader?: boolean;
   slateDateLabel?: string;
+  sessionDate?: string;
   unifiedChrome?: boolean;
   entryCostInScorecard?: boolean;
+  feedId?: FeedId;
   className?: string;
 }
 
@@ -75,8 +80,10 @@ export function RecommendedAction({
   spxProjection,
   compactHeader = false,
   slateDateLabel,
+  sessionDate,
   unifiedChrome = false,
   entryCostInScorecard = false,
+  feedId,
   className,
 }: Props) {
   const rec = recommendationFor(spyState, spxState);
@@ -166,6 +173,7 @@ export function RecommendedAction({
             <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-paper/46">
               Discipline before conviction
             </div>
+            {feedId && <FeedHeartbeat feedId={feedId} />}
           </div>
         </div>
       </div>
@@ -201,32 +209,34 @@ export function RecommendedAction({
             {rec.label}
             <ArrowRight size={12} className="opacity-70" aria-hidden />
           </Link>
+          <VerdictActions
+            verdictState={command.title}
+            spyState={spyState}
+            spxState={spxState}
+            sessionDate={sessionDate ?? new Date().toISOString().slice(0, 10)}
+          />
 
-          <div
-            className={cn(
-              "mt-7 grid max-w-2xl grid-cols-2 gap-2",
-              entryCostInScorecard
-                ? "md:grid-cols-3 xl:grid-cols-5"
-                : "md:grid-cols-4",
-            )}
-          >
+          <div className="mt-7 grid max-w-2xl grid-cols-2 gap-2 md:grid-cols-4">
             <HeroMetric label="Confidence" value={`${confidence}%`} tone="text-gold-soft" />
             <HeroMetric label="Risk exposure" value="Low" tone="text-bull-soft" />
             <HeroMetric label="Reward setup" value="Neutral" tone="text-gold-soft" />
             <HeroMetric label="Trend context" value="Range" tone="text-paper" />
-            {entryCostInScorecard && (
+          </div>
+          {entryCostInScorecard && (
+            <div className="mt-2 max-w-2xl">
               <HeroMetric
                 label="Entry cost"
                 value={entryCostValue(activeProjection)}
                 tone={
                   activeProjection
                     ? "text-gold-soft"
-                    : "text-paper/68 text-[17px] leading-tight"
+                    : "text-paper/72 text-[19px] leading-tight"
                 }
                 tooltip="Estimates the option debit at the planned entry line from the live chain and Greeks. It stays pending until the chain is usable; no placeholder debit is shown."
+                className="min-h-[70px]"
               />
-            )}
-          </div>
+            </div>
+          )}
           {!entryCostInScorecard && activeProjection ? (
             <ContractProjectionCard
               projection={activeProjection}
@@ -310,14 +320,16 @@ function HeroMetric({
   value,
   tone,
   tooltip,
+  className,
 }: {
   label: string;
   value: string;
   tone: string;
   tooltip?: string;
+  className?: string;
 }) {
   return (
-    <div className="rounded-soft border border-paper/10 bg-paper/[0.045] px-3 py-2.5">
+    <div className={cn("rounded-soft border border-paper/10 bg-paper/[0.045] px-3 py-2.5", className)}>
       <div className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.16em] text-paper/42">
         <span>{label}</span>
         {tooltip && (

@@ -51,14 +51,8 @@ const FLAG_DEFINITIONS: Record<FlagName, FlagDefinition> = {
   slate_hero_v2: flag("SLATE_HERO_V2", true),
   slate_verdict_chrome: flag("SLATE_VERDICT_CHROME", true),
   slate_entry_cost_tile: flag("SLATE_ENTRY_COST_TILE", true),
-  slate_state_rail: flag("SLATE_STATE_RAIL", false),
-  slate_feed_health: flag("SLATE_FEED_HEALTH", {
-    development: true,
-    preview: true,
-    staging: true,
-    production: false,
-    test: false,
-  }),
+  slate_state_rail: flag("SLATE_STATE_RAIL", true),
+  slate_feed_health: flag("SLATE_FEED_HEALTH", true),
   slate_a11y: flag("SLATE_A11Y", false),
   verdict_actions: flag("VERDICT_ACTIONS", false),
   personalization: flag("PERSONALIZATION", false),
@@ -66,7 +60,7 @@ const FLAG_DEFINITIONS: Record<FlagName, FlagDefinition> = {
   telemetry_receipts: flag("TELEMETRY_RECEIPTS", false),
   notifications: flag("NOTIFICATIONS", false),
   armed_go: flag("ARMED_GO", false),
-  slate_compliance: flag("SLATE_COMPLIANCE", false),
+  slate_compliance: flag("SLATE_COMPLIANCE", true),
   compliance_footer: flag("COMPLIANCE_FOOTER", false),
 };
 

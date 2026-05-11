@@ -5,6 +5,7 @@
 // just visual jitter. Re-evaluates every 30s.
 
 import { useEffect, useState } from "react";
+import { resolveUserTimezone } from "@/lib/user-prefs";
 
 interface Props {
   iso: string;
@@ -24,15 +25,15 @@ export function AsOfTicker({ iso, className }: Props) {
       }
       suppressHydrationWarning
     >
-      as of {formatHM(now)} CT
+      as of {formatHM(now, resolveUserTimezone())} <span className="text-ink-4">(CT: {formatHM(now, "America/Chicago")})</span>
     </span>
   );
 }
 
-function formatHM(ms: number): string {
+function formatHM(ms: number, timeZone: string): string {
   try {
     return new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/Chicago",
+      timeZone,
       hour: "2-digit",
       minute: "2-digit",
       hour12: false,
