@@ -173,7 +173,7 @@ export function RecommendedAction({
           </div>
         </div>
       </div>
-      <div className="relative grid gap-0 lg:grid-cols-[minmax(0,0.92fr)_minmax(360px,1.1fr)_230px]">
+      <div className="relative grid gap-0 lg:grid-cols-[minmax(250px,0.78fr)_minmax(0,1.48fr)_220px] xl:grid-cols-[minmax(280px,0.82fr)_minmax(440px,1.55fr)_230px]">
         <div className="px-6 py-6 md:px-7 md:py-7">
           <p
             id="recommended-action-heading"
@@ -357,26 +357,27 @@ function CommandRailDiagram({
 }) {
   if (!chart) {
     return (
-      <div className="hidden min-h-[238px] border-t border-paper/10 px-4 py-7 lg:block lg:border-t-0">
+      <div className="hidden min-h-[430px] border-t border-paper/10 px-5 py-7 lg:block lg:border-t-0">
         <div
           className={cn(
-            "flex h-full min-h-[190px] items-center justify-center px-6 text-center",
+            "flex h-full min-h-[360px] items-center justify-center px-7 text-center",
             frameless
               ? "rounded-none border-0 bg-transparent"
               : "rounded-[10px] border border-paper/10 bg-paper/[0.035]",
           )}
         >
-          <div className="max-w-sm">
-            <div className="mx-auto grid h-11 w-11 place-items-center rounded-[10px] border border-gold/25 bg-gold-soft/10 text-gold-soft">
-              <span className="h-2.5 w-2.5 rounded-full bg-current animate-breathe" />
+          <div className="max-w-md">
+            <div className="mx-auto grid h-16 w-16 place-items-center rounded-[14px] border border-gold/25 bg-gold-soft/10 text-gold-soft">
+              <span className="h-3.5 w-3.5 rounded-full bg-current animate-breathe" />
             </div>
             <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.18em] text-gold-soft/72">
-              Chart withheld
+              Workspace chart awaiting bars
             </p>
-            <p className="mt-2 text-[13px] leading-relaxed text-paper/58">
-              The slate is standing aside until replay bars and rails resolve into an auditable path.
+            <p className="mx-auto mt-3 max-w-sm text-[14px] leading-relaxed text-paper/64">
+              The slate will draw the actual price path against the active rails
+              as soon as replay bars and structure lines resolve.
             </p>
-            <div className="mt-4 grid grid-cols-3 gap-2 font-mono text-[9px] uppercase tracking-[0.12em] text-paper/42">
+            <div className="mx-auto mt-6 grid max-w-sm grid-cols-3 gap-2 font-mono text-[9px] uppercase tracking-[0.12em] text-paper/46">
               <span className="rounded-soft border border-paper/10 bg-paper/[0.04] px-2 py-2">
                 No fake chart
               </span>
@@ -394,13 +395,13 @@ function CommandRailDiagram({
   }
 
   return (
-    <div className="hidden min-h-[238px] border-t border-paper/10 px-4 py-7 lg:block lg:border-t-0">
-      <div className="relative h-full min-h-[190px]">
+    <div className="hidden min-h-[430px] border-t border-paper/10 px-5 py-7 lg:block lg:border-t-0">
+      <div className="relative h-full min-h-[360px]">
         <StructurePathChart
           data={chart}
           variant="dark"
           accent={accent}
-          height={190}
+          height={340}
           title="recommended path"
           frameless={frameless}
         />
