@@ -78,10 +78,18 @@ expectId(
 // --- reason text mentions the driving engine state ---
 const watchSpx = recommendationFor("STAND_DOWN", "WATCH");
 check(
-  'WATCH dispatcher reason names "spx watch"',
-  watchSpx.reason.toLowerCase().includes("spx") &&
+  'WATCH dispatcher reason names "ES watch"',
+  watchSpx.reason.toLowerCase().includes("es") &&
     watchSpx.reason.toLowerCase().includes("watch"),
   `got reason="${watchSpx.reason}"`,
+);
+
+const armedSpx = forState("ARMED", "SPX");
+check(
+  'ARMED SPX branch renders user-facing "ES"',
+  armedSpx.reason.startsWith("ES ") &&
+    armedSpx.description.startsWith("ES is armed"),
+  `got reason="${armedSpx.reason}" description="${armedSpx.description}"`,
 );
 
 if (failed > 0) {
