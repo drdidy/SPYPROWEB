@@ -402,7 +402,7 @@ function MiniStructureMap({
     <div className="group/structure mt-3 rounded-soft border border-rule-soft bg-paper-tier3 px-3 py-3 transition-colors hover:border-rule-strong">
       <div className="mb-2 flex items-center justify-between gap-3">
         <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3">
-          09:00 references
+          08:00 references
         </span>
         <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-4">
           Price path
@@ -414,7 +414,7 @@ function MiniStructureMap({
           variant="paper"
           accent={accent}
           height={340}
-          title={`${displayEngine(engine)} price vs 09:00 references`}
+          title={`${displayEngine(engine)} price vs 08:00 references`}
         />
         <div className="grid gap-2 sm:grid-cols-3">
           {rails.map((rail) => (

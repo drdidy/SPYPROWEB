@@ -196,7 +196,7 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
           {/* First read: distance to nearest line */}
           <div className="mt-7 max-w-md">
             <div className="flex items-baseline justify-between mb-1.5">
-              <span className="eyebrow text-ink-3">Nearest 09:00 reference</span>
+              <span className="eyebrow text-ink-3">Nearest 08:00 reference</span>
               {nearestRead ? (
                 <span className="font-mono text-sm text-ink tabular-nums">
                   <span className="font-semibold">{nearestRead.label}</span>
@@ -228,7 +228,7 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
             ) : (
               <span className="block mt-2 text-ink-3 text-[13.5px]">
                 No qualifying anchor is active. The channel is using the
-                closest 09:00 structural reference until a qualified line arms.
+                closest 08:00 structural reference until a qualified line arms.
               </span>
             )}
           </div>
@@ -277,7 +277,7 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
             variant="paper"
             accent={bias === "BULLISH" ? "bull" : bias === "BEARISH" ? "bear" : "gold"}
             height={460}
-            title="SPY price vs 09:00 references"
+            title="SPY price vs 08:00 references"
             className="mb-4"
           />
 
@@ -394,7 +394,7 @@ function buildExecutionRead(
       value: nearestRead ? `${nearestRead.label} ${nearestRead.value.toFixed(2)}` : "Awaiting line",
       detail: nearestRead
         ? `${formatSigned(nearestRead.dist)} pts from LAST ${snap.currentPrice.toFixed(2)}.`
-        : "The engine has not returned a qualified 09:00 reference yet.",
+        : "The engine has not returned a qualified 08:00 reference yet.",
       tone: nearestRead && Math.abs(nearestRead.dist) <= 0.5 ? "watch" : "neutral",
     },
     {

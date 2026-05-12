@@ -14,7 +14,7 @@ synchronized SPX-cash / ES print pair (see ``offset.derive_offset``).
 """
 from __future__ import annotations
 
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time
 from typing import Optional
 
 # We don't import the schema at module top-level because the api package
@@ -509,7 +509,7 @@ def compute_snapshot(
             reason=channel.reason,
             noChannelReason=channel.no_channel_reason,
         ),
-        lines=[_line_model(l, projected, last_price) for l in lines],
+        lines=[_line_model(l, projected, last_price, session) for l in lines],
         price=SPXPrice(last=last_price, change=change, changePct=change_pct),
         scenario=scenario,
         scenarioExplanation=scenario_text,
@@ -578,7 +578,7 @@ def compute_snapshot(
 # ---------------------------------------------------------------------------
 
 
-def _line_model(l: Line, projected: list[ProjectedLine], price: float):
+def _line_model(l: Line, projected: list[ProjectedLine], price: float, session: date):
     """Convert internal Line + projection into the schema's SPXLine."""
     from .schema import SPXLine
     name_map = {
@@ -590,11 +590,7 @@ def _line_model(l: Line, projected: list[ProjectedLine], price: float):
         "SWING_LOW_DESC": "Overnight Swing Low · Descending",
     }
     cur = next(p.value for p in projected if p.kind == l.kind)
-    anchor_ct = to_ct(l.anchor.time)
-    entry_day = anchor_ct.date()
-    if anchor_ct.hour >= 17:
-        entry_day = entry_day + timedelta(days=1)
-    entry_reference = at_ct(entry_day, time(9, 0))
+    entry_reference = at_ct(session, time(8, 0))
     entry_value = project_line(l, entry_reference)
     return SPXLine(
         kind=l.kind,

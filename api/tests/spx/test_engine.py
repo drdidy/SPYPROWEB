@@ -85,15 +85,15 @@ def test_snapshot_six_lines_do_not_apply_es_to_spx_offset(es_candles_ascending_i
     by_kind = {line.kind: line for line in snap.lines}
 
     assert by_kind["SWING_HIGH_ASC"].anchor_price == pytest.approx(5858.00)
-    assert by_kind["SWING_HIGH_ASC"].entry_value == pytest.approx(5868.40)
-    assert by_kind["SWING_HIGH_DESC"].entry_value == pytest.approx(5847.60)
+    assert by_kind["SWING_HIGH_ASC"].entry_value == pytest.approx(5867.36)
+    assert by_kind["SWING_HIGH_DESC"].entry_value == pytest.approx(5848.64)
     assert by_kind["SWING_LOW_ASC"].anchor_price == pytest.approx(5838.00)
-    assert by_kind["SWING_LOW_ASC"].entry_value == pytest.approx(5854.64)
-    assert by_kind["SWING_LOW_DESC"].entry_value == pytest.approx(5821.36)
+    assert by_kind["SWING_LOW_ASC"].entry_value == pytest.approx(5853.60)
+    assert by_kind["SWING_LOW_DESC"].entry_value == pytest.approx(5822.40)
     assert by_kind["PREV_RTH_HIGH_ASC"].anchor_price == pytest.approx(5866.50)
-    assert by_kind["PREV_RTH_HIGH_ASC"].entry_value == pytest.approx(5862.34)
+    assert by_kind["PREV_RTH_HIGH_ASC"].entry_value == pytest.approx(5886.26)
     assert by_kind["PREV_RTH_LOW_DESC"].anchor_price == pytest.approx(5837.00)
-    assert by_kind["PREV_RTH_LOW_DESC"].entry_value == pytest.approx(5837.00)
+    assert by_kind["PREV_RTH_LOW_DESC"].entry_value == pytest.approx(5813.08)
 
 
 def test_snapshot_rejects_empty_candles(as_of):

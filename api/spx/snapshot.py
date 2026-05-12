@@ -76,8 +76,8 @@ def _build_payload(replay_date: date | None = None) -> dict:
         as_of = datetime.now(CT)
     else:
         # Replay mode: pin "now" to 09:00 CT — the moment the first
-        # RTH hour closes and the framework becomes the trader's
-        # entry reference. Channel rails + prev-RTH lines project
+        # RTH hour begins and the framework becomes the trader's
+        # review point. Channel rails + prev-RTH lines project
         # to that time, scenario classifies the morning state, and
         # the playback panel handles "what happened next" forward
         # from there. Using 15:00 (RTH close) instead would project
@@ -140,15 +140,15 @@ def _build_spx_replay_block(payload: dict, replay_date: date | None) -> dict:
     always reads N_A and the dashboard renders "no graded sessions".
 
     Grading rule for SPX/ES (v10 — six-line 09:00 framework):
-      - Every ES structure line is projected to its 09:00 CT entry
-        reference. Replay grading evaluates the real line set, not
+      - Every ES structure line is projected to its 08:00 CT operating
+        point. Replay grading evaluates the real line set, not
         the old primary/alternate play proxy.
       - Only the 09:00, 10:00, and 11:00 CT hourly candles are eligible.
       - BUY trigger: price is above the line, drops into it on a
         bearish hourly candle, and closes back above the line.
       - SELL trigger: price is below the line, rises into it on a
         bullish hourly candle, and closes back below the line.
-      - Entry is the 09:00 reference level; exit is that hourly
+      - Entry is the 08:00 operating level; exit is that hourly
         candle close. If no qualified rejection occurs, N_A is the
         honest grade — do not mark a loss just because price touched.
 

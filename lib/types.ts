@@ -47,7 +47,7 @@ export interface DynamicLine {
   zoneType: ZoneType;
   isPrimary: boolean;
   currentValue: number; // value at "now"
-  entryValue?: number; // value at the 09:00 CT entry reference
+  entryValue?: number; // value at the 08:00 CT operating reference
   entryReferenceTime?: string;
   touchWindowStart?: string;
   touchWindowEnd?: string;
@@ -192,7 +192,7 @@ export interface SPXLine {
   anchorTime: string;
   slopePerHour: number; // +1.04 or -1.04
   currentValue: number; // projected to as-of
-  entryValue?: number | null; // projected to the 09:00 CT entry reference
+  entryValue?: number | null; // projected to the 08:00 CT operating reference
   entryReferenceTime?: string | null;
   distanceFromPrice: number; // signed
 }

@@ -225,7 +225,7 @@ function heroSynthesis(snap: AdaptedSnapshot): string {
         : displayedState === "PRE_CONFIG"
           ? "Awaiting the setup window."
           : "Tracking the current state.";
-  return `${capitalize(bias)} lean, engine ${state}; SPY ${snap.currentPrice.toFixed(2)} sits ${distanceText} the 09:00 reference ${lineText}. ${action}${flowTail}`;
+  return `${capitalize(bias)} lean, engine ${state}; SPY ${snap.currentPrice.toFixed(2)} sits ${distanceText} the 08:00 reference ${lineText}. ${action}${flowTail}`;
 }
 
 function cleanSpyExplanation(text: string, spot: number): string {

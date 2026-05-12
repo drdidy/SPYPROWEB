@@ -110,7 +110,7 @@ export function TriggerMap({
       <Card>
         <CardHeader
           eyebrow="Trigger Map"
-          title="09:00 references"
+          title="08:00 references"
           meta="Waiting for qualified structure"
           action={healthAction}
         />
@@ -121,7 +121,7 @@ export function TriggerMap({
             </div>
             <p className="mt-2 max-w-lg text-[13px] leading-relaxed text-ink-3">
               SPY levels arm after the premarket anchor window resolves and the
-              engine has a 09:00 reference to evaluate. Until then, this panel
+              engine has an 08:00 reference to evaluate. Until then, this panel
               is intentionally quiet.
             </p>
           </div>
@@ -134,14 +134,14 @@ export function TriggerMap({
     <Card>
       <CardHeader
         eyebrow="Trigger Map"
-        title="09:00 references"
+        title="08:00 references"
         meta="actionable first; context below"
         action={healthAction}
       />
       <CardBody className="px-0 pb-0">
         <div className="px-5 pb-4">
           <p className="max-w-2xl text-[12px] leading-relaxed text-ink-3">
-            These are the 09:00 CT operating values. Backup and day-open rows are
+            These are the 08:00 CT operating values. Backup and day-open rows are
             retained as diagnostics, but they are not equal to the active entry
             framework.
           </p>
@@ -165,7 +165,7 @@ export function TriggerMap({
         <div className="hidden grid-cols-12 px-5 pb-2 eyebrow text-ink-3 sm:grid">
           <div className="col-span-3">Line</div>
           <div className="col-span-3">Type</div>
-          <div className="col-span-2 text-right">09:00 value</div>
+          <div className="col-span-2 text-right">08:00 value</div>
           <div className="col-span-2 text-right">Delta to last</div>
           <div className="col-span-2 text-right">Status</div>
         </div>
