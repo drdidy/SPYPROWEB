@@ -24,6 +24,9 @@ interface Payload {
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const IP_LIMIT = { max: 5, windowMs: 60 * 60 * 1000 };
+const EMAIL_LIMIT = { max: 3, windowMs: 24 * 60 * 60 * 1000 };
+const rateBuckets = new Map<string, { count: number; resetAt: number }>();
 
 export async function POST(req: NextRequest) {
   let body: Payload;
@@ -56,10 +59,6 @@ export async function POST(req: NextRequest) {
   }
 
   // ---- Rate limit ----
-  // TODO(rate-limit): wire @upstash/ratelimit or a Vercel KV-backed
-  // limiter. Suggested policy: 5 requests per IP per hour, 10 per
-  // email per day. With no KV configured the limiter is a no-op so
-  // the form still works in local + preview deploys.
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
   const rateLimitOk = await checkRateLimit(ip, email);
   if (!rateLimitOk) {
@@ -132,9 +131,13 @@ function pick(v: unknown): string | null {
 // Stubs — replace each with real provider call when secrets are wired.
 // ----------------------------------------------------------------------
 
-async function checkRateLimit(_ip: string, _email: string): Promise<boolean> {
-  // TODO(rate-limit): replace with Upstash / KV implementation.
-  return true;
+async function checkRateLimit(ip: string, email: string): Promise<boolean> {
+  const now = Date.now();
+  pruneRateBuckets(now);
+  return (
+    consumeRateBucket(`ip:${hashForLog(ip)}`, IP_LIMIT, now) &&
+    consumeRateBucket(`email:${hashForLog(email)}`, EMAIL_LIMIT, now)
+  );
 }
 
 async function verifyCaptcha(token: string | null): Promise<boolean> {
@@ -220,4 +223,26 @@ function hashForLog(value: string): string {
     hash = Math.imul(hash, 16777619);
   }
   return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+function consumeRateBucket(
+  key: string,
+  limit: { max: number; windowMs: number },
+  now: number,
+): boolean {
+  const current = rateBuckets.get(key);
+  if (!current || current.resetAt <= now) {
+    rateBuckets.set(key, { count: 1, resetAt: now + limit.windowMs });
+    return true;
+  }
+  if (current.count >= limit.max) return false;
+  current.count += 1;
+  return true;
+}
+
+function pruneRateBuckets(now: number) {
+  if (rateBuckets.size < 500) return;
+  for (const [key, bucket] of rateBuckets) {
+    if (bucket.resetAt <= now) rateBuckets.delete(key);
+  }
 }
