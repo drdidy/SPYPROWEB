@@ -1,7 +1,6 @@
 // User preferences accessor. The backend doesn't persist user prefs
-// yet (the /settings page renders a "coming soon" notice), so until
-// the auth + persistence layer lands the slate falls back to
-// the browser timezone when available. Session math remains Chicago-
+// yet, so until the auth + persistence layer lands the slate falls
+// back to the browser timezone when available. Session math remains Chicago-
 // anchored; display preferences are user-local.
 //
 // TODO(backend): once /api/me returns userPrefs.timezone, replace
