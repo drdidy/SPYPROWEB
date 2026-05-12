@@ -859,6 +859,47 @@ def _spy_engine_state(decision_verb: str, conviction: int) -> str:
     return "WATCH"
 
 
+def _spy_state_from_touch_window(now_ct: pd.Timestamp, touch_window: dict | None) -> str | None:
+    """Live-state override from the same 09/10/11 CT rule replay uses."""
+    if touch_window is None:
+        return None
+    entry_time = pd.Timestamp(touch_window["entry_time"])
+    exit_time = pd.Timestamp(touch_window["exit_time"])
+    ct = pc.get_central_tz()
+    now = pd.Timestamp(now_ct)
+    now = now.tz_localize(ct) if now.tzinfo is None else now.tz_convert(ct)
+    entry_time = entry_time.tz_localize(ct) if entry_time.tzinfo is None else entry_time.tz_convert(ct)
+    exit_time = exit_time.tz_localize(ct) if exit_time.tzinfo is None else exit_time.tz_convert(ct)
+    if now < entry_time:
+        return "ARMED"
+    if now < exit_time:
+        return "GO"
+    return "COOLDOWN"
+
+
+def _spy_touch_window_trace(touch_window: dict) -> str:
+    side = str(touch_window.get("side") or "trade").lower()
+    line = str(touch_window.get("line") or "structure line")
+    entry = float(touch_window.get("entry_price"))
+    exit_price = float(touch_window.get("exit_price"))
+    return (
+        f"Touch-window {side} triggered at {line} ({entry:.2f}); "
+        f"hourly exit marked at {exit_price:.2f}."
+    )
+
+
+def _spy_touch_window_flip_condition(touch_window: dict, state: str) -> str:
+    side = str(touch_window.get("side") or "trade").lower()
+    line = str(touch_window.get("line") or "structure line")
+    entry = float(touch_window.get("entry_price"))
+    exit_time = pd.Timestamp(touch_window["exit_time"]).strftime("%H:%M CT")
+    if state == "GO":
+        return f"Touch-window {side} is active from {line} ({entry:.2f}); manage until the {exit_time} hourly exit."
+    if state == "COOLDOWN":
+        return f"Touch-window {side} completed from {line} ({entry:.2f}); stand down until the next valid setup."
+    return f"Touch-window setup armed at {line} ({entry:.2f})."
+
+
 def _spy_flip_condition(
     *,
     decision_verb: str,
@@ -1488,7 +1529,11 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
     as_of_iso = now_ct.isoformat()
     decision_verb = decision.get("verb", "WAIT")
     decision_conviction = int(decision.get("conviction", 0) or 0)
-    current_state = _spy_engine_state(decision_verb, decision_conviction)
+    touch_window_live = _replay_touch_window_entry(triggers=triggers, rth_today=rth_today)
+    current_state = (
+        _spy_state_from_touch_window(now_ct, touch_window_live)
+        or _spy_engine_state(decision_verb, decision_conviction)
+    )
     # Recompute closest line + active signal at this scope (the values
     # inside _build_decision aren't returned — recomputing keeps this
     # additive without refactoring the decision builder).
@@ -1520,10 +1565,14 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
                 active_signal_for_trace = s
                 break
 
-    flip_condition = _spy_flip_condition(
-        decision_verb=decision_verb,
-        closest_line_label=closest_label_for_flip,
-        closest_line_value=closest_value_for_flip,
+    flip_condition = (
+        _spy_touch_window_flip_condition(touch_window_live, current_state)
+        if touch_window_live is not None
+        else _spy_flip_condition(
+            decision_verb=decision_verb,
+            closest_line_label=closest_label_for_flip,
+            closest_line_value=closest_value_for_flip,
+        )
     )
     state_history_payload = [{"ts": as_of_iso, "state": current_state}]
     decision_trace_payload = _spy_decision_trace(
@@ -1533,6 +1582,12 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
         rationale=decision.get("rationale", "") or "",
         active_signal=active_signal_for_trace,
     )
+    if touch_window_live is not None:
+        decision_trace_payload.append({
+            "ts": pd.Timestamp(touch_window_live["entry_time"]).isoformat(),
+            "event": _spy_touch_window_trace(touch_window_live),
+            "weight": "key",
+        })
     invalidation_payload = _spy_invalidation(active_signal_for_trace)
     feed_health_payload = {
         "lastTickTs": as_of_iso,

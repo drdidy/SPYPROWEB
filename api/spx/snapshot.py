@@ -248,7 +248,7 @@ def _grade_replay_from_rail_tag(payload: dict, replay_date: date, offset: float)
             entry_value = _entry_value_for_payload_line(line, t)
             if entry_value is None:
                 continue
-            side = _qualified_rejection_side(bar, entry_value)
+            side = _qualified_rejection_side(bar, entry_value, str(line.get("kind") or ""))
             if side is None:
                 continue
             triggers.append({
@@ -270,7 +270,7 @@ def _grade_replay_from_rail_tag(payload: dict, replay_date: date, offset: float)
     return None
 
 
-def _qualified_rejection_side(bar: dict, line_value: float) -> str | None:
+def _qualified_rejection_side(bar: dict, line_value: float, line_kind: str = "") -> str | None:
     open_ = float(bar["open"])
     high = float(bar["high"])
     low = float(bar["low"])
@@ -283,6 +283,13 @@ def _qualified_rejection_side(bar: dict, line_value: float) -> str | None:
         return "BUY"
     # Sell: below the line, bullish candle rises into it, close rejects below.
     if open_ < line_value and close > open_ and close < line_value:
+        return "SELL"
+    # Below-both continuation: when ES opens below the swing-low pair,
+    # the swing-low descending line is the sell continuation reference.
+    # A strong bearish-pressure day can tag the line and still close red;
+    # under the trader's rule that is still a valid sell if it rejects
+    # back below the line.
+    if line_kind == "SWING_LOW_DESC" and open_ < line_value and close < line_value:
         return "SELL"
     return None
 

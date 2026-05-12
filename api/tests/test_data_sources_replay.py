@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from _lib.data_sources import _build_replay_block
+from _lib.data_sources import _build_replay_block, _spy_state_from_touch_window
 from _lib.prophet_core import DynamicLine
 
 CT = ZoneInfo("America/Chicago")
@@ -114,6 +114,16 @@ def test_spy_replay_includes_11am_ct_candle_in_plan_window():
     assert block["verdictOutcome"] == "WIN"
     assert block["verdictPnl"] == 2.5
     assert block["entry"]["time"] == _ts(11).isoformat()
+
+
+def test_live_spy_state_uses_touch_window_trade_lifecycle():
+    touch = {
+        "entry_time": _ts(9, 30),
+        "exit_time": _ts(10, 30),
+    }
+
+    assert _spy_state_from_touch_window(_ts(10), touch) == "GO"
+    assert _spy_state_from_touch_window(_ts(11), touch) == "COOLDOWN"
 
 
 def test_spy_replay_grades_open_above_primary_structure_as_one_hour_long():

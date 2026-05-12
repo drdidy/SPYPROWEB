@@ -173,6 +173,28 @@ def test_replay_grades_previous_rth_line_not_in_primary_or_alternate_plays():
     assert block["verdictPnl"] == 1.0
 
 
+def test_replay_grades_below_both_swing_low_desc_continuation_sell():
+    swing_low_desc = {
+        "kind": "SWING_LOW_DESC",
+        "anchorPrice": 100.0,
+        "anchorTime": "2026-05-08T09:00:00-05:00",
+        "slopePerHour": 0.0,
+        "entryValue": 100.0,
+    }
+    with (
+        patch("spx.snapshot._spx_session_ohlc", return_value=_ohlc()),
+        patch("spx.snapshot._spx_session_intraday", return_value=[
+            _bar(9, high=100.0, low=94.0, close=96.0, open_=98.0),
+        ]),
+    ):
+        block = _build_spx_replay_block(
+            _payload(direction="ASCENDING", lines=[swing_low_desc]),
+            date(2026, 5, 8),
+        )
+    assert block["verdictOutcome"] == "WIN"
+    assert block["verdictPnl"] == 4.0
+
+
 def test_replay_date_none_returns_skeleton():
     block = _build_spx_replay_block(_payload(action="TAKE"), None)
     assert block["isReplay"] is False
