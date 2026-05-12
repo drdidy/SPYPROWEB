@@ -73,11 +73,27 @@ def test_snapshot_serializes_to_camelcase_json(es_candles_ascending_inside, es_o
     assert "currentValue" in js["lines"][0]
 
 
-def test_snapshot_price_is_last_close_in_spx_space(es_candles_ascending_inside, es_offset, as_of):
-    """ES candle close + offset = SPX last."""
+def test_snapshot_price_is_last_close_in_native_es_space(es_candles_ascending_inside, es_offset, as_of):
+    """ES Channel keeps the displayed price and structure lines native to ES."""
     snap = compute_snapshot(es_candles_ascending_inside, es_offset, as_of)
-    # Last bar before 09:35 is the 09:00 bar with c=5872.00 (in SPX space).
-    assert snap.price.last == pytest.approx(5872.00)
+    # Last bar before 09:35 is the 09:00 ES bar with c=5860.00.
+    assert snap.price.last == pytest.approx(5860.00)
+
+
+def test_snapshot_six_lines_do_not_apply_es_to_spx_offset(es_candles_ascending_inside, es_offset, as_of):
+    snap = compute_snapshot(es_candles_ascending_inside, es_offset, as_of)
+    by_kind = {line.kind: line for line in snap.lines}
+
+    assert by_kind["SWING_HIGH_ASC"].anchor_price == pytest.approx(5858.00)
+    assert by_kind["SWING_HIGH_ASC"].entry_value == pytest.approx(5868.40)
+    assert by_kind["SWING_HIGH_DESC"].entry_value == pytest.approx(5847.60)
+    assert by_kind["SWING_LOW_ASC"].anchor_price == pytest.approx(5838.00)
+    assert by_kind["SWING_LOW_ASC"].entry_value == pytest.approx(5854.64)
+    assert by_kind["SWING_LOW_DESC"].entry_value == pytest.approx(5821.36)
+    assert by_kind["PREV_RTH_HIGH_ASC"].anchor_price == pytest.approx(5866.50)
+    assert by_kind["PREV_RTH_HIGH_ASC"].entry_value == pytest.approx(5862.34)
+    assert by_kind["PREV_RTH_LOW_DESC"].anchor_price == pytest.approx(5837.00)
+    assert by_kind["PREV_RTH_LOW_DESC"].entry_value == pytest.approx(5837.00)
 
 
 def test_snapshot_rejects_empty_candles(as_of):

@@ -37,7 +37,6 @@ from .channel import (
 from .confluence import evaluate as evaluate_confluence
 from .constants import DEFAULT_OTM_DISTANCE, DEFAULT_SLOPE_PER_HOUR, SPX_STRIKE_INCREMENT
 from .contracts import suggest_for_plays
-from .offset import apply_offset_to_series
 from .reentry import evaluate_reentry
 from .scenario import (
     ProjectedLine,
@@ -369,8 +368,13 @@ def compute_snapshot(
     as_of_ct = to_ct(as_of)
     session = session_date_ct(as_of_ct)
 
-    # 1. Apply ES->SPX offset to the entire series.
-    spx_candles = apply_offset_to_series(es_candles, es_to_spx_offset)
+    # 1. ES Channel structure is computed in native ES coordinates.
+    #
+    # The `es_to_spx_offset` argument is retained for API compatibility and
+    # quote diagnostics, but it must not be applied to the six structure lines.
+    # Applying basis here makes the ES chart disagree with TradingView/native
+    # ES even if the frontend later tries to subtract it back out.
+    spx_candles = es_candles
 
     # 2. Session ranges (drive direction).
     sydney = sydney_range(spx_candles, session)

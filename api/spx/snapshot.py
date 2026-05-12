@@ -1,7 +1,7 @@
-"""GET /api/spx/snapshot — current SPX Channel state for the dashboard.
+"""GET /api/spx/snapshot — current ES Channel state for the dashboard.
 
-Pulls ES hourly bars + an SPX/ES sync quote, applies the offset, and
-runs the SPX Channel engine. Returns the camelCase JSON shape defined
+Pulls ES hourly bars + an SPX/ES sync quote, keeps structure in native
+ES coordinates, and runs the Channel engine. Returns the camelCase JSON shape defined
 by ``api/_lib/spx/schema.py`` (mirrored on the web side as the
 SPXSnapshot TypeScript interface).
 
@@ -33,7 +33,6 @@ if str(_API_ROOT) not in sys.path:
     sys.path.insert(0, str(_API_ROOT))
 
 from _lib.spx_data import build_default_fetcher, build_snapshot_with_provenance  # noqa: E402
-from _lib.spx_data.historical_offset import historical_offset_for_date  # noqa: E402
 from _lib.spx.time_utils import hours_between  # noqa: E402
 
 CT = ZoneInfo("America/Chicago")
@@ -47,9 +46,8 @@ def _resolve_offset_override() -> float | None:
     broker's /ES (typical: ~80-100pt drift from back-month / back-
     adjusted continuous), the auto-computed offset (yfinance SPX -
     yfinance ES) doesn't match the broker spread. Setting this env
-    var to the broker's actual SPX_cash - /ES_active spread (e.g.
-    "28.5") forces the engine to apply that value instead of the
-    computed one, producing broker-aligned channel entries.
+    var is retained as diagnostic metadata only. ES structure lines
+    are native and do not apply the basis offset.
     """
     raw = os.environ.get("SPX_ES_OFFSET_OVERRIDE")
     if not raw:
@@ -74,7 +72,6 @@ def _build_payload(replay_date: date | None = None) -> dict:
     fetcher = build_default_fetcher()
     env_override = _resolve_offset_override()
     offset_override = env_override
-    used_historical_offset = False
     if replay_date is None:
         as_of = datetime.now(CT)
     else:
@@ -89,25 +86,12 @@ def _build_payload(replay_date: date | None = None) -> dict:
         as_of = datetime(
             replay_date.year, replay_date.month, replay_date.day, 9, 0, tzinfo=CT
         )
-        if env_override is None:
-            try:
-                hist_quote = historical_offset_for_date(replay_date)
-                offset_override = hist_quote.offset
-                used_historical_offset = True
-            except Exception:
-                # Couldn't derive historical offset; fall through to the
-                # live offset. The frontend's _meta surface still shows
-                # which offset was actually applied.
-                offset_override = None
     snap, meta = build_snapshot_with_provenance(
         fetcher,
         as_of,
         offset_override=offset_override,
     )
     payload = snap.model_dump(by_alias=True)
-    if used_historical_offset:
-        # Distinguish historical-replay offset from a real env override.
-        meta["offsetSource"] = "historical_replay"
     payload["_meta"] = _public_meta(meta)
     payload["replay"] = _build_spx_replay_block(payload, replay_date)
     return payload
@@ -332,36 +316,25 @@ def _project_payload_line(line: dict, at: datetime) -> float | None:
 
 
 def _spx_session_ohlc(d: date, offset: float) -> dict | None:
-    """Day's open/close in SPX-equivalent points for `d`.
+    """Day's open/close in native ES points for `d`.
 
-    Tries ES=F first (the engine's data source) + the supplied offset,
-    then ^GSPC, then SPY*10 — each fallback narrows but maintains
-    direction. Returns {open, close} in SPX-equivalent points, or None
-    if every source fails.
+    Tries ES=F only, because replay grading must remain in the same
+    coordinate system as the six ES structure lines. Returns None if
+    the native ES bar is unavailable.
 
     Single-day yfinance downloads are flaky, so we widen the window
     to ±3 calendar days and pick the bar matching `d`.
     """
-    # 1) ES=F + offset — preferred, matches what the engine sees.
+    # ES=F only - matches what the engine sees.
     es = _yf_daily_ohlc("ES=F", d)
     if es is not None:
-        return {"open": es["open"] + offset, "close": es["close"] + offset}
-
-    # 2) ^GSPC cash index — direct SPX value.
-    gspc = _yf_daily_ohlc("^GSPC", d)
-    if gspc is not None:
-        return gspc
-
-    # 3) SPY × 10 — closest cash proxy when both above fail.
-    spy = _yf_daily_ohlc("SPY", d)
-    if spy is not None:
-        return {"open": spy["open"] * 10, "close": spy["close"] * 10}
+        return {"open": es["open"], "close": es["close"]}
 
     return None
 
 
 def _spx_session_intraday(d: date, offset: float) -> list[dict]:
-    """RTH intraday bars in SPX-equivalent points for replay grading."""
+    """RTH intraday bars in native ES points for replay grading."""
     try:
         import yfinance as yf  # type: ignore[import-not-found]
     except Exception:
@@ -396,10 +369,10 @@ def _spx_session_intraday(d: date, offset: float) -> list[dict]:
                 continue
             out.append({
                 "time": t,
-                "open": float(row["Open"]) + offset,
-                "high": float(row["High"]) + offset,
-                "low": float(row["Low"]) + offset,
-                "close": float(row["Close"]) + offset,
+                "open": float(row["Open"]),
+                "high": float(row["High"]),
+                "low": float(row["Low"]),
+                "close": float(row["Close"]),
             })
         return out
     except Exception:

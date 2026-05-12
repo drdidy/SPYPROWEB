@@ -236,15 +236,17 @@ export interface SPXSnapshotMeta {
   quoteError: string | null;
   barsCount: number;
   lookbackHours: number;
-  // Offset actually fed into the engine (= computedOffset, unless
-  // SPX_ES_OFFSET_OVERRIDE is set, in which case = the override).
+  // Offset actually fed into the ES structure engine. This should be 0
+  // because ES lines must remain in native ES coordinates.
   appliedOffset: number;
   // Offset derived from the live quote pair, ignoring any override.
   // Useful for noticing when yfinance and your broker disagree.
   computedOffset?: number;
+  // Offset requested by env/config for diagnostics. Not applied to ES lines.
+  requestedOffset?: number;
   // "computed" or "env_override" — tells you whether the displayed
   // offset is from the live quote or from SPX_ES_OFFSET_OVERRIDE.
-  offsetSource?: "computed" | "env_override" | "historical_replay";
+  offsetSource?: "native_es" | "computed" | "env_override" | "historical_replay";
   // Sub-algorithm that produced the offset when offsetSource is
   // "computed". One of:
   //   "close_anchored"   — daily SPX close + ES bar whose close

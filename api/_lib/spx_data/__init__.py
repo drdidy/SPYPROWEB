@@ -81,7 +81,7 @@ def build_snapshot_from_fetcher(
             f"{fetcher.name} returned no ES bars in [{start}, {as_of}]"
         )
     quote = fetcher.fetch_sync_quote()
-    return compute_snapshot(bars, quote.offset, as_of, **engine_kwargs)
+    return compute_snapshot(bars, 0.0, as_of, **engine_kwargs)
 
 
 def build_snapshot_with_provenance(
@@ -121,7 +121,10 @@ def build_snapshot_with_provenance(
         )
     quote = fetcher.fetch_sync_quote()
     computed_offset = quote.offset
-    applied_offset = offset_override if offset_override is not None else computed_offset
+    requested_offset = offset_override if offset_override is not None else computed_offset
+    # ES structure is native. Keep the computed/requested basis in metadata for
+    # transparency, but do not feed it into the six-line engine.
+    applied_offset = 0.0
     snap = compute_snapshot(bars, applied_offset, as_of, **engine_kwargs)
     meta = {
         "fetcher": fetcher.name,
@@ -133,7 +136,8 @@ def build_snapshot_with_provenance(
         "lookbackHours": lookback_hours,
         "appliedOffset": round(applied_offset, 4),
         "computedOffset": round(computed_offset, 4),
-        "offsetSource": "env_override" if offset_override is not None else "computed",
+        "requestedOffset": round(requested_offset, 4),
+        "offsetSource": "native_es",
         # Sub-algorithm that produced the offset when offsetSource is
         # "computed". One of: "close_anchored" (preferred — daily SPX
         # close + ES at cash close), "intersection_1m" (last common
