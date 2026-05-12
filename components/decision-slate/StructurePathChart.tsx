@@ -1,4 +1,7 @@
+"use client";
+
 import { cn } from "@/lib/utils";
+import { useState, type KeyboardEvent, type PointerEvent } from "react";
 
 export interface StructureChartBar {
   t: string;
@@ -39,6 +42,7 @@ export function StructurePathChart({
   title?: string;
   frameless?: boolean;
 }) {
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const largeCanvas = height >= 320;
   const W = largeCanvas ? 520 : 620;
   const H = largeCanvas ? 340 : 210;
@@ -133,6 +137,21 @@ export function StructurePathChart({
     .map((bar, i) => `${i === 0 ? "M" : "L"} ${xOf(new Date(bar.t).getTime()).toFixed(1)},${yOf(bar.c).toFixed(1)}`)
     .join(" ");
   const last = bars[bars.length - 1];
+  const selectedIndex = activeIndex ?? bars.length - 1;
+  const selected = bars[Math.max(0, Math.min(bars.length - 1, selectedIndex))] ?? last;
+  const selectedMs = new Date(selected.t).getTime();
+  const selectedX = xOf(selectedMs);
+  const selectedY = yOf(selected.c);
+  const selectedLine = lines
+    .slice()
+    .sort(
+      (a, b) =>
+        Math.abs(lineValue(a, selectedMs) - selected.c) -
+        Math.abs(lineValue(b, selectedMs) - selected.c),
+    )[0];
+  const selectedLineValue = selectedLine ? lineValue(selectedLine, selectedMs) : null;
+  const tooltipX = Math.min(W - PAD_R - 116, Math.max(PAD_L + 4, selectedX + 12));
+  const tooltipY = Math.min(H - PAD_B - 54, Math.max(PAD_T + 4, selectedY - 30));
   const touches = bars.flatMap((bar) => {
     const ms = new Date(bar.t).getTime();
     return lines
@@ -202,7 +221,16 @@ export function StructurePathChart({
         className="w-full"
         style={{ height: Math.max(118, height - 38) }}
         role="img"
+        tabIndex={0}
         aria-label={`${data?.label} actual price path against engine rails`}
+        onPointerMove={(event) => {
+          setActiveIndex(nearestBarIndexFromPointer(event, bars, W, PAD_L, W - PAD_R, xOf));
+        }}
+        onPointerLeave={() => setActiveIndex(null)}
+        onFocus={() => setActiveIndex((value) => value ?? bars.length - 1)}
+        onKeyDown={(event) => {
+          setActiveIndex((value) => stepIndex(event, value ?? bars.length - 1, bars.length));
+        }}
       >
         <title>{title}</title>
         <desc>
@@ -282,6 +310,58 @@ export function StructurePathChart({
             className="structure-touch"
           />
         ))}
+        <g className="structure-hover">
+          <line
+            x1={selectedX}
+            x2={selectedX}
+            y1={PAD_T}
+            y2={H - PAD_B}
+            stroke={palette.marker}
+            strokeWidth="0.9"
+            strokeDasharray="3 4"
+            opacity="0.85"
+          />
+          <line
+            x1={PAD_L}
+            x2={W - PAD_R}
+            y1={selectedY}
+            y2={selectedY}
+            stroke={accentStroke}
+            strokeWidth="0.7"
+            strokeDasharray="2 5"
+            opacity="0.42"
+          />
+          <circle
+            cx={selectedX}
+            cy={selectedY}
+            r={largeCanvas ? 4.6 : 3.8}
+            fill={accentStroke}
+            stroke={variant === "dark" ? "#071116" : "#FFFDF7"}
+            strokeWidth="1.3"
+          />
+          <g transform={`translate(${tooltipX},${tooltipY})`}>
+            <rect
+              width="112"
+              height="50"
+              rx="7"
+              fill={variant === "dark" ? "#071116" : "#FFFDF7"}
+              stroke={accentStroke}
+              strokeOpacity="0.35"
+              filter="drop-shadow(0 8px 16px rgba(20,22,26,0.12))"
+            />
+            <text x="8" y="12" fontSize="7" fontFamily="var(--font-geist-mono)" fontWeight="700" fill={palette.axis}>
+              {shortTime(selected.t)}
+            </text>
+            <text x="8" y="27" fontSize="12" fontFamily="var(--font-geist-mono)" fontWeight="800" fill={accentStroke}>
+              {selected.c.toFixed(2)}
+            </text>
+            {selectedLine && selectedLineValue !== null && (
+              <text x="8" y="42" fontSize="7.5" fontFamily="var(--font-geist-mono)" fill={lineColor(selectedLine.tone, variant)}>
+                {selectedLine.label} {selectedLineValue.toFixed(2)}
+              </text>
+            )}
+          </g>
+        </g>
         <g>
           <line
             x1={PAD_L}
@@ -410,6 +490,44 @@ function shortTime(iso: string): string {
   } catch {
     return "--:--";
   }
+}
+
+function nearestBarIndexFromPointer(
+  event: PointerEvent<SVGSVGElement>,
+  bars: StructureChartBar[],
+  width: number,
+  minX: number,
+  maxX: number,
+  xOf: (ms: number) => number,
+): number {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const viewX = ((event.clientX - rect.left) / Math.max(1, rect.width)) * width;
+  const clamped = Math.max(minX, Math.min(maxX, viewX));
+  let bestIndex = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  bars.forEach((bar, index) => {
+    const distance = Math.abs(xOf(Date.parse(bar.t)) - clamped);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = index;
+    }
+  });
+  return bestIndex;
+}
+
+function stepIndex(
+  event: KeyboardEvent<SVGSVGElement>,
+  current: number,
+  length: number,
+): number {
+  if (event.key !== "ArrowLeft" && event.key !== "ArrowRight" && event.key !== "Home" && event.key !== "End") {
+    return current;
+  }
+  event.preventDefault();
+  if (event.key === "Home") return 0;
+  if (event.key === "End") return Math.max(0, length - 1);
+  const delta = event.key === "ArrowLeft" ? -1 : 1;
+  return Math.max(0, Math.min(length - 1, current + delta));
 }
 
 const chartStyles = `

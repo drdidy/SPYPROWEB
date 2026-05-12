@@ -4,6 +4,7 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import type { SPXSnapshot, SPXScenario, SPXAction, SPXLine } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
+import { useState, type KeyboardEvent, type PointerEvent } from "react";
 
 const scenarioLabel: Record<SPXScenario, string> = {
   ABOVE_ASCENDING: "Above active structure",
@@ -347,6 +348,7 @@ function ChannelDiagram({
   snap: SPXSnapshot;
   bars: Array<{ t: string; h: number; l: number; c: number }> | null;
 }) {
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const W = 560;
   const H = 320;
   const PAD_L = 40;
@@ -402,6 +404,8 @@ function ChannelDiagram({
       return `${index === 0 ? "M" : "L"} ${xOf(ms).toFixed(1)},${yOf(bar.c).toFixed(1)}`;
     })
     .join(" ");
+  const selectedIndex = activeIndex ?? Math.max(0, cleanBars.length - 1);
+  const selected = cleanBars[Math.max(0, Math.min(cleanBars.length - 1, selectedIndex))] ?? null;
 
   const projectAt = (
     anchorPrice: number,
@@ -454,12 +458,42 @@ function ChannelDiagram({
 
   const xNow = Math.max(PAD_L, Math.min(W - PAD_R, xOf(Math.min(Math.max(tNow, t0), tEnd))));
   const yPrice = yOf(snap.price.last);
+  const selectedMs = selected ? Date.parse(selected.t) : tNow;
+  const selectedX = Math.max(PAD_L, Math.min(W - PAD_R, xOf(selectedMs)));
+  const selectedPrice = selected?.c ?? snap.price.last;
+  const selectedY = yOf(selectedPrice);
+  const selectedLine = snap.lines
+    .slice()
+    .sort(
+      (a, b) =>
+        Math.abs(projectAt(a.anchorPrice, a.anchorTime, a.slopePerHour, selectedMs) - selectedPrice) -
+        Math.abs(projectAt(b.anchorPrice, b.anchorTime, b.slopePerHour, selectedMs) - selectedPrice),
+    )[0];
+  const selectedLineValue = selectedLine
+    ? projectAt(selectedLine.anchorPrice, selectedLine.anchorTime, selectedLine.slopePerHour, selectedMs)
+    : null;
+  const tooltipX = Math.min(W - PAD_R - 118, Math.max(PAD_L + 4, selectedX + 10));
+  const tooltipY = Math.min(H - PAD_B - 56, Math.max(PAD_T + 4, selectedY - 32));
 
   const rthOpen = new Date(snap.sessionDateCT + "T08:30:00-05:00").getTime();
   const xRTH = xOf(rthOpen);
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full spx-diagram">
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      className="w-full spx-diagram"
+      tabIndex={0}
+      role="img"
+      aria-label="ES framework chart with interactive price crosshair"
+      onPointerMove={(event) => {
+        setActiveIndex(nearestEsBarIndexFromPointer(event, cleanBars, W, PAD_L, W - PAD_R, xOf));
+      }}
+      onPointerLeave={() => setActiveIndex(null)}
+      onFocus={() => setActiveIndex((value) => value ?? Math.max(0, cleanBars.length - 1))}
+      onKeyDown={(event) => {
+        setActiveIndex((value) => stepEsIndex(event, value ?? Math.max(0, cleanBars.length - 1), cleanBars.length));
+      }}
+    >
       <style>{spxDiagramStyles}</style>
       {/* horizontal price gridlines */}
       {[0.25, 0.5, 0.75].map((f) => {
@@ -620,6 +654,59 @@ function ChannelDiagram({
           pathLength={1}
         />
       )}
+      {selected && (
+        <g className="spx-hover">
+          <line
+            x1={selectedX}
+            x2={selectedX}
+            y1={PAD_T}
+            y2={H - PAD_B}
+            stroke="#14161A"
+            strokeWidth={0.7}
+            strokeDasharray="3 4"
+            opacity={0.5}
+          />
+          <line
+            x1={PAD_L}
+            x2={W - PAD_R}
+            y1={selectedY}
+            y2={selectedY}
+            stroke="#14161A"
+            strokeWidth={0.55}
+            strokeDasharray="2 5"
+            opacity={0.35}
+          />
+          <circle
+            cx={selectedX}
+            cy={selectedY}
+            r={4.1}
+            fill="#14161A"
+            stroke="#FFFDF7"
+            strokeWidth={1.2}
+          />
+          <g transform={`translate(${tooltipX},${tooltipY})`}>
+            <rect
+              width="116"
+              height="52"
+              rx="7"
+              fill="#FFFDF7"
+              stroke="#D6CCB7"
+              filter="drop-shadow(0 8px 16px rgba(20,22,26,0.12))"
+            />
+            <text x="8" y="12" fontSize="7" fontFamily="var(--font-geist-mono)" fontWeight="700" fill="#5A5A5A">
+              {formatChartTime(selected.t)}
+            </text>
+            <text x="8" y="28" fontSize="12" fontFamily="var(--font-geist-mono)" fontWeight="800" fill="#14161A">
+              {selectedPrice.toFixed(2)}
+            </text>
+            {selectedLine && selectedLineValue !== null && (
+              <text x="8" y="44" fontSize="7.4" fontFamily="var(--font-geist-mono)" fill={lineStroke(selectedLine.kind)}>
+                {lineCode(selectedLine.kind)} {selectedLineValue.toFixed(2)}
+              </text>
+            )}
+          </g>
+        </g>
+      )}
 
       {/* anchor dots */}
       {ceiling && snap.channel.direction !== "NONE" && (
@@ -701,6 +788,55 @@ function ChannelDiagram({
 
     </svg>
   );
+}
+
+function nearestEsBarIndexFromPointer(
+  event: PointerEvent<SVGSVGElement>,
+  bars: Array<{ t: string; h: number; l: number; c: number }>,
+  width: number,
+  minX: number,
+  maxX: number,
+  xOf: (ms: number) => number,
+): number {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const viewX = ((event.clientX - rect.left) / Math.max(1, rect.width)) * width;
+  const clamped = Math.max(minX, Math.min(maxX, viewX));
+  let bestIndex = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  bars.forEach((bar, index) => {
+    const distance = Math.abs(xOf(Date.parse(bar.t)) - clamped);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = index;
+    }
+  });
+  return bestIndex;
+}
+
+function stepEsIndex(
+  event: KeyboardEvent<SVGSVGElement>,
+  current: number,
+  length: number,
+): number {
+  if (event.key !== "ArrowLeft" && event.key !== "ArrowRight" && event.key !== "Home" && event.key !== "End") {
+    return current;
+  }
+  event.preventDefault();
+  if (event.key === "Home") return 0;
+  if (event.key === "End") return Math.max(0, length - 1);
+  const delta = event.key === "ArrowLeft" ? -1 : 1;
+  return Math.max(0, Math.min(length - 1, current + delta));
+}
+
+function formatChartTime(iso: string): string {
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return "--:-- CT";
+  return `${new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(ms))} CT`;
 }
 
 function lineCode(kind: string): string {
