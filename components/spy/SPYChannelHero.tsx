@@ -8,24 +8,31 @@ import {
   type StructureChartData,
   type StructureChartLine,
 } from "@/components/decision-slate/StructurePathChart";
+import { PHASE_DEFINITIONS } from "@/content/phase-definitions";
 import type { AdaptedSnapshot, AnchorBand, AnchorGroup } from "@/lib/snapshot-adapter";
+import type { EngineState } from "@/lib/states";
 import type { DynamicLine } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowDownRight } from "lucide-react";
 
-const verdictTone: Record<string, "confirmed" | "watching" | "breached" | "stale"> = {
-  LONG: "confirmed",
-  SHORT: "breached",
+const stateTone: Record<EngineState, "armed" | "confirmed" | "watching" | "stale"> = {
+  PRE_CONFIG: "stale",
+  STAND_DOWN: "stale",
+  WATCH: "watching",
   WAIT: "watching",
-  "STAND DOWN": "stale",
+  ARMED: "armed",
+  GO: "confirmed",
+  COOLDOWN: "stale",
 };
 
-const headlineByVerdict: Record<string, string> = {
-  LONG: "Lean long",
-  SHORT: "Lean short",
-  HOLD: "Holding",
+const headlineByState: Record<EngineState, string> = {
+  PRE_CONFIG: "Awaiting setup window",
+  STAND_DOWN: "Standing down today",
+  WATCH: "Watching structure",
   WAIT: "Waiting on confirmation",
-  "STAND DOWN": "Standing down today",
+  ARMED: "Setup armed",
+  GO: "Trade active",
+  COOLDOWN: "Touch-window complete",
 };
 
 const SLOPE_PER_HOUR = 0.2;        // display fallback only; engine projects live values upstream
@@ -61,16 +68,10 @@ function buildSpyEntryFramework(
 }
 
 export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
-  const verdict = snap.decision.verdict;
   const bias = snap.bias.bias;
-  const displayedState =
-    snap.currentState === "PRE_CONFIG"
-      ? "PRE_CONFIG"
-      : verdict === "WAIT"
-        ? "WAIT"
-        : verdict === "LONG" || verdict === "SHORT"
-          ? "GO"
-          : snap.currentState;
+  const displayedState = snap.currentState;
+  const displayedStateLabel =
+    PHASE_DEFINITIONS[displayedState]?.label ?? displayedState.replace(/_/g, " ");
 
   const directionTone =
     bias === "BULLISH"
@@ -79,7 +80,10 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
         ? "text-bear-ink"
         : "text-ink-3";
 
-  const heroBg = verdict === "WAIT" ? "bg-gold-tint/40" : "bg-paper";
+  const heroBg =
+    displayedState === "WAIT" || displayedState === "ARMED"
+      ? "bg-gold-tint/40"
+      : "bg-paper";
 
   const anchor = snap.anchor;
   const primary = anchor?.primary ?? null;
@@ -139,8 +143,8 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
             </div>
             <div className="flex items-center gap-2">
               <PanelHeartbeat feedId="anchor-levels" />
-              <StatusPill variant={verdictTone[verdict] ?? "stale"} pulse>
-                {verdict}
+              <StatusPill variant={stateTone[displayedState] ?? "stale"} pulse>
+                {displayedStateLabel}
               </StatusPill>
               <WhyThisStateLink
                 engine="SPY"
@@ -150,7 +154,7 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
                   weight: event.weight,
                 }))}
                 flipCondition={snap.flipCondition}
-                currentStateLabel={displayedState.replace(/_/g, " ")}
+                currentStateLabel={displayedStateLabel}
                 className="hidden h-7 items-center gap-1.5 rounded-pill border border-rule bg-paper px-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-2 transition-colors hover:border-rule-strong hover:bg-paper-2 sm:inline-flex"
               />
             </div>
@@ -160,14 +164,14 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
             <ArrowDownRight className={`${directionTone} -mb-2`} size={36} strokeWidth={1.25} />
             <AnimatePresence mode="wait">
               <motion.h1
-                key={verdict}
+                key={displayedState}
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -12 }}
                 transition={{ duration: 0.32, ease: [0.2, 0.8, 0.2, 1] }}
                 className={`text-display font-serif tracking-tight ${directionTone} leading-[1.02]`}
               >
-                {headlineByVerdict[verdict] ?? verdict}
+                {headlineByState[displayedState] ?? displayedStateLabel}
               </motion.h1>
             </AnimatePresence>
           </div>
@@ -223,9 +227,8 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
           </div>
 
           <p className="mt-7 text-[15px] text-ink-2 leading-relaxed max-w-xl">
-            {synthesisLine(snap, nearestRead, displayedState)}
             {primary ? (
-              <span className="block mt-2 text-ink-3 text-[13.5px]">
+              <span className="block text-ink-3 text-[13.5px]">
                 {primary.role === "ANCHOR_2" ? "Anchor 2" : "Primary anchor"} ·
                 low <span className="font-mono">{primary.anchorLow.toFixed(2)}</span> ·
                 set <span className="font-mono">{anchorTimeLabel(primary)}</span> CT.
@@ -319,11 +322,26 @@ function synthesisLine(
 ): string {
   const bias = snap.bias.bias.toLowerCase();
   const state = displayedState.replace(/_/g, " ").toLowerCase();
-  if (nearestRead) {
-    const relation = nearestRead.dist >= 0 ? "below LAST" : "above LAST";
-    return `${capitalize(bias)} lean, but no qualified confirmation yet - engine ${state} because ${nearestRead.label} (${nearestRead.value.toFixed(2)}) remains ${Math.abs(nearestRead.dist).toFixed(2)} pts ${relation}.`;
+  const engineCondition = cleanSpyExplanation(snap.flipCondition, snap.currentPrice);
+  if (
+    engineCondition &&
+    (displayedState === "ARMED" || displayedState === "GO" || displayedState === "COOLDOWN")
+  ) {
+    return `${capitalize(bias)} lean, engine ${state}. ${engineCondition}`;
   }
-  return `${capitalize(bias)} lean, but no qualified confirmation yet - engine ${state} until SPY structure becomes actionable.`;
+  if (nearestRead) {
+    const relation = nearestRead.dist >= 0 ? "above LAST" : "below LAST";
+    const action =
+      displayedState === "WAIT" || displayedState === "WATCH"
+        ? "waiting for qualified confirmation"
+        : displayedState === "STAND_DOWN"
+          ? "standing down until structure reactivates"
+          : displayedState === "PRE_CONFIG"
+            ? "awaiting the setup window"
+            : "tracking the active state";
+    return `${capitalize(bias)} lean, engine ${state}; ${nearestRead.label} (${nearestRead.value.toFixed(2)}) sits ${Math.abs(nearestRead.dist).toFixed(2)} pts ${relation}, ${action}.`;
+  }
+  return `${capitalize(bias)} lean, engine ${state} until SPY structure becomes actionable.`;
 }
 
 function cleanSpyExplanation(text: string, spot: number): string {

@@ -194,20 +194,38 @@ function EsContextStrip({ snap }: { snap: AdaptedSnapshot }) {
 
 function heroSynthesis(snap: AdaptedSnapshot): string {
   const bias = snap.bias.bias.toLowerCase();
-  const state = statePhrase(displayedChannelState(snap));
+  const displayedState = displayedChannelState(snap);
+  const state = statePhrase(displayedState);
+  const engineCondition = cleanSpyExplanation(snap.flipCondition, snap.currentPrice);
+  if (
+    engineCondition &&
+    (displayedState === "ARMED" || displayedState === "GO" || displayedState === "COOLDOWN")
+  ) {
+    return `${capitalize(bias)} lean, engine ${state}; ${engineCondition}`;
+  }
   const closest = snap.lines
     .slice()
     .sort((a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice))[0];
   const lineText = closest
     ? `${closest.name} (${(closest.entryValue ?? closest.currentValue).toFixed(2)})`
     : "a qualified SPY rail";
+  const lineValue = closest ? closest.entryValue ?? closest.currentValue : null;
+  const signedDistance = lineValue === null ? null : lineValue - snap.currentPrice;
   const distanceText = closest
-    ? `${Math.abs(closest.distanceFromPrice).toFixed(2)} pts ${closest.distanceFromPrice >= 0 ? "above" : "below"}`
+    ? `${Math.abs(signedDistance ?? closest.distanceFromPrice).toFixed(2)} pts ${(signedDistance ?? closest.distanceFromPrice) >= 0 ? "above" : "below"}`
     : "away from";
   const flowTail = snap.flow
     ? ` Options flow ${snap.flow.lean.toLowerCase()} (${snap.flow.bullishCount} bull / ${snap.flow.bearishCount} bear).`
     : "";
-  return `${capitalize(bias)} lean, engine ${state}; SPY ${snap.currentPrice.toFixed(2)} sits ${distanceText} the 09:00 reference ${lineText}. Waiting for qualified confirmation.${flowTail}`;
+  const action =
+    displayedState === "WAIT" || displayedState === "WATCH"
+      ? "Waiting for qualified confirmation."
+      : displayedState === "STAND_DOWN"
+        ? "Standing down until structure reactivates."
+        : displayedState === "PRE_CONFIG"
+          ? "Awaiting the setup window."
+          : "Tracking the current state.";
+  return `${capitalize(bias)} lean, engine ${state}; SPY ${snap.currentPrice.toFixed(2)} sits ${distanceText} the 09:00 reference ${lineText}. ${action}${flowTail}`;
 }
 
 function cleanSpyExplanation(text: string, spot: number): string {
@@ -242,9 +260,6 @@ function statePhrase(state: string): string {
 }
 
 function displayedChannelState(snap: AdaptedSnapshot): AdaptedSnapshot["currentState"] {
-  if (snap.currentState === "PRE_CONFIG") return "PRE_CONFIG";
-  if (snap.decision.verdict === "WAIT") return "WAIT";
-  if (snap.decision.verdict === "LONG" || snap.decision.verdict === "SHORT") return "GO";
   return snap.currentState;
 }
 
