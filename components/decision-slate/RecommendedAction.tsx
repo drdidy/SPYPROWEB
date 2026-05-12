@@ -97,7 +97,12 @@ export function RecommendedAction({
       : spyState === "ARMED" || spxState === "ARMED"
         ? 82
       : 72;
-  const activeChart = rec.id === "live-spx" ? spxChart : spyChart ?? spxChart;
+  const activeChart =
+    rec.id === "live-spx"
+      ? spxChart
+      : rec.id === "live-spy"
+        ? spyChart
+        : spyChart ?? spxChart;
   const activeProjection =
     rec.id === "live-spx" ? spxProjection : spyProjection ?? spxProjection;
   const chartAccent =
