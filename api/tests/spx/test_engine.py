@@ -8,29 +8,29 @@ def test_snapshot_basic_shape(es_candles_ascending_inside, es_offset, as_of):
     snap = compute_snapshot(es_candles_ascending_inside, es_offset, as_of)
     assert snap.symbol == "SPX"
     assert snap.session_date_ct == "2026-05-08"
-    # Channel resolves ASCENDING from synthetic Tokyo HH+HL.
+    # Six-line framework is active after overnight swing closes resolve.
     assert snap.channel.direction == "ASCENDING"
-    # Five lines: 2 channel rails, 2 prev-RTH play refs, 1 RTH bias gate.
-    assert len(snap.lines) == 5
+    assert len(snap.lines) == 6
     kinds = {l.kind for l in snap.lines}
     assert kinds == {
-        "CHANNEL_FLOOR",
-        "CHANNEL_CEILING",
         "PREV_RTH_HIGH_ASC",
         "PREV_RTH_LOW_DESC",
-        "PREV_RTH_HIGH_DESC",
+        "SWING_HIGH_ASC",
+        "SWING_HIGH_DESC",
+        "SWING_LOW_ASC",
+        "SWING_LOW_DESC",
     }
     assert snap.rth_bias is not None
-    assert snap.rth_bias.reference_line == "PREV_RTH_HIGH_DESC"
+    assert snap.rth_bias.reference_line in ("SWING_HIGH_DESC", "SWING_LOW_ASC")
 
 
 def test_snapshot_inside_ascending_with_plays(es_candles_ascending_inside, es_offset, as_of):
     snap = compute_snapshot(es_candles_ascending_inside, es_offset, as_of)
-    assert snap.scenario == "INSIDE_ASCENDING"
+    assert snap.scenario == "INSIDE_DESCENDING"
     assert snap.plays.primary is not None
     assert snap.plays.alternate is not None
     assert snap.plays.primary.side == "BUY"
-    assert snap.plays.primary.entry_line == "CHANNEL_FLOOR"
+    assert snap.plays.primary.entry_line in ("SWING_HIGH_DESC", "SWING_LOW_ASC")
     assert snap.plays.alternate.side == "SELL"
 
 

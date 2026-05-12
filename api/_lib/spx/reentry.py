@@ -1,17 +1,15 @@
-"""Channel re-entry / breakout confirmation watch.
+"""Line re-entry / rejection confirmation watch.
 
-Per spec:
+Per current ES rules:
 
-  Above the channel:
-    A bearish candle that touches the ceiling and CLOSES ABOVE it
-    triggers a continuation BUY from above.
+  Buy trigger:
+    A bearish candle drops to a watched line and CLOSES ABOVE it.
 
-  Below the channel:
-    A bullish candle that touches the floor and CLOSES BELOW it
-    triggers a continuation SELL from below.
+  Sell trigger:
+    A bullish candle rises to a watched line and CLOSES BELOW it.
 
-The watch state lives between bars: 'inside' means dormant; outside the
-channel it arms and waits for the touch-and-close pattern.
+The watch state lives between hourly bars: inside means dormant; outside the
+six-line framework arms and waits for the touch-and-close pattern.
 """
 from __future__ import annotations
 
@@ -58,14 +56,14 @@ def evaluate_reentry(
         return ReentryWatch(
             active=False,
             side=None,
-            detail="Inside channel — re-entry watch dormant.",
+            detail="Inside channel Ã¢â‚¬â€ re-entry watch dormant.",
         )
 
     if scenario == "OUTSIDE_PLAY":
         return ReentryWatch(
             active=False,
             side=None,
-            detail="Outside the planned play — no re-entry watch today.",
+            detail="Outside the planned play Ã¢â‚¬â€ no re-entry watch today.",
         )
 
     if scenario in ("ABOVE_ASCENDING", "ABOVE_DESCENDING"):
@@ -73,7 +71,7 @@ def evaluate_reentry(
             return ReentryWatch(
                 active=True,
                 side="BUY_FROM_ABOVE",
-                detail="Above channel — awaiting bearish candle that touches ceiling and closes above it.",
+                detail="Above channel Ã¢â‚¬â€ awaiting bearish candle that touches ceiling and closes above it.",
             )
         ceil_at_close = project_line(ceiling, last_candle.t)
         touched = last_candle.l <= ceil_at_close <= last_candle.h
@@ -84,13 +82,13 @@ def evaluate_reentry(
                 side="BUY_FROM_ABOVE",
                 detail=(
                     f"Bearish candle touched ceiling ({ceil_at_close:.2f}) and "
-                    f"closed above ({last_candle.c:.2f}) — continuation buy confirmed."
+                    f"closed above ({last_candle.c:.2f}) Ã¢â‚¬â€ continuation buy confirmed."
                 ),
             )
         return ReentryWatch(
             active=True,
             side="BUY_FROM_ABOVE",
-            detail="Above channel — awaiting bearish candle that touches ceiling and closes above it.",
+            detail="Above channel Ã¢â‚¬â€ awaiting bearish candle that touches ceiling and closes above it.",
         )
 
     # BELOW_*
@@ -98,7 +96,7 @@ def evaluate_reentry(
         return ReentryWatch(
             active=True,
             side="SELL_FROM_BELOW",
-            detail="Below channel — awaiting bullish candle that touches floor and closes below it.",
+            detail="Below channel Ã¢â‚¬â€ awaiting bullish candle that touches floor and closes below it.",
         )
     floor_at_close = project_line(floor, last_candle.t)
     touched = last_candle.l <= floor_at_close <= last_candle.h
@@ -109,11 +107,11 @@ def evaluate_reentry(
             side="SELL_FROM_BELOW",
             detail=(
                 f"Bullish candle touched floor ({floor_at_close:.2f}) and "
-                f"closed below ({last_candle.c:.2f}) — continuation sell confirmed."
+                f"closed below ({last_candle.c:.2f}) Ã¢â‚¬â€ continuation sell confirmed."
             ),
         )
     return ReentryWatch(
         active=True,
         side="SELL_FROM_BELOW",
-        detail="Below channel — awaiting bullish candle that touches floor and closes below it.",
+        detail="Below channel Ã¢â‚¬â€ awaiting bullish candle that touches floor and closes below it.",
     )

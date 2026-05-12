@@ -26,8 +26,8 @@ def test_score_in_range_and_action_take(es_candles_ascending_inside, es_offset, 
     high, low = overnight_anchors(spx, session_date)
     lines = build_lines(direction=ch.direction, overnight_high=high, overnight_low=low,
                        prev_rth_high=None, prev_rth_low=None)
-    ceiling = next((l for l in lines if l.kind == "CHANNEL_CEILING"), None)
-    floor = next((l for l in lines if l.kind == "CHANNEL_FLOOR"), None)
+    ceiling = next((l for l in lines if l.kind == "SWING_HIGH_DESC"), None)
+    floor = next((l for l in lines if l.kind == "SWING_LOW_ASC"), None)
 
     res = evaluate(
         candles=spx, session_date=session_date, channel=ch,
@@ -68,8 +68,8 @@ def test_factors_contain_only_implemented_slots(es_candles_ascending_inside, es_
     high, low = overnight_anchors(spx, session_date)
     lines = build_lines(direction=ch.direction, overnight_high=high, overnight_low=low,
                        prev_rth_high=None, prev_rth_low=None)
-    ceiling = next((l for l in lines if l.kind == "CHANNEL_CEILING"), None)
-    floor = next((l for l in lines if l.kind == "CHANNEL_FLOOR"), None)
+    ceiling = next((l for l in lines if l.kind == "SWING_HIGH_DESC"), None)
+    floor = next((l for l in lines if l.kind == "SWING_LOW_ASC"), None)
 
     res = evaluate(
         candles=spx, session_date=session_date, channel=ch,
@@ -88,8 +88,8 @@ def test_no_unimplemented_placeholder_factors_are_emitted(es_candles_ascending_i
     high, low = overnight_anchors(spx, session_date)
     lines = build_lines(direction=ch.direction, overnight_high=high, overnight_low=low,
                        prev_rth_high=None, prev_rth_low=None)
-    ceiling = next((l for l in lines if l.kind == "CHANNEL_CEILING"), None)
-    floor = next((l for l in lines if l.kind == "CHANNEL_FLOOR"), None)
+    ceiling = next((l for l in lines if l.kind == "SWING_HIGH_DESC"), None)
+    floor = next((l for l in lines if l.kind == "SWING_LOW_ASC"), None)
 
     res = evaluate(
         candles=spx, session_date=session_date, channel=ch,

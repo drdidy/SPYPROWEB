@@ -20,12 +20,12 @@ def _line(kind, anchor_price, anchor_hour, slope):
 
 def _ceiling():
     # 5872.40 anchor at 23:00 prev day, +1.04/hr.
-    return _line("CHANNEL_CEILING", 5872.40, 23, 1.04)
+    return _line("SWING_HIGH_DESC", 5872.40, 23, -1.04)
 
 
 def _floor():
-    # 5848.20 anchor at 17:00 prev day, +1.04/hr (ascending channel).
-    return _line("CHANNEL_FLOOR", 5848.20, 17, 1.04)
+    # 5848.20 anchor at 17:00 prev day, +1.04/hr.
+    return _line("SWING_LOW_ASC", 5848.20, 17, 1.04)
 
 
 def test_inside_channel_dormant():
@@ -44,7 +44,7 @@ def test_above_armed_without_qualifying_candle():
     # Ceiling at 09:00 today = 5872.40 + 10 * 1.04 = 5882.80
     bar = Candle(
         t=datetime(2026, 5, 8, 9, tzinfo=CT),
-        o=5885.00, h=5888.00, l=5884.00, c=5887.00,  # bullish
+        o=5865.00, h=5868.00, l=5864.00, c=5867.00,  # bullish
     )
     w = evaluate_reentry("ABOVE_ASCENDING", bar, _ceiling(), _floor())
     assert w.active is True
@@ -56,7 +56,7 @@ def test_above_triggered_by_bearish_touch_and_close_above():
     # Bearish candle that touches ceiling (5882.80 at 09:00) and closes above.
     bar = Candle(
         t=datetime(2026, 5, 8, 9, tzinfo=CT),
-        o=5890.00, h=5891.00, l=5882.50, c=5884.00,  # bearish (c < o), low <= 5882.80 <= high, c > 5882.80
+        o=5868.00, h=5869.00, l=5861.50, c=5864.00,  # bearish, low <= 5862.00 <= high, c > 5862.00
     )
     w = evaluate_reentry("ABOVE_ASCENDING", bar, _ceiling(), _floor())
     assert w.active is True

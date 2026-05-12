@@ -14,13 +14,13 @@ import type {
 import { ArrowDown, ArrowUp } from "lucide-react";
 
 const lineLabel: Record<SPXLineKind, string> = {
-  CHANNEL_CEILING: "Channel Ceiling",
-  CHANNEL_FLOOR: "Channel Floor",
-  PREV_RTH_HIGH_ASC: "Prev RTH High · Asc",
-  PREV_RTH_LOW_DESC: "Prev RTH Low · Desc",
-  PREV_RTH_HIGH_DESC: "Prev RTH High · Desc Bias",
+  PREV_RTH_HIGH_ASC: "Prev RTH High - Asc",
+  PREV_RTH_LOW_DESC: "Prev RTH Low - Desc",
+  SWING_HIGH_ASC: "Swing High - Asc",
+  SWING_HIGH_DESC: "Swing High - Desc",
+  SWING_LOW_ASC: "Swing Low - Asc",
+  SWING_LOW_DESC: "Swing Low - Desc",
 };
-
 export function SPXPlaysSlate({
   snap,
   optionsChain,

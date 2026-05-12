@@ -28,7 +28,7 @@ def test_build_snapshot_pulls_bars_and_offset_then_runs_engine(
 
     assert snap.symbol == "SPX"
     assert snap.channel.direction == "ASCENDING"
-    assert snap.scenario == "INSIDE_ASCENDING"
+    assert snap.scenario == "INSIDE_DESCENDING"
     # The fetcher was asked for the lookback window.
     fetcher.fetch_es_bars.assert_called_once()
     start_arg, end_arg = fetcher.fetch_es_bars.call_args.args

@@ -18,28 +18,28 @@ def _payload(action: str = "STAND_DOWN", direction: str = "ASCENDING", offset: f
         "plays": {
             "primary": {
                 "side": "BUY",
-                "entryLine": "CHANNEL_FLOOR",
+                "entryLine": "SWING_LOW_ASC",
                 "entryPrice": 100.0,
-                "exitLine": "CHANNEL_CEILING",
+                "exitLine": "SWING_HIGH_DESC",
                 "exitPrice": 110.0,
             },
             "alternate": {
                 "side": "SELL",
-                "entryLine": "CHANNEL_CEILING",
+                "entryLine": "SWING_HIGH_DESC",
                 "entryPrice": 110.0,
-                "exitLine": "CHANNEL_FLOOR",
+                "exitLine": "SWING_LOW_ASC",
                 "exitPrice": 100.0,
             }
         },
         "lines": [
             {
-                "kind": "CHANNEL_FLOOR",
+                "kind": "SWING_LOW_ASC",
                 "anchorPrice": 100.0,
                 "anchorTime": "2026-05-08T09:00:00-05:00",
                 "slopePerHour": 0.0,
             },
             {
-                "kind": "CHANNEL_CEILING",
+                "kind": "SWING_HIGH_DESC",
                 "anchorPrice": 110.0,
                 "anchorTime": "2026-05-08T09:00:00-05:00",
                 "slopePerHour": 0.0,

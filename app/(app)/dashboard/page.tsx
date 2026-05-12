@@ -599,8 +599,8 @@ function spyStructureLevels(snap: AdaptedSnapshot): StructureLevels {
 }
 
 function spxStructureLevels(snap: SPXSnapshot): StructureLevels {
-  const ceiling = snap.lines.find((line) => line.kind === "CHANNEL_CEILING");
-  const floor = snap.lines.find((line) => line.kind === "CHANNEL_FLOOR");
+  const ceiling = snap.lines.find((line) => line.kind === "SWING_HIGH_DESC");
+  const floor = snap.lines.find((line) => line.kind === "SWING_LOW_ASC");
   const upper = ceiling?.currentValue ?? snap.overnight.high.price ?? null;
   const lower = floor?.currentValue ?? snap.overnight.low.price ?? null;
   const anchor =
@@ -672,9 +672,9 @@ function buildSpxStructureChart(
       anchorPrice: line.anchorPrice,
       slopePerHour: line.slopePerHour,
       tone:
-        line.kind === "CHANNEL_CEILING"
+        line.kind === "SWING_HIGH_DESC"
           ? "upper"
-          : line.kind === "CHANNEL_FLOOR"
+          : line.kind === "SWING_LOW_ASC"
             ? "lower"
             : "reference",
     }))
@@ -700,11 +700,12 @@ function normalizeChartBars(
 
 function shortSpxLineLabel(kind: string): string {
   const m: Record<string, string> = {
-    CHANNEL_CEILING: "Ceil",
-    CHANNEL_FLOOR: "Floor",
+    SWING_HIGH_DESC: "Swing H dn",
+    SWING_LOW_ASC: "Swing L up",
     PREV_RTH_HIGH_ASC: "Prev H",
     PREV_RTH_LOW_DESC: "Prev L",
-    PREV_RTH_HIGH_DESC: "Bias",
+    SWING_HIGH_ASC: "Swing H up",
+    SWING_LOW_DESC: "Swing L dn",
   };
   return m[kind] || "Ref";
 }
@@ -1096,7 +1097,7 @@ function SpxVerdictCard({
 
 function SpxReadCard({ snap }: { snap: SPXSnapshot }) {
   const sorted = snap.lines
-    .filter((line) => line.kind !== "PREV_RTH_HIGH_DESC")
+    .filter((line) => true)
     .sort(
       (a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice),
     );
@@ -1111,8 +1112,8 @@ function SpxReadCard({ snap }: { snap: SPXSnapshot }) {
         <span className="flex items-center gap-2 flex-wrap">
           <span>{empty ? "No active levels" : `${top.length} active level${top.length === 1 ? "" : "s"}`}</span>
           <InfoTooltip
-            label="Channel rail"
-            content="A primary rail of the overnight channel projected into RTH — used for rejection / break confirmation."
+            label="ES structure line"
+            content="One of the six ES structure lines projected into RTH and watched for hourly-close rejection."
           />
         </span>
       }
@@ -1517,22 +1518,24 @@ function spyLineHint(name: string): string {
 
 function spxLineLabel(kind: string): string {
   const m: Record<string, string> = {
-    CHANNEL_CEILING: "Channel ceiling",
-    CHANNEL_FLOOR: "Channel floor",
+    SWING_HIGH_DESC: "Swing high descending",
+    SWING_LOW_ASC: "Swing low ascending",
     PREV_RTH_HIGH_ASC: "Prev RTH high · ascending",
     PREV_RTH_LOW_DESC: "Prev RTH low · descending",
-    PREV_RTH_HIGH_DESC: "Prev RTH high · descending bias",
+    SWING_HIGH_ASC: "Swing high ascending",
+    SWING_LOW_DESC: "Swing low descending",
   };
   return m[kind] || kind;
 }
 
 function spxLineHint(kind: string): string {
   const m: Record<string, string> = {
-    CHANNEL_CEILING: "Top rail of the overnight channel, projected forward.",
-    CHANNEL_FLOOR: "Bottom rail of the overnight channel, projected forward.",
+    SWING_HIGH_DESC: "Descending line from the overnight swing-high close.",
+    SWING_LOW_ASC: "Ascending line from the overnight swing-low close.",
     PREV_RTH_HIGH_ASC: "Yesterday's RTH high, projected upward.",
     PREV_RTH_LOW_DESC: "Yesterday's RTH low, projected downward.",
-    PREV_RTH_HIGH_DESC: "Yesterday's RTH high, projected downward as the RTH-open bias gate.",
+    SWING_HIGH_ASC: "Ascending line from the overnight swing-high close.",
+    SWING_LOW_DESC: "Descending line from the overnight swing-low close.",
   };
   return m[kind] || "Engine-generated ES reference line.";
 }

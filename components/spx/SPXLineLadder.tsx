@@ -4,34 +4,45 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import type { SPXLine, SPXLineKind } from "@/lib/types";
 
 const lineMeta: Record<SPXLineKind, { dot: string; label: string; group: string }> = {
-  CHANNEL_CEILING: { dot: "bg-bear", label: "Channel Ceiling", group: "Active channel" },
-  CHANNEL_FLOOR: { dot: "bg-bull", label: "Channel Floor", group: "Active channel" },
   PREV_RTH_HIGH_ASC: {
     dot: "bg-ink-4",
-    label: "Prev RTH High · Asc",
-    group: "Reference",
+    label: "Prev RTH High - Asc",
+    group: "Outer reference",
   },
   PREV_RTH_LOW_DESC: {
     dot: "bg-ink-4",
-    label: "Prev RTH Low · Desc",
-    group: "Reference",
+    label: "Prev RTH Low - Desc",
+    group: "Outer reference",
   },
-  PREV_RTH_HIGH_DESC: {
+  SWING_HIGH_ASC: {
     dot: "bg-gold",
-    label: "Prev RTH High · Desc Bias",
-    group: "RTH bias",
+    label: "Swing High - Asc",
+    group: "Overnight swing",
+  },
+  SWING_HIGH_DESC: {
+    dot: "bg-bear",
+    label: "Swing High - Desc",
+    group: "Overnight swing",
+  },
+  SWING_LOW_ASC: {
+    dot: "bg-bull",
+    label: "Swing Low - Asc",
+    group: "Overnight swing",
+  },
+  SWING_LOW_DESC: {
+    dot: "bg-gold",
+    label: "Swing Low - Desc",
+    group: "Overnight swing",
   },
 };
 
 function lineState(kind: SPXLineKind, distance: number): "armed" | "watching" | "stale" | "reference" | "bias" {
-  if (kind === "PREV_RTH_HIGH_DESC") return "bias";
-  if (lineMeta[kind].group === "Reference") return "reference";
+  if (lineMeta[kind].group === "Outer reference") return "reference";
   const a = Math.abs(distance);
   if (a <= 3) return "armed";
   if (a <= 15) return "watching";
   return "stale";
 }
-
 export function SPXLineLadder({ lines, price }: { lines: SPXLine[]; price: number }) {
   return (
     <Card>

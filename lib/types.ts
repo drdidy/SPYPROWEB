@@ -159,11 +159,12 @@ export type SPXScenario =
   | "OUTSIDE_PLAY"; // scenario 7: stand down
 
 export type SPXLineKind =
-  | "CHANNEL_CEILING"
-  | "CHANNEL_FLOOR"
   | "PREV_RTH_HIGH_ASC"
   | "PREV_RTH_LOW_DESC"
-  | "PREV_RTH_HIGH_DESC";
+  | "SWING_HIGH_ASC"
+  | "SWING_HIGH_DESC"
+  | "SWING_LOW_ASC"
+  | "SWING_LOW_DESC";
 
 export type SPXAction = "TAKE" | "SELECTIVE" | "STAND_DOWN";
 

@@ -1,24 +1,15 @@
 """Scenario classifier + primary/alternate play construction.
 
-Given the active channel (lines projected to `now`) and the current
-SPX price, classify into one of seven scenarios and produce the
-trade pair (primary + alternate) per the spec.
+ES now classifies price against a six-line framework:
 
-Trade map (ascending channel; descending mirrors with sides flipped):
+  - ascending and descending projections from the overnight swing-high close
+  - ascending and descending projections from the overnight swing-low close
+  - previous RTH high ascending for high-side sell entries or buy exits
+  - previous RTH low descending for low-side buy entries or sell exits
 
-  ABOVE_ASCENDING
-    primary  = BUY  at channel ceiling, exit at prev RTH high asc
-    alternate= SELL at prev RTH high asc, exit at channel ceiling
-
-  INSIDE_ASCENDING
-    primary  = BUY  at channel floor, exit at channel ceiling
-    alternate= SELL at channel ceiling, exit at channel floor
-
-  BELOW_ASCENDING
-    primary  = BUY  at prev RTH low desc, exit at channel floor
-    alternate= SELL at channel floor, exit at prev RTH low desc
-
-  OUTSIDE_PLAY (scenario 7) — stand down. No primary, no alternate.
+Hourly confirmation remains rule-based: buys require a bearish touch that
+closes above the line, and sells require a bullish touch that closes below the
+line. The legacy scenario names are retained for API compatibility.
 """
 from __future__ import annotations
 
@@ -74,44 +65,34 @@ def _by_kind(lines: list[ProjectedLine]) -> dict[LineKind, float]:
 def classify(
     direction: ChannelDirection, price: float, lines: list[ProjectedLine]
 ) -> Scenario:
-    """Map (direction, price, projected lines) to one of 7 scenarios.
+    """Map price and projected lines to one of the existing scenario tags.
 
-    OUTSIDE_PLAY when price is past the prev-RTH-high asc above OR past the
-    prev-RTH-low desc below — the user's hard rule for "far outside".
+    The direction parameter is retained for compatibility. ES no longer
+    relies on Sydney/Tokyo direction; it reads price against the swing-high
+    and swing-low ascending/descending pairs.
     """
-    if direction == "NONE":
-        return "OUTSIDE_PLAY"
-
     by = _by_kind(lines)
-    ceiling = by.get("CHANNEL_CEILING")
-    floor = by.get("CHANNEL_FLOOR")
+    swing_high_asc = by.get("SWING_HIGH_ASC")
+    swing_high_desc = by.get("SWING_HIGH_DESC")
+    swing_low_asc = by.get("SWING_LOW_ASC")
+    swing_low_desc = by.get("SWING_LOW_DESC")
     prev_high = by.get("PREV_RTH_HIGH_ASC")
     prev_low = by.get("PREV_RTH_LOW_DESC")
 
-    if ceiling is not None and floor is not None and floor >= ceiling:
+    if None in (swing_high_asc, swing_high_desc, swing_low_asc, swing_low_desc):
         return "OUTSIDE_PLAY"
 
-    if ceiling is None or floor is None:
-        # Channel rails missing despite a non-NONE direction — defensive.
-        return "OUTSIDE_PLAY"
-
-    # Far-outside check: past the prev-RTH reference lines.
     if prev_high is not None and price > prev_high:
-        return "OUTSIDE_PLAY"
+        return "ABOVE_ASCENDING"
     if prev_low is not None and price < prev_low:
-        return "OUTSIDE_PLAY"
+        return "BELOW_DESCENDING"
 
-    if direction == "ASCENDING":
-        if price > ceiling:
-            return "ABOVE_ASCENDING"
-        if price < floor:
-            return "BELOW_ASCENDING"
-        return "INSIDE_ASCENDING"
+    assert swing_high_asc is not None and swing_high_desc is not None
+    assert swing_low_asc is not None and swing_low_desc is not None
 
-    # DESCENDING
-    if price > ceiling:
-        return "ABOVE_DESCENDING"
-    if price < floor:
+    if price > swing_high_asc and price > swing_high_desc:
+        return "ABOVE_ASCENDING"
+    if price < swing_low_asc and price < swing_low_desc:
         return "BELOW_DESCENDING"
     return "INSIDE_DESCENDING"
 
@@ -119,33 +100,29 @@ def classify(
 def explain_scenario(scenario: Scenario, price: float, lines: list[ProjectedLine]) -> str:
     """Human-readable one-liner describing where price sits."""
     by = _by_kind(lines)
-    ceiling = by.get("CHANNEL_CEILING")
-    floor = by.get("CHANNEL_FLOOR")
+    upper = by.get("SWING_HIGH_DESC")
+    lower = by.get("SWING_LOW_ASC")
     if scenario == "OUTSIDE_PLAY":
-        return (
-            f"Last print {price:.2f} is outside the planned play envelope — "
-            "no trade today."
-        )
+        return f"Last print {price:.2f} does not have a complete six-line ES framework yet."
     if scenario in ("INSIDE_ASCENDING", "INSIDE_DESCENDING"):
-        assert ceiling is not None and floor is not None
+        pair = _ordered_swing_pair(by)
+        assert pair is not None
+        lower_pair, upper_pair = pair
         return (
-            f"Last print {price:.2f} sits inside the channel — "
-            f"{price - floor:+.2f} above floor, {ceiling - price:+.2f} below ceiling. "
-            "Both rails are reachable on the session."
+            f"Last print {price:.2f} sits inside the ES six-line framework - "
+            f"{price - lower_pair[1]:+.2f} above {lower_pair[0].lower()}, "
+            f"{upper_pair[1] - price:+.2f} below {upper_pair[0].lower()}. "
+            "Wait for an hourly rejection into a line."
         )
     if scenario in ("ABOVE_ASCENDING", "ABOVE_DESCENDING"):
-        assert ceiling is not None
         return (
-            f"Last print {price:.2f} is above the channel ceiling "
-            f"({ceiling:.2f}) — ceiling now acts as support."
+            f"Last print {price:.2f} is above both swing-high lines - "
+            "previous RTH high ascending becomes the sell entry or buy-exit reference."
         )
-    # BELOW_*
-    assert floor is not None
     return (
-        f"Last print {price:.2f} is below the channel floor "
-        f"({floor:.2f}) — floor now acts as resistance."
+        f"Last print {price:.2f} is below both swing-low lines - "
+        "previous RTH low descending becomes the buy entry or sell-exit reference."
     )
-
 
 # ---------------------------------------------------------------------------
 # Plays
@@ -176,10 +153,25 @@ def _trade(
     )
 
 
+def _ordered_swing_pair(
+    by: dict[LineKind, float],
+) -> Optional[tuple[tuple[LineKind, float], tuple[LineKind, float]]]:
+    candidates: list[tuple[LineKind, float]] = []
+    for kind in ("SWING_HIGH_DESC", "SWING_LOW_ASC"):
+        if kind in by:
+            candidates.append((kind, by[kind]))
+    if len(candidates) != 2:
+        return None
+    low, high = sorted(candidates, key=lambda item: item[1])
+    if low[1] >= high[1]:
+        return None
+    return low, high
+
+
 def build_plays(scenario: Scenario, lines: list[ProjectedLine]) -> Plays:
     """Primary + alternate per the spec.
 
-    Descending mirrors ascending — same line roles, same play shape;
+    Descending mirrors ascending Ã¢â‚¬â€ same line roles, same play shape;
     direction-specific scenario tags are decorative.
     """
     by = _by_kind(lines)
@@ -188,16 +180,20 @@ def build_plays(scenario: Scenario, lines: list[ProjectedLine]) -> Plays:
         return Plays(None, None)
 
     if scenario in ("ABOVE_ASCENDING", "ABOVE_DESCENDING"):
-        primary = _trade("BUY", "CHANNEL_CEILING", "PREV_RTH_HIGH_ASC", by)
-        alternate = _trade("SELL", "PREV_RTH_HIGH_ASC", "CHANNEL_CEILING", by)
+        primary = _trade("SELL", "PREV_RTH_HIGH_ASC", "SWING_HIGH_DESC", by)
+        alternate = _trade("BUY", "SWING_HIGH_DESC", "PREV_RTH_HIGH_ASC", by)
         return Plays(primary, alternate)
 
     if scenario in ("INSIDE_ASCENDING", "INSIDE_DESCENDING"):
-        primary = _trade("BUY", "CHANNEL_FLOOR", "CHANNEL_CEILING", by)
-        alternate = _trade("SELL", "CHANNEL_CEILING", "CHANNEL_FLOOR", by)
+        pair = _ordered_swing_pair(by)
+        if pair is None:
+            return Plays(None, None)
+        low, high = pair
+        primary = Trade("BUY", low[0], low[1], high[0], high[1])
+        alternate = Trade("SELL", high[0], high[1], low[0], low[1])
         return Plays(primary, alternate)
 
     # BELOW_*
-    primary = _trade("BUY", "PREV_RTH_LOW_DESC", "CHANNEL_FLOOR", by)
-    alternate = _trade("SELL", "CHANNEL_FLOOR", "PREV_RTH_LOW_DESC", by)
+    primary = _trade("BUY", "PREV_RTH_LOW_DESC", "SWING_LOW_ASC", by)
+    alternate = _trade("SELL", "SWING_LOW_ASC", "PREV_RTH_LOW_DESC", by)
     return Plays(primary, alternate)

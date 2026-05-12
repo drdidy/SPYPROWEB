@@ -50,8 +50,8 @@ export function SPXChannelHero({ snap }: { snap: SPXSnapshot }) {
   const heroBg = selective ? "bg-gold-tint/40" : "bg-paper";
 
   // Compose right-rail stat strip values
-  const ceiling = snap.lines.find((l) => l.kind === "CHANNEL_CEILING");
-  const floor = snap.lines.find((l) => l.kind === "CHANNEL_FLOOR");
+  const ceiling = snap.lines.find((l) => l.kind === "SWING_HIGH_DESC");
+  const floor = snap.lines.find((l) => l.kind === "SWING_LOW_ASC");
   const channelWidth =
     ceiling && floor ? ceiling.currentValue - floor.currentValue : null;
   const distToCeiling = ceiling
@@ -73,7 +73,7 @@ export function SPXChannelHero({ snap }: { snap: SPXSnapshot }) {
         <div className="col-span-12 lg:col-span-7 p-7 pr-6 pl-8 relative">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="eyebrow text-ink-3">ES · Channel Slate</span>
+              <span className="eyebrow text-ink-3">ES · Structure Slate</span>
               {/* v9: slope value hidden — proprietary engine
                   parameter, not for surface display. */}
               <span className="text-[10px] text-ink-4 font-mono">
@@ -149,7 +149,7 @@ export function SPXChannelHero({ snap }: { snap: SPXSnapshot }) {
           </p>
           {snap.rthBias && (
             <div className="mt-4 rounded-[12px] border border-rule bg-paper-2/65 px-3 py-3">
-              <div className="eyebrow text-ink-3">RTH bias gate</div>
+              <div className="eyebrow text-ink-3">RTH posture</div>
               <p className="mt-1 text-[13px] leading-relaxed text-ink-2">
                 {snap.rthBias.note}
               </p>
@@ -200,7 +200,7 @@ export function SPXChannelHero({ snap }: { snap: SPXSnapshot }) {
               suffix="pts"
             />
             <RailStat
-              label="To Ceil"
+              label="To high"
               value={distToCeiling !== null ? distToCeiling.toFixed(2) : "—"}
               tone={
                 distToCeiling !== null && distToCeiling >= 0 ? "bear" : "bull"
@@ -208,7 +208,7 @@ export function SPXChannelHero({ snap }: { snap: SPXSnapshot }) {
               suffix="pts"
             />
             <RailStat
-              label="To Floor"
+              label="To low"
               value={distToFloor !== null ? distToFloor.toFixed(2) : "—"}
               tone={distToFloor !== null && distToFloor >= 0 ? "bull" : "bear"}
               suffix="pts"
@@ -343,8 +343,8 @@ function ChannelDiagram({ snap }: { snap: SPXSnapshot }) {
   const tNow = new Date(snap.asOf).getTime();
   const tEnd = tNow + 60 * 60 * 1000;
 
-  const ceiling = snap.lines.find((l) => l.kind === "CHANNEL_CEILING");
-  const floor = snap.lines.find((l) => l.kind === "CHANNEL_FLOOR");
+  const ceiling = snap.lines.find((l) => l.kind === "SWING_HIGH_DESC");
+  const floor = snap.lines.find((l) => l.kind === "SWING_LOW_ASC");
   const prevHighAsc = snap.lines.find((l) => l.kind === "PREV_RTH_HIGH_ASC");
 
   const yPoints: number[] = [snap.price.last];

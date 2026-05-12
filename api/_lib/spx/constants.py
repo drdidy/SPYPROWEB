@@ -16,26 +16,24 @@ PROXY_SYMBOL = "ES"  # we pull ES hourly bars; SPX values are derived via offset
 CENTRAL_TZ_NAME = "America/Chicago"
 
 # ---------------------------------------------------------------------------
-# Slope: applied (positive) to ascending lines, negative to descending lines.
-# All four lines (channel ceiling, channel floor, prev-RTH-high asc,
-# prev-RTH-low desc) use the same magnitude.
+# Slope: applied positive to ascending lines and negative to descending lines.
+# The six-line ES framework uses the same magnitude on every structure line.
 # ---------------------------------------------------------------------------
 
 DEFAULT_SLOPE_PER_HOUR = 1.04
 
 # ---------------------------------------------------------------------------
-# Session windows (Central Time, naive `time` objects — combine with a date
-# in time_utils to get tz-aware bounds).
+# Session windows (Central Time, naive `time` objects; combine with a date in
+# time_utils to get tz-aware bounds).
 #
-# OVERNIGHT spans 15:00 prev-day -> 02:00 today CT (11 hours). The anchor
-#   pivots are scanned across this window — the highest and lowest prints
-#   before 02:00 CT become the channel ceiling and floor anchors. London
-#   open (02:00) is the session boundary; anchors set after that point
-#   belong to today's session, not the overnight build-up.
-# SYDNEY 17:00 -> 20:00 (3h). Used for direction determination only.
-# TOKYO  21:00 -> 02:00 (5h, crossing midnight). Used for direction
-#   determination; ends at the session boundary so it doesn't reach into
-#   the next day's pre-session.
+# OVERNIGHT spans 15:00 prev-day -> 02:00 today CT (11 hours). The highest
+#   swing-high close and lowest swing-low close before 02:00 CT anchor four
+#   swing lines. London open (02:00) is the session boundary; anchors set
+#   after that point belong to today's session, not the overnight build-up.
+# SYDNEY 17:00 -> 20:00 (3h). Retained for diagnostics and confluence.
+# TOKYO  21:00 -> 02:00 (5h, crossing midnight). Retained for diagnostics and
+#   confluence; ends at the session boundary so it doesn't reach into the next
+#   day's pre-session.
 # RTH    08:30 -> 15:00 (cash session for SPX).
 # ---------------------------------------------------------------------------
 
@@ -48,18 +46,16 @@ TOKYO_END = time(2, 0)
 RTH_START = time(8, 30)
 RTH_END = time(15, 0)
 
-# Session boundary — the moment of day that demarcates "still part of
-# yesterday's trading session" from "this is now today's session."
-# Channel anchors are pinned strictly before this; bars at 02:00 or
-# after belong to the new session.
+# Session boundary: the moment of day that demarcates "still part of yesterday's
+# trading session" from "this is now today's session." Structure anchors are
+# pinned strictly before this; bars at 02:00 or after belong to the new session.
 SESSION_BOUNDARY = time(2, 0)
 
 # ---------------------------------------------------------------------------
 # Overnight anchor rule
 # ---------------------------------------------------------------------------
-# ASCENDING channel  -> anchor at highest CLOSE / lowest CLOSE of window
-# DESCENDING channel -> anchor at highest WICK / lowest WICK (raw h/l)
-# Determined by direction in channel.overnight_anchors().
+# Highest CLOSE and lowest CLOSE in the overnight window before 02:00 CT. Both
+# anchors produce an ascending and descending line.
 
 # ---------------------------------------------------------------------------
 # Contract suggestion
@@ -72,8 +68,8 @@ SPX_STRIKE_INCREMENT = 5     # SPX standard board
 # Scenario thresholds
 # ---------------------------------------------------------------------------
 
-# "Far" outside the planned play (scenario 7) means past the prev-RTH-high
-# asc line above, or past the prev-RTH-low desc line below. The user
+# "Far" outside the planned play means past the previous RTH high ascending
+# line above, or past the previous RTH low descending line below. The user
 # specified this as a hard rule, not a numeric tolerance.
 
 # ---------------------------------------------------------------------------

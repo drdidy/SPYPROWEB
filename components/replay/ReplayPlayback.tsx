@@ -163,16 +163,14 @@ function SPXPlaybackPanel({
 }
 
 function spxLineProjections(lines: SPXLine[]): LineProjection[] {
-  // Colors map to the four SPX engine line kinds:
-  //   - CHANNEL_CEILING / CHANNEL_FLOOR   solid, rendered emphasized
-  //   - PREV_RTH_HIGH_ASC                 ascending ref above the channel
-  //   - PREV_RTH_LOW_DESC                 descending ref below the channel
+  // Colors map to the ES six-line framework.
   const palette: Record<string, string> = {
-    CHANNEL_CEILING: "#B5301E",
-    CHANNEL_FLOOR: "#0E7C50",
     PREV_RTH_HIGH_ASC: "#7E5BAE",
     PREV_RTH_LOW_DESC: "#7E5BAE",
-    PREV_RTH_HIGH_DESC: "#B8860B",
+    SWING_HIGH_ASC: "#B8860B",
+    SWING_HIGH_DESC: "#B5301E",
+    SWING_LOW_ASC: "#0E7C50",
+    SWING_LOW_DESC: "#B8860B",
   };
   return lines.map((l) => {
     const t0Ms = new Date(l.anchorTime).getTime();
@@ -180,7 +178,7 @@ function spxLineProjections(lines: SPXLine[]): LineProjection[] {
     return {
       name: l.name,
       color: palette[l.kind] ?? "#9CA3AF",
-      emphasized: l.kind === "CHANNEL_CEILING" || l.kind === "CHANNEL_FLOOR",
+      emphasized: l.kind === "SWING_HIGH_DESC" || l.kind === "SWING_LOW_ASC",
       valueAtMs: (ms: number) => l.anchorPrice + slopePerMs * (ms - t0Ms),
     };
   });
