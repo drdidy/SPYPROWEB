@@ -62,40 +62,31 @@ class Confluence:
 
 
 def _factor_asian(channel: Channel, sydney: Optional[SessionRange], tokyo: Optional[SessionRange]) -> FactorResult:
-    """How decisively Tokyo dominates / fails to dominate Sydney.
+    """Whether the overnight swing framework has usable range data.
 
-    For a clean ASCENDING or DESCENDING read the factor leans high; for
-    NONE (expansion/contraction) it leans low.
+    This no longer determines direction. Direction comes from the six-line
+    framework; the Asian factor only answers whether the overnight build has
+    enough measured range to be useful.
     """
-    if sydney is None or tokyo is None:
+    ranges = [r for r in (sydney, tokyo) if r is not None]
+    if not ranges:
         return FactorResult(
             key="asian",
             label="Asian session",
             value=0.0,
             weight=FACTOR_WEIGHTS["asian"],
             contribution=0.0,
-            note="Sydney / Tokyo data missing.",
+            note="Overnight session data missing.",
         )
 
-    if channel.direction == "NONE":
-        value = 0.20
-        note = "Tokyo did not decisively dominate Sydney."
-    else:
-        # Margin = how far Tokyo's high/low extended past Sydney's, normalized
-        # by Sydney's range. Bigger margin -> cleaner Asian read.
-        if channel.direction == "ASCENDING":
-            margin_h = max(0.0, tokyo.high - sydney.high)
-            margin_l = max(0.0, tokyo.low - sydney.low)
-        else:
-            margin_h = max(0.0, sydney.high - tokyo.high)
-            margin_l = max(0.0, sydney.low - tokyo.low)
-        sydney_range = max(sydney.high - sydney.low, 1e-6)
-        normalized = min(1.0, (margin_h + margin_l) / sydney_range)
-        value = 0.60 + 0.35 * normalized  # clean reads land in [0.60, 0.95]
-        note = (
-            f"Tokyo extended {margin_h + margin_l:.2f} pts beyond Sydney "
-            f"({normalized * 100:.0f}% of Sydney's range)."
-        )
+    high = max(r.high for r in ranges)
+    low = min(r.low for r in ranges)
+    span = max(0.0, high - low)
+    value = 0.65 if len(ranges) == 2 else 0.35
+    note = (
+        f"Overnight swing framework resolved with {span:.2f} pts of measured "
+        f"range across {len(ranges)} session block{'s' if len(ranges) != 1 else ''}."
+    )
     weight = FACTOR_WEIGHTS["asian"]
     return FactorResult(
         key="asian", label="Asian session", value=value,
