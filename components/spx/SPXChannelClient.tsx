@@ -62,11 +62,16 @@ interface ApiErrorBody {
 export function SPXChannelClient({ replayDate }: Props) {
   const [state, setState] = useState<FetchState>({ status: "loading" });
   const [optionsChain, setOptionsChain] = useState<SpxProjectionChainInput | null>(null);
+  const [showLoadingDetail, setShowLoadingDetail] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    const slowLoadTimer = window.setTimeout(() => {
+      if (!cancelled) setShowLoadingDetail(true);
+    }, 3500);
     setState({ status: "loading" });
     setOptionsChain(null);
+    setShowLoadingDetail(false);
     const url = replayDate
       ? `/api/spx/snapshot?date=${encodeURIComponent(replayDate)}`
       : `/api/spx/snapshot`;
@@ -109,14 +114,59 @@ export function SPXChannelClient({ replayDate }: Props) {
     })();
     return () => {
       cancelled = true;
+      window.clearTimeout(slowLoadTimer);
     };
   }, [replayDate]);
 
   if (state.status === "loading") {
     return (
-      <div className="w-full max-w-[1440px] space-y-10 pb-16 pt-6">
+      <div className="w-full max-w-[1440px] space-y-8 pb-16 pt-6">
         {replayDate && <ReplayBanner date={replayDate} />}
-        <Skeleton className="h-10 w-2/3" />
+        <section
+          role="status"
+          aria-live="polite"
+          className="relative overflow-hidden rounded-[22px] border border-[#C9A227]/35 bg-[#071116] px-5 py-5 text-paper shadow-[0_24px_60px_-42px_rgba(7,17,22,0.95)] md:px-7 md:py-6"
+        >
+          <div
+            aria-hidden
+            className="absolute inset-0 opacity-[0.12] bg-[linear-gradient(rgba(244,228,192,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(244,228,192,0.10)_1px,transparent_1px)] bg-[size:42px_42px]"
+          />
+          <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
+            <div>
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="font-mono text-[10px] text-gold-soft/82 tracking-[0.20em] uppercase">
+                  ES · Channel · resolving
+                </span>
+                <span className="h-px w-10 bg-gold/45" />
+                <span className="font-mono text-[10px] text-paper/48 tracking-[0.20em] uppercase">
+                  No fallback values
+                </span>
+              </div>
+              <h1 className="mt-3 text-[34px] font-serif leading-none tracking-tight text-paper md:text-[44px]">
+                Building the ES channel.
+              </h1>
+              <p className="mt-4 max-w-3xl text-[15px] leading-relaxed text-paper/72">
+                The live ES price, overnight bars, channel rules, line ladder,
+                confluence, and decision tape are being assembled from the
+                current session. The page will only render measured values or
+                an explicit unavailable state.
+              </p>
+              {showLoadingDetail && (
+                <p className="mt-3 max-w-3xl rounded-[12px] border border-paper/12 bg-paper/8 px-3 py-2 text-[12px] leading-relaxed text-paper/62">
+                  This request is taking longer than usual. ES often resolves
+                  after the market-data function warms up; if a feed is missing,
+                  the channel will switch to a named data state instead of
+                  displaying placeholders.
+                </p>
+              )}
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <LoadingStat label="Price" value="Resolving" />
+              <LoadingStat label="Channel" value="Building" />
+              <LoadingStat label="Tape" value="Queued" />
+            </div>
+          </div>
+        </section>
         <Skeleton className="h-72 w-full" />
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
           <Skeleton className="h-64 w-full" />
@@ -600,6 +650,19 @@ function Stat({
         className={`font-mono text-[13px] font-semibold tabular-nums ${tone}`}
         data-num
       >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function LoadingStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[12px] border border-paper/12 bg-paper/8 px-3 py-3">
+      <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-paper/45">
+        {label}
+      </div>
+      <div className="mt-1 font-mono text-[12px] font-semibold uppercase tracking-[0.10em] text-paper/78">
         {value}
       </div>
     </div>
