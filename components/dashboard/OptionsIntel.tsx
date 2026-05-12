@@ -36,7 +36,7 @@ export function OptionsIntelPanel({
           action={
             <>
               {healthAction}
-              <StatusPill variant="stale">PENDING</StatusPill>
+              <StatusPill variant="stale">CHAIN WAITING</StatusPill>
             </>
           }
         />

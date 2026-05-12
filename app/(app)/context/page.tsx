@@ -32,13 +32,13 @@ export default async function Page() {
       <SectionLabel number="01">Pressure board</SectionLabel>
       {!ctx ? (
         <CommandEmptyState
-          eyebrow="Macro feed standby"
+          eyebrow="Macro feed unavailable"
           title="Market context is unavailable."
           body="The dashboard is not receiving a market-context block in the current snapshot. No substitute pressure readings are shown; this panel reconnects when the engine publishes VIX, DXY, rates, and trigger-gap context."
           rows={[
             { label: "Values", value: "Hidden until loaded" },
             { label: "Mode", value: "Live snapshot only" },
-            { label: "State", value: "Waiting" },
+            { label: "State", value: "Unavailable" },
           ]}
         />
       ) : (

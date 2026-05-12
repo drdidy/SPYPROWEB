@@ -35,12 +35,12 @@ export default async function Page() {
 
       {!flow && !gex ? (
         <CommandEmptyState
-          eyebrow="Flow feed standby"
+          eyebrow="Flow feed unavailable"
           title="No flow or GEX feed is available."
           body="The app is not receiving Unusual Whales flow or dealer gamma in this snapshot. No substitute prints, premiums, or flip points are rendered until the upstream provides them."
           rows={[
-            { label: "Flow", value: "Waiting" },
-            { label: "GEX", value: "Waiting" },
+            { label: "Flow", value: "Unavailable" },
+            { label: "GEX", value: "Unavailable" },
             { label: "Policy", value: "No fake tape" },
           ]}
         />
@@ -83,7 +83,7 @@ export default async function Page() {
             <CardBody>
               {!flow ? (
                 <CommandEmptyState
-                  eyebrow="Print tape"
+                  eyebrow="Print tape unavailable"
                   title="Flow has not returned yet."
                   body="Unusual Whales returned no flow data for this snapshot. The premium bars and top prints appear only when the upstream response carries real prints."
                   rows={[

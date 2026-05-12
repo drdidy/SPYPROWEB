@@ -74,13 +74,13 @@ export default async function Page() {
         <Card tone="sunken">
           <CardBody>
             <CommandEmptyState
-              eyebrow="Unusual Whales standby"
+              eyebrow="Options provider unavailable"
               title="Options intelligence is waiting for upstream data."
               body="This page is configured for SPY and SPX flow alerts, dark-pool prints, dealer gamma, full option chains, and contract Greeks. It will render live sections as soon as the provider responds; no synthetic rows are displayed."
               rows={[
                 { label: "Symbols", value: "SPY + SPX" },
                 { label: "Sections", value: "Flow, dark pool, GEX, chain, Greeks" },
-                { label: "Display rule", value: "Actual upstream data only" },
+                { label: "Display rule", value: "No synthetic rows" },
               ]}
             />
           </CardBody>

@@ -35,7 +35,7 @@ export function CommandEmptyState({
           </h3>
           <p className="mt-4 text-[14px] leading-relaxed text-paper/68">{body}</p>
           {rows.length > 0 && (
-            <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div className="mt-6 grid grid-cols-1 gap-2.5 sm:grid-cols-3 lg:hidden">
               {rows.map((row) => (
                 <div
                   key={row.label}
@@ -53,73 +53,50 @@ export function CommandEmptyState({
           )}
           {action && <div className="mt-6">{action}</div>}
         </div>
-        <ScopeGraphic />
+        <ReadinessPanel rows={rows} />
       </div>
     </div>
   );
 }
 
-function ScopeGraphic() {
-  const ticks = [18, 36, 54, 72, 90];
+function ReadinessPanel({
+  rows,
+}: {
+  rows: Array<{ label: string; value: string }>;
+}) {
+  const readinessRows =
+    rows.length > 0
+      ? rows
+      : [
+          { label: "Status", value: "Unavailable" },
+          { label: "Display rule", value: "No synthetic data" },
+          { label: "Next step", value: "Waiting for source" },
+        ];
+
   return (
-    <div className="relative min-h-[220px] hidden lg:block">
-      <div className="absolute inset-0 rounded-card border border-paper/10 bg-paper/[0.035]" />
-      <svg
-        viewBox="0 0 360 220"
-        className="absolute inset-0 h-full w-full"
-        role="img"
-        aria-label="Awaiting data graphic"
-      >
-        <defs>
-          <linearGradient id="scopeGold" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#F4E4C0" stopOpacity="0.95" />
-            <stop offset="100%" stopColor="#B8821F" stopOpacity="0.5" />
-          </linearGradient>
-        </defs>
-        <rect x="30" y="26" width="300" height="168" rx="8" fill="none" stroke="rgba(255,255,255,0.12)" />
-        {ticks.map((x) => (
-          <line
-            key={x}
-            x1={30 + x * 3}
-            x2={30 + x * 3}
-            y1="26"
-            y2="194"
-            stroke="rgba(255,255,255,0.07)"
-          />
+    <div className="hidden lg:flex min-h-[220px] flex-col rounded-card border border-paper/10 bg-paper/[0.035] p-5">
+      <div className="font-mono text-[10px] uppercase tracking-[0.20em] text-gold-soft">
+        Source readiness
+      </div>
+      <div className="mt-4 space-y-2.5">
+        {readinessRows.map((row) => (
+          <div
+            key={`${row.label}-${row.value}`}
+            className="rounded-[8px] border border-paper/10 bg-paper/[0.055] px-3 py-3"
+          >
+            <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-paper/42">
+              {row.label}
+            </div>
+            <div className="mt-1 font-mono text-[12px] text-paper/86">
+              {row.value}
+            </div>
+          </div>
         ))}
-        {[48, 82, 116, 150].map((y) => (
-          <line
-            key={y}
-            x1="30"
-            x2="330"
-            y1={y}
-            y2={y}
-            stroke="rgba(255,255,255,0.07)"
-          />
-        ))}
-        <path
-          d="M44 154 C 86 118, 112 132, 148 98 S 220 74, 254 104 S 300 139, 318 88"
-          fill="none"
-          stroke="url(#scopeGold)"
-          strokeWidth="3"
-          strokeLinecap="round"
-        />
-        <path
-          d="M44 156 L318 90"
-          fill="none"
-          stroke="rgba(244,228,192,0.28)"
-          strokeWidth="1.5"
-          strokeDasharray="7 8"
-        />
-        <circle cx="254" cy="104" r="4" fill="#F4E4C0" />
-        <circle cx="254" cy="104" r="13" fill="none" stroke="rgba(244,228,192,0.28)" />
-        <text x="45" y="48" fill="rgba(255,255,255,0.46)" fontSize="9" fontFamily="monospace">
-          DATA LINK
-        </text>
-        <text x="249" y="178" fill="rgba(244,228,192,0.72)" fontSize="9" fontFamily="monospace">
-          STANDBY
-        </text>
-      </svg>
+      </div>
+      <p className="mt-auto pt-4 text-[12px] leading-relaxed text-paper/52">
+        This panel stays quiet until the source returns measured values. The app
+        does not draw illustrative charts or substitute stale levels here.
+      </p>
     </div>
   );
 }
