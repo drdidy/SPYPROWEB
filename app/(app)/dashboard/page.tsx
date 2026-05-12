@@ -849,7 +849,7 @@ function SpyVerdictCard({
         />
       }
     >
-      <p className="text-meta text-ink-3 -mt-2">{SLATE_COPY.spySubtitle}</p>
+      <p className="sr-only">{SLATE_COPY.spySubtitle}</p>
       <p className="text-body text-ink-2 leading-relaxed">
         {cleanActionableExplanation(
           decision.finalExplanation ||
@@ -917,7 +917,7 @@ function SpyVerdictCard({
         )}
       </div>
       {!isPreConfig && (
-        <WhyChips trace={snap.decisionTrace} className="pt-2" />
+        <DiagnosticsDisclosure trace={snap.decisionTrace} />
       )}
     </EngineCard>
   );
@@ -1050,7 +1050,7 @@ function SpxVerdictCard({
         />
       }
     >
-      <p className="text-meta text-ink-3 -mt-2">{SLATE_COPY.spxSubtitle}</p>
+      <p className="sr-only">{SLATE_COPY.spxSubtitle}</p>
       <p className="text-body text-ink-2 leading-relaxed">
         {snap.scenarioExplanation ||
           snap.channel.reason ||
@@ -1108,7 +1108,7 @@ function SpxVerdictCard({
         )}
       </div>
       {!isPreConfig && (
-        <WhyChips trace={snap.decisionTrace ?? []} className="pt-2" />
+        <DiagnosticsDisclosure trace={snap.decisionTrace ?? []} />
       )}
     </EngineCard>
   );
@@ -1336,6 +1336,36 @@ function InvalidationLine({
       {invalidation.stopOffset.toFixed(2)} below trigger
     </p>
   );
+}
+
+function DiagnosticsDisclosure({ trace }: { trace: import("@/components/slate/DecisionTraceDrawer").TraceEvent[] }) {
+  if (!trace || trace.length === 0) return null;
+  const cleanedTrace = trace
+    .map((event) => ({
+      ...event,
+      event: cleanActionableExplanation(event.event, extractSpotFromTrace(trace)),
+    }))
+    .filter((event) => event.event.trim().length > 0)
+    .slice(0, 3);
+  if (cleanedTrace.length === 0) return null;
+
+  return (
+    <details className="group rounded-soft border border-rule bg-paper-2/35 px-3 py-2">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3 outline-none transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-gold/40">
+        <span>Diagnostics</span>
+        <span className="text-ink-4 group-open:hidden">{cleanedTrace.length} checks</span>
+        <span className="hidden text-ink-4 group-open:inline">Hide</span>
+      </summary>
+      <WhyChips trace={cleanedTrace} className="mt-2" />
+    </details>
+  );
+}
+
+function extractSpotFromTrace(trace: import("@/components/slate/DecisionTraceDrawer").TraceEvent[]): number {
+  const joined = trace.map((event) => event.event).join(" ");
+  const match = joined.match(/\b(?:SPY|ES|SPX)\s+([0-9]{3,5}(?:\.[0-9]+)?)/i);
+  const value = match ? Number(match[1]) : NaN;
+  return Number.isFinite(value) ? value : 0;
 }
 
 // ---- structure list bits ----
