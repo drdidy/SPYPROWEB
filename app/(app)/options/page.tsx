@@ -322,8 +322,8 @@ function ChainPanel({ symbol, chain, spot }: { symbol: string; chain?: UwOptionC
                 <WallMeter label="Put volume" value={chain.totals.putVol} total={chain.totals.callVol + chain.totals.putVol} tone="bear" />
               </div>
               <div className="mt-6 grid grid-cols-2 gap-2">
-                <SideStat label="PCR" value={fmtRatio(chain.totals.pcr)} />
-                <SideStat label="Shown" value={`${rows.length}`} />
+                <ChainPressureStat label="PCR" value={fmtRatio(chain.totals.pcr)} />
+                <ChainPressureStat label="Shown" value={`${rows.length}`} />
               </div>
             </div>
           </div>
@@ -373,6 +373,15 @@ function SideStat({ label, value }: { label: string; value: string }) {
     <div className="rounded-[10px] border border-rule bg-paper-2/75 px-3 py-2">
       <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-3">{label}</div>
       <div className="mt-1 font-mono text-[14px] text-ink tabular-nums">{value}</div>
+    </div>
+  );
+}
+
+function ChainPressureStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[8px] border border-paper/12 bg-paper/[0.055] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+      <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-paper/45">{label}</div>
+      <div className="mt-1 font-mono text-[14px] text-paper tabular-nums">{value}</div>
     </div>
   );
 }
