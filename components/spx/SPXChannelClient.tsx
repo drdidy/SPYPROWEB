@@ -350,7 +350,7 @@ export function SPXChannelClient({ replayDate }: Props) {
           <Link href="/privacy" className="hover:text-ink">Privacy</Link>
           <Link href="/risk" className="hover:text-ink">Options Risk</Link>
           <span>Build 0.9.7</span>
-          <Link href="/signal-log" className="hover:text-ink">Report an issue</Link>
+          <Link href="/contact" className="hover:text-ink">Report an issue</Link>
         </span>
         <span className="hidden">Prophet · ES channel</span>
         <span className="hidden">Session surface</span>

@@ -101,13 +101,13 @@ export function forState(
           }
         : {
             id: "live-spx",
-            href: "/spx",
-            label: "Open SPX Channel",
-            reason: `SPX ${state.toLowerCase()}`,
+            href: "/es",
+            label: "Open ES Channel",
+            reason: `ES ${state.toLowerCase()}`,
             description:
               state === "WAIT"
-                ? "SPX rejection candle printed. Watch for confirmation on the next bar."
-                : "SPX is approaching the channel rail — watching for a rejection.",
+                ? "ES rejection candle printed. Watch for confirmation on the next bar."
+                : "ES is approaching the channel rail — watching for a rejection.",
           };
 
     case "COOLDOWN":
