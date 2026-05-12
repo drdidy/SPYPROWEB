@@ -199,14 +199,15 @@ function heroSynthesis(snap: AdaptedSnapshot): string {
     .slice()
     .sort((a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice))[0];
   const lineText = closest
-    ? `${closest.name} (${closest.currentValue.toFixed(2)})`
+    ? `${closest.name} (${(closest.entryValue ?? closest.currentValue).toFixed(2)})`
     : "a qualified SPY rail";
-  const explanation = cleanSpyExplanation(
-    snap.decision.finalExplanation || snap.bias.explanation || "",
-    snap.currentPrice,
-  );
-  if (explanation) return explanation;
-  return `${capitalize(bias)} lean, engine ${state} because ${lineText} has not produced a qualified trigger yet.`;
+  const distanceText = closest
+    ? `${Math.abs(closest.distanceFromPrice).toFixed(2)} pts ${closest.distanceFromPrice >= 0 ? "above" : "below"}`
+    : "away from";
+  const flowTail = snap.flow
+    ? ` Options flow ${snap.flow.lean.toLowerCase()} (${snap.flow.bullishCount} bull / ${snap.flow.bearishCount} bear).`
+    : "";
+  return `${capitalize(bias)} lean, engine ${state}; SPY ${snap.currentPrice.toFixed(2)} sits ${distanceText} the 09:00 reference ${lineText}. Waiting for qualified confirmation.${flowTail}`;
 }
 
 function cleanSpyExplanation(text: string, spot: number): string {
