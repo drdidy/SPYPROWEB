@@ -1,50 +1,29 @@
-import { cn } from "@/lib/utils";
-import { formatSessionTime } from "@/lib/session-time";
-import type { ReactNode } from "react";
+import { ReactNode } from "react";
+import { Button } from "./Button";
 
 export function EmptyState({
+  icon,
   title,
-  reason,
-  detail,
-  retryAt,
-  action,
-  kind = "empty",
-  className,
+  body,
+  exampleAction,
 }: {
+  icon: ReactNode;
   title: string;
-  reason: string;
-  detail?: string;
-  retryAt?: string | null;
-  action?: ReactNode;
-  kind?: "empty" | "waiting" | "stale" | "error";
-  className?: string;
+  body: string;
+  exampleAction?: { label: string; onClick: () => void };
 }) {
-  const tone =
-    kind === "error"
-      ? "border-bear/25 bg-bear-tint/35"
-      : kind === "stale"
-        ? "border-gold/30 bg-gold-tint/35"
-        : "border-rule bg-paper-2/60";
-
   return (
-    <div className={cn("rounded-soft border px-4 py-5", tone, className)}>
-      <div className="font-serif text-headline text-ink-3 italic font-light">
-        {title}
+    <div className="flex flex-col items-center justify-center text-center py-14 px-6">
+      <div className="w-12 h-12 rounded-full bg-paper-2 flex items-center justify-center text-ink-3 mb-5 shadow-rule">
+        {icon}
       </div>
-      <p className="mt-3 max-w-md text-[13px] leading-relaxed text-ink-3">
-        {reason}
-      </p>
-      {detail && (
-        <p className="mt-2 max-w-md text-[12px] leading-relaxed text-ink-4">
-          {detail}
-        </p>
+      <h3 className="text-title font-serif text-ink mb-1.5">{title}</h3>
+      <p className="text-sm text-ink-2 max-w-md mb-5 leading-relaxed">{body}</p>
+      {exampleAction && (
+        <Button variant="secondary" size="sm" onClick={exampleAction.onClick}>
+          {exampleAction.label}
+        </Button>
       )}
-      {retryAt && (
-        <div className="mt-3 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-3 tabular-nums">
-          Next check {formatSessionTime(retryAt)}
-        </div>
-      )}
-      {action && <div className="mt-4">{action}</div>}
     </div>
   );
 }

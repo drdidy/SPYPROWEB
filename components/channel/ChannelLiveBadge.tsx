@@ -2,27 +2,22 @@
 
 import { FeedHeartbeat, useFeedHealth } from "@/components/decision-slate/FeedHealthProvider";
 import type { FeedId } from "@/lib/feed-health";
-import type { FeedHealthState } from "@/lib/feed-health";
-import { formatSessionTime } from "@/lib/session-time";
 import { cn } from "@/lib/utils";
 
 type LiveState = "live" | "stale" | "offline";
 
-export function useChannelFreshness() {
+export function ChannelLiveBadge() {
   const price = useFeedHealth("price-tick");
   const anchors = useFeedHealth("anchor-levels");
   const tape = useFeedHealth("signal-tape");
-  const state = resolveChannelFreshness([price, anchors, tape]);
-  const laggingHealth = laggingFeed([price, anchors, tape]);
-  const lagging = laggingHealth?.label ?? "feed refresh";
-  const freshest = freshestFeed([price, anchors, tape]);
-  const next = nextFeed([price, anchors, tape]);
-
-  return { state, lagging, laggingHealth, freshest, next, feeds: [price, anchors, tape] };
-}
-
-export function ChannelLiveBadge() {
-  const { state, lagging } = useChannelFreshness();
+  const healthyContext = anchors.status === "live" || tape.status === "live";
+  const state: LiveState =
+    price.status === "failed" || (anchors.status === "failed" && tape.status === "failed")
+      ? "offline"
+      : price.status === "live" && healthyContext
+        ? "live"
+        : "stale";
+  const lagging = laggingFeed([price, anchors, tape]);
   const tone = {
     live: "bg-bull-tint text-bull-ink shadow-[inset_0_0_0_1px_rgba(14,124,80,0.30)]",
     stale: "bg-gold-tint text-gold-ink shadow-[inset_0_0_0_1px_rgba(184,130,31,0.30)]",
@@ -55,48 +50,6 @@ export function ChannelLiveBadge() {
   );
 }
 
-export function ChannelFreshnessLine() {
-  const { state, lagging, freshest, next } = useChannelFreshness();
-  const updated = formatSessionTime(freshest?.lastUpdatedAt, { fallback: "--:-- CT" });
-  const nextLabel = formatSessionTime(next?.nextExpectedAt, { fallback: "--:-- CT" });
-  return (
-    <span
-      title={
-        state === "live"
-          ? `Live: updated ${updated}, next ${nextLabel}`
-          : `${state.toUpperCase()}: waiting on ${lagging}. Updated ${updated}; next ${nextLabel}`
-      }
-    >
-      {state} | updated {updated} | next {nextLabel}
-    </span>
-  );
-}
-
-export function ChannelFeedPauseBanner({ className }: { className?: string }) {
-  const { state, lagging, laggingHealth } = useChannelFreshness();
-  const ageMs = laggingHealth?.ageMs ?? 0;
-  if (state === "live" || (state === "stale" && ageMs < 60_000)) return null;
-
-  const message =
-    state === "offline"
-      ? `Feed disconnected: ${lagging}. Live decisions are paused until the feed reconnects.`
-      : `Decisions paused: ${lagging} is stale. Live-only reads are dimmed until the next refresh.`;
-
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      className={cn(
-        "rounded-card border border-gold/35 bg-gold-tint px-4 py-3",
-        "font-mono text-[11px] uppercase tracking-[0.10em] text-gold-ink",
-        className,
-      )}
-    >
-      {message}
-    </div>
-  );
-}
-
 export function LastUpdatedAge({ feedId = "price-tick" }: { feedId?: FeedId }) {
   const health = useFeedHealth(feedId);
   return (
@@ -115,29 +68,9 @@ export function PanelHeartbeat({ feedId }: { feedId: FeedId }) {
 
 function laggingFeed(
   feeds: readonly ReturnType<typeof useFeedHealth>[],
-): FeedHealthState | null {
-  return feeds.find((feed) => feed.status !== "live") ?? null;
-}
-
-function resolveChannelFreshness(feeds: readonly FeedHealthState[]): LiveState {
-  const [price, anchors, tape] = feeds;
-  const healthyContext = anchors.status === "live" || tape.status === "live";
-  if (price.status === "failed" || (anchors.status === "failed" && tape.status === "failed")) {
-    return "offline";
-  }
-  return price.status === "live" && healthyContext ? "live" : "stale";
-}
-
-function freshestFeed(feeds: readonly FeedHealthState[]): FeedHealthState | null {
-  return feeds
-    .filter((feed) => feed.lastUpdatedAt)
-    .sort((a, b) => Date.parse(b.lastUpdatedAt ?? "") - Date.parse(a.lastUpdatedAt ?? ""))[0] ?? null;
-}
-
-function nextFeed(feeds: readonly FeedHealthState[]): FeedHealthState | null {
-  return feeds
-    .filter((feed) => feed.nextExpectedAt)
-    .sort((a, b) => Date.parse(a.nextExpectedAt ?? "") - Date.parse(b.nextExpectedAt ?? ""))[0] ?? null;
+): string {
+  const lagging = feeds.find((feed) => feed.status !== "live");
+  return lagging?.label ?? "feed refresh";
 }
 
 function formatAge(ageMs: number): string {

@@ -52,7 +52,7 @@ export function ChannelStateRail({
       <ol
         role="list"
         aria-label={`${engine} seven-step state progression`}
-        className="grid grid-cols-1 gap-1.5 sm:grid-cols-7"
+        className="grid grid-cols-7 gap-1.5"
       >
         {ENGINE_STATES.map((state, index) => {
           const phase = PHASE_DEFINITIONS[state];
@@ -61,14 +61,9 @@ export function ChannelStateRail({
           return (
             <li
               key={state}
-              role="listitem"
-              tabIndex={0}
               aria-current={isCurrent ? "step" : undefined}
-              aria-label={`Step ${index + 1} of ${ENGINE_STATES.length}: ${phase.label}, ${
-                isCurrent ? "current" : isComplete ? "completed" : "upcoming"
-              }`}
               className={cn(
-                "relative min-w-0 rounded-soft border px-2 py-2 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-gold/45 sm:text-center",
+                "relative min-w-0 rounded-soft border px-1.5 py-2 text-center transition-colors",
                 isCurrent
                   ? "border-gold bg-gold text-paper shadow-glow motion-safe:animate-breathe"
                   : isComplete
@@ -83,7 +78,7 @@ export function ChannelStateRail({
               <span
                 aria-hidden
                 className={cn(
-                  "mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full font-mono text-[10px] font-bold sm:mx-auto sm:mb-1 sm:mr-0",
+                  "mx-auto mb-1 inline-flex h-5 w-5 items-center justify-center rounded-full font-mono text-[10px] font-bold",
                   isCurrent
                     ? "bg-paper text-gold-ink"
                     : isComplete
@@ -91,9 +86,9 @@ export function ChannelStateRail({
                       : "bg-paper-2 text-ink-3",
                 )}
               >
-                {isComplete ? "OK" : index + 1}
+                {isComplete ? "✓" : index + 1}
               </span>
-              <span className="font-mono text-[9px] uppercase tracking-[0.08em]">
+              <span className="hidden font-mono text-[9px] uppercase tracking-[0.08em] sm:block">
                 {phase.short}
               </span>
             </li>

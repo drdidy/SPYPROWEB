@@ -210,8 +210,8 @@ export interface ReplayBlock {
 export interface OptionsRaw {
   expiration: string;
   atm: number;
-  calls: Array<{ strike: number; bid: number | null; ask: number | null; mark?: number | null; iv: number | null; delta: number | null; gamma: number | null; oi: number; volume: number }>;
-  puts: Array<{ strike: number; bid: number | null; ask: number | null; mark?: number | null; iv: number | null; delta: number | null; gamma: number | null; oi: number; volume: number }>;
+  calls: Array<{ strike: number; bid: number | null; ask: number | null; iv: number | null; delta: number | null; gamma: number | null; oi: number; volume: number }>;
+  puts: Array<{ strike: number; bid: number | null; ask: number | null; iv: number | null; delta: number | null; gamma: number | null; oi: number; volume: number }>;
   totals: {
     callOi: number;
     putOi: number;

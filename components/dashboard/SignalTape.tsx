@@ -2,8 +2,6 @@
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 import { GradeBadge } from "@/components/ui/GradeBadge";
 import { Sparkline } from "@/components/ui/Sparkline";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { formatSessionTime } from "@/lib/session-time";
 import type { Grade } from "@/lib/types";
 import { ArrowRight, CircleDot, FileText, Target } from "lucide-react";
 import Link from "next/link";
@@ -42,12 +40,15 @@ export function SignalTape({
           action={healthAction}
         />
         <CardBody>
-          <EmptyState
-            title="Session still warming up."
-            reason="No qualified touch, rejection, break, or risk event has printed yet."
-            detail="New events post here as the engine observes the 09:00-11:00 CT touch window and risk checks."
-            kind="waiting"
-          />
+          <div className="py-10">
+            <div className="font-serif text-headline text-ink-3 italic font-light">
+              Session still warming up.
+            </div>
+            <p className="mt-3 text-[13px] text-ink-3 leading-relaxed max-w-md">
+              No qualified touch, rejection, break, or risk event has printed
+              yet. New events post here as the engine observes them.
+            </p>
+          </div>
         </CardBody>
       </Card>
     );
@@ -65,7 +66,7 @@ export function SignalTape({
           <div className="mb-2 flex items-center justify-between">
             <span className="eyebrow text-ink-3">Session event rail</span>
             <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-3">
-              replay linked
+              replay-linked
             </span>
           </div>
           <div className="relative h-7 rounded-soft border border-rule bg-paper-2 px-2">
@@ -78,7 +79,7 @@ export function SignalTape({
                   key={`${t.time}-${i}`}
                   className={`absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-paper ${ts.bar}`}
                   style={{ left: `calc(8px + (${left}% * 0.96))` }}
-                  title={`${formatTapeTime(t.time)} ${ts.label}: ${t.body}`}
+                  title={`${t.time} ${ts.label}: ${t.body}`}
                 />
               );
             })}
@@ -96,9 +97,7 @@ export function SignalTape({
               >
                 <div className="flex items-center gap-2 pt-0.5">
                   <span className={`w-0.5 h-6 rounded-sm ${ts.bar}`} />
-                  <span className="font-mono text-[11px] text-ink-3 tabular-nums">
-                    {formatTapeTime(t.time)}
-                  </span>
+                  <span className="font-mono text-[11px] text-ink-3 tabular-nums">{t.time}</span>
                 </div>
                 <div className="pt-0.5">
                   <span
@@ -136,14 +135,4 @@ export function SignalTape({
       </CardBody>
     </Card>
   );
-}
-
-function formatTapeTime(value: string): string {
-  if (Number.isFinite(Date.parse(value))) {
-    return formatSessionTime(value, { seconds: true });
-  }
-  if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(value.trim())) {
-    return `${value.trim()} CT`;
-  }
-  return value;
 }

@@ -16,12 +16,8 @@ export function buildSpyContractProjection(
     side === "CALL" ? snap.strikes.callStrike : snap.strikes.putStrike;
   const nearestLine = snap.lines
     .slice()
-    .sort(
-      (a, b) =>
-        Math.abs(snap.currentPrice - lineEntryValue(a)) -
-        Math.abs(snap.currentPrice - lineEntryValue(b)),
-    )[0];
-  const entryUnderlying = snap.signal?.entryPrice ?? (nearestLine ? lineEntryValue(nearestLine) : null);
+    .sort((a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice))[0];
+  const entryUnderlying = snap.signal?.entryPrice ?? nearestLine?.currentValue ?? null;
 
   return buildContractProjection({
     symbol: "SPY",
@@ -37,10 +33,6 @@ export function buildSpyContractProjection(
     stopUnderlying: snap.signal?.stopPrice ?? null,
     targetUnderlying: snap.signal?.targetPrice ?? null,
   });
-}
-
-function lineEntryValue(line: { entryValue?: number; currentValue: number }): number {
-  return line.entryValue ?? line.currentValue;
 }
 
 function chooseSpySide(

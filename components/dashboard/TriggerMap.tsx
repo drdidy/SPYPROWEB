@@ -1,6 +1,5 @@
 "use client";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { StatusPill } from "@/components/ui/StatusPill";
 import type { DynamicLine } from "@/lib/types";
 import type { ReactNode } from "react";
@@ -21,9 +20,9 @@ function displayValue(line: DynamicLine): number {
 function distanceToLast(line: DynamicLine, currentPrice?: number): number {
   const reference = displayValue(line);
   if (typeof currentPrice === "number" && Number.isFinite(currentPrice)) {
-    return currentPrice - reference;
+    return reference - currentPrice;
   }
-  return -line.distanceFromPrice;
+  return line.distanceFromPrice;
 }
 
 const lineStyle: Record<string, { dot: string; label: string }> = {
@@ -76,7 +75,7 @@ function LevelCard({
         <span>{meta.label}</span>
         <span
           className={`font-mono tabular-nums ${
-            distance >= 0 ? "text-bull-ink" : "text-bear-ink"
+            distance >= 0 ? "text-bear-ink" : "text-bull-ink"
           }`}
         >
           {distance >= 0 ? "+" : ""}
@@ -99,6 +98,8 @@ export function TriggerMap({
   const sorted = lines
     .slice()
     .sort((a, b) => Math.abs(distanceToLast(a, currentPrice)) - Math.abs(distanceToLast(b, currentPrice)));
+  const actionable = sorted.filter(isActionableReference);
+  const context = sorted.filter((line) => !isActionableReference(line));
 
   if (lines.length === 0) {
     return (
@@ -110,30 +111,20 @@ export function TriggerMap({
           action={healthAction}
         />
         <CardBody>
-          <EmptyState
-            title="No qualified levels yet."
-            reason="SPY levels arm after the premarket anchor window resolves and the engine has a 09:00 CT reference to evaluate."
-            detail="Until then, this panel is intentionally quiet instead of showing placeholder rows."
-            kind="waiting"
-          />
+          <div className="rounded-soft border border-rule bg-paper-2 px-4 py-5">
+            <div className="font-serif text-headline text-ink-2 italic font-light">
+              No qualified levels yet.
+            </div>
+            <p className="mt-2 max-w-lg text-[13px] leading-relaxed text-ink-3">
+              SPY levels arm after the premarket anchor window resolves and the
+              engine has a 09:00 reference to evaluate. Until then, this panel
+              is intentionally quiet.
+            </p>
+          </div>
         </CardBody>
       </Card>
     );
   }
-  const pdh = sorted.find((line) => line.kind === "PDH");
-  const pdl = sorted.find((line) => line.kind === "PDL");
-  const invalidPriorRange = Boolean(
-    pdh &&
-      pdl &&
-      Number.isFinite(displayValue(pdh)) &&
-      Number.isFinite(displayValue(pdl)) &&
-      displayValue(pdh) < displayValue(pdl),
-  );
-  const validatedSorted = invalidPriorRange
-    ? sorted.filter((line) => line.kind !== "PDH" && line.kind !== "PDL")
-    : sorted;
-  const actionable = validatedSorted.filter(isActionableReference);
-  const context = validatedSorted.filter((line) => !isActionableReference(line));
 
   return (
     <Card>
@@ -150,12 +141,6 @@ export function TriggerMap({
             retained as diagnostics, but they are not equal to the active entry
             framework.
           </p>
-          {invalidPriorRange && (
-            <div className="mt-3 rounded-soft border border-gold/35 bg-gold-tint px-3 py-2 font-mono text-[10px] uppercase tracking-[0.10em] text-gold-ink">
-              Prior-day range failed validation; PDH/PDL are hidden until the feed
-              resolves.
-            </div>
-          )}
         </div>
 
         <div className="grid gap-3 px-5 pb-5 sm:hidden">
@@ -172,7 +157,7 @@ export function TriggerMap({
           <div className="col-span-3">Line</div>
           <div className="col-span-3">Type</div>
           <div className="col-span-2 text-right">09:00 value</div>
-          <div className="col-span-2 text-right">LAST - REF</div>
+          <div className="col-span-2 text-right">Delta to last</div>
           <div className="col-span-2 text-right">Status</div>
         </div>
         <ul className="hidden divide-y divide-rule border-t border-rule sm:block">
@@ -200,7 +185,7 @@ export function TriggerMap({
                 </div>
                 <div
                   className={`col-span-2 text-right font-mono text-sm tabular-nums ${
-                    distance >= 0 ? "text-bull-ink" : "text-bear-ink"
+                    distance >= 0 ? "text-bear-ink" : "text-bull-ink"
                   }`}
                   data-num
                 >

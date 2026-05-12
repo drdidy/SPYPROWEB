@@ -1,5 +1,4 @@
 import type { ContractProjection as Projection } from "@/lib/contract-projection";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { cn } from "@/lib/utils";
 
 export function ContractProjectionCard({
@@ -13,13 +12,13 @@ export function ContractProjectionCard({
 }) {
   if (!projection) {
     return (
-      <EmptyState
-        className={cn("px-3 py-3", className)}
-        title="Contract model waiting."
-        reason="The chain is loaded only when bid, ask, delta, and gamma are all usable for the active strike."
-        detail="No debit is fabricated. Retry follows the options-chain heartbeat, and the panel will populate as soon as the live chain returns usable Greeks."
-        kind="waiting"
-      />
+      <div className={cn("rounded-soft border border-rule bg-paper-2/50 px-3 py-3", className)}>
+        <div className="eyebrow text-ink-3">Contract entry projection</div>
+        <p className="mt-1.5 text-[12px] leading-snug text-ink-3">
+          Waiting for a live chain with usable Greeks before estimating the
+          entry debit.
+        </p>
+      </div>
     );
   }
 

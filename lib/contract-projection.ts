@@ -125,7 +125,6 @@ export function projectionChainFromRows<
     strike: number;
     bid: number | null;
     ask: number | null;
-    mark?: number | null;
     iv?: number | null;
     delta: number | null;
     gamma: number | null;
@@ -144,7 +143,6 @@ export function projectionChainFromRows<
       expiration: input.expiration ?? null,
       bid: row.bid,
       ask: row.ask,
-      mark: row.mark ?? null,
       iv: row.iv ?? null,
       delta: row.delta,
       gamma: row.gamma,
@@ -157,7 +155,6 @@ export function projectionChainFromRows<
       expiration: input.expiration ?? null,
       bid: row.bid,
       ask: row.ask,
-      mark: row.mark ?? null,
       iv: row.iv ?? null,
       delta: row.delta,
       gamma: row.gamma,

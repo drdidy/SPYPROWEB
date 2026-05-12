@@ -60,7 +60,6 @@ function toContract(row: UwOptionContract): OptionsRaw["calls"][number] | null {
     strike: row.strike!,
     bid: finiteOrNull(row.bid),
     ask: finiteOrNull(row.ask),
-    mark: finiteOrNull(row.mark),
     iv: finiteOrNull(row.iv),
     delta: finiteOrNull(row.delta),
     gamma: finiteOrNull(row.gamma),
