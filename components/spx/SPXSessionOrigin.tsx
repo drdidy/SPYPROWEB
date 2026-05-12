@@ -15,14 +15,14 @@ export function SPXSessionOrigin({ snap }: { snap: SPXSnapshot }) {
     <Card>
       <CardHeader
         eyebrow="Origin"
-        title="Why today's channel"
-        meta="Sydney 17:00–20:00 CT · Tokyo 21:00–03:00 CT · Overnight anchors 15:00–03:00 CT"
+        title="Why today's framework"
+        meta="Overnight swing closes before 02:00 CT - previous RTH references"
       />
       <CardBody className="px-0 pb-0">
         <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-rule">
           <SessionPanel
             name="Sydney"
-            window="17:00–20:00 CT"
+            window="17:00-20:00 CT"
             high={snap.sessions.sydney.high}
             low={snap.sessions.sydney.low}
             highTime={snap.sessions.sydney.highTime}
@@ -30,7 +30,7 @@ export function SPXSessionOrigin({ snap }: { snap: SPXSnapshot }) {
           />
           <SessionPanel
             name="Tokyo"
-            window="21:00–03:00 CT"
+            window="21:00-03:00 CT"
             high={snap.sessions.tokyo.high}
             low={snap.sessions.tokyo.low}
             highTime={snap.sessions.tokyo.highTime}
@@ -62,18 +62,7 @@ export function SPXSessionOrigin({ snap }: { snap: SPXSnapshot }) {
           />
           <div className="p-5">
             <div className="flex items-center justify-between mb-3">
-              <span className="eyebrow text-ink-3">Determination</span>
-              <StatusPill
-                variant={
-                  snap.channel.direction === "ASCENDING"
-                    ? "confirmed"
-                    : snap.channel.direction === "DESCENDING"
-                      ? "breached"
-                      : "stale"
-                }
-              >
-                {snap.channel.direction}
-              </StatusPill>
+              <span className="eyebrow text-ink-3">Framework</span>\n              <StatusPill variant={snap.lines.length >= 6 ? "confirmed" : "stale"}>\n                {snap.lines.length >= 6 ? "SIX LINE" : "RESOLVING"}\n              </StatusPill>
             </div>
             <div className="text-[13px] text-ink-2 leading-relaxed">
               {determinationText(snap)}
@@ -131,7 +120,7 @@ function SessionPanel({
       <div className="mt-3 flex justify-between text-[11px]">
         <span className="text-ink-3">Range</span>
         <span className="font-mono tabular-nums text-ink" data-num>
-          {isMeasured(high) && isMeasured(low) ? `${(high - low).toFixed(2)} pts` : "—"}
+          {isMeasured(high) && isMeasured(low) ? `${(high - low).toFixed(2)} pts` : "-"}
         </span>
       </div>
       {isMeasured(high) && isMeasured(low) ? (
@@ -172,7 +161,7 @@ function Stat({
         className={`font-mono text-sm font-semibold tabular-nums ${cls}`}
         data-num
       >
-        {measured ? value.toFixed(2) : "—"}
+        {measured ? value.toFixed(2) : "-"}
       </div>
       <div className="font-mono text-[9px] text-ink-3 tabular-nums mt-0.5">
         {measured ? formatClock(time) : "Data missing"}
@@ -199,7 +188,7 @@ function Anchor({
           className="font-mono text-sm font-semibold tabular-nums text-ink"
           data-num
         >
-          {measured ? value.toFixed(2) : "—"}
+          {measured ? value.toFixed(2) : "-"}
         </span>
         <span className="font-mono text-[10px] text-ink-3 tabular-nums">
           {measured ? formatClock(time) : "Data missing"}
@@ -222,11 +211,8 @@ function formatClock(time: string): string {
 }
 
 function determinationText(snap: SPXSnapshot): string {
-  if (snap.channel.direction === "ASCENDING") {
-    return "Tokyo resolved a higher-high and higher-low structure against Sydney, so the ES channel is ascending.";
+  if (snap.lines.length >= 6) {
+    return snap.channel.reason;
   }
-  if (snap.channel.direction === "DESCENDING") {
-    return "Tokyo resolved a lower-high and lower-low structure against Sydney, so the ES channel is descending.";
-  }
-  return "Sydney and Tokyo did not produce a clean directional pivot, so no ES channel is active.";
+  return "The ES framework resolves after the overnight swing-high close, swing-low close, previous RTH high, and previous RTH low are all available.";
 }

@@ -6,22 +6,22 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
 
 const scenarioLabel: Record<SPXScenario, string> = {
-  ABOVE_ASCENDING: "Above the rising channel",
-  INSIDE_ASCENDING: "Inside the rising channel",
-  BELOW_ASCENDING: "Below the rising channel",
-  ABOVE_DESCENDING: "Above the falling channel",
-  INSIDE_DESCENDING: "Inside the falling channel",
-  BELOW_DESCENDING: "Below the falling channel",
+  ABOVE_ASCENDING: "Above the swing-high pair",
+  INSIDE_ASCENDING: "Inside the six-line framework",
+  BELOW_ASCENDING: "Below the swing-low pair",
+  ABOVE_DESCENDING: "Above the swing-high pair",
+  INSIDE_DESCENDING: "Inside the six-line framework",
+  BELOW_DESCENDING: "Below the swing-low pair",
   OUTSIDE_PLAY: "Outside the planned play",
 };
 
 const scenarioShort: Record<SPXScenario, string> = {
-  ABOVE_ASCENDING: "ABOVE · ASC",
-  INSIDE_ASCENDING: "INSIDE · ASC",
-  BELOW_ASCENDING: "BELOW · ASC",
-  ABOVE_DESCENDING: "ABOVE · DESC",
-  INSIDE_DESCENDING: "INSIDE · DESC",
-  BELOW_DESCENDING: "BELOW · DESC",
+  ABOVE_ASCENDING: "ABOVE - HIGH PAIR",
+  INSIDE_ASCENDING: "INSIDE - SIX LINE",
+  BELOW_ASCENDING: "BELOW - LOW PAIR",
+  ABOVE_DESCENDING: "ABOVE - HIGH PAIR",
+  INSIDE_DESCENDING: "INSIDE - SIX LINE",
+  BELOW_DESCENDING: "BELOW - LOW PAIR",
   OUTSIDE_PLAY: "OUTSIDE",
 };
 
@@ -50,31 +50,34 @@ export function SPXChannelHero({ snap }: { snap: SPXSnapshot }) {
   const heroBg = selective ? "bg-gold-tint/40" : "bg-paper";
 
   // Compose right-rail stat strip values
-  const ceiling = snap.lines.find((l) => l.kind === "SWING_HIGH_DESC");
-  const floor = snap.lines.find((l) => l.kind === "SWING_LOW_ASC");
-  const channelWidth =
-    ceiling && floor ? ceiling.currentValue - floor.currentValue : null;
-  const distToCeiling = ceiling
-    ? ceiling.currentValue - snap.price.last
-    : null;
-  const distToFloor = floor ? snap.price.last - floor.currentValue : null;
+  const swingHighDesc = snap.lines.find((l) => l.kind === "SWING_HIGH_DESC");
+  const swingLowAsc = snap.lines.find((l) => l.kind === "SWING_LOW_ASC");
+  const activePair = [swingHighDesc, swingLowAsc]
+    .filter((line): line is NonNullable<typeof line> => Boolean(line))
+    .sort((a, b) => a.currentValue - b.currentValue);
+  const lowerLine = activePair[0] ?? null;
+  const upperLine = activePair[1] ?? null;
+  const activeGap =
+    lowerLine && upperLine ? upperLine.currentValue - lowerLine.currentValue : null;
+  const distToUpper = upperLine ? upperLine.currentValue - snap.price.last : null;
+  const distToLower = lowerLine ? snap.price.last - lowerLine.currentValue : null;
 
   return (
     <Card
       className={`relative overflow-hidden ${heroBg}`}
     >
-      {/* SPX violet signature — left edge */}
+      {/* SPX violet signature - left edge */}
       <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-violet/55" />
       {/* hairline top */}
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-rule to-transparent" />
 
       <div className="grid grid-cols-12 gap-0">
-        {/* LEFT — scenario + action */}
+        {/* LEFT - scenario + action */}
         <div className="col-span-12 lg:col-span-7 p-7 pr-6 pl-8 relative">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="eyebrow text-ink-3">ES · Structure Slate</span>
-              {/* v9: slope value hidden — proprietary engine
+              <span className="eyebrow text-ink-3">ES - Structure Slate</span>
+              {/* v9: slope value hidden - proprietary engine
                   parameter, not for surface display. */}
               <span className="text-[10px] text-ink-4 font-mono">
                 Session {snap.sessionDateCT}
@@ -140,8 +143,8 @@ export function SPXChannelHero({ snap }: { snap: SPXSnapshot }) {
             </div>
           </div>
 
-          {/* Single combined paragraph — scenario explanation followed by the
-              channel-determination context as a leader sentence. The previous
+          {/* Single combined paragraph - scenario explanation followed by the
+              framework context as a leader sentence. The previous
               version stacked two italic blocks which read as sentimental. */}
           <p className="mt-7 text-[15px] text-ink-2 leading-relaxed max-w-xl">
             {snap.scenarioExplanation}
@@ -160,17 +163,13 @@ export function SPXChannelHero({ snap }: { snap: SPXSnapshot }) {
         {/* vertical rule */}
         <div className="hidden lg:block absolute left-[58.333%] top-7 bottom-7 w-px bg-rule" />
 
-        {/* RIGHT — diagram + stat strip (rebalanced) */}
+        {/* RIGHT - diagram + stat strip (rebalanced) */}
         <div className="col-span-12 lg:col-span-5 p-7 pl-7 bg-paper-2/40 relative">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <span className="eyebrow text-ink-3">Channel</span>
+              <span className="eyebrow text-ink-3">Framework</span>
               <div className="mt-1.5 text-title font-serif text-ink">
-                {snap.channel.direction === "NONE"
-                  ? "No channel today"
-                  : snap.channel.direction === "ASCENDING"
-                    ? "Ascending"
-                    : "Descending"}
+                {snap.channel.direction === "NONE" ? "Resolving" : "Six-line"}
               </div>
             </div>
             <div className="text-right">
@@ -192,25 +191,25 @@ export function SPXChannelHero({ snap }: { snap: SPXSnapshot }) {
             </div>
           </div>
 
-          {/* 3-stat band — gives the right rail visual gravity */}
+          {/* 3-stat band - gives the right rail visual gravity */}
           <div className="grid grid-cols-3 gap-2 mb-4">
             <RailStat
-              label="Width"
-              value={channelWidth !== null ? `${channelWidth.toFixed(2)}` : "—"}
+              label="Active gap"
+              value={activeGap !== null ? `${activeGap.toFixed(2)}` : "-"}
               suffix="pts"
             />
             <RailStat
-              label="To high"
-              value={distToCeiling !== null ? distToCeiling.toFixed(2) : "—"}
+              label="To upper"
+              value={distToUpper !== null ? distToUpper.toFixed(2) : "-"}
               tone={
-                distToCeiling !== null && distToCeiling >= 0 ? "bear" : "bull"
+                distToUpper !== null && distToUpper >= 0 ? "bear" : "bull"
               }
               suffix="pts"
             />
             <RailStat
-              label="To low"
-              value={distToFloor !== null ? distToFloor.toFixed(2) : "—"}
-              tone={distToFloor !== null && distToFloor >= 0 ? "bull" : "bear"}
+              label="To lower"
+              value={distToLower !== null ? distToLower.toFixed(2) : "-"}
+              tone={distToLower !== null && distToLower >= 0 ? "bull" : "bear"}
               suffix="pts"
             />
           </div>
@@ -268,13 +267,13 @@ function RailStat({
       : tone === "bear"
         ? "text-bear-ink"
         : "text-ink";
-  const isBlank = value === "â€”" || value === "—";
+  const isBlank = value === "-";
   return (
     <div
       className="px-2.5 py-1.5 rounded-soft bg-paper shadow-rule"
       title={
         isBlank
-          ? "These populate once Sydney and Tokyo produce a qualifying overnight pivot."
+          ? "These populate once the overnight swing closes and previous RTH references are available."
           : undefined
       }
     >
@@ -333,7 +332,7 @@ function Anchor({
 
 function ChannelDiagram({ snap }: { snap: SPXSnapshot }) {
   const W = 400;
-  const H = 220; // grown from 180 — gives the diagram more visual gravity
+  const H = 220; // grown from 180 - gives the diagram more visual gravity
   const PAD_L = 40;
   const PAD_R = 14;
   const PAD_T = 14;
@@ -375,7 +374,7 @@ function ChannelDiagram({ snap }: { snap: SPXSnapshot }) {
   const ascending = snap.channel.direction === "ASCENDING";
   const railColor = ascending ? "#0E7C50" : "#B5301E";
   const railFill = ascending ? "rgba(14,124,80,0.09)" : "rgba(181,48,30,0.09)";
-  // Prev-day RTH refs: violet (was teal — collided with SPY's "armed" state).
+  // Prev-day RTH refs: violet (was teal - collided with SPY's "armed" state).
   const refColor = "#5B3FB1";
 
   const ceilingPath =
@@ -497,7 +496,7 @@ function ChannelDiagram({ snap }: { snap: SPXSnapshot }) {
         </>
       )}
 
-      {/* channel band fill */}
+      {/* six-line active-pair fill */}
       {snap.channel.direction === "NONE" && (
         <g className="spx-ghost-channel">
           <path
@@ -524,13 +523,13 @@ function ChannelDiagram({ snap }: { snap: SPXSnapshot }) {
             fill="#5A5A5A"
             letterSpacing="0.08em"
           >
-            CHANNEL FORMS ON FIRST QUALIFYING OVERNIGHT PIVOT
+            SIX-LINE FRAMEWORK AWAITS OVERNIGHT SWINGS
           </text>
         </g>
       )}
       {bandPath && <path d={bandPath} fill={railFill} className="spx-band" />}
 
-      {/* prev-day RTH high asc — dashed violet reference */}
+      {/* prev-day RTH high asc - dashed violet reference */}
       {prevHighPath && (
         <path
           d={prevHighPath}
@@ -543,7 +542,7 @@ function ChannelDiagram({ snap }: { snap: SPXSnapshot }) {
         />
       )}
 
-      {/* channel rails */}
+      {/* active swing-pair lines */}
       {ceilingPath && (
         <path
           d={ceilingPath}
@@ -644,7 +643,7 @@ function ChannelDiagram({ snap }: { snap: SPXSnapshot }) {
           textAnchor="end"
           fontWeight={600}
         >
-          CEIL {ceiling.currentValue.toFixed(2)}
+          SH-D {ceiling.currentValue.toFixed(2)}
         </text>
       )}
       {floor && snap.channel.direction !== "NONE" && (
@@ -666,7 +665,7 @@ function ChannelDiagram({ snap }: { snap: SPXSnapshot }) {
           textAnchor="end"
           fontWeight={600}
         >
-          FLOOR {floor.currentValue.toFixed(2)}
+          SL-A {floor.currentValue.toFixed(2)}
         </text>
       )}
       {prevHighAsc && (

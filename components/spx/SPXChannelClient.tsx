@@ -6,14 +6,14 @@
 // uses.
 //
 // Why client-side fetch on /spx? The previous server-side path
-// silently fell back to the mock fixture (lib/spx-mock-data.ts —
+// silently fell back to the mock fixture (lib/spx-mock-data.ts -
 // 5872.00 / TAKE / ASCENDING) whenever the server function couldn't
 // reach /api/spx/snapshot. The most common cause: Vercel preview
 // deployments enforce Deployment Protection on the public URL, and
 // server-to-server fetches from inside a Vercel function get a 401
 // from that wall. The browser carries the user's bypass cookie so
 // /replay's client-side fetch sails through, but /spx's server
-// fetch did not — hence the user-reported "shows mock data on the
+// fetch did not - hence the user-reported "shows mock data on the
 // SPX Channel tab".
 //
 // Moving the fetch to the browser uses the same auth-cookie path as
@@ -96,7 +96,7 @@ export function SPXChannelClient({ replayDate }: Props) {
         const message = scrubProviderDetail(
           body.error ?? `API returned ${res.status} from ${url}`,
         );
-        const trace = body.trace?.map(scrubProviderDetail).join(" · ");
+        const trace = body.trace?.map(scrubProviderDetail).join(" - ");
         if (cancelled) return;
         if (res.status === 503 || body.kind === "no_bars") {
           setState({ status: "no_bars", message });
@@ -135,7 +135,7 @@ export function SPXChannelClient({ replayDate }: Props) {
             <div>
               <div className="flex flex-wrap items-center gap-3">
                 <span className="font-mono text-[10px] text-gold-soft/82 tracking-[0.20em] uppercase">
-                  ES · Channel · resolving
+                  ES - Channel - resolving
                 </span>
                 <span className="h-px w-10 bg-gold/45" />
                 <span className="font-mono text-[10px] text-paper/48 tracking-[0.20em] uppercase">
@@ -143,10 +143,10 @@ export function SPXChannelClient({ replayDate }: Props) {
                 </span>
               </div>
               <h1 className="mt-3 text-[34px] font-serif leading-none tracking-tight text-paper md:text-[44px]">
-                Building the ES channel.
+                Building the ES framework.
               </h1>
               <p className="mt-4 max-w-3xl text-[15px] leading-relaxed text-paper/72">
-                The live ES price, overnight bars, channel rules, line ladder,
+                The live ES price, overnight bars, six-line rules, line ladder,
                 confluence, and decision tape are being assembled from the
                 current session. The page will only render measured values or
                 an explicit unavailable state.
@@ -155,14 +155,14 @@ export function SPXChannelClient({ replayDate }: Props) {
                 <p className="mt-3 max-w-3xl rounded-[12px] border border-paper/12 bg-paper/8 px-3 py-2 text-[12px] leading-relaxed text-paper/62">
                   This request is taking longer than usual. ES often resolves
                   after the market-data function warms up; if a feed is missing,
-                  the channel will switch to a named data state instead of
+                  the framework will switch to a named data state instead of
                   displaying placeholders.
                 </p>
               )}
             </div>
             <div className="grid grid-cols-3 gap-2">
               <LoadingStat label="Price" value="Resolving" />
-              <LoadingStat label="Channel" value="Building" />
+              <LoadingStat label="Framework" value="Building" />
               <LoadingStat label="Tape" value="Queued" />
             </div>
           </div>
@@ -180,7 +180,7 @@ export function SPXChannelClient({ replayDate }: Props) {
     // 503 from the API. The engine couldn't compute a snapshot for
     // structural reasons (overnight window empty, weekend, holiday,
     // data-feed gap). This is the honest "channel is between
-    // sessions" state — render it as such, not as a hard error.
+    // sessions" state - render it as such, not as a hard error.
     return (
       <div className="w-full max-w-[1440px] space-y-6 pb-16 pt-6">
         {replayDate && <ReplayBanner date={replayDate} />}
@@ -189,15 +189,15 @@ export function SPXChannelClient({ replayDate }: Props) {
           className="rounded-card border border-rule bg-paper-2/50 px-5 py-6 md:px-6 md:py-8"
         >
           <p className="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-3 mb-2">
-            ES · Channel
+            ES - Channel
           </p>
           <h1 className="font-serif text-h2 text-ink tracking-tight">
-            Channel forms after the configuration window
+            Framework forms after the configuration window
           </h1>
           <p className="mt-3 text-body text-ink-2 leading-snug max-w-2xl">
             The engine plots from ES front-month overnight bars
-            (15:00 prev-day → 02:00 today CT). Outside that window —
-            on weekends, holidays, or when the data feed gaps — there
+            (15:00 prev-day - 02:00 today CT). Outside that window -
+            on weekends, holidays, or when the data feed gaps - there
             is nothing yet to plot. Check back during the next
             overnight session, or open <code>/replay</code> to step
             through a previous day.
@@ -211,7 +211,7 @@ export function SPXChannelClient({ replayDate }: Props) {
   }
 
   if (state.status === "error") {
-    // Hard error path — engine threw something we don't know how to
+    // Hard error path - engine threw something we don't know how to
     // recover from. v5 silently substituted the mock fixture
     // (5872.00 / TAKE / ASCENDING) here, which made the failure
     // indistinguishable from a real engine reading. v6 surfaces
@@ -226,7 +226,7 @@ export function SPXChannelClient({ replayDate }: Props) {
               ? `Couldn't load the ES snapshot for ${replayDate}`
               : "Couldn't load the live ES snapshot"
           }
-          message={`${state.message}. The /replay tab uses the same endpoint and may be working — if it is, retry in a moment.`}
+          message={`${state.message}. The /replay tab uses the same endpoint and may be working - if it is, retry in a moment.`}
         />
         {state.trace && (
           <pre className="text-[11px] font-mono text-ink-3 whitespace-pre-wrap rounded-card border border-rule bg-paper-2/40 p-4 max-h-64 overflow-auto">
@@ -263,7 +263,7 @@ export function SPXChannelClient({ replayDate }: Props) {
         <div>
           <div className="flex items-center gap-3">
             <span className="font-mono text-[10px] text-gold-soft/82 tracking-[0.20em] uppercase">
-              ES · Channel · session {snap.sessionDateCT}
+              ES - Channel - session {snap.sessionDateCT}
             </span>
             <span className="h-px w-10 bg-gold/45" />
             <span className="font-mono text-[10px] text-paper/48 tracking-[0.20em] uppercase">
@@ -271,7 +271,7 @@ export function SPXChannelClient({ replayDate }: Props) {
             </span>
           </div>
           <h1 className="mt-3 text-[36px] font-serif leading-none tracking-tight text-paper md:text-[46px]">
-            ES channel,{" "}
+            ES framework,{" "}
             <span className="text-gold-soft/72 italic font-light">live.</span>
           </h1>
           <p className="mt-4 max-w-3xl text-[15px] leading-relaxed text-paper/72">
@@ -298,11 +298,11 @@ export function SPXChannelClient({ replayDate }: Props) {
               <span>
                 Bars <span className="text-ink-2">{meta.barsCount}</span>
               </span>
-              <span className="text-ink-4">·</span>
+              <span className="text-ink-4">-</span>
               <span>
                 Quote <span className="text-ink-2">synced</span>
               </span>
-              <span className="text-ink-4">·</span>
+              <span className="text-ink-4">-</span>
               <span>
                 Offset{" "}
                 <span className="text-ink-2 tabular-nums">
@@ -317,18 +317,18 @@ export function SPXChannelClient({ replayDate }: Props) {
                 {meta.offsetSource === "env_override" &&
                   typeof meta.computedOffset === "number" && (
                     <span className="ml-1 text-ink-4">
-                      ↔ live {meta.computedOffset >= 0 ? "+" : ""}
+                      - live {meta.computedOffset >= 0 ? "+" : ""}
                       {meta.computedOffset.toFixed(2)}
                     </span>
                   )}
                 {meta.offsetMethod && (
                   <span className="ml-1 text-ink-4">
-                    · {meta.offsetMethod.replace(/_/g, " ")}
+                    - {meta.offsetMethod.replace(/_/g, " ")}
                   </span>
                 )}
               </span>
-              <span className="text-ink-4">·</span>
-              {/* v9: dropped the "/ SPX <cash>" half — the cash
+              <span className="text-ink-4">-</span>
+              {/* v9: dropped the "/ SPX <cash>" half - the cash
                   index quote was diagnostic-only and the only
                   user-facing SPX leak left on this page. The
                   Cmd+Shift+D overlay still surfaces the full
@@ -341,13 +341,9 @@ export function SPXChannelClient({ replayDate }: Props) {
         </div>
         <div className="hidden md:flex items-center gap-6 text-right">
           <Stat label="Last" value={snap.price.last.toFixed(2)} />
-          <Stat
-            label="Direction"
-            value={snap.channel.direction}
-            highlight={snap.channel.direction}
-          />
+          <Stat label="Framework" value="SIX LINE" highlight={snap.scenario} />
           <Stat label="Scenario" value={snap.scenario.replace(/_/g, " ")} />
-          {/* v9: Slope stat removed — proprietary engine parameter. */}
+          {/* v9: Slope stat removed - proprietary engine parameter. */}
         </div>
         </div>
       </header>
@@ -402,7 +398,7 @@ export function SPXChannelClient({ replayDate }: Props) {
           <span>Build 0.9.7</span>
           <Link href="/contact" className="hover:text-ink">Report an issue</Link>
         </span>
-        <span className="hidden">Prophet · ES channel</span>
+        <span className="hidden">Prophet - ES channel</span>
         <span className="hidden">Session surface</span>
       </footer>
     </div>
@@ -414,24 +410,20 @@ export function SPXChannelClient({ replayDate }: Props) {
 // ---------------------------------------------------------------------
 
 function heroSynthesis(snap: SPXSnapshot): string {
-  if (snap.channel.direction === "NONE") {
-    return `No ES channel is active: ${snap.channel.reason || "Sydney and Tokyo did not produce a clean pivot."} The engine is standing down until structure resolves.`;
+  if (snap.lines.length < 6) {
+    return `ES framework is resolving: ${snap.channel.reason || "overnight swing lines are still being built."} The engine is standing down until structure resolves.`;
   }
-  const direction =
-    snap.channel.direction === "ASCENDING" ? "ascending" : "descending";
   const action = snap.confluence.action.replace(/_/g, " ").toLowerCase();
   const bias = snap.rthBias?.note ? ` ${snap.rthBias.note}` : "";
-  return `ES has a ${direction} overnight channel and a ${action} read. ${snap.scenarioExplanation}${bias}`;
+  return `ES has a six-line overnight framework and a ${action} read. ${snap.scenarioExplanation}${bias}`;
 }
 
 function reentryCondition(snap: SPXSnapshot): string {
+  if (snap.flipCondition) return snap.flipCondition;
   if (snap.plannedEnvelope) {
-    return `Re-entry into ${snap.plannedEnvelope.low.toFixed(2)}-${snap.plannedEnvelope.high.toFixed(2)} reactivates the play.`;
+    return `Hourly rejection inside ${snap.plannedEnvelope.low.toFixed(2)}-${snap.plannedEnvelope.high.toFixed(2)} reactivates the play.`;
   }
-  if (snap.channel.direction === "NONE") {
-    return "Channel forms when Sydney and Tokyo produce a clean higher-high/higher-low or lower-low/lower-high pivot.";
-  }
-  return "Price must reclaim the active channel envelope before ES can move from stand down into watch.";
+  return "Framework forms from the overnight swing-high close, swing-low close, previous RTH high, and previous RTH low.";
 }
 
 function formatHM(iso: string): string {
@@ -471,7 +463,7 @@ function Diagnostics({ details }: { details: NonNullable<SPXSnapshot["_meta"]> }
   return (
     <details className="rounded-card border border-rule bg-paper px-4 py-3 text-[12px] text-ink-2 shadow-card">
       <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3">
-        Diagnostics · bars {details.barsCount} · quote synced · offset{" "}
+        Diagnostics - bars {details.barsCount} - quote synced - offset{" "}
         <span className="tabular-nums">{offset}</span>
       </summary>
       <p className="mt-3 max-w-3xl leading-relaxed">
@@ -491,7 +483,7 @@ function EsDecisionTape({ snap }: { snap: SPXSnapshot }) {
       <CardHeader
         eyebrow="Decision Trail"
         title="ES session tape"
-        meta={`${events.length} event${events.length === 1 ? "" : "s"} · replay-linked`}
+        meta={`${events.length} event${events.length === 1 ? "" : "s"} - replay-linked`}
       />
       <CardBody className="px-0 pb-0">
         {events.length === 0 ? (
@@ -500,7 +492,7 @@ function EsDecisionTape({ snap }: { snap: SPXSnapshot }) {
               Waiting for ES tape events.
             </div>
             <p className="mt-2 text-[13px] leading-relaxed text-ink-3">
-              State changes, channel formation, line touches, and rule blocks
+              State changes, structure formation, line touches, and rule blocks
               will appear here as the session develops.
             </p>
           </div>
@@ -550,7 +542,7 @@ function ReplayBanner({ date }: { date: string }) {
         </span>
         <span aria-hidden className="h-3 w-px bg-gold/40" />
         <span className="text-ink-2 font-medium">
-          Showing the historical ES channel for{" "}
+          Showing the historical ES framework for{" "}
           <span className="font-mono tabular-nums text-ink">{date}</span>
         </span>
       </div>
