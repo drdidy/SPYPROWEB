@@ -61,6 +61,40 @@ def _http_get(url: str, headers: dict, timeout: float = 6.0) -> dict | None:
         return None
 
 
+def _quote_items(body: dict | None) -> list[dict]:
+    if not isinstance(body, dict):
+        return []
+    data = body.get("data")
+    if isinstance(data, dict):
+        items = data.get("items")
+        if isinstance(items, list):
+            return [i for i in items if isinstance(i, dict)]
+        if "symbol" in data:
+            return [data]
+    if isinstance(data, list):
+        return [i for i in data if isinstance(i, dict)]
+    return []
+
+
+def _quote_last(item: dict) -> float | None:
+    for key in ("last", "mark", "close"):
+        value = item.get(key)
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError):
+            continue
+        if parsed > 0:
+            return parsed
+    try:
+        bid = float(item.get("bid"))
+        ask = float(item.get("ask"))
+    except (TypeError, ValueError):
+        return None
+    if bid > 0 and ask >= bid:
+        return (bid + ask) / 2
+    return None
+
+
 @pc.ttl_cache(ttl_seconds=600.0, maxsize=1)
 def _get_access_token() -> str | None:
     """Exchange the long-lived refresh token for a short-lived access token.
@@ -94,6 +128,33 @@ def _fetch_nested_chain(symbol: str = "SPY") -> dict | None:
     if ENV == "production":
         headers["Accept-Version"] = TASTYTRADE_API_VERSION
     return _http_get(f"{BASE}/option-chains/{symbol}/nested", headers)
+
+
+@pc.ttl_cache(ttl_seconds=15.0, maxsize=8)
+def fetch_equity_quote(symbol: str = "SPY") -> float | None:
+    """Best-effort live equity quote from the primary market-data source.
+
+    Returns None on any auth/API/schema issue so the caller can keep using its
+    existing bar-source fallback without breaking the snapshot.
+    """
+    token = _get_access_token()
+    if not token:
+        return None
+    clean = symbol.strip().upper()
+    if not clean:
+        return None
+    headers = {
+        "Accept": "application/json",
+        "Authorization": f"Bearer {token}",
+    }
+    if ENV == "production":
+        headers["Accept-Version"] = TASTYTRADE_API_VERSION
+    query = urllib.parse.urlencode([("equity", clean)])
+    body = _http_get(f"{BASE}/market-data/by-type?{query}", headers, timeout=4.0)
+    for item in _quote_items(body):
+        if item.get("symbol") == clean:
+            return _quote_last(item)
+    return None
 
 
 def _safe_float(value: Any) -> float:

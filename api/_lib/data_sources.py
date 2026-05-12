@@ -1386,6 +1386,12 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
     current_price = _latest_price_for_session(df, signal_day)
     if current_price is None:
         current_price = float(df["Close"].dropna().iloc[-1])
+    price_feed_source = "backup"
+    if not is_replay:
+        primary_quote = tastytrade.fetch_equity_quote("SPY")
+        if primary_quote is not None and primary_quote == primary_quote and primary_quote > 0:
+            current_price = float(primary_quote)
+            price_feed_source = "primary"
 
     bias_state = pc.determine_preopen_bias(primary_lines, current_price, now_ct.to_pydatetime())
 
@@ -1400,6 +1406,8 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
         day_open = float(latest_session.iloc[0]["Open"]) if not latest_session.empty else current_price
         day_high = float(latest_session["High"].max()) if not latest_session.empty else current_price
         day_low = float(latest_session["Low"].min()) if not latest_session.empty else current_price
+    day_high = max(day_high, current_price)
+    day_low = min(day_low, current_price)
     prev_close = float(rth_yesterday.iloc[-1]["Close"]) if not rth_yesterday.empty else float("nan")
     chg = current_price - prev_close if not pd.isna(prev_close) else 0.0
     chg_pct = (chg / prev_close * 100) if prev_close else 0.0
@@ -1591,7 +1599,7 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
     invalidation_payload = _spy_invalidation(active_signal_for_trace)
     feed_health_payload = {
         "lastTickTs": as_of_iso,
-        "source": "yfinance",
+        "source": price_feed_source,
     }
 
     return {

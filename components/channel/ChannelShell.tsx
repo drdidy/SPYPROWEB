@@ -95,7 +95,7 @@ export function ChannelShell({
               {heroSynthesis(data.snap)}
             </p>
             <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.12em] text-paper/46 tabular-nums">
-              {freshnessLine(data.snap.asOf, session.nextSignificantEvent.at)}
+              {freshnessLine(data.source, data.snap.asOf, session.nextSignificantEvent.at)}
             </p>
           </div>
           <div className="hidden md:grid grid-cols-3 gap-2 text-right">
@@ -240,8 +240,10 @@ function cleanSpyExplanation(text: string, spot: number): string {
   return cleaned || "Options context is withheld until the live chain is inside a realistic SPY range.";
 }
 
-function freshnessLine(asOf: string, next: Date): string {
-  return `live | updated ${formatHM(asOf)} CT | next ${formatHM(next.toISOString())} CT`;
+function freshnessLine(source: LiveSnapshotSource, asOf: string, next: Date): string {
+  const state =
+    source === "live" ? "live" : source === "degraded" || source === "seed" ? "stale" : "offline";
+  return `${state} | updated ${formatHM(asOf)} CT | next ${formatHM(next.toISOString())} CT`;
 }
 
 function formatHM(iso: string): string {
