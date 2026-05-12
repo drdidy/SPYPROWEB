@@ -68,7 +68,7 @@ export default async function Page({
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
   const now = new Date();
-  const chartDate = chartSessionDateISO(now);
+  const spyChartDate = chartSessionDateISO("SPY", now);
   const flagContext = { query: searchParams ?? null };
   const slateHeroV2 = isEnabled("slate_hero_v2", flagContext);
   const slateVerdictChrome = isEnabled("slate_verdict_chrome", flagContext);
@@ -84,9 +84,6 @@ export default async function Page({
     recaps,
     spyTrack,
     spxTrack,
-    chartSpyLoaded,
-    chartSpxLoaded,
-    intraday,
     optionBundle,
   ] = await Promise.all([
     loadLiveSnapshot(),
@@ -94,13 +91,17 @@ export default async function Page({
     fetchLastSessionRecaps(),
     fetchTrackRecord("SPY"),
     fetchTrackRecord("SPX"),
-    loadLiveSnapshot(chartDate),
-    loadSpxSnapshot(chartDate),
-    loadIntradayReplay(chartDate),
     loadOptionsIntelBundle(["SPX"]),
   ]);
   const spx = spxLoaded.snap;
   const spxSource = spxLoaded.source;
+  const spxChartDate = spx.sessionDateCT || spyChartDate;
+  const [spyIntraday, spxIntraday] = await Promise.all([
+    loadIntradayReplay(spyChartDate),
+    spxChartDate === spyChartDate
+      ? Promise.resolve(null)
+      : loadIntradayReplay(spxChartDate),
+  ]);
 
   // Source badges intentionally not rendered here — feed health lives
   // in the TopBar and any error/seed mode degrades the FreshnessPill.
@@ -128,14 +129,14 @@ export default async function Page({
     optionsError: optionBundle.source === "error" ? optionBundle.error ?? "options unavailable" : null,
   });
   const spyChart = buildSpyStructureChart(
-    chartSpyLoaded.data,
-    intraday?.spy ?? null,
-    chartDate,
+    spy,
+    spyIntraday?.spy ?? null,
+    spyChartDate,
   );
   const spxChart = buildSpxStructureChart(
-    chartSpxLoaded.snap,
-    intraday?.es ?? null,
-    chartDate,
+    spx,
+    (spxIntraday ?? spyIntraday)?.es ?? null,
+    spxChartDate,
   );
   const spyProjection = buildSpyContractProjection(spy);
   const spxProjection = buildSpxContractProjection({
@@ -188,7 +189,7 @@ export default async function Page({
         spxProjection={spxProjection}
         compactHeader={slateHeroV2}
         slateDateLabel={formatSlateDate(now)}
-        sessionDate={chartDate}
+        sessionDate={spyChartDate}
         unifiedChrome={slateVerdictChrome}
         entryCostInScorecard={slateEntryCostTile}
         feedId="market-clock"
@@ -622,8 +623,17 @@ function buildSpyStructureChart(
 ): StructureChartData | null {
   const anchor = snap.anchor?.primary;
   const bars = normalizeChartBars(
-    intradayBars && intradayBars.length > 1 ? intradayBars : snap.candles,
+    snap.candles && snap.candles.length > 1 ? snap.candles : intradayBars,
   );
+  if (bars.length > 0 && Number.isFinite(snap.currentPrice) && snap.currentPrice > 0) {
+    const last = bars[bars.length - 1];
+    bars[bars.length - 1] = {
+      ...last,
+      h: Math.max(last.h, snap.currentPrice),
+      l: Math.min(last.l, snap.currentPrice),
+      c: snap.currentPrice,
+    };
+  }
   if (bars.length < 2) return null;
   const referenceTime = anchor?.entryReferenceTime ?? bars[0].t;
   const lines: StructureChartLine[] = anchor
@@ -729,12 +739,8 @@ function shortSpxLineLabel(kind: string): string {
   return m[kind] || "Ref";
 }
 
-function chartSessionDateISO(now: Date): string {
-  const session = getSessionInfo("SPY", now);
-  if (session.phase === "RTH_OPEN" || session.phase === "POST_RTH") {
-    return chicagoDateISO(session.rthClose);
-  }
-  return previousTradingDateISO("SPY", now);
+function chartSessionDateISO(engine: "SPY" | "SPX", now: Date): string {
+  return latestTradingDateISO(engine, now);
 }
 
 function chicagoDateISO(d: Date): string {
@@ -746,16 +752,23 @@ function chicagoDateISO(d: Date): string {
   }).format(d);
 }
 
-function previousTradingDateISO(engine: "SPY" | "SPX", now: Date): string {
+function latestTradingDateISO(engine: "SPY" | "SPX", now: Date): string {
   const todayISO = chicagoDateISO(now);
-  for (let offset = 1; offset <= 14; offset++) {
+  for (let offset = 0; offset <= 14; offset++) {
     const probe = new Date(now.getTime() - offset * 86_400_000);
-    if (chicagoDateISO(probe) === todayISO) continue;
-    const session = getSessionInfo(engine, probe);
+    const probeISO = chicagoDateISO(probe);
+    const session = getSessionInfo(engine, middayProbeForChicagoDate(probeISO));
     const tradingDateISO = chicagoDateISO(session.rthClose);
-    if (tradingDateISO < todayISO) return tradingDateISO;
+    if (tradingDateISO <= todayISO) return tradingDateISO;
   }
   return todayISO;
+}
+
+function middayProbeForChicagoDate(dateISO: string): Date {
+  // Noon CT is safely inside the same Chicago calendar day and before
+  // the RTH close. The UTC hour keeps this deterministic for the US
+  // market calendar dates this app supports.
+  return new Date(`${dateISO}T17:00:00.000Z`);
 }
 
 function Section({
