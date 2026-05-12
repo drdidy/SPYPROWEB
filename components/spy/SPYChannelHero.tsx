@@ -265,6 +265,15 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
             </div>
           </div>
 
+          <StructurePathChart
+            data={buildSpyChannelChart(snap)}
+            variant="paper"
+            accent={bias === "BULLISH" ? "bull" : bias === "BEARISH" ? "bear" : "gold"}
+            height={380}
+            title="SPY price vs 09:00 references"
+            className="mb-4"
+          />
+
           {primary ? (
             <div className="grid grid-cols-2 gap-2 mb-4">
               {entryFramework.map((item) => (
@@ -288,14 +297,6 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
               </p>
             </div>
           )}
-
-          <StructurePathChart
-            data={buildSpyChannelChart(snap)}
-            variant="paper"
-            accent={bias === "BULLISH" ? "bull" : bias === "BEARISH" ? "bear" : "gold"}
-            height={300}
-            title="SPY price vs 09:00 references"
-          />
 
           {primary && (
             <div className="mt-3 grid grid-cols-2 gap-3 text-[11px]">
