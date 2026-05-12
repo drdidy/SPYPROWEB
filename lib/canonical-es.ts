@@ -8,6 +8,22 @@ function formatPrice(value: number): string {
   return value.toFixed(2);
 }
 
+function appliedOffset(snap: SPXSnapshot): number | null {
+  const offset = snap._meta?.appliedOffset;
+  return typeof offset === "number" && Number.isFinite(offset) ? offset : null;
+}
+
+function toNativeEsPrice(value: number | null | undefined, offset: number): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  if (value <= 0) return value;
+  return value - offset;
+}
+
+function nativeOrOriginal(value: number, offset: number): number {
+  const converted = toNativeEsPrice(value, offset);
+  return converted === null ? value : converted;
+}
+
 function rebuildScenarioExplanation(
   snap: SPXSnapshot,
   esLast: number,
@@ -54,23 +70,124 @@ function rewriteTraceEvent(event: string, snap: SPXSnapshot, esLast: number): st
 export function canonicalizeEsSnapshot(snap: SPXSnapshot): SPXSnapshot {
   const esLast = snap._meta?.esSpot;
   if (!isUsablePrice(esLast)) return snap;
+  const offset = appliedOffset(snap);
+  const alreadyNative = Math.abs(snap.price.last - esLast) < 0.01;
+  if (offset === null || alreadyNative) {
+    const lines = snap.lines.map((line) => ({
+      ...line,
+      distanceFromPrice: line.currentValue - esLast,
+    }));
+    return {
+      ...snap,
+      price: {
+        ...snap.price,
+        last: esLast,
+      },
+      lines,
+      scenarioExplanation: rebuildScenarioExplanation(snap, esLast),
+      decisionTrace: snap.decisionTrace?.map((event) => ({
+        ...event,
+        event: rewriteTraceEvent(event.event, snap, esLast),
+      })),
+    };
+  }
 
   const lines = snap.lines.map((line) => ({
     ...line,
-    distanceFromPrice: line.currentValue - esLast,
+    anchorPrice: nativeOrOriginal(line.anchorPrice, offset),
+    currentValue: nativeOrOriginal(line.currentValue, offset),
+    entryValue:
+      line.entryValue === null || line.entryValue === undefined
+        ? line.entryValue
+        : nativeOrOriginal(line.entryValue, offset),
+    distanceFromPrice:
+      (line.entryValue === null || line.entryValue === undefined
+        ? nativeOrOriginal(line.currentValue, offset)
+        : nativeOrOriginal(line.entryValue, offset)) - esLast,
   }));
-
-  return {
+  const converted: SPXSnapshot = {
     ...snap,
+    overnight: {
+      ...snap.overnight,
+      high: {
+        ...snap.overnight.high,
+        price: nativeOrOriginal(snap.overnight.high.price, offset),
+      },
+      low: {
+        ...snap.overnight.low,
+        price: nativeOrOriginal(snap.overnight.low.price, offset),
+      },
+    },
+    sessions: {
+      sydney: {
+        ...snap.sessions.sydney,
+        high: nativeOrOriginal(snap.sessions.sydney.high, offset),
+        low: nativeOrOriginal(snap.sessions.sydney.low, offset),
+      },
+      tokyo: {
+        ...snap.sessions.tokyo,
+        high: nativeOrOriginal(snap.sessions.tokyo.high, offset),
+        low: nativeOrOriginal(snap.sessions.tokyo.low, offset),
+      },
+    },
+    lines,
     price: {
       ...snap.price,
       last: esLast,
     },
-    lines,
-    scenarioExplanation: rebuildScenarioExplanation(snap, esLast),
-    decisionTrace: snap.decisionTrace?.map((event) => ({
+    plays: {
+      primary: snap.plays.primary
+        ? {
+            ...snap.plays.primary,
+            entryPrice: nativeOrOriginal(snap.plays.primary.entryPrice, offset),
+            exitPrice: nativeOrOriginal(snap.plays.primary.exitPrice, offset),
+          }
+        : null,
+      alternate: snap.plays.alternate
+        ? {
+            ...snap.plays.alternate,
+            entryPrice: nativeOrOriginal(snap.plays.alternate.entryPrice, offset),
+            exitPrice: nativeOrOriginal(snap.plays.alternate.exitPrice, offset),
+          }
+        : null,
+    },
+    invalidation: snap.invalidation
+      ? {
+          ...snap.invalidation,
+          level: nativeOrOriginal(snap.invalidation.level, offset),
+        }
+      : snap.invalidation,
+    plannedEnvelope: snap.plannedEnvelope
+      ? {
+          low: nativeOrOriginal(snap.plannedEnvelope.low, offset),
+          high: nativeOrOriginal(snap.plannedEnvelope.high, offset),
+        }
+      : snap.plannedEnvelope,
+    rthBias: snap.rthBias
+      ? {
+          ...snap.rthBias,
+          openPrice:
+            snap.rthBias.openPrice === null
+              ? null
+              : nativeOrOriginal(snap.rthBias.openPrice, offset),
+          referenceValue:
+            snap.rthBias.referenceValue === null
+              ? null
+              : nativeOrOriginal(snap.rthBias.referenceValue, offset),
+          continuationValue:
+            snap.rthBias.continuationValue === null
+              ? null
+              : nativeOrOriginal(snap.rthBias.continuationValue, offset),
+        }
+      : snap.rthBias,
+  };
+
+  return {
+    ...converted,
+    scenarioExplanation: rebuildScenarioExplanation(converted, esLast),
+    decisionTrace: converted.decisionTrace?.map((event) => ({
       ...event,
-      event: rewriteTraceEvent(event.event, snap, esLast),
+      event: rewriteTraceEvent(event.event, converted, esLast),
     })),
   };
 }
