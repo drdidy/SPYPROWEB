@@ -44,26 +44,19 @@ def evaluate_reentry(
     ceiling: Optional[Line],
     floor: Optional[Line],
 ) -> ReentryWatch:
-    """Resolve the re-entry watch state for the active session.
-
-    Inside the channel -> dormant.
-    Above with no qualifying candle -> armed, waiting.
-    Above with a bearish-touch-close-above -> triggered (BUY from above).
-    Below with no qualifying candle -> armed, waiting.
-    Below with a bullish-touch-close-below -> triggered (SELL from below).
-    """
+    """Resolve the rejection watch state for the active session."""
     if scenario in ("INSIDE_ASCENDING", "INSIDE_DESCENDING"):
         return ReentryWatch(
             active=False,
             side=None,
-            detail="Inside channel Ã¢â‚¬â€ re-entry watch dormant.",
+            detail="Inside the six-line ES framework - rejection watch dormant.",
         )
 
     if scenario == "OUTSIDE_PLAY":
         return ReentryWatch(
             active=False,
             side=None,
-            detail="Outside the planned play Ã¢â‚¬â€ no re-entry watch today.",
+            detail="Outside the planned play - no rejection watch today.",
         )
 
     if scenario in ("ABOVE_ASCENDING", "ABOVE_DESCENDING"):
@@ -71,7 +64,10 @@ def evaluate_reentry(
             return ReentryWatch(
                 active=True,
                 side="BUY_FROM_ABOVE",
-                detail="Above channel Ã¢â‚¬â€ awaiting bearish candle that touches ceiling and closes above it.",
+                detail=(
+                    "Above the active swing pair - awaiting a bearish candle "
+                    "that touches the buy line and closes above it."
+                ),
             )
         ceil_at_close = project_line(ceiling, last_candle.t)
         touched = last_candle.l <= ceil_at_close <= last_candle.h
@@ -81,22 +77,27 @@ def evaluate_reentry(
                 active=True,
                 side="BUY_FROM_ABOVE",
                 detail=(
-                    f"Bearish candle touched ceiling ({ceil_at_close:.2f}) and "
-                    f"closed above ({last_candle.c:.2f}) Ã¢â‚¬â€ continuation buy confirmed."
+                    f"Bearish candle touched the buy line ({ceil_at_close:.2f}) and "
+                    f"closed above ({last_candle.c:.2f}) - continuation buy confirmed."
                 ),
             )
         return ReentryWatch(
             active=True,
             side="BUY_FROM_ABOVE",
-            detail="Above channel Ã¢â‚¬â€ awaiting bearish candle that touches ceiling and closes above it.",
+            detail=(
+                "Above the active swing pair - awaiting a bearish candle "
+                "that touches the buy line and closes above it."
+            ),
         )
 
-    # BELOW_*
     if last_candle is None or floor is None:
         return ReentryWatch(
             active=True,
             side="SELL_FROM_BELOW",
-            detail="Below channel Ã¢â‚¬â€ awaiting bullish candle that touches floor and closes below it.",
+            detail=(
+                "Below the active swing pair - awaiting a bullish candle "
+                "that touches the sell line and closes below it."
+            ),
         )
     floor_at_close = project_line(floor, last_candle.t)
     touched = last_candle.l <= floor_at_close <= last_candle.h
@@ -106,12 +107,15 @@ def evaluate_reentry(
             active=True,
             side="SELL_FROM_BELOW",
             detail=(
-                f"Bullish candle touched floor ({floor_at_close:.2f}) and "
-                f"closed below ({last_candle.c:.2f}) Ã¢â‚¬â€ continuation sell confirmed."
+                f"Bullish candle touched the sell line ({floor_at_close:.2f}) and "
+                f"closed below ({last_candle.c:.2f}) - continuation sell confirmed."
             ),
         )
     return ReentryWatch(
         active=True,
         side="SELL_FROM_BELOW",
-        detail="Below channel Ã¢â‚¬â€ awaiting bullish candle that touches floor and closes below it.",
+        detail=(
+            "Below the active swing pair - awaiting a bullish candle "
+            "that touches the sell line and closes below it."
+        ),
     )

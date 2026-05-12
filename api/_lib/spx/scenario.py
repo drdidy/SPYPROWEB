@@ -171,7 +171,7 @@ def _ordered_swing_pair(
 def build_plays(scenario: Scenario, lines: list[ProjectedLine]) -> Plays:
     """Primary + alternate per the spec.
 
-    Descending mirrors ascending Ã¢â‚¬â€ same line roles, same play shape;
+    Descending mirrors ascending - same line roles, same play shape;
     direction-specific scenario tags are decorative.
     """
     by = _by_kind(lines)

@@ -104,19 +104,19 @@ def _factor_asian(channel: Channel, sydney: Optional[SessionRange], tokyo: Optio
 
 
 def _factor_london(
-    candles: list[Candle], session_date: date, ceiling: Optional[Line], floor: Optional[Line]
+    candles: list[Candle], session_date: date, upper: Optional[Line], lower: Optional[Line]
 ) -> FactorResult:
-    """Did London (02:00-08:00 CT) hold the channel?
+    """Did London (02:00-08:00 CT) hold the active swing pair?
 
-    'Hold' = London bars stayed inside the channel projection. Each bar
+    'Hold' = London bars stayed inside the active line pair. Each bar
     counts; clean holds score high, frequent breaches score low.
     """
     weight = FACTOR_WEIGHTS["london"]
-    if ceiling is None or floor is None:
+    if upper is None or lower is None:
         return FactorResult(
             key="london", label="London session", value=0.0,
             weight=weight, contribution=0.0,
-            note="No active channel; London check skipped.",
+            note="No active swing pair; London check skipped.",
         )
 
     # London window: 02:00 -> 08:00 CT on session_date.
@@ -132,9 +132,9 @@ def _factor_london(
 
     held = 0
     for bar in bars:
-        c_val = project_line(ceiling, bar.t)
-        f_val = project_line(floor, bar.t)
-        # Bar held the channel if both wicks stay within rails.
+        c_val = project_line(upper, bar.t)
+        f_val = project_line(lower, bar.t)
+        # Bar held the framework if both wicks stay within the active pair.
         if bar.l >= f_val and bar.h <= c_val:
             held += 1
     fraction = held / len(bars)
@@ -142,14 +142,14 @@ def _factor_london(
     return FactorResult(
         key="london", label="London session", value=value,
         weight=weight, contribution=value * weight,
-        note=f"{held}/{len(bars)} London bars held the channel.",
+        note=f"{held}/{len(bars)} London bars held the active swing pair.",
     )
 
 
 def _factor_reaction(
-    candles: list[Candle], session_date: date, scenario: Scenario, ceiling: Optional[Line], floor: Optional[Line]
+    candles: list[Candle], session_date: date, scenario: Scenario, upper: Optional[Line], lower: Optional[Line]
 ) -> FactorResult:
-    """First RTH bar's reaction to the active rails.
+    """First RTH bar's reaction to the active swing pair.
 
     Looks at the 08:30 bar (first RTH hour). If it touched a rail and
     rejected (wicked back), that's a confirming reaction. If it sliced
@@ -165,15 +165,15 @@ def _factor_reaction(
         )
 
     first = bars[0]
-    if scenario == "OUTSIDE_PLAY" or ceiling is None or floor is None:
+    if scenario == "OUTSIDE_PLAY" or upper is None or lower is None:
         return FactorResult(
             key="reaction", label="RTH reaction", value=0.0,
             weight=weight, contribution=0.0,
             note="No play in scope; reaction not graded.",
         )
 
-    c_val = project_line(ceiling, first.t)
-    f_val = project_line(floor, first.t)
+    c_val = project_line(upper, first.t)
+    f_val = project_line(lower, first.t)
 
     # Did the first bar interact cleanly with one of the rails?
     touched_ceiling = first.l <= c_val <= first.h
@@ -186,16 +186,16 @@ def _factor_reaction(
         rejection = first.h - body_top
         wick_fraction = min(1.0, rejection / max(first.h - first.l, 1e-6))
         value = 0.40 + 0.55 * wick_fraction
-        note = f"First RTH bar tested ceiling; rejection wick {wick_fraction * 100:.0f}% of bar range."
+        note = f"First RTH bar tested the upper swing line; rejection wick {wick_fraction * 100:.0f}% of bar range."
     elif touched_floor:
         rejection = body_bottom - first.l
         wick_fraction = min(1.0, rejection / max(first.h - first.l, 1e-6))
         value = 0.40 + 0.55 * wick_fraction
-        note = f"First RTH bar tested floor; rejection wick {wick_fraction * 100:.0f}% of bar range."
+        note = f"First RTH bar tested the lower swing line; rejection wick {wick_fraction * 100:.0f}% of bar range."
     else:
-        # Bar built inside the channel without touching a rail — neutral.
+        # Bar built inside the framework without touching either active line.
         value = 0.55
-        note = "First RTH bar built inside the channel without testing a rail."
+        note = "First RTH bar built inside the six-line framework without testing an active line."
     return FactorResult(
         key="reaction", label="RTH reaction", value=value,
         weight=weight, contribution=value * weight, note=note,

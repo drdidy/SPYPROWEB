@@ -121,7 +121,7 @@ def prev_rth_anchors(
 ) -> Optional[tuple[Anchor, Anchor]]:
     """Previous trading day's RTH high and low.
 
-    Returns None if no candles fall in the prior RTH window Ã¢â‚¬â€ happens on
+    Returns None if no candles fall in the prior RTH window; this happens on
     Mondays if the caller didn't supply Friday's bars.
     """
     prev = previous_session_date(session_date)
