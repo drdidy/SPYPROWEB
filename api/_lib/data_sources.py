@@ -195,11 +195,11 @@ def _replay_touch_window_entry(
     triggers: list[dict] | None,
     rth_today: pd.DataFrame,
 ) -> dict | None:
-    """First 09:00-11:00 CT reference touch, exited at that hour's close.
+    """First 09:00/10:00/11:00 CT reference touch, exited at that hour's close.
 
     Replay grading is intentionally tied to the operating window, not the
-    full-day drift. A valid replay entry is the first hourly bar in the
-    09:00-11:00 CT window that tags an engine reference and closes away from
+    full-day drift. A valid replay entry is the first hourly candle starting
+    at 09:00, 10:00, or 11:00 CT that tags an engine reference and closes away from
     it. Entry is the touched reference value; exit is the same hourly bar's
     close.
     """
@@ -228,7 +228,7 @@ def _replay_touch_window_entry(
             ct_ts = ct_ts.tz_localize(pc.get_central_tz())
         else:
             ct_ts = ct_ts.tz_convert(pc.get_central_tz())
-        if not (ENTRY_WINDOW_START_HOUR_CT <= ct_ts.hour < ENTRY_WINDOW_END_HOUR_CT):
+        if not (ENTRY_WINDOW_START_HOUR_CT <= ct_ts.hour <= ENTRY_WINDOW_END_HOUR_CT):
             continue
         high = float(bar["High"])
         low = float(bar["Low"])
@@ -1173,7 +1173,7 @@ def _build_replay_block(
 ) -> dict:
     """OHLC + verdict-outcome card for backtest mode.
 
-    Scoring rule: first 09:00-11:00 CT reference touch, exited at the
+    Scoring rule: first 09:00/10:00/11:00 CT reference touch, exited at the
     close of that hour. Older confirmed-entry/open-zone fallbacks remain
     for historical payloads that do not yet carry entry references.
     """
@@ -1409,7 +1409,7 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
     # before the decision so flow + dealer gamma can append confluence
     # to the rationale when the lean is decisive.
     flow_summary = unusual_whales.fetch_flow_summary("SPY")
-    gex_summary = unusual_whales.fetch_gex_summary("SPY")
+    gex_summary = unusual_whales.fetch_gex_summary("SPY", center=current_price)
 
     decision = _build_decision(
         bias_state, bias_score, primary_lines, raw_signals,

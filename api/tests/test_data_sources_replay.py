@@ -89,6 +89,33 @@ def test_spy_replay_grades_first_9_to_11_reference_touch_to_hour_close():
     assert block["exit"]["rule"] == "HOURLY_CLOSE"
 
 
+def test_spy_replay_includes_11am_ct_candle_in_plan_window():
+    bars = pd.DataFrame(
+        {
+            "Open": [104.0],
+            "High": [105.0],
+            "Low": [99.75],
+            "Close": [102.5],
+        },
+        index=[_ts(11)],
+    )
+
+    block = _build_replay_block(
+        is_replay=True,
+        signal_day=_ts(11).date(),
+        rth_today=bars,
+        decision={},
+        primary_lines=[_line("UPPER", 100.0)],
+        signals=[],
+        intraday_5m=bars,
+        triggers=[_trigger("Upper ref", 100.0)],
+    )
+
+    assert block["verdictOutcome"] == "WIN"
+    assert block["verdictPnl"] == 2.5
+    assert block["entry"]["time"] == _ts(11).isoformat()
+
+
 def test_spy_replay_grades_open_above_primary_structure_as_one_hour_long():
     bars = _frame(entry_open=100.0, exit_close=102.0)
 
