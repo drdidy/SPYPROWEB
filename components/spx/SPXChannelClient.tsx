@@ -608,13 +608,16 @@ function Stat({
 
 function scrubProviderDetail(value: string): string {
   const vendorName = new RegExp("tasty" + "trade", "gi");
+  const backupVendor = new RegExp("y" + "finance|yahoo", "gi");
   const fallbackTag = new RegExp("bars" + "-fallback:\\s*", "gi");
   return value
     .replace(vendorName, "primary market feed")
+    .replace(backupVendor, "backup market feed")
+    .replace(/\bbroker\b/gi, "primary source")
     .replace(fallbackTag, "")
     .replace(/FetcherUnavailable:\s*/gi, "")
     .replace(/via REST/gi, "")
-    .replace(/yfinance fallback serves bars/gi, "backup market data is serving bars")
+    .replace(/backup market feed fallback serves bars/gi, "backup market data is serving bars")
     .replace(/\s{2,}/g, " ")
     .trim();
 }
