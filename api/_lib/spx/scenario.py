@@ -108,10 +108,11 @@ def explain_scenario(scenario: Scenario, price: float, lines: list[ProjectedLine
         pair = _ordered_swing_pair(by)
         assert pair is not None
         lower_pair, upper_pair = pair
+        lower_relation = _relative_phrase(price, lower_pair[1], lower_pair[0])
+        upper_relation = _relative_phrase(price, upper_pair[1], upper_pair[0])
         return (
             f"Last print {price:.2f} sits inside the ES six-line framework - "
-            f"{price - lower_pair[1]:+.2f} above {lower_pair[0].lower()}, "
-            f"{upper_pair[1] - price:+.2f} below {upper_pair[0].lower()}. "
+            f"{lower_relation}, {upper_relation}. "
             "Wait for an hourly rejection into a line."
         )
     if scenario in ("ABOVE_ASCENDING", "ABOVE_DESCENDING"):
@@ -166,6 +167,27 @@ def _ordered_swing_pair(
     if low[1] >= high[1]:
         return None
     return low, high
+
+
+def _line_label(kind: LineKind) -> str:
+    labels: dict[LineKind, str] = {
+        "PREV_RTH_HIGH_ASC": "previous RTH high ascending",
+        "PREV_RTH_LOW_DESC": "previous RTH low descending",
+        "SWING_HIGH_ASC": "swing-high ascending",
+        "SWING_HIGH_DESC": "swing-high descending",
+        "SWING_LOW_ASC": "swing-low ascending",
+        "SWING_LOW_DESC": "swing-low descending",
+    }
+    return labels[kind]
+
+
+def _relative_phrase(price: float, line_value: float, kind: LineKind) -> str:
+    delta = price - line_value
+    if abs(delta) < 0.005:
+        return f"on {_line_label(kind)}"
+    if delta > 0:
+        return f"{abs(delta):.2f} above {_line_label(kind)}"
+    return f"{abs(delta):.2f} below {_line_label(kind)}"
 
 
 def build_plays(scenario: Scenario, lines: list[ProjectedLine]) -> Plays:
