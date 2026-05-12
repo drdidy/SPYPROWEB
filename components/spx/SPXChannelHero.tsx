@@ -1,7 +1,7 @@
 "use client";
 import { Card } from "@/components/ui/Card";
 import { StatusPill } from "@/components/ui/StatusPill";
-import type { SPXSnapshot, SPXScenario, SPXAction } from "@/lib/types";
+import type { SPXSnapshot, SPXScenario, SPXAction, SPXLine } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
 
@@ -37,6 +37,10 @@ const actionLabel: Record<SPXAction, string> = {
   STAND_DOWN: "STAND DOWN",
 };
 
+function entryLineValue(line: SPXLine): number {
+  return line.entryValue ?? line.currentValue;
+}
+
 export function SPXChannelHero({
   snap,
   bars,
@@ -60,13 +64,13 @@ export function SPXChannelHero({
   const swingLowAsc = snap.lines.find((l) => l.kind === "SWING_LOW_ASC");
   const activePair = [swingHighDesc, swingLowAsc]
     .filter((line): line is NonNullable<typeof line> => Boolean(line))
-    .sort((a, b) => a.currentValue - b.currentValue);
+    .sort((a, b) => entryLineValue(a) - entryLineValue(b));
   const lowerLine = activePair[0] ?? null;
   const upperLine = activePair[1] ?? null;
   const activeGap =
-    lowerLine && upperLine ? upperLine.currentValue - lowerLine.currentValue : null;
-  const distToUpper = upperLine ? upperLine.currentValue - snap.price.last : null;
-  const distToLower = lowerLine ? snap.price.last - lowerLine.currentValue : null;
+    lowerLine && upperLine ? entryLineValue(upperLine) - entryLineValue(lowerLine) : null;
+  const distToUpper = upperLine ? entryLineValue(upperLine) - snap.price.last : null;
+  const distToLower = lowerLine ? snap.price.last - entryLineValue(lowerLine) : null;
 
   return (
     <Card
@@ -372,7 +376,7 @@ function ChannelDiagram({
 
   const yPoints: number[] = [snap.price.last];
   for (const bar of cleanBars) yPoints.push(bar.h, bar.l, bar.c);
-  for (const line of snap.lines) yPoints.push(line.currentValue, line.anchorPrice);
+  for (const line of snap.lines) yPoints.push(entryLineValue(line), line.currentValue, line.anchorPrice);
   let yMin = Math.min(...yPoints);
   let yMax = Math.max(...yPoints);
   const pad = (yMax - yMin) * 0.12 || 4;
@@ -546,6 +550,8 @@ function ChannelDiagram({
       {snap.lines.map((line, index) => {
         const start = new Date(line.anchorTime).getTime();
         const endValue = projectAt(line.anchorPrice, line.anchorTime, line.slopePerHour, tEnd);
+        const entryValue = entryLineValue(line);
+        const entryTime = line.entryReferenceTime ? new Date(line.entryReferenceTime).getTime() : null;
         const color = lineStroke(line.kind);
         return (
           <g key={line.kind}>
@@ -566,8 +572,29 @@ function ChannelDiagram({
               fontFamily="var(--font-geist-mono)"
               fill={color}
             >
-              {lineCode(line.kind)} {line.currentValue.toFixed(2)}
+              {lineCode(line.kind)}
             </text>
+            {entryTime !== null && entryTime >= t0 && entryTime <= tEnd && (
+              <g>
+                <circle
+                  cx={xOf(entryTime)}
+                  cy={yOf(entryValue)}
+                  r={3.2}
+                  fill="#FFFDF7"
+                  stroke={color}
+                  strokeWidth={1.2}
+                />
+                <text
+                  x={Math.min(W - PAD_R - 66, xOf(entryTime) + 7)}
+                  y={yOf(entryValue) - 5}
+                  fontSize="8"
+                  fontFamily="var(--font-geist-mono)"
+                  fill={color}
+                >
+                  {lineCode(line.kind)} 09 {entryValue.toFixed(2)}
+                </text>
+              </g>
+            )}
           </g>
         );
       })}

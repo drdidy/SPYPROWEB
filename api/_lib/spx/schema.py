@@ -73,6 +73,8 @@ class SPXLine(BaseModel):
     anchor_time: str = Field(..., alias="anchorTime")
     slope_per_hour: float = Field(..., alias="slopePerHour")
     current_value: float = Field(..., alias="currentValue")
+    entry_value: float | None = Field(default=None, alias="entryValue")
+    entry_reference_time: str | None = Field(default=None, alias="entryReferenceTime")
     distance_from_price: float = Field(..., alias="distanceFromPrice")
 
     model_config = {"populate_by_name": True}

@@ -27,6 +27,9 @@ from . import seed_snapshot
 from . import tastytrade
 from . import unusual_whales
 
+ENTRY_REFERENCE_HOUR_CT = 9
+ENTRY_WINDOW_END_HOUR_CT = 11
+
 
 @pc.ttl_cache(ttl_seconds=60.0, maxsize=8)
 def fetch_spy_hourly(period: str = "60d") -> pd.DataFrame:
@@ -256,6 +259,8 @@ def _triggers_from_lines(
     current_price: float,
     rth_today: pd.DataFrame,
     rth_yesterday: pd.DataFrame,
+    entry_reference_dt: datetime,
+    slope: float,
 ) -> list[dict]:
     rows: list[dict] = []
     name_to_label = {
@@ -288,6 +293,13 @@ def _triggers_from_lines(
 
     armed_set = {l.name for l in pc.active_entry_lines(primary_lines, current_price, current_dt)}
 
+    def _touch_window(dt: datetime) -> tuple[str, str]:
+        ref = pd.Timestamp(dt)
+        end = ref.replace(hour=ENTRY_WINDOW_END_HOUR_CT, minute=0, second=0, microsecond=0)
+        return ref.isoformat(), end.isoformat()
+
+    entry_window_start, entry_window_end = _touch_window(entry_reference_dt)
+
     def _bias_contribution(dist: float, price: float, decay_pct: float = 1.2) -> int:
         if not price:
             return 0
@@ -297,23 +309,29 @@ def _triggers_from_lines(
         return int(round(sign * mag))
 
     for line in primary_lines:
-        v = line.tradable_value_at(current_dt)
-        if pd.isna(v):
+        current_v = line.tradable_value_at(current_dt)
+        entry_v = line.tradable_value_at(entry_reference_dt)
+        if pd.isna(entry_v):
             continue
-        dist = current_price - v
+        dist = current_price - entry_v
         bps = round((dist / current_price) * 10000) if current_price else 0
         if line.name in armed_set:
             status = "ARMED"
         elif abs(dist) < 0.20:
             status = "WATCHING"
-        elif (line.direction == "descending" and current_price < v) or (line.direction == "ascending" and current_price > v):
+        elif (line.direction == "descending" and current_price < entry_v) or (line.direction == "ascending" and current_price > entry_v):
             status = "BREACHED"
         else:
             status = "WATCHING"
         rows.append({
             "line": _label_for(line.name),
             "kind": _kind_for(line),
-            "level": round(float(v), 2),
+            "level": round(float(entry_v), 2),
+            "entryLevel": round(float(entry_v), 2),
+            "entryReferenceTime": pd.Timestamp(entry_reference_dt).isoformat(),
+            "touchWindowStart": entry_window_start,
+            "touchWindowEnd": entry_window_end,
+            "currentLevel": round(float(current_v), 2) if current_v is not None and not pd.isna(current_v) else None,
             "dist": round(float(dist), 2),
             "bps": bps,
             "bias": _bias_contribution(dist, current_price),
@@ -321,15 +339,46 @@ def _triggers_from_lines(
         })
 
     if rth_yesterday is not None and not rth_yesterday.empty:
-        pdh = float(rth_yesterday["High"].max())
-        pdl = float(rth_yesterday["Low"].min())
-        for label, level in (("PDH", pdh), ("PDL", pdl)):
+        pdh_idx = rth_yesterday["High"].idxmax()
+        pdl_idx = rth_yesterday["Low"].idxmin()
+        pdh_line = pc.DynamicLine(
+            "PDH",
+            float(rth_yesterday.loc[pdh_idx]["High"]),
+            pd.Timestamp(pdh_idx),
+            slope,
+            "descending",
+            "CALL_ZONE",
+            "PREVIOUS_RTH",
+            True,
+            "Previous RTH high projected to the entry reference",
+        )
+        pdl_line = pc.DynamicLine(
+            "PDL",
+            float(rth_yesterday.loc[pdl_idx]["Low"]),
+            pd.Timestamp(pdl_idx),
+            slope,
+            "ascending",
+            "PUT_ZONE",
+            "PREVIOUS_RTH",
+            True,
+            "Previous RTH low projected to the entry reference",
+        )
+        for label, line in (("PDH", pdh_line), ("PDL", pdl_line)):
+            level = line.tradable_value_at(entry_reference_dt)
+            current_level = line.tradable_value_at(current_dt)
+            if pd.isna(level):
+                continue
             dist = current_price - level
             bps = round((dist / current_price) * 10000) if current_price else 0
             rows.append({
                 "line": label,
                 "kind": "PDH" if label == "PDH" else "PDL",
                 "level": round(level, 2),
+                "entryLevel": round(level, 2),
+                "entryReferenceTime": pd.Timestamp(entry_reference_dt).isoformat(),
+                "touchWindowStart": entry_window_start,
+                "touchWindowEnd": entry_window_end,
+                "currentLevel": round(float(current_level), 2) if current_level is not None and not pd.isna(current_level) else None,
                 "dist": round(dist, 2),
                 "bps": bps,
                 "bias": _bias_contribution(dist, current_price, decay_pct=1.6),
@@ -454,6 +503,7 @@ def _anchor_display_label(name: str) -> str:
 def _anchor_payload_for_ui(
     primary_lines: list[pc.DynamicLine],
     current_dt: datetime,
+    entry_reference_dt: datetime,
     slope: float,
 ) -> dict | None:
     """Structured payload for the SPY Channel hero diagram.
@@ -485,18 +535,25 @@ def _anchor_payload_for_ui(
             "role": main.name.split("_")[1] if main.name.startswith("ANC_") else "PRIMARY",
             "anchorTime": anchor_ts,
             "anchorLow": round(float(main.anchor_price), 2),
+            "entryReferenceTime": pd.Timestamp(entry_reference_dt).isoformat(),
+            "touchWindowEnd": pd.Timestamp(entry_reference_dt).replace(
+                hour=ENTRY_WINDOW_END_HOUR_CT, minute=0, second=0, microsecond=0
+            ).isoformat(),
             "bands": {
                 "upper": {
                     "anchorPrice": round(float(upper.anchor_price), 2) if upper else None,
                     "currentValue": _line_current_or_none(upper, current_dt),
+                    "entryValue": _line_current_or_none(upper, entry_reference_dt),
                 },
                 "main": {
                     "anchorPrice": round(float(main.anchor_price), 2),
                     "currentValue": _line_current_or_none(main, current_dt),
+                    "entryValue": _line_current_or_none(main, entry_reference_dt),
                 },
                 "lower": {
                     "anchorPrice": round(float(lower.anchor_price), 2) if lower else None,
                     "currentValue": _line_current_or_none(lower, current_dt),
+                    "entryValue": _line_current_or_none(lower, entry_reference_dt),
                 },
             },
         }
@@ -1197,6 +1254,9 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
         primary_source = "pivot_fallback"
 
     projection_time = _structure_projection_time(now_ct).to_pydatetime()
+    entry_reference_time = pd.Timestamp(signal_day, tz=ct).replace(
+        hour=ENTRY_REFERENCE_HOUR_CT, minute=0, second=0, microsecond=0
+    ).to_pydatetime()
 
     current_price = _latest_price_for_session(df, signal_day)
     if current_price is None:
@@ -1239,7 +1299,15 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
     if not spark:
         spark = seed_snapshot.SPARK
 
-    triggers = _triggers_from_lines(primary_lines, projection_time, current_price, rth_today, rth_yesterday)
+    triggers = _triggers_from_lines(
+        primary_lines,
+        projection_time,
+        current_price,
+        rth_today,
+        rth_yesterday,
+        entry_reference_time,
+        slope,
+    )
 
     # Trigger detection considers the 8am CT bar plus all RTH bars (8:30-15:00)
     # so an 8am wick on the descending anchor line can fire the entry trigger.
@@ -1291,13 +1359,12 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
     # entry reference. Otherwise the replay shows lines after 9 hours
     # of decay, which is correct math but useless for backtesting the
     # entry decision.
-    if is_replay:
-        anchor_display_time = pd.Timestamp(signal_day, tz=ct).replace(
-            hour=9, minute=0
-        ).to_pydatetime()
-    else:
-        anchor_display_time = projection_time
-    anchor_payload_for_ui = _anchor_payload_for_ui(primary_lines, anchor_display_time, slope)
+    anchor_payload_for_ui = _anchor_payload_for_ui(
+        primary_lines,
+        projection_time,
+        entry_reference_time,
+        slope,
+    )
 
     options = tastytrade.fetch_options_snapshot(current_price)
 

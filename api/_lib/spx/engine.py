@@ -14,7 +14,7 @@ synchronized SPX-cash / ES print pair (see ``offset.derive_offset``).
 """
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, time, timedelta
 from typing import Optional
 
 # We don't import the schema at module top-level because the api package
@@ -46,6 +46,7 @@ from .scenario import (
     explain_scenario,
 )
 from .time_utils import (
+    at_ct,
     overnight_window,
     previous_session_date,
     rth_window,
@@ -585,6 +586,12 @@ def _line_model(l: Line, projected: list[ProjectedLine], price: float):
         "SWING_LOW_DESC": "Overnight Swing Low · Descending",
     }
     cur = next(p.value for p in projected if p.kind == l.kind)
+    anchor_ct = to_ct(l.anchor.time)
+    entry_day = anchor_ct.date()
+    if anchor_ct.hour >= 17:
+        entry_day = entry_day + timedelta(days=1)
+    entry_reference = at_ct(entry_day, time(9, 0))
+    entry_value = project_line(l, entry_reference)
     return SPXLine(
         kind=l.kind,
         name=name_map[l.kind],
@@ -592,7 +599,9 @@ def _line_model(l: Line, projected: list[ProjectedLine], price: float):
         anchorTime=l.anchor.time.isoformat(),
         slopePerHour=l.slope_per_hour,
         currentValue=cur,
-        distanceFromPrice=cur - price,
+        entryValue=entry_value,
+        entryReferenceTime=entry_reference.isoformat(),
+        distanceFromPrice=entry_value - price,
     )
 
 

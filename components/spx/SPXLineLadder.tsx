@@ -43,12 +43,17 @@ function lineState(kind: SPXLineKind, distance: number): "armed" | "watching" | 
   if (a <= 15) return "watching";
   return "stale";
 }
+
+function entryLineValue(line: SPXLine): number {
+  return line.entryValue ?? line.currentValue;
+}
+
 export function SPXLineLadder({ lines, price }: { lines: SPXLine[]; price: number }) {
   return (
     <Card>
       <CardHeader
         eyebrow="Line Ladder"
-        title="Levels in play"
+        title="09:00 CT levels in play"
         meta={`Last ${price.toFixed(2)} · sorted by proximity`}
       />
       <CardBody className="px-0 pb-0">
@@ -63,14 +68,16 @@ export function SPXLineLadder({ lines, price }: { lines: SPXLine[]; price: numbe
           {[...lines]
             .sort(
               (a, b) =>
-                Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice),
+                Math.abs(entryLineValue(a) - price) - Math.abs(entryLineValue(b) - price),
             )
             .map((l, idx) => {
-              const state = lineState(l.kind, l.distanceFromPrice);
+              const entryValue = entryLineValue(l);
+              const distanceFromEntry = entryValue - price;
+              const state = lineState(l.kind, distanceFromEntry);
               const m = lineMeta[l.kind];
               const pct =
                 price !== 0 && Number.isFinite(price)
-                  ? (Math.abs(l.distanceFromPrice) / Math.abs(price)) * 100
+                  ? (Math.abs(distanceFromEntry) / Math.abs(price)) * 100
                   : null;
               const pillVariant =
                 state === "reference" ? "stale" : state === "bias" ? "waiting" : state;
@@ -93,16 +100,16 @@ export function SPXLineLadder({ lines, price }: { lines: SPXLine[]; price: numbe
                     className="col-span-2 text-right font-mono text-sm tabular-nums text-ink"
                     data-num
                   >
-                    {l.currentValue.toFixed(2)}
+                    {entryValue.toFixed(2)}
                   </div>
                   <div
                     className={`col-span-2 text-right font-mono text-sm tabular-nums ${
-                      l.distanceFromPrice >= 0 ? "text-bull-ink" : "text-bear-ink"
+                      distanceFromEntry >= 0 ? "text-bull-ink" : "text-bear-ink"
                     }`}
                     data-num
                   >
-                    {l.distanceFromPrice >= 0 ? "+" : ""}
-                    {l.distanceFromPrice.toFixed(2)}
+                    {distanceFromEntry >= 0 ? "+" : ""}
+                    {distanceFromEntry.toFixed(2)}
                     {pct !== null && (
                       <span className="ml-1 text-[10px] text-ink-4">
                         {pct.toFixed(2)}%

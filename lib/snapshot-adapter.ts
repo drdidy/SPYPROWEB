@@ -60,6 +60,11 @@ export interface RawSnapshot {
     line: string;
     kind?: string;
     level: number;
+    entryLevel?: number | null;
+    entryReferenceTime?: string | null;
+    touchWindowStart?: string | null;
+    touchWindowEnd?: string | null;
+    currentLevel?: number | null;
     dist: number;
     bps: number;
     bias: number;
@@ -147,11 +152,14 @@ interface PivotInfo {
 export interface AnchorBand {
   anchorPrice: number | null;
   currentValue: number | null;
+  entryValue?: number | null;
 }
 export interface AnchorGroup {
   role: string;
   anchorTime: string;
   anchorLow: number;
+  entryReferenceTime?: string;
+  touchWindowEnd?: string;
   bands: { upper: AnchorBand; main: AnchorBand; lower: AnchorBand };
 }
 export interface AnchorPayload {
@@ -353,13 +361,18 @@ function mapTriggerToLine(t: RawSnapshot["triggers"][number]): DynamicLine {
   return {
     name: t.line,
     kind,
-    anchorPrice: t.level,
+    anchorPrice: t.entryLevel ?? t.level,
     anchorTime: "",
     slopePerHour: 0,
     direction: ascending ? "ASCENDING" : "DESCENDING",
     zoneType: t.status === "ARMED" ? "PRIMARY_TRIGGER" : "SECONDARY_TARGET",
     isPrimary: t.status === "ARMED",
-    currentValue: t.level,
+    currentValue: t.entryLevel ?? t.level,
+    entryValue: t.entryLevel ?? t.level,
+    entryReferenceTime: t.entryReferenceTime ?? undefined,
+    touchWindowStart: t.touchWindowStart ?? undefined,
+    touchWindowEnd: t.touchWindowEnd ?? undefined,
+    liveValue: t.currentLevel ?? null,
     distanceFromPrice: t.dist,
   };
 }

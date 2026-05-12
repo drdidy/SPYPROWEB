@@ -8,7 +8,8 @@ import {
   type StructureChartData,
   type StructureChartLine,
 } from "@/components/decision-slate/StructurePathChart";
-import type { AdaptedSnapshot, AnchorGroup } from "@/lib/snapshot-adapter";
+import type { AdaptedSnapshot, AnchorBand, AnchorGroup } from "@/lib/snapshot-adapter";
+import type { DynamicLine } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowDownRight } from "lucide-react";
 
@@ -28,6 +29,36 @@ const headlineByVerdict: Record<string, string> = {
 };
 
 const SLOPE_PER_HOUR = 0.2;        // display fallback only; engine projects live values upstream
+
+function entryBandValue(band: AnchorBand): number | null {
+  return band.entryValue ?? band.currentValue ?? null;
+}
+
+function entryLineValue(line: DynamicLine): number {
+  return line.entryValue ?? line.currentValue;
+}
+
+function buildSpyEntryFramework(
+  snap: AdaptedSnapshot,
+  primary: AnchorGroup | null,
+): Array<{ label: string; value: number | null; emphasized?: boolean }> {
+  const findLine = (kind: string) =>
+    snap.lines.find((line) => line.kind === kind || line.name.toUpperCase() === kind);
+  const pdh = findLine("PDH");
+  const pdl = findLine("PDL");
+  const rows: Array<{ label: string; value: number | null; emphasized?: boolean }> = [
+    { label: "PDH ref", value: pdh ? entryLineValue(pdh) : null },
+    { label: "PDL ref", value: pdl ? entryLineValue(pdl) : null },
+  ];
+  if (primary) {
+    rows.push(
+      { label: "Main +", value: entryBandValue(primary.bands.upper) },
+      { label: "Main", value: entryBandValue(primary.bands.main), emphasized: true },
+      { label: "Main -", value: entryBandValue(primary.bands.lower) },
+    );
+  }
+  return rows;
+}
 
 export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
   const verdict = snap.decision.verdict;
@@ -52,15 +83,16 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
 
   const anchor = snap.anchor;
   const primary = anchor?.primary ?? null;
+  const entryFramework = buildSpyEntryFramework(snap, primary);
 
   // Distance to nearest line (the "first read" the trader looks for).
   // Uses live currentValue per band — already projected to "now" by the
   // engine — and picks the closest of upper / main / lower.
   const distances = primary
     ? [
-        { label: "Upper", value: primary.bands.upper.currentValue },
-        { label: "Main", value: primary.bands.main.currentValue },
-        { label: "Lower", value: primary.bands.lower.currentValue },
+        { label: "Upper ref", value: entryBandValue(primary.bands.upper) },
+        { label: "Main ref", value: entryBandValue(primary.bands.main) },
+        { label: "Lower ref", value: entryBandValue(primary.bands.lower) },
       ].filter((b) => b.value !== null)
     : [];
   const nearest = distances.reduce<{ label: string; dist: number; value: number } | null>(
@@ -82,7 +114,7 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
       ? {
           label: nearestStructural.name,
           dist: nearestStructural.distanceFromPrice,
-          value: nearestStructural.currentValue,
+          value: entryLineValue(nearestStructural),
         }
       : null);
 
@@ -155,7 +187,7 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
           {/* First read: distance to nearest line */}
           <div className="mt-7 max-w-md">
             <div className="flex items-baseline justify-between mb-1.5">
-              <span className="eyebrow text-ink-3">Nearest line</span>
+              <span className="eyebrow text-ink-3">Nearest 09:00 reference</span>
               {nearestRead ? (
                 <span className="font-mono text-sm text-ink tabular-nums">
                   <span className="font-semibold">{nearestRead.label}</span>
@@ -186,8 +218,8 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
               </div>
             ) : (
               <span className="block mt-2 text-ink-3 text-[13.5px]">
-                No qualifying premarket anchor is active. The slate is using
-                current structural context until a qualified line arms.
+                No qualifying anchor is active. The channel is using the
+                closest 09:00 structural reference until a qualified line arms.
               </span>
             )}
           </div>
@@ -237,27 +269,15 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
 
           {primary ? (
             <div className="grid grid-cols-2 gap-2 mb-4">
-              <BandStat
-                label="UA"
-                value={primary.bands.upper.currentValue}
-                price={snap.currentPrice}
-              />
-              <BandStat
-                label="ANCHOR"
-                value={primary.bands.main.currentValue}
-                price={snap.currentPrice}
-                emphasized
-              />
-              <BandStat
-                label="LA"
-                value={primary.bands.lower.currentValue}
-                price={snap.currentPrice}
-              />
-              <BandStat
-                label="UD"
-                value={nearestStructural?.currentValue ?? null}
-                price={snap.currentPrice}
-              />
+              {entryFramework.map((item) => (
+                <BandStat
+                  key={item.label}
+                  label={item.label}
+                  value={item.value}
+                  price={snap.currentPrice}
+                  emphasized={item.emphasized}
+                />
+              ))}
             </div>
           ) : (
             <div className="mb-4 rounded-soft bg-paper px-3 py-3 shadow-rule">
@@ -265,7 +285,7 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
               <p className="text-[12px] leading-snug text-ink-3">
                 No anchor today. Nearest structural line is{" "}
                 {nearestStructural
-                  ? `${nearestStructural.name} ${nearestStructural.currentValue.toFixed(2)} (${nearestStructural.distanceFromPrice >= 0 ? "+" : ""}${nearestStructural.distanceFromPrice.toFixed(2)} pts from LAST).`
+                  ? `${nearestStructural.name} ${entryLineValue(nearestStructural).toFixed(2)} (${nearestStructural.distanceFromPrice >= 0 ? "+" : ""}${nearestStructural.distanceFromPrice.toFixed(2)} pts from LAST).`
                   : "not available yet."}
               </p>
             </div>
@@ -276,7 +296,7 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
             variant="paper"
             accent={bias === "BULLISH" ? "bull" : bias === "BEARISH" ? "bear" : "gold"}
             height={300}
-            title="SPY price vs active levels"
+            title="SPY price vs 09:00 references"
           />
 
           {primary && (
@@ -419,12 +439,11 @@ function buildSpyChannelChart(snap: AdaptedSnapshot): StructureChartData | null 
     .map((bar) => ({ t: bar.t, h: bar.h, l: bar.l, c: bar.c }))
     .sort((a, b) => Date.parse(a.t) - Date.parse(b.t));
   if (!primary || bars.length < 2) return null;
-  const rawSlope = Number(snap.anchor?.slopePerHour);
-  const slope = Number.isFinite(rawSlope) ? (rawSlope > 0 ? -rawSlope : rawSlope) : -Math.abs(SLOPE_PER_HOUR);
+  const referenceTime = primary.entryReferenceTime ?? bars[0]?.t ?? primary.anchorTime;
   const lines = [
-    makeSpyChartLine("UA", primary.bands.upper.anchorPrice, primary.anchorTime, slope, "upper"),
-    makeSpyChartLine("ANC", primary.bands.main.anchorPrice, primary.anchorTime, slope, "anchor"),
-    makeSpyChartLine("LA", primary.bands.lower.anchorPrice, primary.anchorTime, slope, "lower"),
+    makeSpyChartLine("Upper ref", entryBandValue(primary.bands.upper), referenceTime, "upper"),
+    makeSpyChartLine("Main", entryBandValue(primary.bands.main), referenceTime, "anchor"),
+    makeSpyChartLine("Lower ref", entryBandValue(primary.bands.lower), referenceTime, "lower"),
   ].filter((line): line is StructureChartLine => line !== null);
   if (lines.length === 0) return null;
   return { label: "SPY", date: new Date().toISOString().slice(0, 10), bars, lines };
@@ -434,7 +453,6 @@ function makeSpyChartLine(
   label: string,
   anchorPrice: number | null,
   anchorTime: string,
-  slopePerHour: number,
   tone: StructureChartLine["tone"],
 ): StructureChartLine | null {
   if (!Number.isFinite(anchorPrice ?? NaN)) return null;
@@ -442,7 +460,7 @@ function makeSpyChartLine(
     label,
     anchorTime,
     anchorPrice: Number(anchorPrice),
-    slopePerHour,
+    slopePerHour: 0,
     tone,
   };
 }

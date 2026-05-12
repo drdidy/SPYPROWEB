@@ -551,9 +551,9 @@ function spxExplanation(state: EngineState, snap: SPXSnapshot): string {
 
 function spyStructureLevels(snap: AdaptedSnapshot): StructureLevels {
   const primaryAnchor = snap.anchor?.primary;
-  const upper = primaryAnchor?.bands.upper.currentValue;
-  const anchor = primaryAnchor?.bands.main.currentValue;
-  const lower = primaryAnchor?.bands.lower.currentValue;
+  const upper = primaryAnchor?.bands.upper.entryValue ?? primaryAnchor?.bands.upper.currentValue;
+  const anchor = primaryAnchor?.bands.main.entryValue ?? primaryAnchor?.bands.main.currentValue;
+  const lower = primaryAnchor?.bands.lower.entryValue ?? primaryAnchor?.bands.lower.currentValue;
   if (
     typeof upper === "number" ||
     typeof anchor === "number" ||
@@ -625,12 +625,12 @@ function buildSpyStructureChart(
     intradayBars && intradayBars.length > 1 ? intradayBars : snap.candles,
   );
   if (bars.length < 2) return null;
-  const slope = Number(snap.anchor?.slopePerHour);
-  const lines: StructureChartLine[] = anchor && Number.isFinite(slope)
+  const referenceTime = anchor?.entryReferenceTime ?? bars[0].t;
+  const lines: StructureChartLine[] = anchor
     ? [
-        makeSpyBand("Upper", anchor.bands.upper.anchorPrice, anchor.anchorTime, slope, "upper"),
-        makeSpyBand("Anchor", anchor.bands.main.anchorPrice, anchor.anchorTime, slope, "anchor"),
-        makeSpyBand("Lower", anchor.bands.lower.anchorPrice, anchor.anchorTime, slope, "lower"),
+        makeSpyBand("Upper", anchor.bands.upper.entryValue ?? anchor.bands.upper.currentValue, referenceTime, "upper"),
+        makeSpyBand("Main", anchor.bands.main.entryValue ?? anchor.bands.main.currentValue, referenceTime, "anchor"),
+        makeSpyBand("Lower", anchor.bands.lower.entryValue ?? anchor.bands.lower.currentValue, referenceTime, "lower"),
       ].filter(Boolean) as StructureChartLine[]
     : snap.lines
         .slice()
@@ -661,7 +661,6 @@ function makeSpyBand(
   label: string,
   anchorPrice: number | null,
   anchorTime: string,
-  slopePerHour: number,
   tone: StructureChartLine["tone"],
 ): StructureChartLine | null {
   if (!Number.isFinite(anchorPrice ?? NaN)) return null;
@@ -669,7 +668,7 @@ function makeSpyBand(
     label,
     anchorTime,
     anchorPrice: Number(anchorPrice),
-    slopePerHour,
+    slopePerHour: 0,
     tone,
   };
 }
