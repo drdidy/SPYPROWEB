@@ -262,18 +262,18 @@ def _qualified_rejection_side(bar: dict, line_value: float, line_kind: str = "")
     touched = low <= line_value <= high
     if not touched:
         return None
-    # Buy: above the line, bearish candle drops into it, close rejects above.
-    if open_ > line_value and close < open_ and close > line_value:
+    # The current ES rule treats any 9/10/11 CT touch of an 08:00
+    # operating line as a graded event. Direction comes from where the
+    # candle opened relative to the line; outcome comes from that hour's
+    # close. Do not silently turn a touched line into SKIP just because
+    # the old candle-color confirmation did not appear.
+    if open_ > line_value:
         return "BUY"
-    # Sell: below the line, bullish candle rises into it, close rejects below.
-    if open_ < line_value and close > open_ and close < line_value:
+    if open_ < line_value:
         return "SELL"
-    # Below-both continuation: when ES opens below the swing-low pair,
-    # the swing-low descending line is the sell continuation reference.
-    # A strong bearish-pressure day can tag the line and still close red;
-    # under the trader's rule that is still a valid sell if it rejects
-    # back below the line.
-    if line_kind == "SWING_LOW_DESC" and open_ < line_value and close < line_value:
+    if close > open_:
+        return "BUY"
+    if close < open_:
         return "SELL"
     return None
 

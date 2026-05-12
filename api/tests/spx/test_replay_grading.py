@@ -127,7 +127,7 @@ def test_replay_grades_alternate_when_it_is_first_touched_entry():
     assert block["verdictPnl"] == 2.0
 
 
-def test_replay_touch_without_qualified_rejection_is_not_a_loss():
+def test_replay_touch_without_old_rejection_pattern_is_still_graded():
     with (
         patch("spx.snapshot._spx_session_ohlc", return_value=_ohlc()),
         patch("spx.snapshot._spx_session_intraday", return_value=[
@@ -135,8 +135,8 @@ def test_replay_touch_without_qualified_rejection_is_not_a_loss():
         ]),
     ):
         block = _build_spx_replay_block(_payload(), date(2026, 5, 8))
-    assert block["verdictOutcome"] == "N_A"
-    assert block["verdictPnl"] is None
+    assert block["verdictOutcome"] == "LOSS"
+    assert block["verdictPnl"] == -2.0
 
 
 def test_replay_grades_six_line_framework_even_without_old_channel_direction():
