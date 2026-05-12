@@ -169,7 +169,7 @@ export function SPXChannelClient({ replayDate }: Props) {
                 </span>
               </div>
               <h1 className="mt-3 text-[34px] font-serif leading-none tracking-tight text-paper md:text-[44px]">
-                Building the ES framework.
+                Building the ES structure map.
               </h1>
               <p className="mt-4 max-w-3xl text-[15px] leading-relaxed text-paper/72">
                 The live ES price, overnight bars, structure map, line ladder,
@@ -181,14 +181,14 @@ export function SPXChannelClient({ replayDate }: Props) {
                 <p className="mt-3 max-w-3xl rounded-[12px] border border-paper/12 bg-paper/8 px-3 py-2 text-[12px] leading-relaxed text-paper/62">
                   This request is taking longer than usual. ES often resolves
                   after the market-data function warms up; if a feed is missing,
-                  the framework will switch to a named data state instead of
+                  the structure map will switch to a named data state instead of
                   displaying placeholders.
                 </p>
               )}
             </div>
             <div className="grid grid-cols-3 gap-2">
               <LoadingStat label="Price" value="Resolving" />
-              <LoadingStat label="Framework" value="Building" />
+              <LoadingStat label="Structure" value="Building" />
               <LoadingStat label="Tape" value="Queued" />
             </div>
           </div>
@@ -218,7 +218,7 @@ export function SPXChannelClient({ replayDate }: Props) {
             ES - Channel
           </p>
           <h1 className="font-serif text-h2 text-ink tracking-tight">
-            Framework forms after the configuration window
+            Structure map forms after the configuration window
           </h1>
           <p className="mt-3 text-body text-ink-2 leading-snug max-w-2xl">
             The engine plots from ES front-month overnight bars
@@ -297,8 +297,8 @@ export function SPXChannelClient({ replayDate }: Props) {
             </span>
           </div>
           <h1 className="mt-3 text-[36px] font-serif leading-none tracking-tight text-paper md:text-[46px]">
-            ES framework,{" "}
-            <span className="text-gold-soft/72 italic font-light">live.</span>
+            ES structure{" "}
+            <span className="text-gold-soft/72 italic font-light">map.</span>
           </h1>
           <p className="mt-4 max-w-3xl text-[15px] leading-relaxed text-paper/72">
             {heroSynthesis(snap)}
