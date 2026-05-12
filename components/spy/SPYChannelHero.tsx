@@ -320,7 +320,7 @@ function synthesisLine(
   const bias = snap.bias.bias.toLowerCase();
   const state = displayedState.replace(/_/g, " ").toLowerCase();
   if (nearestRead) {
-    const relation = nearestRead.dist >= 0 ? "above LAST" : "below LAST";
+    const relation = nearestRead.dist >= 0 ? "below LAST" : "above LAST";
     return `${capitalize(bias)} lean, but no qualified confirmation yet - engine ${state} because ${nearestRead.label} (${nearestRead.value.toFixed(2)}) remains ${Math.abs(nearestRead.dist).toFixed(2)} pts ${relation}.`;
   }
   return `${capitalize(bias)} lean, but no qualified confirmation yet - engine ${state} until SPY structure becomes actionable.`;
