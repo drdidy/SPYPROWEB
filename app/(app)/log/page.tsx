@@ -20,7 +20,7 @@ export default async function Page() {
       <PageHeader
         eyebrow="Journal - 12"
         title="Signal Log"
-        lede="Every event the engine printed today. Historical archive arrives next."
+        lede="Every event the engine printed today, with Replay as the session archive."
         source={source}
       />
 
@@ -36,7 +36,7 @@ export default async function Page() {
               rows={[
                 { label: "Events", value: "0" },
                 { label: "Session", value: "Today" },
-                { label: "Archive", value: "Pending storage" },
+                { label: "Archive", value: "Open Replay" },
               ]}
             />
           ) : (
@@ -74,11 +74,18 @@ export default async function Page() {
       <Card>
         <CardBody>
           <div className="rounded-card bg-[#071116] text-paper border border-[#243138] p-7">
-            <div className="font-mono text-[10px] uppercase tracking-[0.20em] text-gold-soft">Historical layer</div>
-            <div className="mt-3 font-serif text-[32px] leading-none text-paper">Archive is ready for storage wiring.</div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.20em] text-gold-soft">Historical sessions</div>
+            <div className="mt-3 font-serif text-[32px] leading-none text-paper">Replay is the audit trail.</div>
             <p className="mt-4 text-[13px] text-paper/62 leading-relaxed max-w-2xl">
-              The production UI shell is in place. Search, filter, annotation, and export can attach here once the persistence layer begins writing historical signal events.
+              Use Replay to review prior sessions bar by bar: verdict trail, line touches,
+              channel state, anchors, and the exact decision path the engine printed.
             </p>
+            <a
+              href="/replay"
+              className="mt-6 inline-flex min-h-11 items-center rounded-pill border border-gold/35 bg-paper/8 px-4 font-mono text-[11px] uppercase tracking-[0.14em] text-gold-soft transition-colors hover:bg-paper/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
+            >
+              Open Replay
+            </a>
           </div>
         </CardBody>
       </Card>
