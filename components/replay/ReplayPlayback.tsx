@@ -148,7 +148,7 @@ function SPXPlaybackPanel({
 
   return (
     <PanelChart
-      title="SPX · channel vs tape"
+      title="ES · channel vs tape"
       bars={spxBars}
       lines={lines}
       playhead={playhead}
@@ -156,7 +156,7 @@ function SPXPlaybackPanel({
       emptyMsg={
         snap
           ? "No 5-minute ES bars for this date"
-          : "No SPX snapshot for this date"
+          : "No ES snapshot for this date"
       }
     />
   );

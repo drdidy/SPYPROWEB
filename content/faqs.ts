@@ -13,7 +13,7 @@ export const FAQS = [
   },
   {
     q: "Which symbols are covered?",
-    a: "SPY and SPX, side by side. Each gets its own surface tuned to how it actually trades. We'll add other liquid index instruments when our read on them is as good.",
+    a: "SPY and ES, side by side. Each gets its own surface tuned to how it actually trades. We'll add other liquid index instruments when our read on them is as good.",
   },
   {
     q: "How does Prophet decide?",

@@ -1534,5 +1534,5 @@ function spxLineHint(kind: string): string {
     PREV_RTH_LOW_DESC: "Yesterday's RTH low, projected downward.",
     PREV_RTH_HIGH_DESC: "Yesterday's RTH high, projected downward as the RTH-open bias gate.",
   };
-  return m[kind] || "Engine-generated SPX reference line.";
+  return m[kind] || "Engine-generated ES reference line.";
 }

@@ -18,6 +18,7 @@ export const metadata: Metadata = {
   applicationName: SITE_NAME,
   keywords: [
     "SPY",
+    "ES",
     "SPX",
     "options trading",
     "trading workspace",

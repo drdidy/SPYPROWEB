@@ -2,7 +2,7 @@
 // trigger / exit definitions without touching component code.
 //
 // Each entry powers the info popover on a phase rail cell. The rail
-// component itself reads from this single map so SPY and SPX share
+// component itself reads from this single map so SPY and ES share
 // definitions where they overlap and diverge only when the spec calls
 // for it.
 
@@ -26,7 +26,7 @@ export interface PhaseDefinition {
 }
 
 // Slate refinement (2026-05): labels are now sentence case — only
-// ticker tokens (SPY, SPX) and one tier of section eyebrows still
+// ticker tokens (SPY, ES) and one tier of section eyebrows still
 // shout. Tooltip body copy is plain-English, no jargon.
 export const PHASE_DEFINITIONS: Record<EngineState, PhaseDefinition> = {
   PRE_CONFIG: {
@@ -37,7 +37,7 @@ export const PHASE_DEFINITIONS: Record<EngineState, PhaseDefinition> = {
     enterOn:
       "Default state at the start of every session, before the engine's overnight or premarket window opens.",
     exitOn:
-      "When the setup window starts (SPY: 03:00 CT, SPX: 17:00 CT the previous day).",
+      "When the setup window starts (SPY: 03:00 CT, ES: 17:00 CT the previous day).",
   },
   STAND_DOWN: {
     label: "Stand down",

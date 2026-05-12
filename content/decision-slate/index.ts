@@ -50,7 +50,7 @@ export const SLATE_COPY = {
   // log line, not a sentence.
   structureEmpty: {
     spy: "No active levels yet. SPY's primary lines plot during the 03:00–07:00 CT premarket window.",
-    spx: "No active levels yet. SPX's channel resolves on the first qualifying overnight pivot during 17:00–02:00 CT.",
+    spx: "No active levels yet. ES channel resolves on the first qualifying overnight pivot during 17:00–02:00 CT.",
   },
 
   // ---- PRE-CONFIG briefing ----
@@ -84,7 +84,7 @@ export const SLATE_COPY = {
   // ---- Search palette example queries ----
   searchExamples: [
     "spy 5m levels",
-    "spx overnight pivot",
+    "es overnight pivot",
     "last go signal",
     "grade history",
   ],
@@ -95,7 +95,7 @@ export const SLATE_COPY = {
     body:
       "SPY and ES stay separate until the slate asks for a decision. " +
       "The Decision Slate is your daily 'should I trade?' command center. " +
-      "Each engine — SPY (intraday premarket) and SPX (overnight channel) — " +
+      "Each engine — SPY (intraday premarket) and ES (overnight channel) — " +
       "moves through a fixed pipeline: Pre-config → Stand down → Watch → " +
       "Wait → Armed → Go → Cooldown. The page tells you what state each " +
       "engine is in, why, what to watch for, and how the engine has been performing recently.",
