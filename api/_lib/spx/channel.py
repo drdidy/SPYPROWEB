@@ -8,11 +8,12 @@ This module implements the geometry that defines the SPX session:
        Tokyo HH+HL vs Sydney  -> ASCENDING
        Tokyo LH+LL vs Sydney  -> DESCENDING
        otherwise              -> NONE (expansion or contraction)
-  4. Line construction: 4 lines per active session.
+  4. Line construction: 5 lines per active session.
        CHANNEL_FLOOR     anchor=overnight low,  slope=+/-1.04
        CHANNEL_CEILING   anchor=overnight high, slope=+/-1.04
        PREV_RTH_HIGH_ASC anchor=prev RTH high,  slope=+1.04
        PREV_RTH_LOW_DESC anchor=prev RTH low,   slope=-1.04
+       PREV_RTH_HIGH_DESC anchor=prev RTH high, slope=-1.04 (RTH-open bias gate)
   5. Projection: anchor_price + slope_per_hour * hours_since_anchor.
 """
 from __future__ import annotations
@@ -35,7 +36,13 @@ from .time_utils import (
 
 ChannelDirection = Literal["ASCENDING", "DESCENDING", "NONE"]
 NoChannelReason = Literal["EXPANSION", "CONTRACTION"]
-LineKind = Literal["CHANNEL_CEILING", "CHANNEL_FLOOR", "PREV_RTH_HIGH_ASC", "PREV_RTH_LOW_DESC"]
+LineKind = Literal[
+    "CHANNEL_CEILING",
+    "CHANNEL_FLOOR",
+    "PREV_RTH_HIGH_ASC",
+    "PREV_RTH_LOW_DESC",
+    "PREV_RTH_HIGH_DESC",
+]
 
 
 @dataclass(frozen=True)
@@ -232,11 +239,15 @@ def build_lines(
         lines.append(Line("CHANNEL_FLOOR", overnight_low, channel_slope))
         lines.append(Line("CHANNEL_CEILING", overnight_high, channel_slope))
 
-    # Prev-RTH references: always asc from the high, desc from the low.
+    # Prev-RTH references used for plays/targets.
     if prev_rth_high is not None:
         lines.append(Line("PREV_RTH_HIGH_ASC", prev_rth_high, +slope_per_hour))
     if prev_rth_low is not None:
         lines.append(Line("PREV_RTH_LOW_DESC", prev_rth_low, -slope_per_hour))
+    # RTH-open bias gate: only the previous RTH high descending line
+    # carries this role. It does not replace the play/target rails above.
+    if prev_rth_high is not None:
+        lines.append(Line("PREV_RTH_HIGH_DESC", prev_rth_high, -slope_per_hour))
 
     return lines
 

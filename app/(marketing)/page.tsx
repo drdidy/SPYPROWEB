@@ -218,6 +218,7 @@ function shortSpxLineLabel(kind: string): string {
     CHANNEL_FLOOR: "Floor",
     PREV_RTH_HIGH_ASC: "Prev H",
     PREV_RTH_LOW_DESC: "Prev L",
+    PREV_RTH_HIGH_DESC: "Bias",
   };
   return labels[kind] || "Ref";
 }

@@ -234,6 +234,73 @@ def _score_bands() -> dict:
     }
 
 
+def _rth_open_price(candles: list[Candle], session: date) -> Optional[float]:
+    bars = [c for c in candles if rth_window(session).contains(to_ct(c.t))]
+    if not bars:
+        return None
+    return min(bars, key=lambda c: to_ct(c.t)).o
+
+
+def _rth_bias_for(lines: list[Line], candles: list[Candle], session: date) -> Optional[dict]:
+    """RTH-open bias from the previous day's high descending line.
+
+    This is an added bias gate only. It does not replace the high-up and
+    low-down previous-RTH rails used for entries/exits.
+    """
+    high_desc = next((l for l in lines if l.kind == "PREV_RTH_HIGH_DESC"), None)
+    high_up = next((l for l in lines if l.kind == "PREV_RTH_HIGH_ASC"), None)
+    low_down = next((l for l in lines if l.kind == "PREV_RTH_LOW_DESC"), None)
+    if high_desc is None:
+        return None
+
+    open_at = rth_window(session).start
+    gate = project_line(high_desc, open_at)
+    open_price = _rth_open_price(candles, session)
+
+    if open_price is None:
+        return {
+            "direction": "PENDING",
+            "openPrice": None,
+            "referenceLine": "PREV_RTH_HIGH_DESC",
+            "referenceValue": round(gate, 2),
+            "continuationLine": "PREV_RTH_HIGH_ASC",
+            "continuationValue": round(project_line(high_up, open_at), 2) if high_up else None,
+            "note": (
+                f"RTH bias pending: compare the opening print to the "
+                f"previous RTH high descending line at {gate:.2f}."
+            ),
+        }
+
+    if open_price > gate:
+        cont = project_line(high_up, open_at) if high_up else None
+        return {
+            "direction": "BULLISH",
+            "openPrice": round(open_price, 2),
+            "referenceLine": "PREV_RTH_HIGH_DESC",
+            "referenceValue": round(gate, 2),
+            "continuationLine": "PREV_RTH_HIGH_ASC",
+            "continuationValue": round(cont, 2) if cont is not None else None,
+            "note": (
+                f"RTH opened above the previous RTH high descending line "
+                f"({open_price:.2f} > {gate:.2f}); bias favors buying higher."
+            ),
+        }
+
+    cont = project_line(low_down, open_at) if low_down else None
+    return {
+        "direction": "BEARISH",
+        "openPrice": round(open_price, 2),
+        "referenceLine": "PREV_RTH_HIGH_DESC",
+        "referenceValue": round(gate, 2),
+        "continuationLine": "PREV_RTH_LOW_DESC",
+        "continuationValue": round(cont, 2) if cont is not None else None,
+        "note": (
+            f"RTH opened below the previous RTH high descending line "
+            f"({open_price:.2f} <= {gate:.2f}); bias favors downside work."
+        ),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -271,6 +338,7 @@ def compute_snapshot(
         SPXPlays,
         SPXPrice,
         SPXReentryWatch,
+        SPXRthBias,
         SPXScoreBands,
         SPXSessionRange as SPXSessionRangeModel,
         SPXSessions,
@@ -379,6 +447,13 @@ def compute_snapshot(
     state_history = _state_history(as_of_iso=as_of_iso, current_state=current_state)
     planned_envelope = _planned_envelope_for(projected)
     score_bands = _score_bands()
+    rth_bias = _rth_bias_for(lines, spx_candles, session)
+    if rth_bias is not None:
+        decision_trace.append({
+            "ts": as_of_iso,
+            "event": f"RTH bias: {rth_bias['note']}",
+            "weight": "key",
+        })
 
     # ---- Build the Pydantic model (camelCase aliases) ----
 
@@ -452,6 +527,18 @@ def compute_snapshot(
             watch=score_bands["watch"],
             go=score_bands["go"],
         ),
+        rthBias=(
+            SPXRthBias(
+                direction=rth_bias["direction"],
+                openPrice=rth_bias["openPrice"],
+                referenceLine=rth_bias["referenceLine"],
+                referenceValue=rth_bias["referenceValue"],
+                continuationLine=rth_bias["continuationLine"],
+                continuationValue=rth_bias["continuationValue"],
+                note=rth_bias["note"],
+            )
+            if rth_bias else None
+        ),
     )
     return snapshot
 
@@ -469,6 +556,7 @@ def _line_model(l: Line, projected: list[ProjectedLine], price: float):
         "CHANNEL_FLOOR": "Channel Floor",
         "PREV_RTH_HIGH_ASC": "Prev RTH High · Ascending",
         "PREV_RTH_LOW_DESC": "Prev RTH Low · Descending",
+        "PREV_RTH_HIGH_DESC": "Prev RTH High · Descending Bias",
     }
     cur = next(p.value for p in projected if p.kind == l.kind)
     return SPXLine(

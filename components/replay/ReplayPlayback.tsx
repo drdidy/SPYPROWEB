@@ -172,6 +172,7 @@ function spxLineProjections(lines: SPXLine[]): LineProjection[] {
     CHANNEL_FLOOR: "#0E7C50",
     PREV_RTH_HIGH_ASC: "#7E5BAE",
     PREV_RTH_LOW_DESC: "#7E5BAE",
+    PREV_RTH_HIGH_DESC: "#B8860B",
   };
   return lines.map((l) => {
     const t0Ms = new Date(l.anchorTime).getTime();

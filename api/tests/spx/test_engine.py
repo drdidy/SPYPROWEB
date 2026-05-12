@@ -10,10 +10,18 @@ def test_snapshot_basic_shape(es_candles_ascending_inside, es_offset, as_of):
     assert snap.session_date_ct == "2026-05-08"
     # Channel resolves ASCENDING from synthetic Tokyo HH+HL.
     assert snap.channel.direction == "ASCENDING"
-    # Four lines: 2 channel rails + 2 prev-RTH refs.
-    assert len(snap.lines) == 4
+    # Five lines: 2 channel rails, 2 prev-RTH play refs, 1 RTH bias gate.
+    assert len(snap.lines) == 5
     kinds = {l.kind for l in snap.lines}
-    assert kinds == {"CHANNEL_FLOOR", "CHANNEL_CEILING", "PREV_RTH_HIGH_ASC", "PREV_RTH_LOW_DESC"}
+    assert kinds == {
+        "CHANNEL_FLOOR",
+        "CHANNEL_CEILING",
+        "PREV_RTH_HIGH_ASC",
+        "PREV_RTH_LOW_DESC",
+        "PREV_RTH_HIGH_DESC",
+    }
+    assert snap.rth_bias is not None
+    assert snap.rth_bias.reference_line == "PREV_RTH_HIGH_DESC"
 
 
 def test_snapshot_inside_ascending_with_plays(es_candles_ascending_inside, es_offset, as_of):

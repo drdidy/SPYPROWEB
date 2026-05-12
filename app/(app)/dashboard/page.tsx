@@ -704,6 +704,7 @@ function shortSpxLineLabel(kind: string): string {
     CHANNEL_FLOOR: "Floor",
     PREV_RTH_HIGH_ASC: "Prev H",
     PREV_RTH_LOW_DESC: "Prev L",
+    PREV_RTH_HIGH_DESC: "Bias",
   };
   return m[kind] || "Ref";
 }
@@ -1094,9 +1095,11 @@ function SpxVerdictCard({
 }
 
 function SpxReadCard({ snap }: { snap: SPXSnapshot }) {
-  const sorted = [...snap.lines].sort(
-    (a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice),
-  );
+  const sorted = snap.lines
+    .filter((line) => line.kind !== "PREV_RTH_HIGH_DESC")
+    .sort(
+      (a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice),
+    );
   const top = sorted.slice(0, 4);
   const empty = top.length === 0;
   return (
@@ -1518,6 +1521,7 @@ function spxLineLabel(kind: string): string {
     CHANNEL_FLOOR: "Channel floor",
     PREV_RTH_HIGH_ASC: "Prev RTH high · ascending",
     PREV_RTH_LOW_DESC: "Prev RTH low · descending",
+    PREV_RTH_HIGH_DESC: "Prev RTH high · descending bias",
   };
   return m[kind] || kind;
 }
@@ -1528,6 +1532,7 @@ function spxLineHint(kind: string): string {
     CHANNEL_FLOOR: "Bottom rail of the overnight channel, projected forward.",
     PREV_RTH_HIGH_ASC: "Yesterday's RTH high, projected upward.",
     PREV_RTH_LOW_DESC: "Yesterday's RTH low, projected downward.",
+    PREV_RTH_HIGH_DESC: "Yesterday's RTH high, projected downward as the RTH-open bias gate.",
   };
   return m[kind] || "Engine-generated SPX reference line.";
 }

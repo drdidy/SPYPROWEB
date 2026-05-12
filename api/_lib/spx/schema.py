@@ -33,7 +33,9 @@ SPXLineKind = Literal[
     "CHANNEL_FLOOR",
     "PREV_RTH_HIGH_ASC",
     "PREV_RTH_LOW_DESC",
+    "PREV_RTH_HIGH_DESC",
 ]
+SPXRthBiasDirection = Literal["BULLISH", "BEARISH", "PENDING"]
 SPXAction = Literal["TAKE", "SELECTIVE", "STAND_DOWN"]
 SPXSide = Literal["BUY", "SELL"]
 SPXContractType = Literal["CALL", "PUT"]
@@ -204,6 +206,18 @@ class SPXScoreBands(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class SPXRthBias(BaseModel):
+    direction: SPXRthBiasDirection
+    open_price: Optional[float] = Field(default=None, alias="openPrice")
+    reference_line: Optional[SPXLineKind] = Field(default=None, alias="referenceLine")
+    reference_value: Optional[float] = Field(default=None, alias="referenceValue")
+    continuation_line: Optional[SPXLineKind] = Field(default=None, alias="continuationLine")
+    continuation_value: Optional[float] = Field(default=None, alias="continuationValue")
+    note: str
+
+    model_config = {"populate_by_name": True}
+
+
 class SPXSnapshot(BaseModel):
     symbol: Literal["SPX"] = "SPX"
     as_of: str = Field(..., alias="asOf")
@@ -239,5 +253,6 @@ class SPXSnapshot(BaseModel):
         default=None, alias="plannedEnvelope",
     )
     score_bands: Optional[SPXScoreBands] = Field(default=None, alias="scoreBands")
+    rth_bias: Optional[SPXRthBias] = Field(default=None, alias="rthBias")
 
     model_config = {"populate_by_name": True}

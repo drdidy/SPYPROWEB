@@ -167,7 +167,13 @@ def test_build_lines_ascending_has_four_lines(es_candles_ascending_inside, es_of
         prev_rth_low=prev[1],
     )
     kinds = {l.kind for l in lines}
-    assert kinds == {"CHANNEL_FLOOR", "CHANNEL_CEILING", "PREV_RTH_HIGH_ASC", "PREV_RTH_LOW_DESC"}
+    assert kinds == {
+        "CHANNEL_FLOOR",
+        "CHANNEL_CEILING",
+        "PREV_RTH_HIGH_ASC",
+        "PREV_RTH_LOW_DESC",
+        "PREV_RTH_HIGH_DESC",
+    }
 
 
 def test_build_lines_none_direction_omits_channel_rails():

@@ -147,6 +147,14 @@ export function SPXChannelHero({ snap }: { snap: SPXSnapshot }) {
             {snap.scenarioExplanation}
             <span className="text-ink-3 ml-1.5">{snap.channel.reason}</span>
           </p>
+          {snap.rthBias && (
+            <div className="mt-4 rounded-[12px] border border-rule bg-paper-2/65 px-3 py-3">
+              <div className="eyebrow text-ink-3">RTH bias gate</div>
+              <p className="mt-1 text-[13px] leading-relaxed text-ink-2">
+                {snap.rthBias.note}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* vertical rule */}

@@ -1881,6 +1881,7 @@ function esLineLabel(kind: SPXLine["kind"]): string {
     CHANNEL_FLOOR: "Floor",
     PREV_RTH_HIGH_ASC: "Prev high",
     PREV_RTH_LOW_DESC: "Prev low",
+    PREV_RTH_HIGH_DESC: "Bias gate",
   };
   return map[kind];
 }

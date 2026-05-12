@@ -162,7 +162,8 @@ export type SPXLineKind =
   | "CHANNEL_CEILING"
   | "CHANNEL_FLOOR"
   | "PREV_RTH_HIGH_ASC"
-  | "PREV_RTH_LOW_DESC";
+  | "PREV_RTH_LOW_DESC"
+  | "PREV_RTH_HIGH_DESC";
 
 export type SPXAction = "TAKE" | "SELECTIVE" | "STAND_DOWN";
 
@@ -322,4 +323,13 @@ export interface SPXSnapshot {
     watch: [number, number];
     go: [number, number];
   };
+  rthBias?: {
+    direction: "BULLISH" | "BEARISH" | "PENDING";
+    openPrice: number | null;
+    referenceLine: SPXLineKind | null;
+    referenceValue: number | null;
+    continuationLine: SPXLineKind | null;
+    continuationValue: number | null;
+    note: string;
+  } | null;
 }

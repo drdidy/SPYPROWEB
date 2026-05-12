@@ -370,7 +370,8 @@ function heroSynthesis(snap: SPXSnapshot): string {
   const direction =
     snap.channel.direction === "ASCENDING" ? "ascending" : "descending";
   const action = snap.confluence.action.replace(/_/g, " ").toLowerCase();
-  return `ES has a ${direction} overnight channel and a ${action} read. ${snap.scenarioExplanation}`;
+  const bias = snap.rthBias?.note ? ` ${snap.rthBias.note}` : "";
+  return `ES has a ${direction} overnight channel and a ${action} read. ${snap.scenarioExplanation}${bias}`;
 }
 
 function reentryCondition(snap: SPXSnapshot): string {

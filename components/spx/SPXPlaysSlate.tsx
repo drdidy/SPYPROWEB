@@ -18,6 +18,7 @@ const lineLabel: Record<SPXLineKind, string> = {
   CHANNEL_FLOOR: "Channel Floor",
   PREV_RTH_HIGH_ASC: "Prev RTH High · Asc",
   PREV_RTH_LOW_DESC: "Prev RTH Low · Desc",
+  PREV_RTH_HIGH_DESC: "Prev RTH High · Desc Bias",
 };
 
 export function SPXPlaysSlate({

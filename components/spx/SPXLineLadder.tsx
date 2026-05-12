@@ -16,9 +16,15 @@ const lineMeta: Record<SPXLineKind, { dot: string; label: string; group: string 
     label: "Prev RTH Low · Desc",
     group: "Reference",
   },
+  PREV_RTH_HIGH_DESC: {
+    dot: "bg-gold",
+    label: "Prev RTH High · Desc Bias",
+    group: "RTH bias",
+  },
 };
 
-function lineState(kind: SPXLineKind, distance: number): "armed" | "watching" | "stale" | "reference" {
+function lineState(kind: SPXLineKind, distance: number): "armed" | "watching" | "stale" | "reference" | "bias" {
+  if (kind === "PREV_RTH_HIGH_DESC") return "bias";
   if (lineMeta[kind].group === "Reference") return "reference";
   const a = Math.abs(distance);
   if (a <= 3) return "armed";
@@ -55,8 +61,10 @@ export function SPXLineLadder({ lines, price }: { lines: SPXLine[]; price: numbe
                 price !== 0 && Number.isFinite(price)
                   ? (Math.abs(l.distanceFromPrice) / Math.abs(price)) * 100
                   : null;
-              const pillVariant = state === "reference" ? "stale" : state;
-              const stateLabel = state === "reference" ? "REFERENCE" : state;
+              const pillVariant =
+                state === "reference" ? "stale" : state === "bias" ? "waiting" : state;
+              const stateLabel =
+                state === "reference" ? "REFERENCE" : state === "bias" ? "BIAS" : state;
               return (
                 <li
                   key={l.kind}

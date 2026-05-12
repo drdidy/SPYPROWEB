@@ -272,7 +272,9 @@ function normalizeEsDossier(
     available: true,
     state: snap.currentState ?? es.state,
     scenario: snap.scenario,
-    scenarioExplanation: snap.scenarioExplanation,
+    scenarioExplanation: snap.rthBias?.note
+      ? `${snap.scenarioExplanation} ${snap.rthBias.note}`
+      : snap.scenarioExplanation,
     price: {
       last: snap.price.last,
       change: snap.price.change,
