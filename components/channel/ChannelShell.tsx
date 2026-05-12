@@ -1,5 +1,9 @@
 import { AnchorSlate } from "@/components/channel/AnchorSlate";
-import { ChannelLiveBadge } from "@/components/channel/ChannelLiveBadge";
+import {
+  ChannelFeedPauseBanner,
+  ChannelFreshnessLine,
+  ChannelLiveBadge,
+} from "@/components/channel/ChannelLiveBadge";
 import { ChannelStateRail } from "@/components/channel/ChannelStateRail";
 import { OptionsIntelligence } from "@/components/channel/OptionsIntelligence";
 import { PreOpenBias } from "@/components/channel/PreOpenBias";
@@ -21,6 +25,7 @@ import {
   type FeedStatus,
 } from "@/lib/feed-health";
 import { getSessionInfo } from "@/lib/sessions";
+import { formatSessionDate } from "@/lib/session-time";
 import type { AdaptedSnapshot } from "@/lib/snapshot-adapter";
 import type { LiveSnapshotSource } from "@/lib/snapshot-fetch";
 import type { ReactNode } from "react";
@@ -95,7 +100,7 @@ export function ChannelShell({
               {heroSynthesis(data.snap)}
             </p>
             <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.12em] text-paper/46 tabular-nums">
-              {freshnessLine(data.source, data.snap.asOf, session.nextSignificantEvent.at)}
+              <ChannelFreshnessLine />
             </p>
           </div>
           <div className="hidden md:grid grid-cols-3 gap-2 text-right">
@@ -110,6 +115,7 @@ export function ChannelShell({
       </header>
 
       <DegradedModeBanner className="-mt-6" />
+      <ChannelFeedPauseBanner className="-mt-6" />
 
       <ChannelStateRail
         engine={engine === "spy" ? "SPY" : "ES"}
@@ -205,12 +211,16 @@ function heroSynthesis(snap: AdaptedSnapshot): string {
   }
   const closest = snap.lines
     .slice()
-    .sort((a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice))[0];
+    .sort(
+      (a, b) =>
+        Math.abs(snap.currentPrice - (a.entryValue ?? a.currentValue)) -
+        Math.abs(snap.currentPrice - (b.entryValue ?? b.currentValue)),
+    )[0];
   const lineText = closest
     ? `${closest.name} (${(closest.entryValue ?? closest.currentValue).toFixed(2)})`
     : "a qualified SPY rail";
   const lineValue = closest ? closest.entryValue ?? closest.currentValue : null;
-  const signedDistance = lineValue === null ? null : lineValue - snap.currentPrice;
+  const signedDistance = lineValue === null ? null : snap.currentPrice - lineValue;
   const distanceText = closest
     ? `${Math.abs(signedDistance ?? closest.distanceFromPrice).toFixed(2)} pts ${(signedDistance ?? closest.distanceFromPrice) >= 0 ? "above" : "below"}`
     : "away from";
@@ -238,23 +248,6 @@ function cleanSpyExplanation(text: string, spot: number): string {
   if (Math.abs(flip - spot) / spot <= 0.12) return text;
   const cleaned = text.replace(gammaFlip, "").replace(/\s{2,}/g, " ").trim();
   return cleaned || "Options context is withheld until the live chain is inside a realistic SPY range.";
-}
-
-function freshnessLine(source: LiveSnapshotSource, asOf: string, next: Date): string {
-  const state =
-    source === "live" ? "live" : source === "degraded" || source === "seed" ? "stale" : "offline";
-  return `${state} | updated ${formatHM(asOf)} CT | next ${formatHM(next.toISOString())} CT`;
-}
-
-function formatHM(iso: string): string {
-  const ms = Date.parse(iso);
-  if (!Number.isFinite(ms)) return "--:--";
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Chicago",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(new Date(ms));
 }
 
 function statePhrase(state: string): string {
@@ -393,14 +386,7 @@ function SourceBadge({
 }
 
 function todayLabel(): string {
-  return new Date()
-    .toLocaleDateString("en-US", {
-      weekday: "long",
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    })
-    .toUpperCase();
+  return formatSessionDate(new Date());
 }
 
 function Stat({

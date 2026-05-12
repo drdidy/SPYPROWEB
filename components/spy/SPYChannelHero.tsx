@@ -9,6 +9,7 @@ import {
   type StructureChartLine,
 } from "@/components/decision-slate/StructurePathChart";
 import { PHASE_DEFINITIONS } from "@/content/phase-definitions";
+import { formatSessionTime } from "@/lib/session-time";
 import type { AdaptedSnapshot, AnchorBand, AnchorGroup } from "@/lib/snapshot-adapter";
 import type { EngineState } from "@/lib/states";
 import type { DynamicLine } from "@/lib/types";
@@ -48,15 +49,19 @@ function entryLineValue(line: DynamicLine): number {
 function buildSpyEntryFramework(
   snap: AdaptedSnapshot,
   primary: AnchorGroup | null,
+  includePriorRange = true,
 ): Array<{ label: string; value: number | null; emphasized?: boolean }> {
   const findLine = (kind: string) =>
     snap.lines.find((line) => line.kind === kind || line.name.toUpperCase() === kind);
   const pdh = findLine("PDH");
   const pdl = findLine("PDL");
-  const rows: Array<{ label: string; value: number | null; emphasized?: boolean }> = [
-    { label: "PDH ref", value: pdh ? entryLineValue(pdh) : null },
-    { label: "PDL ref", value: pdl ? entryLineValue(pdl) : null },
-  ];
+  const rows: Array<{ label: string; value: number | null; emphasized?: boolean }> = [];
+  if (includePriorRange) {
+    rows.push(
+      { label: "PDH ref", value: pdh ? entryLineValue(pdh) : null },
+      { label: "PDL ref", value: pdl ? entryLineValue(pdl) : null },
+    );
+  }
   if (primary) {
     rows.push(
       { label: "Main +", value: entryBandValue(primary.bands.upper) },
@@ -87,7 +92,8 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
 
   const anchor = snap.anchor;
   const primary = anchor?.primary ?? null;
-  const entryFramework = buildSpyEntryFramework(snap, primary);
+  const priorRangeValid = isPriorRangeValid(snap.lines);
+  const entryFramework = buildSpyEntryFramework(snap, primary, priorRangeValid);
 
   // Distance to nearest line (the "first read" the trader looks for).
   // Uses live currentValue per band — already projected to "now" by the
@@ -101,7 +107,7 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
     : [];
   const nearest = distances.reduce<{ label: string; dist: number; value: number } | null>(
     (best, b) => {
-      const d = b.value! - snap.currentPrice;
+      const d = snap.currentPrice - b.value!;
       if (best === null || Math.abs(d) < Math.abs(best.dist)) {
         return { label: b.label, dist: d, value: b.value! };
       }
@@ -111,12 +117,17 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
   );
   const nearestStructural = snap.lines
     .slice()
-    .sort((a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice))[0];
+    .filter((line) => isActionableSpyReference(line, priorRangeValid))
+    .sort(
+      (a, b) =>
+        Math.abs(snap.currentPrice - entryLineValue(a)) -
+        Math.abs(snap.currentPrice - entryLineValue(b)),
+    )[0];
   const nearestRead = nearestStructural
     ? {
         label: nearestStructural.name,
         value: entryLineValue(nearestStructural),
-        dist: entryLineValue(nearestStructural) - snap.currentPrice,
+        dist: snap.currentPrice - entryLineValue(nearestStructural),
       }
     : nearest;
   const executionRead = buildExecutionRead(snap, nearestRead, displayedState, displayedStateLabel);
@@ -196,7 +207,7 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
                   <span className="font-semibold">{nearestRead.label}</span>
                   <span className="text-ink-4 ml-1.5">{nearestRead.value.toFixed(2)}</span>
                   <span
-                    className={`ml-1.5 ${nearestRead.dist >= 0 ? "text-bear-ink" : "text-bull-ink"}`}
+                    className={`ml-1.5 ${nearestRead.dist >= 0 ? "text-bull-ink" : "text-bear-ink"}`}
                   >
                     ({nearestRead.dist >= 0 ? "+" : ""}
                     {nearestRead.dist.toFixed(2)} pts)
@@ -276,24 +287,31 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
           />
 
           {primary ? (
-            <div className="grid grid-cols-2 gap-2 mb-4 sm:grid-cols-3 xl:grid-cols-5">
-              {entryFramework.map((item) => (
-                <BandStat
-                  key={item.label}
-                  label={item.label}
-                  value={item.value}
-                  price={snap.currentPrice}
-                  emphasized={item.emphasized}
-                />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-2 gap-2 mb-4 sm:grid-cols-3 xl:grid-cols-5">
+                {entryFramework.map((item) => (
+                  <BandStat
+                    key={item.label}
+                    label={item.label}
+                    value={item.value}
+                    price={snap.currentPrice}
+                    emphasized={item.emphasized}
+                  />
+                ))}
+              </div>
+              {!priorRangeValid && (
+                <div className="mb-4 rounded-soft border border-gold/30 bg-gold-tint px-3 py-2 font-mono text-[10px] uppercase tracking-[0.10em] text-gold-ink">
+                  Prior-day range failed validation; PDH/PDL are hidden until the feed resolves.
+                </div>
+              )}
+            </>
           ) : (
             <div className="mb-4 rounded-soft bg-paper px-3 py-3 shadow-rule">
               <div className="eyebrow text-ink-3 mb-1">Anchor lines today</div>
               <p className="text-[12px] leading-snug text-ink-3">
                 No anchor today. Nearest structural line is{" "}
                 {nearestStructural
-                  ? `${nearestStructural.name} ${entryLineValue(nearestStructural).toFixed(2)} (${nearestStructural.distanceFromPrice >= 0 ? "+" : ""}${nearestStructural.distanceFromPrice.toFixed(2)} pts from LAST).`
+                  ? `${nearestStructural.name} ${entryLineValue(nearestStructural).toFixed(2)} (${formatSigned(snap.currentPrice - entryLineValue(nearestStructural))} LAST minus reference).`
                   : "not available yet."}
               </p>
             </div>
@@ -333,7 +351,7 @@ function synthesisLine(
     return `${capitalize(bias)} lean, engine ${state}. ${engineCondition}`;
   }
   if (nearestRead) {
-    const relation = nearestRead.dist >= 0 ? "above LAST" : "below LAST";
+    const relation = nearestRead.dist >= 0 ? "above reference" : "below reference";
     const action =
       displayedState === "WAIT" || displayedState === "WATCH"
         ? "waiting for qualified confirmation"
@@ -342,7 +360,7 @@ function synthesisLine(
           : displayedState === "PRE_CONFIG"
             ? "awaiting the setup window"
             : "tracking the active state";
-    return `${capitalize(bias)} lean, engine ${state}; ${nearestRead.label} (${nearestRead.value.toFixed(2)}) sits ${Math.abs(nearestRead.dist).toFixed(2)} pts ${relation}, ${action}.`;
+    return `${capitalize(bias)} lean, engine ${state}; LAST is ${Math.abs(nearestRead.dist).toFixed(2)} pts ${relation} ${nearestRead.label} (${nearestRead.value.toFixed(2)}), ${action}.`;
   }
   return `${capitalize(bias)} lean, engine ${state} until SPY structure becomes actionable.`;
 }
@@ -380,7 +398,7 @@ function buildExecutionRead(
       label: "Active reference",
       value: nearestRead ? `${nearestRead.label} ${nearestRead.value.toFixed(2)}` : "Awaiting line",
       detail: nearestRead
-        ? `${formatSigned(nearestRead.dist)} pts from LAST ${snap.currentPrice.toFixed(2)}.`
+        ? `LAST ${snap.currentPrice.toFixed(2)} is ${formatSigned(nearestRead.dist)} pts versus the reference.`
         : "The engine has not returned a qualified 09:00 reference yet.",
       tone: nearestRead && Math.abs(nearestRead.dist) <= 0.5 ? "watch" : "neutral",
     },
@@ -471,14 +489,7 @@ function formatSigned(value: number): string {
 }
 
 function shortClock(iso: string): string {
-  const ms = Date.parse(iso);
-  if (!Number.isFinite(ms)) return "--:--";
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Chicago",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(new Date(ms));
+  return formatSessionTime(iso);
 }
 
 function cleanSpyExplanation(text: string, spot: number): string {
@@ -497,13 +508,22 @@ function capitalize(value: string): string {
   return value.slice(0, 1).toUpperCase() + value.slice(1);
 }
 
+function isPriorRangeValid(lines: DynamicLine[]): boolean {
+  const pdh = lines.find((line) => line.kind === "PDH");
+  const pdl = lines.find((line) => line.kind === "PDL");
+  if (!pdh || !pdl) return true;
+  return entryLineValue(pdh) >= entryLineValue(pdl);
+}
+
+function isActionableSpyReference(line: DynamicLine, priorRangeValid: boolean): boolean {
+  if (line.kind === "DAY_OPEN") return false;
+  if (/backup/i.test(line.name)) return false;
+  if (!priorRangeValid && (line.kind === "PDH" || line.kind === "PDL")) return false;
+  return line.isPrimary || /^Anchor\s/i.test(line.name) || line.kind === "PDH" || line.kind === "PDL";
+}
+
 function anchorTimeLabel(g: AnchorGroup): string {
-  try {
-    const d = new Date(g.anchorTime);
-    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  } catch {
-    return "—";
-  }
+  return formatSessionTime(g.anchorTime).replace(" CT", "");
 }
 
 function BandStat({
@@ -525,13 +545,13 @@ function BandStat({
       </div>
     );
   }
-  const dist = value - price;
+  const dist = price - value;
   const distTone =
     Math.abs(dist) < 0.6
       ? "text-gold-ink"
       : dist >= 0
-        ? "text-bear-ink"
-        : "text-bull-ink";
+        ? "text-bull-ink"
+        : "text-bear-ink";
   return (
     <div className={`px-2.5 py-1.5 rounded-soft bg-paper shadow-rule ${emphasized ? "ring-1 ring-gold/40" : ""}`}>
       <div className="eyebrow text-ink-3 mb-0.5">{label}</div>
@@ -588,6 +608,15 @@ function buildSpyChannelChart(snap: AdaptedSnapshot): StructureChartData | null 
     )
     .map((bar) => ({ t: bar.t, h: bar.h, l: bar.l, c: bar.c }))
     .sort((a, b) => Date.parse(a.t) - Date.parse(b.t));
+  if (bars.length > 0 && Number.isFinite(snap.currentPrice)) {
+    const last = bars[bars.length - 1];
+    bars[bars.length - 1] = {
+      ...last,
+      h: Math.max(last.h, snap.currentPrice),
+      l: Math.min(last.l, snap.currentPrice),
+      c: snap.currentPrice,
+    };
+  }
   if (!primary || bars.length < 2) return null;
   const referenceTime = primary.entryReferenceTime ?? bars[0]?.t ?? primary.anchorTime;
   const lines = [
