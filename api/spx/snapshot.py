@@ -105,12 +105,47 @@ def _build_payload(replay_date: date | None = None) -> dict:
         offset_override=offset_override,
     )
     payload = snap.model_dump(by_alias=True)
-    payload["_meta"] = meta
     if used_historical_offset:
         # Distinguish historical-replay offset from a real env override.
         meta["offsetSource"] = "historical_replay"
+    payload["_meta"] = _public_meta(meta)
     payload["replay"] = _build_spx_replay_block(payload, replay_date)
     return payload
+
+
+def _public_meta(meta: dict) -> dict:
+    """Return user-safe metadata without broker/provider names.
+
+    Internal fetchers can keep their concrete names for diagnostics. The public
+    app/API should only describe roles, because provider implementation is not
+    part of the user-facing product contract.
+    """
+    clean = dict(meta)
+
+    def role(value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        text = value
+        replacements = {
+            "tastytrade_quote": "primary_quote",
+            "tastytrade": "primary",
+            "yfinance": "fallback",
+            "yahoo": "fallback",
+        }
+        lowered = text.lower()
+        for needle, replacement in replacements.items():
+            lowered = lowered.replace(needle, replacement)
+        return lowered
+
+    for key in ("fetcher", "barsSource", "quoteSource", "offsetMethod"):
+        if key in clean:
+            clean[key] = role(clean[key])
+
+    if clean.get("barsError"):
+        clean["barsError"] = "Primary bars unavailable; fallback bars are serving this snapshot."
+    if clean.get("quoteError"):
+        clean["quoteError"] = "Primary quote unavailable; fallback quote logic was used."
+    return clean
 
 
 def _build_spx_replay_block(payload: dict, replay_date: date | None) -> dict:
