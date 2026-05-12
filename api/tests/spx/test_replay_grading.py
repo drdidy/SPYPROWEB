@@ -95,12 +95,24 @@ def test_replay_ignores_tags_outside_9_to_11_window():
         patch("spx.snapshot._spx_session_ohlc", return_value=_ohlc(open_=100.0, close=120.0)),
         patch("spx.snapshot._spx_session_intraday", return_value=[
             _bar(8, high=106.0, low=100.0, close=104.0, open_=105.5),
-            _bar(11, high=110.0, low=100.0, close=108.0, open_=109.0),
+            _bar(12, high=110.0, low=100.0, close=108.0, open_=109.0),
         ]),
     ):
         block = _build_spx_replay_block(_payload(), date(2026, 5, 8))
     assert block["verdictOutcome"] == "N_A"
     assert block["verdictPnl"] is None
+
+
+def test_replay_includes_11am_ct_candle_in_plan_window():
+    with (
+        patch("spx.snapshot._spx_session_ohlc", return_value=_ohlc(open_=100.0, close=120.0)),
+        patch("spx.snapshot._spx_session_intraday", return_value=[
+            _bar(11, high=106.0, low=100.0, close=104.0, open_=105.5),
+        ]),
+    ):
+        block = _build_spx_replay_block(_payload(), date(2026, 5, 8))
+    assert block["verdictOutcome"] == "WIN"
+    assert block["verdictPnl"] == 4.0
 
 
 def test_replay_grades_alternate_when_it_is_first_touched_entry():

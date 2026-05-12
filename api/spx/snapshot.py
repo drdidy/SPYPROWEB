@@ -159,7 +159,7 @@ def _build_spx_replay_block(payload: dict, replay_date: date | None) -> dict:
       - Every ES structure line is projected to its 09:00 CT entry
         reference. Replay grading evaluates the real line set, not
         the old primary/alternate play proxy.
-      - Only the 09:00 and 10:00 CT hourly candles are eligible.
+      - Only the 09:00, 10:00, and 11:00 CT hourly candles are eligible.
       - BUY trigger: price is above the line, drops into it on a
         bearish hourly candle, and closes back above the line.
       - SELL trigger: price is below the line, rises into it on a
@@ -171,7 +171,8 @@ def _build_spx_replay_block(payload: dict, replay_date: date | None) -> dict:
     The previous rule used `plays.primary` / `plays.alternate` only.
     That dropped valid touches from the six-line framework, especially
     the previous-RTH continuation references. The replay score must
-    grade what the framework actually offered between 09:00 and 11:00.
+    grade what the framework actually offered through the 09:00-11:00
+    institutional window.
 
     Critical detail: the engine plots lines from ES=F bars + an
     offset (SPX_equiv = ES + offset). Grading must walk the same
@@ -239,7 +240,7 @@ def _grade_replay_from_rail_tag(payload: dict, replay_date: date, offset: float)
 
     for bar in hourly:
         t = bar["time"]
-        if not (9 <= t.hour < 11):
+        if not (9 <= t.hour <= 11):
             continue
 
         triggers: list[dict] = []
