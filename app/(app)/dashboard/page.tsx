@@ -601,8 +601,8 @@ function spyStructureLevels(snap: AdaptedSnapshot): StructureLevels {
 function spxStructureLevels(snap: SPXSnapshot): StructureLevels {
   const ceiling = snap.lines.find((line) => line.kind === "SWING_HIGH_DESC");
   const floor = snap.lines.find((line) => line.kind === "SWING_LOW_ASC");
-  const upper = ceiling?.currentValue ?? snap.overnight.high.price ?? null;
-  const lower = floor?.currentValue ?? snap.overnight.low.price ?? null;
+  const upper = ceiling?.entryValue ?? ceiling?.currentValue ?? snap.overnight.high.price ?? null;
+  const lower = floor?.entryValue ?? floor?.currentValue ?? snap.overnight.low.price ?? null;
   const anchor =
     typeof upper === "number" && typeof lower === "number"
       ? (upper + lower) / 2
@@ -687,9 +687,9 @@ function buildSpxStructureChart(
   const lines = snap.lines
     .map((line): StructureChartLine => ({
       label: shortSpxLineLabel(line.kind),
-      anchorTime: line.anchorTime,
-      anchorPrice: line.anchorPrice,
-      slopePerHour: line.slopePerHour,
+      anchorTime: line.entryReferenceTime ?? line.anchorTime,
+      anchorPrice: line.entryValue ?? line.currentValue,
+      slopePerHour: 0,
       tone:
         line.kind === "SWING_HIGH_DESC"
           ? "upper"

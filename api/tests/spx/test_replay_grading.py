@@ -89,6 +89,19 @@ def test_replay_no_tag_is_not_credited_by_day_net():
     assert block["verdictPnl"] is None
 
 
+def test_replay_ignores_tags_outside_9_to_11_window():
+    with (
+        patch("spx.snapshot._spx_session_ohlc", return_value=_ohlc(open_=100.0, close=120.0)),
+        patch("spx.snapshot._spx_session_intraday", return_value=[
+            _bar(8, high=106.0, low=100.0, close=104.0),
+            _bar(11, high=110.0, low=100.0, close=108.0),
+        ]),
+    ):
+        block = _build_spx_replay_block(_payload(), date(2026, 5, 8))
+    assert block["verdictOutcome"] == "N_A"
+    assert block["verdictPnl"] is None
+
+
 def test_replay_grades_alternate_when_it_is_first_touched_entry():
     with (
         patch("spx.snapshot._spx_session_ohlc", return_value=_ohlc(open_=100.0, close=99.0)),
@@ -106,7 +119,7 @@ def test_replay_one_hour_exit_can_be_loss():
     with (
         patch("spx.snapshot._spx_session_ohlc", return_value=_ohlc()),
         patch("spx.snapshot._spx_session_intraday", return_value=[
-            _bar(9, high=101.0, low=100.0, close=100.5),
+            _bar(9, high=101.0, low=97.5, close=98.0),
             _bar(10, high=101.0, low=97.5, close=98.0),
         ]),
     ):

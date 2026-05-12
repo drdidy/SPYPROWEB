@@ -268,13 +268,15 @@ def _grade_replay_from_rail_tag(payload: dict, replay_date: date, offset: float)
         t = bar["time"]
 
         if entry_price is None:
+            if not (9 <= t.hour < 11):
+                continue
             for trade in valid_trades:
-                entry_value = _project_payload_line(trade["entryPayload"], t)
+                entry_value = _entry_value_for_payload_line(trade["entryPayload"], t)
                 if entry_value is None:
                     continue
                 if float(bar["low"]) <= entry_value <= float(bar["high"]):
                     entry_price = entry_value
-                    exit_after = t + timedelta(hours=1)
+                    exit_after = t.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
                     side = trade["side"]
                     break
             if entry_price is None:
@@ -290,6 +292,13 @@ def _grade_replay_from_rail_tag(payload: dict, replay_date: date, offset: float)
     pnl = close_price - entry_price if side == "BUY" else entry_price - close_price
     outcome = "WIN" if pnl > 0 else ("LOSS" if pnl < 0 else "PUSH")
     return {"outcome": outcome, "pnl": round(pnl, 2)}
+
+
+def _entry_value_for_payload_line(line: dict, at: datetime) -> float | None:
+    value = line.get("entryValue")
+    if isinstance(value, (int, float)):
+        return float(value)
+    return _project_payload_line(line, at)
 
 
 def _project_payload_line(line: dict, at: datetime) -> float | None:

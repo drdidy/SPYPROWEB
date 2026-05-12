@@ -28,6 +28,7 @@ from . import tastytrade
 from . import unusual_whales
 
 ENTRY_REFERENCE_HOUR_CT = 9
+ENTRY_WINDOW_START_HOUR_CT = 9
 ENTRY_WINDOW_END_HOUR_CT = 11
 
 
@@ -187,6 +188,74 @@ def _forced_one_hour_exit(
     future_hourly = rth_today[rth_today.index >= exit_time]
     row = future_hourly.iloc[0] if not future_hourly.empty else rth_today.iloc[-1]
     return exit_time, float(row["Close"])
+
+
+def _replay_touch_window_entry(
+    *,
+    triggers: list[dict] | None,
+    rth_today: pd.DataFrame,
+) -> dict | None:
+    """First 09:00-11:00 CT reference touch, exited at that hour's close.
+
+    Replay grading is intentionally tied to the operating window, not the
+    full-day drift. A valid replay entry is the first hourly bar in the
+    09:00-11:00 CT window that tags an engine reference and closes away from
+    it. Entry is the touched reference value; exit is the same hourly bar's
+    close.
+    """
+    if rth_today is None or rth_today.empty or not triggers:
+        return None
+    refs = []
+    for row in triggers:
+        if row.get("kind") == "DAY_OPEN":
+            continue
+        level = row.get("entryLevel", row.get("level"))
+        if level is None:
+            continue
+        try:
+            refs.append({
+                "line": str(row.get("line") or row.get("kind") or "Reference"),
+                "level": float(level),
+            })
+        except Exception:
+            continue
+    if not refs:
+        return None
+
+    for ts, bar in rth_today.sort_index().iterrows():
+        ct_ts = pd.Timestamp(ts)
+        if ct_ts.tzinfo is None:
+            ct_ts = ct_ts.tz_localize(pc.get_central_tz())
+        else:
+            ct_ts = ct_ts.tz_convert(pc.get_central_tz())
+        if not (ENTRY_WINDOW_START_HOUR_CT <= ct_ts.hour < ENTRY_WINDOW_END_HOUR_CT):
+            continue
+        high = float(bar["High"])
+        low = float(bar["Low"])
+        close = float(bar["Close"])
+        candidates = sorted(refs, key=lambda ref: abs(close - ref["level"]))
+        for ref in candidates:
+            level = ref["level"]
+            if low <= level <= high:
+                if close > level:
+                    signal_type = "CALL"
+                    side = "LONG"
+                elif close < level:
+                    signal_type = "PUT"
+                    side = "SHORT"
+                else:
+                    continue
+                return {
+                    "entry_time": ct_ts,
+                    "exit_time": ct_ts + pd.Timedelta(hours=1),
+                    "entry_price": level,
+                    "exit_price": close,
+                    "signal_type": signal_type,
+                    "side": side,
+                    "line": ref["line"],
+                    "rule": "ENTRY_WINDOW_TOUCH",
+                }
+    return None
 
 
 def _open_zone_replay_entry(
@@ -1100,12 +1169,13 @@ def _build_replay_block(
     primary_lines: list[pc.DynamicLine] | None = None,
     signals: list[pc.TradeSignal] | None = None,
     intraday_5m: pd.DataFrame | None = None,
+    triggers: list[dict] | None = None,
 ) -> dict:
     """OHLC + verdict-outcome card for backtest mode.
 
-    Scoring rule: first confirmed engine entry, force-close after one hour.
-    If no rejection entry confirmed, grade the replay-only RTH open-zone
-    continuation when the open is already outside the primary structure.
+    Scoring rule: first 09:00-11:00 CT reference touch, exited at the
+    close of that hour. Older confirmed-entry/open-zone fallbacks remain
+    for historical payloads that do not yet carry entry references.
     """
     block: dict = {
         "isReplay": is_replay,
@@ -1129,49 +1199,63 @@ def _build_replay_block(
         "netPts": round(c - o, 2),
         "netPct": round(((c - o) / o * 100) if o else 0.0, 3),
     }
-    confirmed = [
-        s for s in (signals or [])
-        if s.status == "CONFIRMED" and s.entry_time is not None and not pd.isna(s.entry_price)
-    ]
-    if not confirmed:
-        open_zone = _open_zone_replay_entry(
-            primary_lines=primary_lines or [],
+    touch_window = _replay_touch_window_entry(triggers=triggers, rth_today=rth_today)
+    if touch_window is not None:
+        entry_time = pd.Timestamp(touch_window["entry_time"])
+        exit_time = pd.Timestamp(touch_window["exit_time"])
+        entry_price = float(touch_window["entry_price"])
+        exit_price = float(touch_window["exit_price"])
+        signal_type = str(touch_window["signal_type"])
+        side = str(touch_window["side"])
+        entry_rule = str(touch_window["rule"])
+        entry_line = str(touch_window["line"])
+    else:
+        confirmed = [
+            s for s in (signals or [])
+            if s.status == "CONFIRMED" and s.entry_time is not None and not pd.isna(s.entry_price)
+        ]
+        if not confirmed:
+            open_zone = _open_zone_replay_entry(
+                primary_lines=primary_lines or [],
+                rth_today=rth_today,
+                intraday_5m=intraday_5m,
+            )
+            if open_zone is None:
+                block["verdictOutcome"] = "N_A"
+                block["verdictPnl"] = None
+                return block
+            entry_time = pd.Timestamp(open_zone["entry_time"])
+            entry_price = float(open_zone["entry_price"])
+            signal_type = str(open_zone["signal_type"])
+            side = str(open_zone["side"])
+            entry_rule = "OPEN_ZONE_CONTINUATION"
+            entry_line = "OPEN_ZONE"
+        else:
+            sig = min(confirmed, key=lambda s: pd.Timestamp(s.entry_time))
+            entry_time = pd.Timestamp(sig.entry_time)
+            entry_price = float(sig.entry_price)
+            signal_type = sig.signal_type
+            side = "LONG" if sig.signal_type == "CALL" else "SHORT"
+            entry_rule = "CONFIRMED_REJECTION"
+            entry_line = pc.compact_line_name(sig.line_name)
+
+        exit_time, exit_price = _forced_one_hour_exit(
+            entry_time=entry_time,
             rth_today=rth_today,
             intraday_5m=intraday_5m,
         )
-        if open_zone is None:
-            block["verdictOutcome"] = "N_A"
-            block["verdictPnl"] = None
-            return block
-        entry_time = pd.Timestamp(open_zone["entry_time"])
-        entry_price = float(open_zone["entry_price"])
-        signal_type = str(open_zone["signal_type"])
-        side = str(open_zone["side"])
-        entry_rule = "OPEN_ZONE_CONTINUATION"
-    else:
-        sig = min(confirmed, key=lambda s: pd.Timestamp(s.entry_time))
-        entry_time = pd.Timestamp(sig.entry_time)
-        entry_price = float(sig.entry_price)
-        signal_type = sig.signal_type
-        side = "LONG" if sig.signal_type == "CALL" else "SHORT"
-        entry_rule = "CONFIRMED_REJECTION"
-
-    exit_time, exit_price = _forced_one_hour_exit(
-        entry_time=entry_time,
-        rth_today=rth_today,
-        intraday_5m=intraday_5m,
-    )
     pnl = (exit_price - entry_price) if signal_type == "CALL" else (entry_price - exit_price)
     block["entry"] = {
         "time": entry_time.isoformat(),
         "price": round(entry_price, 2),
         "side": side,
         "rule": entry_rule,
+        "line": entry_line,
     }
     block["exit"] = {
         "time": exit_time.isoformat(),
         "price": round(exit_price, 2),
-        "rule": "FORCED_1H",
+        "rule": "HOURLY_CLOSE" if entry_rule == "ENTRY_WINDOW_TOUCH" else "FORCED_1H",
     }
     block["verdictOutcome"] = "WIN" if pnl > 0 else ("LOSS" if pnl < 0 else "PUSH")
     block["verdictPnl"] = round(pnl, 2)
@@ -1389,6 +1473,7 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
         primary_lines=primary_lines,
         signals=raw_signals,
         intraday_5m=intraday,
+        triggers=triggers,
     ) if is_replay else None
 
     # Premarket-bar diagnostic — only ship on replay so live payloads

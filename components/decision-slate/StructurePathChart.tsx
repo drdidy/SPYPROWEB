@@ -43,7 +43,7 @@ export function StructurePathChart({
   const largeCanvas = height >= 320;
   const H = largeCanvas ? 420 : 230;
   const PAD_L = 48;
-  const PAD_R = 86;
+  const PAD_R = largeCanvas ? 132 : 124;
   const PAD_T = largeCanvas ? 34 : 22;
   const PAD_B = largeCanvas ? 40 : 28;
   const bars = (data?.bars ?? []).filter(validBar);
@@ -194,7 +194,7 @@ export function StructurePathChart({
               : "border-rule-soft bg-paper-2 text-ink-3",
           )}
         >
-          Rails
+          Refs
         </div>
       </div>
       <svg
@@ -234,11 +234,12 @@ export function StructurePathChart({
               <text
                 x={W - PAD_R + 8}
                 y={yEnd + 3}
-                fontSize="9"
+                fontSize={largeCanvas ? "12" : "11"}
                 fontFamily="var(--font-geist-mono)"
+                fontWeight="700"
                 fill={stroke}
               >
-                {line.label} {projectedNow.toFixed(data?.label === "ES" ? 2 : 2)}
+                {line.label} {projectedNow.toFixed(2)}
               </text>
             </g>
           );
@@ -300,14 +301,14 @@ export function StructurePathChart({
             fill={accentStroke}
           />
         </g>
-        <text x={PAD_L} y={H - 8} fontSize="9" fontFamily="var(--font-geist-mono)" fill={palette.axis}>
+        <text x={PAD_L} y={H - 8} fontSize="10" fontFamily="var(--font-geist-mono)" fill={palette.axis}>
           {shortTime(bars[0].t)}
         </text>
-        <text x={W - PAD_R} y={H - 8} fontSize="9" fontFamily="var(--font-geist-mono)" fill={palette.axis} textAnchor="end">
+        <text x={W - PAD_R} y={H - 8} fontSize="10" fontFamily="var(--font-geist-mono)" fill={palette.axis} textAnchor="end">
           {shortTime(last.t)}
         </text>
-        <text x={W - 12} y={18} fontSize="10" fontFamily="var(--font-geist-mono)" fill={palette.axis} textAnchor="end">
-          LAST {last.c.toFixed(data?.label === "ES" ? 2 : 2)}
+        <text x={W - 12} y={18} fontSize="11" fontFamily="var(--font-geist-mono)" fontWeight="700" fill={palette.axis} textAnchor="end">
+          LAST {last.c.toFixed(2)}
         </text>
       </svg>
     </div>

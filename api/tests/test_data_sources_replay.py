@@ -28,6 +28,32 @@ def _frame(entry_open: float, exit_close: float) -> pd.DataFrame:
     )
 
 
+def _window_touch_frame() -> pd.DataFrame:
+    idx = [_ts(9), _ts(10), _ts(11)]
+    return pd.DataFrame(
+        {
+            "Open": [101.0, 103.5, 104.0],
+            "High": [103.0, 105.0, 104.5],
+            "Low": [99.75, 103.0, 103.5],
+            "Close": [102.5, 104.0, 104.25],
+        },
+        index=idx,
+    )
+
+
+def _trigger(line: str, level: float) -> dict:
+    return {
+        "line": line,
+        "kind": "ANC_DESC",
+        "level": level,
+        "entryLevel": level,
+        "dist": 0.0,
+        "bps": 0,
+        "bias": 0,
+        "status": "WATCHING",
+    }
+
+
 def _line(name: str, price: float) -> DynamicLine:
     return DynamicLine(
         name=name,
@@ -40,6 +66,27 @@ def _line(name: str, price: float) -> DynamicLine:
         is_primary=True,
         description="test primary structure",
     )
+
+
+def test_spy_replay_grades_first_9_to_11_reference_touch_to_hour_close():
+    bars = _window_touch_frame()
+
+    block = _build_replay_block(
+        is_replay=True,
+        signal_day=_ts(9).date(),
+        rth_today=bars,
+        decision={},
+        primary_lines=[_line("UPPER", 100.0)],
+        signals=[],
+        intraday_5m=bars,
+        triggers=[_trigger("Upper ref", 100.0)],
+    )
+
+    assert block["verdictOutcome"] == "WIN"
+    assert block["verdictPnl"] == 2.5
+    assert block["entry"]["rule"] == "ENTRY_WINDOW_TOUCH"
+    assert block["entry"]["line"] == "Upper ref"
+    assert block["exit"]["rule"] == "HOURLY_CLOSE"
 
 
 def test_spy_replay_grades_open_above_primary_structure_as_one_hour_long():

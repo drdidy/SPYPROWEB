@@ -380,14 +380,14 @@ function MiniStructureMap({
   const isEs = engine === "SPX";
   const rails = isEs
     ? [
-        { label: "Upper rail", value: levels?.upper ?? null, tone: "text-bull-ink" },
-        { label: "Anchor", value: levels?.anchor ?? null, tone: "text-gold-ink" },
-        { label: "Lower rail", value: levels?.lower ?? null, tone: "text-bear-ink" },
+        { label: "SH-D 09", value: levels?.upper ?? null, tone: "text-bear-ink" },
+        { label: "Mid 09", value: levels?.anchor ?? null, tone: "text-gold-ink" },
+        { label: "SL-A 09", value: levels?.lower ?? null, tone: "text-bull-ink" },
       ]
     : [
-        { label: "Upper rail", value: levels?.upper ?? null, tone: "text-bull-ink" },
-        { label: "Anchor", value: levels?.anchor ?? null, tone: "text-gold-ink" },
-        { label: "Lower rail", value: levels?.lower ?? null, tone: "text-bear-ink" },
+        { label: "Upper 09", value: levels?.upper ?? null, tone: "text-bear-ink" },
+        { label: "Main 09", value: levels?.anchor ?? null, tone: "text-gold-ink" },
+        { label: "Lower 09", value: levels?.lower ?? null, tone: "text-bull-ink" },
       ];
   const accent =
     current === "GO" || current === "ARMED"
@@ -402,26 +402,26 @@ function MiniStructureMap({
     <div className="group/structure mt-3 rounded-soft border border-rule-soft bg-paper-tier3 px-3 py-3 transition-colors hover:border-rule-strong">
       <div className="mb-2 flex items-center justify-between gap-3">
         <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3">
-          Session rails
+          09:00 references
         </span>
         <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-4">
-          Actual path
+          Price path
         </span>
       </div>
-      <div className="grid gap-3 md:grid-cols-[132px_1fr]">
+      <div className="grid gap-3 md:grid-cols-[162px_1fr]">
         <div className="space-y-2.5">
           {rails.map((rail) => (
             <div key={rail.label} className="grid grid-cols-[1fr_auto] gap-2">
-              <span className="font-mono text-[10px] text-ink-3">
+              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-ink-3">
                 {rail.label}
               </span>
               <span
                 className={cn(
-                  "font-mono text-[10px] tabular-nums",
+                  "font-mono text-[13px] font-semibold tabular-nums",
                   rail.tone,
                 )}
               >
-                {typeof rail.value === "number" ? rail.value.toFixed(isEs ? 0 : 2) : "--"}
+                {typeof rail.value === "number" ? rail.value.toFixed(2) : "--"}
               </span>
             </div>
           ))}
@@ -430,8 +430,8 @@ function MiniStructureMap({
           data={chart}
           variant="paper"
           accent={accent}
-          height={190}
-          title={`${displayEngine(engine)} price vs levels`}
+          height={230}
+          title={`${displayEngine(engine)} price vs 09:00 references`}
         />
       </div>
     </div>
