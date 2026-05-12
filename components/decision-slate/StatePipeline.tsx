@@ -408,16 +408,26 @@ function MiniStructureMap({
           Price path
         </span>
       </div>
-      <div className="grid gap-4 md:grid-cols-[184px_1fr]">
-        <div className="space-y-2.5">
+      <div className="grid gap-3">
+        <StructurePathChart
+          data={chart}
+          variant="paper"
+          accent={accent}
+          height={340}
+          title={`${displayEngine(engine)} price vs 09:00 references`}
+        />
+        <div className="grid gap-2 sm:grid-cols-3">
           {rails.map((rail) => (
-            <div key={rail.label} className="grid grid-cols-[1fr_auto] gap-2">
-              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-ink-3">
+            <div
+              key={rail.label}
+              className="rounded-[6px] border border-rule-soft bg-paper px-3 py-2"
+            >
+              <span className="block font-mono text-[10px] uppercase tracking-[0.10em] text-ink-3">
                 {rail.label}
               </span>
               <span
                 className={cn(
-                  "font-mono text-[13px] font-semibold tabular-nums",
+                  "mt-1 block font-mono text-[18px] font-semibold leading-none tabular-nums",
                   rail.tone,
                 )}
               >
@@ -426,13 +436,6 @@ function MiniStructureMap({
             </div>
           ))}
         </div>
-        <StructurePathChart
-          data={chart}
-          variant="paper"
-          accent={accent}
-          height={320}
-          title={`${displayEngine(engine)} price vs 09:00 references`}
-        />
       </div>
     </div>
   );

@@ -39,13 +39,13 @@ export function StructurePathChart({
   title?: string;
   frameless?: boolean;
 }) {
-  const W = 620;
   const largeCanvas = height >= 320;
-  const H = largeCanvas ? 420 : 230;
+  const W = largeCanvas ? 520 : 620;
+  const H = largeCanvas ? 340 : 210;
   const PAD_L = 48;
   const PAD_R = largeCanvas ? 132 : 124;
-  const PAD_T = largeCanvas ? 34 : 22;
-  const PAD_B = largeCanvas ? 40 : 28;
+  const PAD_T = largeCanvas ? 26 : 22;
+  const PAD_B = largeCanvas ? 34 : 28;
   const bars = (data?.bars ?? []).filter(validBar);
   const lines = (data?.lines ?? []).filter(validLine);
   const hasData = bars.length >= 2 && lines.length > 0;
@@ -115,7 +115,7 @@ export function StructurePathChart({
     line.anchorPrice + line.slopePerHour * ((ms - new Date(line.anchorTime).getTime()) / 36e5);
 
   const yValues: number[] = [];
-  for (const bar of bars) yValues.push(bar.h, bar.l, bar.c);
+  for (const bar of bars) yValues.push(bar.c);
   for (const line of lines) yValues.push(lineValue(line, t0), lineValue(line, t1));
   let yMin = Math.min(...yValues);
   let yMax = Math.max(...yValues);
@@ -234,7 +234,7 @@ export function StructurePathChart({
               <text
                 x={W - PAD_R + 8}
                 y={yEnd + 3}
-                fontSize={largeCanvas ? "12" : "11"}
+                fontSize={largeCanvas ? "14" : "12"}
                 fontFamily="var(--font-geist-mono)"
                 fontWeight="700"
                 fill={stroke}
@@ -301,13 +301,13 @@ export function StructurePathChart({
             fill={accentStroke}
           />
         </g>
-        <text x={PAD_L} y={H - 8} fontSize="10" fontFamily="var(--font-geist-mono)" fill={palette.axis}>
+        <text x={PAD_L} y={H - 8} fontSize={largeCanvas ? "12" : "10"} fontFamily="var(--font-geist-mono)" fill={palette.axis}>
           {shortTime(bars[0].t)}
         </text>
-        <text x={W - PAD_R} y={H - 8} fontSize="10" fontFamily="var(--font-geist-mono)" fill={palette.axis} textAnchor="end">
+        <text x={W - PAD_R} y={H - 8} fontSize={largeCanvas ? "12" : "10"} fontFamily="var(--font-geist-mono)" fill={palette.axis} textAnchor="end">
           {shortTime(last.t)}
         </text>
-        <text x={W - 12} y={18} fontSize="11" fontFamily="var(--font-geist-mono)" fontWeight="700" fill={palette.axis} textAnchor="end">
+        <text x={W - 12} y={18} fontSize={largeCanvas ? "13" : "11"} fontFamily="var(--font-geist-mono)" fontWeight="700" fill={palette.axis} textAnchor="end">
           LAST {last.c.toFixed(2)}
         </text>
       </svg>
