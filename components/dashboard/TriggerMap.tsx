@@ -11,6 +11,13 @@ function lineState(distance: number): "armed" | "watching" | "stale" {
   return "stale";
 }
 
+function distanceToLast(line: DynamicLine, currentPrice?: number): number {
+  if (typeof currentPrice === "number" && Number.isFinite(currentPrice)) {
+    return line.currentValue - currentPrice;
+  }
+  return line.distanceFromPrice;
+}
+
 const lineStyle: Record<string, { dot: string; label: string }> = {
   UA: { dot: "bg-bull", label: "Upper Ascending" },
   UD: { dot: "bg-bear", label: "Upper Descending" },
@@ -28,9 +35,11 @@ const lineStyle: Record<string, { dot: string; label: string }> = {
 export function TriggerMap({
   lines,
   healthAction,
+  currentPrice,
 }: {
   lines: DynamicLine[];
   healthAction?: ReactNode;
+  currentPrice?: number;
 }) {
   const sorted = lines
     .slice()
@@ -73,7 +82,8 @@ export function TriggerMap({
         {sorted.length <= 4 ? (
           <div className="grid gap-3 px-5 pb-5 sm:grid-cols-2">
             {sorted.map((l) => {
-              const state = lineState(l.distanceFromPrice);
+              const distance = distanceToLast(l, currentPrice);
+              const state = lineState(distance);
               const meta = lineStyle[l.kind] ?? { dot: "bg-ink-3", label: l.kind };
               return (
                 <div
@@ -98,11 +108,11 @@ export function TriggerMap({
                     <span>{meta.label}</span>
                     <span
                       className={`font-mono tabular-nums ${
-                        l.distanceFromPrice >= 0 ? "text-bull-ink" : "text-bear-ink"
+                        distance >= 0 ? "text-bear-ink" : "text-bull-ink"
                       }`}
                     >
-                      {l.distanceFromPrice >= 0 ? "+" : ""}
-                      {l.distanceFromPrice.toFixed(2)}
+                      {distance >= 0 ? "+" : ""}
+                      {distance.toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -120,7 +130,8 @@ export function TriggerMap({
         </div>
         <ul className="divide-y divide-rule border-t border-rule">
           {sorted.map((l) => {
-              const state = lineState(l.distanceFromPrice);
+              const distance = distanceToLast(l, currentPrice);
+              const state = lineState(distance);
               const meta = lineStyle[l.kind] ?? { dot: "bg-ink-3", label: l.kind };
               return (
                 <li
@@ -145,12 +156,12 @@ export function TriggerMap({
                   </div>
                   <div
                     className={`col-span-2 text-right font-mono text-sm tabular-nums ${
-                      l.distanceFromPrice >= 0 ? "text-bull-ink" : "text-bear-ink"
+                      distance >= 0 ? "text-bear-ink" : "text-bull-ink"
                     }`}
                     data-num
                   >
-                    {l.distanceFromPrice >= 0 ? "+" : ""}
-                    {l.distanceFromPrice.toFixed(2)}
+                    {distance >= 0 ? "+" : ""}
+                    {distance.toFixed(2)}
                   </div>
                   <div className="col-span-2 flex justify-end">
                     <StatusPill variant={state} pulse={state === "armed"}>

@@ -98,7 +98,7 @@ export function ChannelShell({
               {freshnessLine(data.snap.asOf, session.nextSignificantEvent.at)}
             </p>
           </div>
-          <div className="hidden md:flex items-center gap-6 text-right">
+          <div className="hidden md:grid grid-cols-3 gap-2 text-right">
             <Stat label="Bias" value={bias.bias} highlight={bias.bias} />
             <Stat label="Window" value={decision.windowET || "—"} />
             <Stat
@@ -141,7 +141,7 @@ export function ChannelShell({
         </SectionLabel>
         <div className="grid grid-cols-12 gap-5">
           <div className="col-span-12 xl:col-span-7">
-            <TriggerMap lines={lines} />
+            <TriggerMap lines={lines} currentPrice={currentPrice} />
           </div>
           <div className="col-span-12 xl:col-span-5">
             <PreOpenBias state={bias} />
@@ -413,10 +413,10 @@ function Stat({
   support?: ReactNode;
 }) {
   return (
-    <div>
+    <div className="rounded-[12px] border border-paper/10 bg-paper/[0.045] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
       <div className="eyebrow text-paper/45 mb-0.5">{label}</div>
       <div
-        className={`font-mono text-[13px] font-semibold tabular-nums ${
+        className={`font-mono text-[15px] font-semibold tabular-nums ${
           highlight === "BULLISH"
             ? "text-bull-ink"
             : highlight === "BEARISH"

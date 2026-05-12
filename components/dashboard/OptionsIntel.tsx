@@ -40,15 +40,22 @@ export function OptionsIntelPanel({
             </>
           }
         />
-        <CardBody className="space-y-3 py-10">
-          <div className="font-serif text-headline text-ink-3 italic font-light">
-            Options chain not yet loaded.
+        <CardBody className="space-y-4 py-8">
+          <div>
+            <div className="font-serif text-headline text-ink-3 italic font-light">
+              Options chain not yet loaded.
+            </div>
+            <p className="mt-2 text-[13px] text-ink-3 leading-relaxed max-w-xl">
+              The active option-chain feed has not returned the current expiration.
+              The panel is paused instead of fabricating dealer or flow values.
+            </p>
           </div>
-          <p className="text-[13px] text-ink-3 leading-relaxed max-w-md">
-            The option-chain feed returned no chain for the active expiration (likely
-            outside market hours, or the connection is still warming up).
-            This panel populates once the chain arrives.
-          </p>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <EmptyChainStat label="Live chain" value="Waiting" />
+            <EmptyChainStat label="Contract model" value={projection ? "Available" : "Pending"} />
+            <EmptyChainStat label="Refresh" value="Session clock" />
+          </div>
+          {projection && <ContractProjectionCard projection={projection} />}
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <Button
               type="button"
@@ -184,6 +191,17 @@ export function OptionsIntelPanel({
         </div>
       </CardBody>
     </Card>
+  );
+}
+
+function EmptyChainStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-soft border border-rule bg-paper-2 px-3 py-2">
+      <div className="eyebrow text-ink-3">{label}</div>
+      <div className="mt-1 font-mono text-[13px] font-semibold uppercase tracking-[0.08em] text-ink">
+        {value}
+      </div>
+    </div>
   );
 }
 

@@ -62,6 +62,29 @@ export function SignalTape({
         action={healthAction}
       />
       <CardBody className="px-0 pb-0">
+        <div className="px-5 pb-4">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="eyebrow text-ink-3">Session event rail</span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-3">
+              replay-linked
+            </span>
+          </div>
+          <div className="relative h-7 rounded-soft border border-rule bg-paper-2 px-2">
+            <div className="absolute left-2 right-2 top-1/2 h-px -translate-y-1/2 bg-rule-strong" />
+            {ticks.map((t, i) => {
+              const ts = typeStyle[t.type];
+              const left = ticks.length === 1 ? 50 : (i / (ticks.length - 1)) * 100;
+              return (
+                <span
+                  key={`${t.time}-${i}`}
+                  className={`absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-paper ${ts.bar}`}
+                  style={{ left: `calc(8px + (${left}% * 0.96))` }}
+                  title={`${t.time} ${ts.label}: ${t.body}`}
+                />
+              );
+            })}
+          </div>
+        </div>
         <ol className="divide-y divide-rule border-t border-rule" role="log" aria-live="polite">
           {ticks.map((t, i) => {
             const ts = typeStyle[t.type];

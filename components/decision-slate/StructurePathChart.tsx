@@ -204,6 +204,11 @@ export function StructurePathChart({
         role="img"
         aria-label={`${data?.label} actual price path against engine rails`}
       >
+        <title>{title}</title>
+        <desc>
+          {data?.label} price path with current price {last.c.toFixed(2)}
+          plotted against the active reference lines.
+        </desc>
         <style>{chartStyles}</style>
         <rect x="0" y="0" width={W} height={H} fill="transparent" />
         {[0.25, 0.5, 0.75].map((f) => {
@@ -279,6 +284,16 @@ export function StructurePathChart({
         ))}
         <g>
           <line
+            x1={PAD_L}
+            x2={W - PAD_R}
+            y1={yOf(last.c)}
+            y2={yOf(last.c)}
+            stroke={accentStroke}
+            strokeWidth="0.8"
+            strokeDasharray="2 5"
+            opacity="0.42"
+          />
+          <line
             x1={xOf(new Date(last.t).getTime())}
             x2={xOf(new Date(last.t).getTime())}
             y1={PAD_T}
@@ -300,6 +315,38 @@ export function StructurePathChart({
             r="3.8"
             fill={accentStroke}
           />
+          {largeCanvas && (
+            <g transform={`translate(${Math.min(W - PAD_R - 108, xOf(new Date(last.t).getTime()) + 10)},${Math.max(PAD_T + 8, Math.min(H - PAD_B - 28, yOf(last.c) - 14))})`}>
+              <rect
+                width="104"
+                height="26"
+                rx="6"
+                fill={variant === "dark" ? "#071116" : "#FFFDF7"}
+                stroke={accentStroke}
+                strokeOpacity="0.35"
+              />
+              <text
+                x="8"
+                y="10"
+                fontSize="7"
+                fontFamily="var(--font-geist-mono)"
+                fontWeight="700"
+                fill={palette.axis}
+              >
+                CURRENT PRICE
+              </text>
+              <text
+                x="8"
+                y="21"
+                fontSize="11"
+                fontFamily="var(--font-geist-mono)"
+                fontWeight="800"
+                fill={accentStroke}
+              >
+                {last.c.toFixed(2)}
+              </text>
+            </g>
+          )}
         </g>
         <text x={PAD_L} y={H - 8} fontSize={largeCanvas ? "12" : "10"} fontFamily="var(--font-geist-mono)" fill={palette.axis}>
           {shortTime(bars[0].t)}

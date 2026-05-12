@@ -130,7 +130,7 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
 
       <div className="grid grid-cols-12 gap-0">
         {/* LEFT — verdict + read */}
-        <div className="col-span-12 lg:col-span-7 p-7 pr-6 pl-8 relative">
+        <div className="col-span-12 lg:col-span-5 p-5 sm:p-7 lg:pr-6 lg:pl-8 relative">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <span className="eyebrow text-ink-3">SPY · Anchor Slate</span>
@@ -230,14 +230,12 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
           <p className="mt-7 text-[15px] text-ink-2 leading-relaxed max-w-xl">
             {primary ? (
               <span className="block text-ink-3 text-[13.5px]">
-                {primary.role === "ANCHOR_2" ? "Anchor 2" : "Primary anchor"} ·
-                low <span className="font-mono">{primary.anchorLow.toFixed(2)}</span> ·
-                set <span className="font-mono">{anchorTimeLabel(primary)}</span> CT.{" "}
+                Reference set <span className="font-mono">{anchorTimeLabel(primary)}</span> CT.{" "}
                 {/* v9: slope value hidden — proprietary engine
                     parameter. The bands themselves still render
                     using the const above. */}
-                Bands offset above and below the anchor; both decay
-                through the session.
+                The operating bands are projected into the active window; values
+                stay visible without exposing the proprietary construction.
               </span>
             ) : (
               <span className="block mt-2 text-ink-3 text-[13.5px]">
@@ -249,10 +247,10 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
           <ExecutionRead items={executionRead} />
         </div>
 
-        <div className="hidden lg:block absolute left-[58.333%] top-7 bottom-7 w-px bg-rule" />
+        <div className="hidden lg:block absolute left-[41.666%] top-7 bottom-7 w-px bg-rule" />
 
         {/* RIGHT — diagram + stat strip */}
-        <div className="col-span-12 lg:col-span-5 p-7 pl-7 bg-paper-2/40 relative">
+        <div className="col-span-12 lg:col-span-7 p-5 sm:p-7 lg:pl-7 bg-paper-2/40 relative">
           <div className="flex items-start justify-between mb-4">
             <div>
               <span className="eyebrow text-ink-3">Anchor</span>
@@ -272,13 +270,13 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
             data={buildSpyChannelChart(snap)}
             variant="paper"
             accent={bias === "BULLISH" ? "bull" : bias === "BEARISH" ? "bear" : "gold"}
-            height={380}
+            height={460}
             title="SPY price vs 09:00 references"
             className="mb-4"
           />
 
           {primary ? (
-            <div className="grid grid-cols-2 gap-2 mb-4">
+            <div className="grid grid-cols-2 gap-2 mb-4 sm:grid-cols-3 xl:grid-cols-5">
               {entryFramework.map((item) => (
                 <BandStat
                   key={item.label}
@@ -901,4 +899,5 @@ const spyDiagramStyles = `
     }
   }
 `;
+
 
