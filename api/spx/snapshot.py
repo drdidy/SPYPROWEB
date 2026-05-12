@@ -155,24 +155,23 @@ def _build_spx_replay_block(payload: dict, replay_date: date | None) -> dict:
     reading verdictOutcome (WIN/LOSS/PUSH/N_A). Without scoring it
     always reads N_A and the dashboard renders "no graded sessions".
 
-    Grading rule for SPX (v9 — corrected per trader's strategy):
-      channel.direction != NONE
-        → Engine projected a ceiling and a floor; both rails reach
-          09:00 CT. The trade IS the rail tag — when ES tags either
-          rail at/around 09:00 and moves away, the engine took the
-          play implied by the channel direction (long off the floor
-          for ASCENDING, short off the ceiling for DESCENDING).
-          Compare the day's net open→close to that implied side.
-      channel.direction == NONE
-        → No channel rails were projected, so there is no rail to
-          tag. N_A is the honest read.
+    Grading rule for SPX/ES (v10 — six-line 09:00 framework):
+      - Every ES structure line is projected to its 09:00 CT entry
+        reference. Replay grading evaluates the real line set, not
+        the old primary/alternate play proxy.
+      - Only the 09:00 and 10:00 CT hourly candles are eligible.
+      - BUY trigger: price is above the line, drops into it on a
+        bearish hourly candle, and closes back above the line.
+      - SELL trigger: price is below the line, rises into it on a
+        bullish hourly candle, and closes back below the line.
+      - Entry is the 09:00 reference level; exit is that hourly
+        candle close. If no qualified rejection occurs, N_A is the
+        honest grade — do not mark a loss just because price touched.
 
-    The previous rule also required `action in (TAKE, SELECTIVE)` —
-    a confluence-score gate. That gate is meant to filter
-    low-conviction sessions for *display* purposes ("stand down,
-    don't take this one"), but it shouldn't suppress *grading* of
-    what would have happened if the user had taken the rail tag
-    anyway. Dropped — grading is about what the rails actually did.
+    The previous rule used `plays.primary` / `plays.alternate` only.
+    That dropped valid touches from the six-line framework, especially
+    the previous-RTH continuation references. The replay score must
+    grade what the framework actually offered between 09:00 and 11:00.
 
     Critical detail: the engine plots lines from ES=F bars + an
     offset (SPX_equiv = ES + offset). Grading must walk the same
@@ -195,13 +194,11 @@ def _build_spx_replay_block(payload: dict, replay_date: date | None) -> dict:
         return block
 
     confluence = (payload.get("confluence") or {})
-    channel = (payload.get("channel") or {})
     meta = payload.get("_meta") or {}
     # `action` retained in the payload contract for the dashboard
     # display ("TAKE" / "SELECTIVE" / "STAND_DOWN") but is no
     # longer a grading input — see docstring above.
     _action = confluence.get("action")
-    direction = channel.get("direction")
     applied_offset = meta.get("appliedOffset")
     offset = float(applied_offset) if isinstance(applied_offset, (int, float)) else 0.0
 
@@ -215,11 +212,6 @@ def _build_spx_replay_block(payload: dict, replay_date: date | None) -> dict:
             "netPts": round(day["close"] - day["open"], 2),
         }
 
-    has_channel = direction in ("ASCENDING", "DESCENDING")
-    if not has_channel:
-        block["verdictOutcome"] = "N_A"
-        return block
-
     replay_result = _grade_replay_from_rail_tag(payload, replay_date, offset)
     if replay_result is None:
         block["verdictOutcome"] = "N_A"
@@ -231,67 +223,89 @@ def _build_spx_replay_block(payload: dict, replay_date: date | None) -> dict:
 
 
 def _grade_replay_from_rail_tag(payload: dict, replay_date: date, offset: float) -> dict | None:
-    plays = payload.get("plays") or {}
-    candidates = [
-        trade
-        for trade in (plays.get("primary"), plays.get("alternate"))
-        if isinstance(trade, dict)
+    line_payloads = [
+        line
+        for line in (payload.get("lines") or [])
+        if isinstance(line, dict) and line.get("kind")
     ]
-    if not candidates:
+    if not line_payloads:
         return None
-
-    lines = {line.get("kind"): line for line in payload.get("lines") or []}
-    valid_trades: list[dict] = []
-    for trade in candidates:
-        side = trade.get("side")
-        entry_line = trade.get("entryLine")
-        entry_payload = lines.get(entry_line)
-        if side in ("BUY", "SELL") and entry_payload:
-            valid_trades.append({
-                "side": side,
-                "entryLine": entry_line,
-                "entryPayload": entry_payload,
-            })
-    if not valid_trades:
-        return None
-
     bars = _spx_session_intraday(replay_date, offset)
     if not bars:
         return None
-
-    entry_price = None
-    exit_after = None
-    close_price = None
-    side = None
-    for bar in bars:
-        close_price = float(bar["close"])
-        t = bar["time"]
-
-        if entry_price is None:
-            if not (9 <= t.hour < 11):
-                continue
-            for trade in valid_trades:
-                entry_value = _entry_value_for_payload_line(trade["entryPayload"], t)
-                if entry_value is None:
-                    continue
-                if float(bar["low"]) <= entry_value <= float(bar["high"]):
-                    entry_price = entry_value
-                    exit_after = t.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
-                    side = trade["side"]
-                    break
-            if entry_price is None:
-                continue
-
-        if exit_after is not None and t >= exit_after:
-            pnl = float(bar["close"]) - entry_price if side == "BUY" else entry_price - float(bar["close"])
-            outcome = "WIN" if pnl > 0 else ("LOSS" if pnl < 0 else "PUSH")
-            return {"outcome": outcome, "pnl": round(pnl, 2)}
-
-    if entry_price is None or close_price is None or side is None:
+    hourly = _hourly_replay_bars(bars)
+    if not hourly:
         return None
-    pnl = close_price - entry_price if side == "BUY" else entry_price - close_price
-    outcome = "WIN" if pnl > 0 else ("LOSS" if pnl < 0 else "PUSH")
-    return {"outcome": outcome, "pnl": round(pnl, 2)}
+
+    for bar in hourly:
+        t = bar["time"]
+        if not (9 <= t.hour < 11):
+            continue
+
+        triggers: list[dict] = []
+        for line in line_payloads:
+            entry_value = _entry_value_for_payload_line(line, t)
+            if entry_value is None:
+                continue
+            side = _qualified_rejection_side(bar, entry_value)
+            if side is None:
+                continue
+            triggers.append({
+                "side": side,
+                "entry": entry_value,
+                "distance": abs(float(bar["open"]) - entry_value),
+            })
+        if not triggers:
+            continue
+
+        trigger = sorted(triggers, key=lambda item: item["distance"])[0]
+        entry_price = float(trigger["entry"])
+        close_price = float(bar["close"])
+        side = trigger["side"]
+        pnl = close_price - entry_price if side == "BUY" else entry_price - close_price
+        outcome = "WIN" if pnl > 0 else ("LOSS" if pnl < 0 else "PUSH")
+        return {"outcome": outcome, "pnl": round(pnl, 2)}
+
+    return None
+
+
+def _qualified_rejection_side(bar: dict, line_value: float) -> str | None:
+    open_ = float(bar["open"])
+    high = float(bar["high"])
+    low = float(bar["low"])
+    close = float(bar["close"])
+    touched = low <= line_value <= high
+    if not touched:
+        return None
+    # Buy: above the line, bearish candle drops into it, close rejects above.
+    if open_ > line_value and close < open_ and close > line_value:
+        return "BUY"
+    # Sell: below the line, bullish candle rises into it, close rejects below.
+    if open_ < line_value and close > open_ and close < line_value:
+        return "SELL"
+    return None
+
+
+def _hourly_replay_bars(bars: list[dict]) -> list[dict]:
+    buckets: dict[datetime, list[dict]] = {}
+    for bar in bars:
+        t = bar["time"]
+        if not isinstance(t, datetime):
+            continue
+        hour = t.astimezone(CT).replace(minute=0, second=0, microsecond=0)
+        buckets.setdefault(hour, []).append(bar)
+
+    hourly: list[dict] = []
+    for hour in sorted(buckets):
+        group = sorted(buckets[hour], key=lambda item: item["time"])
+        hourly.append({
+            "time": hour,
+            "open": float(group[0]["open"]),
+            "high": max(float(item["high"]) for item in group),
+            "low": min(float(item["low"]) for item in group),
+            "close": float(group[-1]["close"]),
+        })
+    return hourly
 
 
 def _entry_value_for_payload_line(line: dict, at: datetime) -> float | None:
