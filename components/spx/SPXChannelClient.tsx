@@ -221,8 +221,8 @@ export function SPXChannelClient({ replayDate }: Props) {
             </span>
           </div>
           <h1 className="mt-3 text-[36px] font-serif leading-none tracking-tight text-paper md:text-[46px]">
-            The corridor,{" "}
-            <span className="text-gold-soft/72 italic font-light">mapped live.</span>
+            ES channel,{" "}
+            <span className="text-gold-soft/72 italic font-light">live.</span>
           </h1>
           <p className="mt-4 max-w-3xl text-[15px] leading-relaxed text-paper/72">
             {heroSynthesis(snap)}
@@ -348,12 +348,12 @@ export function SPXChannelClient({ replayDate }: Props) {
         <span className="flex flex-wrap items-center gap-3">
           <Link href="/terms" className="hover:text-ink">Terms</Link>
           <Link href="/privacy" className="hover:text-ink">Privacy</Link>
-          <Link href="/options-risk" className="hover:text-ink">Options Risk</Link>
+          <Link href="/risk" className="hover:text-ink">Options Risk</Link>
           <span>Build 0.9.7</span>
           <Link href="/signal-log" className="hover:text-ink">Report an issue</Link>
         </span>
         <span className="hidden">Prophet · ES channel</span>
-        <span className="hidden">End of slate</span>
+        <span className="hidden">Session surface</span>
       </footer>
     </div>
   );
