@@ -621,19 +621,40 @@ function buildSpyStructureChart(
   date: string,
 ): StructureChartData | null {
   const anchor = snap.anchor?.primary;
-  if (!anchor) return null;
-  const slope = Number(snap.anchor?.slopePerHour);
-  if (!Number.isFinite(slope)) return null;
   const bars = normalizeChartBars(
     intradayBars && intradayBars.length > 1 ? intradayBars : snap.candles,
   );
-  const lines: StructureChartLine[] = [
-    makeSpyBand("Upper", anchor.bands.upper.anchorPrice, anchor.anchorTime, slope, "upper"),
-    makeSpyBand("Anchor", anchor.bands.main.anchorPrice, anchor.anchorTime, slope, "anchor"),
-    makeSpyBand("Lower", anchor.bands.lower.anchorPrice, anchor.anchorTime, slope, "lower"),
-  ].filter(Boolean) as StructureChartLine[];
+  if (bars.length < 2) return null;
+  const slope = Number(snap.anchor?.slopePerHour);
+  const lines: StructureChartLine[] = anchor && Number.isFinite(slope)
+    ? [
+        makeSpyBand("Upper", anchor.bands.upper.anchorPrice, anchor.anchorTime, slope, "upper"),
+        makeSpyBand("Anchor", anchor.bands.main.anchorPrice, anchor.anchorTime, slope, "anchor"),
+        makeSpyBand("Lower", anchor.bands.lower.anchorPrice, anchor.anchorTime, slope, "lower"),
+      ].filter(Boolean) as StructureChartLine[]
+    : snap.lines
+        .slice()
+        .sort((a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice))
+        .slice(0, 4)
+        .map((line, index): StructureChartLine => ({
+          label: spyShortChartLabel(line.name, index),
+          anchorTime: bars[0].t,
+          anchorPrice: line.currentValue,
+          slopePerHour: 0,
+          tone: index === 0 ? "anchor" : line.currentValue >= snap.currentPrice ? "upper" : "lower",
+        }));
   if (bars.length < 2 || lines.length === 0) return null;
   return { label: "SPY", date, bars, lines };
+}
+
+function spyShortChartLabel(name: string, index: number): string {
+  if (/PDH/i.test(name)) return "PDH";
+  if (/PDL/i.test(name)) return "PDL";
+  if (/UA/i.test(name)) return "UA";
+  if (/UD/i.test(name)) return "UD";
+  if (/LA/i.test(name)) return "LA";
+  if (/LD/i.test(name)) return "LD";
+  return `L${index + 1}`;
 }
 
 function makeSpyBand(
