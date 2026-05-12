@@ -96,8 +96,8 @@ export function forState(
             reason: `SPY ${state.toLowerCase()}`,
             description:
               state === "WAIT"
-                ? "SPY rejection candle printed. Watch for confirmation on the next bar."
-                : "SPY is approaching a primary trigger — watching for a rejection.",
+                ? "SPY structure is active. Watch for the next qualified confirmation."
+                : "SPY is approaching active structure. Keep the channel open.",
           }
         : {
             id: "live-spx",
@@ -106,8 +106,8 @@ export function forState(
             reason: `ES ${state.toLowerCase()}`,
             description:
               state === "WAIT"
-                ? "ES rejection candle printed. Watch for confirmation on the next bar."
-                : "ES is approaching the channel rail — watching for a rejection.",
+                ? "ES structure is active. Watch for the next qualified confirmation."
+                : "ES is approaching active structure. Keep the channel open.",
           };
 
     case "COOLDOWN":
@@ -137,3 +137,4 @@ export function forState(
       };
   }
 }
+

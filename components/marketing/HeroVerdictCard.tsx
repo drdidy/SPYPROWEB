@@ -253,7 +253,7 @@ const JARGON: Array<{ pattern: RegExp; hint: string }> = [
   {
     pattern: /\bConfirmed rejection\b/g,
     hint:
-      "A rejection candle followed by a confirmation candle that doesn't break back through.",
+      "A qualified structural condition followed by confirmation.",
   },
 ];
 
@@ -353,3 +353,4 @@ function SampleBadge({ state }: { state: VerdictCardState }) {
     </span>
   );
 }
+

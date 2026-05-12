@@ -175,7 +175,7 @@ export function SPXChannelHero({
             <div>
               <span className="eyebrow text-ink-3">Framework</span>
               <div className="mt-1.5 text-title font-serif text-ink">
-                {snap.channel.direction === "NONE" ? "Resolving" : "Six-line"}
+                {snap.channel.direction === "NONE" ? "Resolving" : "Mapped"}
               </div>
             </div>
             <div className="text-right">
@@ -509,7 +509,7 @@ function ChannelDiagram({
         </>
       )}
 
-      {/* six-line active-pair fill */}
+      {/* framework fill */}
       {snap.channel.direction === "NONE" && (
         <g className="spx-ghost-channel">
           <path
@@ -782,3 +782,4 @@ const spxDiagramStyles = `
     }
   }
 `;
+

@@ -47,7 +47,7 @@ export const spxSnapshot: SPXSnapshot = {
   channel: {
     direction: "ASCENDING",
     reason:
-      "Six-line ES framework active: previous RTH high ascending, previous RTH low descending, and ascending/descending lines from the overnight swing-high and swing-low closes before 02:00 CT.",
+      "ES framework active with measured overnight and prior-session references.",
   },
 
   // Six projected lines from overnight swing closes and previous RTH anchors.
@@ -117,7 +117,7 @@ export const spxSnapshot: SPXSnapshot = {
   // 5872.00 is inside the six-line framework.
   scenario: "INSIDE_DESCENDING",
   scenarioExplanation:
-    "Last print 5872.00 sits inside the ES six-line framework. Wait for an hourly rejection into a line.",
+    "Last print 5872.00 sits inside the ES framework. Wait for qualified confirmation near active structure.",
 
   plays: {
     primary: {
@@ -158,7 +158,7 @@ export const spxSnapshot: SPXSnapshot = {
     active: false,
     side: null,
     detail:
-      "Inside the six-line framework - re-entry watch dormant. Watch reactivates if price closes above or below the active swing pair.",
+      "Inside the ES framework - re-entry watch dormant. Watch reactivates when active structure qualifies.",
   },
 
   confluence: {
@@ -169,7 +169,7 @@ export const spxSnapshot: SPXSnapshot = {
         value: 0.78,
         weight: 0.30,
         contribution: 0.234,
-        note: "Overnight swing-high and swing-low closes resolved before 02:00 CT.",
+        note: "Overnight structure resolved before the RTH planning window.",
       },
       {
         key: "london",
@@ -192,3 +192,4 @@ export const spxSnapshot: SPXSnapshot = {
     action: "TAKE",
   },
 };
+

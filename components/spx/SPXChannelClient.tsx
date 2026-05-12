@@ -172,7 +172,7 @@ export function SPXChannelClient({ replayDate }: Props) {
                 Building the ES framework.
               </h1>
               <p className="mt-4 max-w-3xl text-[15px] leading-relaxed text-paper/72">
-                The live ES price, overnight bars, six-line rules, line ladder,
+                The live ES price, overnight bars, structure map, line ladder,
                 confluence, and decision tape are being assembled from the
                 current session. The page will only render measured values or
                 an explicit unavailable state.
@@ -707,3 +707,4 @@ function scrubProviderDetail(value: string): string {
     .replace(/\s{2,}/g, " ")
     .trim();
 }
+

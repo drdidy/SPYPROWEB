@@ -214,5 +214,6 @@ function determinationText(snap: SPXSnapshot): string {
   if (snap.lines.length >= 6) {
     return snap.channel.reason;
   }
-  return "The ES framework resolves after the overnight swing-high close, swing-low close, previous RTH high, and previous RTH low are all available.";
+  return "The ES framework resolves after the required overnight and prior-session references are available.";
 }
+

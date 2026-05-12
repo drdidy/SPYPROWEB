@@ -52,25 +52,25 @@ export const PHASE_DEFINITIONS: Record<EngineState, PhaseDefinition> = {
     label: "Watch",
     short: "Watch",
     summary:
-      "Price is approaching a primary trigger, but no setup is qualified yet.",
-    enterOn: "Price moves within the proximity threshold of a primary line.",
+      "Price is approaching active structure, but no setup is qualified yet.",
+    enterOn: "Price moves into the engine watch zone.",
     exitOn:
-      "A rejection candle prints (advances to Wait) or price moves away (back to Stand down).",
+      "A qualified condition advances to Wait, or price moves away.",
   },
   WAIT: {
     label: "Wait",
     short: "Wait",
     summary:
-      "A rejection candle has printed. The engine is waiting for the next bar to confirm.",
-    enterOn: "First qualifying rejection candle on a primary line.",
-    exitOn: "Confirmation candle (advances to Armed) or invalidation (back to Watch).",
+      "The engine has an active setup and is waiting for qualified confirmation.",
+    enterOn: "First qualified structural condition.",
+    exitOn: "Qualified confirmation advances to Armed, or invalidation returns to Watch.",
   },
   ARMED: {
     label: "Armed",
     short: "Armed",
     summary:
-      "Confirmation has printed. The trade setup is live and the entry trigger is armed.",
-    enterOn: "Confirmation candle following a qualified rejection.",
+      "Qualified confirmation is in. The trade setup is armed.",
+    enterOn: "Qualified confirmation after a valid setup.",
     exitOn:
       "Trigger fires (advances to Go) or a candle closes past invalidation (back to Wait).",
   },
@@ -91,3 +91,4 @@ export const PHASE_DEFINITIONS: Record<EngineState, PhaseDefinition> = {
     exitOn: "The next session's setup window opens.",
   },
 };
+

@@ -507,13 +507,13 @@ function spyExplanation(state: EngineState, snap: AdaptedSnapshot): string {
     return "Setup is plotted, but conditions aren't favoring a trade right now.";
   }
   if (state === "WATCH") {
-    return "Price is approaching a primary trigger. Watching for a rejection candle.";
+    return "Price is approaching active structure. Keep the channel open.";
   }
   if (state === "WAIT") {
-    return "Rejection candle printed. Waiting for confirmation on the next bar.";
+    return "Structure is active. Waiting for qualified confirmation.";
   }
   if (state === "ARMED") {
-    return "Confirmation in. The entry trigger is armed.";
+    return "Qualified confirmation is in. The setup is armed.";
   }
   if (state === "GO") {
     return "Trigger fired. The setup is live for the rest of the session.";
@@ -532,13 +532,13 @@ function spxExplanation(state: EngineState, snap: SPXSnapshot): string {
     return "Channel is plotted, but price isn't sitting where a setup can qualify.";
   }
   if (state === "WATCH") {
-    return "Price is approaching the channel rail. Watching for a rejection.";
+    return "Price is approaching active structure. Keep the channel open.";
   }
   if (state === "WAIT") {
-    return "Rejection candle printed. Waiting for confirmation.";
+    return "Structure is active. Waiting for qualified confirmation.";
   }
   if (state === "ARMED") {
-    return "Confirmation in. The entry trigger is armed at the channel rail.";
+    return "Qualified confirmation is in. The setup is armed.";
   }
   if (state === "GO") {
     return "Trigger fired. The channel trade is live.";
@@ -1550,12 +1550,14 @@ function spxLineLabel(kind: string): string {
 
 function spxLineHint(kind: string): string {
   const m: Record<string, string> = {
-    SWING_HIGH_DESC: "Descending line from the overnight swing-high close.",
-    SWING_LOW_ASC: "Ascending line from the overnight swing-low close.",
+    SWING_HIGH_DESC: "Engine-generated descending ES reference line.",
+    SWING_LOW_ASC: "Engine-generated ascending ES reference line.",
     PREV_RTH_HIGH_ASC: "Yesterday's RTH high, projected upward.",
     PREV_RTH_LOW_DESC: "Yesterday's RTH low, projected downward.",
-    SWING_HIGH_ASC: "Ascending line from the overnight swing-high close.",
-    SWING_LOW_DESC: "Descending line from the overnight swing-low close.",
+    SWING_HIGH_ASC: "Engine-generated ascending ES reference line.",
+    SWING_LOW_DESC: "Engine-generated descending ES reference line.",
   };
   return m[kind] || "Engine-generated ES reference line.";
 }
+
+
