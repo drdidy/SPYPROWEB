@@ -108,15 +108,13 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
   const nearestStructural = snap.lines
     .slice()
     .sort((a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice))[0];
-  const nearestRead =
-    nearest ??
-    (nearestStructural
-      ? {
-          label: nearestStructural.name,
-          dist: nearestStructural.distanceFromPrice,
-          value: entryLineValue(nearestStructural),
-        }
-      : null);
+  const nearestRead = nearestStructural
+    ? {
+        label: nearestStructural.name,
+        dist: nearestStructural.distanceFromPrice,
+        value: entryLineValue(nearestStructural),
+      }
+    : nearest;
 
   const todayLabel = new Date().toISOString().slice(0, 10);
 
