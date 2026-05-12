@@ -115,10 +115,11 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
   const nearestRead = nearestStructural
     ? {
         label: nearestStructural.name,
-        dist: nearestStructural.distanceFromPrice,
         value: entryLineValue(nearestStructural),
+        dist: entryLineValue(nearestStructural) - snap.currentPrice,
       }
     : nearest;
+  const executionRead = buildExecutionRead(snap, nearestRead, displayedState, displayedStateLabel);
 
   const todayLabel = new Date().toISOString().slice(0, 10);
 
@@ -244,6 +245,8 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
               </span>
             )}
           </p>
+
+          <ExecutionRead items={executionRead} />
         </div>
 
         <div className="hidden lg:block absolute left-[58.333%] top-7 bottom-7 w-px bg-rule" />
@@ -343,6 +346,134 @@ function synthesisLine(
     return `${capitalize(bias)} lean, engine ${state}; ${nearestRead.label} (${nearestRead.value.toFixed(2)}) sits ${Math.abs(nearestRead.dist).toFixed(2)} pts ${relation}, ${action}.`;
   }
   return `${capitalize(bias)} lean, engine ${state} until SPY structure becomes actionable.`;
+}
+
+type ExecutionReadItem = {
+  label: string;
+  value: string;
+  detail: string;
+  tone?: "neutral" | "watch" | "go" | "blocked";
+};
+
+function buildExecutionRead(
+  snap: AdaptedSnapshot,
+  nearestRead: { label: string; dist: number; value: number } | null,
+  state: EngineState,
+  stateLabel: string,
+): ExecutionReadItem[] {
+  const condition = cleanSpyExplanation(snap.flipCondition, snap.currentPrice);
+  const keyTrace =
+    snap.decisionTrace.find((event) => event.weight === "key") ??
+    snap.decisionTrace[0] ??
+    null;
+  const riskDetail = snap.invalidation
+    ? `Invalidation ${snap.invalidation.level.toFixed(2)}; stop offset ${snap.invalidation.stopOffset.toFixed(2)}.`
+    : snap.guardrails.chase.detail || "No active invalidation returned by the engine.";
+
+  return [
+    {
+      label: "Posture",
+      value: stateLabel,
+      detail: executionPostureCopy(state, condition),
+      tone: state === "GO" ? "go" : state === "ARMED" || state === "WAIT" ? "watch" : "neutral",
+    },
+    {
+      label: "Active reference",
+      value: nearestRead ? `${nearestRead.label} ${nearestRead.value.toFixed(2)}` : "Awaiting line",
+      detail: nearestRead
+        ? `${formatSigned(nearestRead.dist)} pts from LAST ${snap.currentPrice.toFixed(2)}.`
+        : "The engine has not returned a qualified 09:00 reference yet.",
+      tone: nearestRead && Math.abs(nearestRead.dist) <= 0.5 ? "watch" : "neutral",
+    },
+    {
+      label: "Risk check",
+      value: snap.guardrails.chase.status.replace(/_/g, " "),
+      detail: riskDetail,
+      tone:
+        snap.guardrails.chase.status === "BROKEN" ||
+        snap.guardrails.chase.status === "MISSED_ENTRY"
+          ? "blocked"
+          : "neutral",
+    },
+    {
+      label: "Engine evidence",
+      value: keyTrace ? shortClock(keyTrace.ts) : "No trace",
+      detail: keyTrace?.event ?? "No decision-trace event has been published yet.",
+      tone: "neutral",
+    },
+  ];
+}
+
+function executionPostureCopy(state: EngineState, condition: string): string {
+  if (condition && (state === "ARMED" || state === "GO" || state === "COOLDOWN")) {
+    return condition;
+  }
+  if (state === "PRE_CONFIG") return "Setup window has not produced actionable lines yet.";
+  if (state === "STAND_DOWN") return condition || "The engine is standing down until structure reactivates.";
+  if (state === "WATCH") return condition || "Price is near structure, but confirmation is not qualified.";
+  if (state === "WAIT") return condition || "Confirmation is pending before the engine can advance.";
+  if (state === "ARMED") return condition || "Setup is armed; wait for the next engine transition.";
+  if (state === "GO") return condition || "Trade is live; manage from the engine state.";
+  return condition || "Trade has resolved; stand down until the next valid setup.";
+}
+
+function ExecutionRead({ items }: { items: ExecutionReadItem[] }) {
+  return (
+    <div className="mt-6 rounded-[14px] border border-rule bg-paper/80 p-4 shadow-rule">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <div className="eyebrow text-ink-3">Execution read</div>
+          <div className="mt-1 font-serif text-[22px] leading-none text-ink">
+            What matters now
+          </div>
+        </div>
+        <span className="rounded-pill border border-rule bg-paper-2 px-2 py-1 font-mono text-[9px] uppercase tracking-[0.12em] text-ink-3">
+          Engine trace
+        </span>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {items.map((item) => (
+          <div
+            key={item.label}
+            className={`rounded-soft border px-3 py-2.5 ${executionToneClass(item.tone)}`}
+          >
+            <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-3">
+              {item.label}
+            </div>
+            <div className="mt-1 font-mono text-[13px] font-semibold tabular-nums text-ink" data-num>
+              {item.value}
+            </div>
+            <p className="mt-1 text-[12px] leading-snug text-ink-3">
+              {item.detail}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function executionToneClass(tone: ExecutionReadItem["tone"]): string {
+  if (tone === "go") return "border-bull/25 bg-bull-tint/50";
+  if (tone === "watch") return "border-gold/30 bg-gold-tint/45";
+  if (tone === "blocked") return "border-bear/25 bg-bear-tint/45";
+  return "border-rule bg-paper";
+}
+
+function formatSigned(value: number): string {
+  if (!Number.isFinite(value)) return "--";
+  return `${value >= 0 ? "+" : ""}${value.toFixed(2)}`;
+}
+
+function shortClock(iso: string): string {
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return "--:--";
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(ms));
 }
 
 function cleanSpyExplanation(text: string, spot: number): string {
