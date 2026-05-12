@@ -2,11 +2,9 @@
 // (when env vars are wired) verifies a Turnstile token, hits the
 // email provider's double-opt-in endpoint, and rate-limits the IP.
 //
-// Today this is a SCAFFOLD: every external integration is gated on an
-// env var. With no secrets configured the route returns 200 and only
-// logs the lead, so the UI flow can be tested end-to-end without
-// committing to a vendor. Each integration carries a TODO that
-// describes the missing piece.
+// External integrations are gated on env vars so local and preview
+// deploys can still exercise the form. When no email provider is
+// configured, logs are redacted and never include raw email or IP.
 
 import { NextResponse, type NextRequest } from "next/server";
 
@@ -170,7 +168,7 @@ async function sendDoubleOptIn(lead: {
   if (!apiKey) {
     // No provider wired — log and accept so closed-beta dev + preview
     // can exercise the full UI flow.
-    console.log("[waitlist] lead (no provider configured)", lead);
+    logWaitlistLead("no_provider", lead);
     return true;
   }
   // TODO(email-provider): implement the provider's add-with-double-opt-in
@@ -190,6 +188,36 @@ async function sendDoubleOptIn(lead: {
   //   });
   //   if (!res.ok) return false;
   //   // Trigger confirmation email via Loops transactional API…
-  console.log("[waitlist] lead (provider stub)", lead);
+  logWaitlistLead("provider_not_implemented", lead);
   return true;
+}
+
+function logWaitlistLead(
+  mode: "no_provider" | "provider_not_implemented",
+  lead: {
+    email: string;
+    utm: Record<string, string | null>;
+    referrer: string | null;
+    receivedAt: string;
+    ip: string;
+  },
+) {
+  const domain = lead.email.split("@")[1] ?? "unknown";
+  console.log("[waitlist] lead accepted", {
+    mode,
+    emailDomain: domain.slice(0, 80),
+    hasReferrer: !!lead.referrer,
+    utm: lead.utm,
+    receivedAt: lead.receivedAt,
+    ipHash: hashForLog(lead.ip),
+  });
+}
+
+function hashForLog(value: string): string {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
 }
