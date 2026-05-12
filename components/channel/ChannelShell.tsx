@@ -293,7 +293,7 @@ function buildChannelFeedSeeds(
       lastUpdatedAt: priceUpdatedAt,
       nextExpectedAt: nextIso,
       staleAfterMs: FEED_DEFAULTS.priceTickMs,
-      failAfterMs: 30_000,
+      failAfterMs: 5 * 60_000,
       critical: true,
       failedAt,
       initialStatus: sourceStatus,
