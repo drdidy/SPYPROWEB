@@ -275,7 +275,7 @@ function ProjectionMatrixTable({ snapshot }: { snapshot: ProjectionSnapshot }) {
             <tr className="border-b border-rule bg-paper-2">
               <th
                 scope="col"
-                className="sticky left-0 z-10 w-56 bg-paper-2 px-4 py-3 text-left font-mono text-[11px] uppercase tracking-[0.08em] text-ink-2"
+                className="sticky left-0 z-10 w-44 bg-paper-2 px-3 py-3 text-left font-mono text-[11px] uppercase tracking-[0.08em] text-ink-2"
               >
                 Line
               </th>
@@ -284,7 +284,7 @@ function ProjectionMatrixTable({ snapshot }: { snapshot: ProjectionSnapshot }) {
                   key={hour.at}
                   scope="col"
                   className={cn(
-                    "min-w-28 px-3 py-3 text-right font-mono text-[11px] uppercase tracking-[0.08em] text-ink-2",
+                    "min-w-24 px-2.5 py-3 text-right font-mono text-[11px] uppercase tracking-[0.08em] text-ink-2",
                     hour.isCurrent && "border-l-2 border-gold bg-gold-tint",
                   )}
                 >
@@ -295,7 +295,7 @@ function ProjectionMatrixTable({ snapshot }: { snapshot: ProjectionSnapshot }) {
             <tr className="border-b border-rule">
               <th
                 scope="row"
-                className="sticky left-0 z-10 bg-paper px-4 py-3 text-left font-mono text-[11px] uppercase tracking-[0.08em] text-ink"
+                className="sticky left-0 z-10 bg-paper px-3 py-3 text-left font-mono text-[11px] uppercase tracking-[0.08em] text-ink"
               >
                 LAST
               </th>
@@ -303,7 +303,7 @@ function ProjectionMatrixTable({ snapshot }: { snapshot: ProjectionSnapshot }) {
                 <td
                   key={hour.at}
                   className={cn(
-                    "px-3 py-3 text-right font-mono text-[12px]",
+                    "px-2.5 py-3 text-right font-mono text-[12px]",
                     hour.isObserved ? "text-ink" : "text-ink-4",
                     hour.isCurrent && "border-l-2 border-gold bg-gold-tint",
                   )}
@@ -318,10 +318,10 @@ function ProjectionMatrixTable({ snapshot }: { snapshot: ProjectionSnapshot }) {
               <tr key={line.id}>
                 <th
                   scope="row"
-                  className="sticky left-0 z-10 bg-paper px-4 py-3 text-left"
+                  className="sticky left-0 z-10 bg-paper px-3 py-3 text-left"
                 >
                   <div className="font-mono text-[12px] text-ink">{line.code}</div>
-                  <div className="mt-0.5 max-w-48 truncate text-xs text-ink-3">
+                  <div className="mt-0.5 max-w-36 truncate text-xs text-ink-3">
                     {line.label}
                   </div>
                 </th>
@@ -409,7 +409,7 @@ function MatrixCell({
       title={title}
       aria-label={title}
       className={cn(
-        "px-3 py-3 text-right outline-none transition focus-visible:ring-2 focus-visible:ring-gold/40",
+        "px-2.5 py-3 text-right outline-none transition focus-visible:ring-2 focus-visible:ring-gold/40",
         cell.hour.isCurrent && "border-l-2 border-gold",
         tone,
       )}
