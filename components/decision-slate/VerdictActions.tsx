@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Check, History, X } from "lucide-react";
+import { History, X } from "lucide-react";
 import { useAnonymousUserId } from "./SlateCompliance";
 
 interface VerdictRecord {
@@ -29,14 +29,8 @@ export function VerdictActions({
   ruleVersion?: string;
 }) {
   const userId = useAnonymousUserId();
-  const ackKey = `spyprophet.slate.acknowledged.${sessionDate}.${verdictState}.${spyState}.${spxState}`;
-  const [acknowledged, setAcknowledged] = useState(false);
   const [open, setOpen] = useState(false);
   const [records, setRecords] = useState<VerdictRecord[]>([]);
-
-  useEffect(() => {
-    setAcknowledged(window.localStorage.getItem(ackKey) === "1");
-  }, [ackKey]);
 
   useEffect(() => {
     const payload = { type: "render", userId, verdictState, spyState, spxState, ruleVersion, sessionDate };
@@ -46,24 +40,6 @@ export function VerdictActions({
       body: JSON.stringify(payload),
     }).catch(() => null);
   }, [sessionDate, ruleVersion, spxState, spyState, userId, verdictState]);
-
-  async function acknowledge() {
-    setAcknowledged(true);
-    window.localStorage.setItem(ackKey, "1");
-    await fetch("/api/slate/verdicts", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        type: "acknowledged",
-        userId,
-        verdictState,
-        spyState,
-        spxState,
-        ruleVersion,
-        sessionDate,
-      }),
-    }).catch(() => null);
-  }
 
   async function openHistory() {
     setOpen(true);
@@ -78,20 +54,11 @@ export function VerdictActions({
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <button
           type="button"
-          onClick={acknowledge}
-          disabled={acknowledged}
-          className="inline-flex h-9 items-center gap-2 rounded-pill border border-paper/15 bg-paper/[0.06] px-3 font-mono text-[11px] font-semibold uppercase tracking-[0.08em] text-paper/78 outline-none transition-colors hover:bg-paper/[0.10] focus-visible:ring-2 focus-visible:ring-gold/60 disabled:opacity-60"
-        >
-          <Check size={13} aria-hidden />
-          {acknowledged ? "Acknowledged" : "Acknowledge"}
-        </button>
-        <button
-          type="button"
           onClick={openHistory}
           className="inline-flex h-9 items-center gap-2 rounded-pill border border-paper/15 bg-paper/[0.06] px-3 font-mono text-[11px] font-semibold uppercase tracking-[0.08em] text-paper/78 outline-none transition-colors hover:bg-paper/[0.10] focus-visible:ring-2 focus-visible:ring-gold/60"
         >
           <History size={13} aria-hidden />
-          Verdict history
+          Decision history
         </button>
       </div>
       {open && (
@@ -99,14 +66,14 @@ export function VerdictActions({
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3">
-                Verdict history
+                Decision history
               </p>
               <h2 className="mt-1 font-serif text-h2 text-ink">Recent slate records</h2>
             </div>
             <button
               type="button"
               onClick={() => setOpen(false)}
-              aria-label="Close verdict history"
+              aria-label="Close decision history"
               className="grid h-9 w-9 place-items-center rounded-full border border-rule text-ink-3 hover:text-ink"
             >
               <X size={15} aria-hidden />
