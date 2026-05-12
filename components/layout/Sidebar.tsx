@@ -164,10 +164,10 @@ export function Sidebar({
           </span>
           <div className="min-w-0">
             <div className="font-serif text-[13px] leading-none tracking-[0.04em] text-paper">
-              CLOSED BETA
+              {BUILD_LABEL}
             </div>
             <div className="mt-1 font-mono text-[9px] text-paper/45">
-              {BUILD_LABEL}
+              Production workspace
             </div>
           </div>
         </div>

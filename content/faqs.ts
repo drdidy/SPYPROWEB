@@ -24,7 +24,7 @@ export const FAQS = [
     a: "The workspace shows your local time. Underneath, the read is anchored to the market's home zone. You don't have to think about it.",
   },
   {
-    q: "What's in the closed beta?",
+    q: "What's included today?",
     a: "Today's decision, the ES channel, the levels in play, the structure read, the day's foresight, the options cockpit, the signal log, and a daily brief.",
   },
   {
