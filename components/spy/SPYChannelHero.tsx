@@ -231,7 +231,7 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
               <span className="block text-ink-3 text-[13.5px]">
                 {primary.role === "ANCHOR_2" ? "Anchor 2" : "Primary anchor"} ·
                 low <span className="font-mono">{primary.anchorLow.toFixed(2)}</span> ·
-                set <span className="font-mono">{anchorTimeLabel(primary)}</span> CT.
+                set <span className="font-mono">{anchorTimeLabel(primary)}</span> CT.{" "}
                 {/* v9: slope value hidden — proprietary engine
                     parameter. The bands themselves still render
                     using the const above. */}
