@@ -55,6 +55,10 @@ const verbPalette: Record<string, string> = {
   // pill, ladder, and card headlines all carry the same tone.
   "PRE-CONFIG":
     "text-state-armed bg-paper-2 shadow-[inset_0_0_0_1px_rgba(10,117,137,0.30)]",
+  WATCH: "text-ink-2 bg-paper-2 shadow-[inset_0_0_0_1px_rgba(20,22,26,0.12)]",
+  ARMED: "text-state-armed bg-paper-2 shadow-[inset_0_0_0_1px_rgba(10,117,137,0.30)]",
+  GO: "text-bull-ink bg-bull-tint shadow-[inset_0_0_0_1px_rgba(14,124,80,0.30)]",
+  COOL: "text-ink-3 bg-paper-2 shadow-[inset_0_0_0_1px_rgba(20,22,26,0.10)]",
 };
 
 const SPX_SCENARIO_TAG: Record<string, string> = {
@@ -66,6 +70,16 @@ const SPX_SCENARIO_TAG: Record<string, string> = {
   BELOW_DESCENDING: "BELOW · DESC",
   OUTSIDE_PLAY: "OUTSIDE",
 };
+
+function engineStateChipLabel(state: EngineState, fallback: string): string {
+  if (state === "PRE_CONFIG") return "PRE-CONFIG";
+  if (state === "STAND_DOWN") return "STAND";
+  if (state === "COOLDOWN") return "COOL";
+  if (state === "WATCH" || state === "WAIT" || state === "ARMED" || state === "GO") {
+    return state;
+  }
+  return fallback;
+}
 
 export function TopBar({
   onOpenPalette,
@@ -85,7 +99,7 @@ export function TopBar({
   const spyState = spy.currentState;
   const spxState = (spxSnapshot.currentState as EngineState | undefined) ?? "STAND_DOWN";
 
-  const spyVerb = spyState === "PRE_CONFIG" ? "PRE-CONFIG" : decision.verdict;
+  const spyVerb = engineStateChipLabel(spyState, decision.verdict);
   const spyTone = verbPalette[spyVerb] ?? verbPalette["STAND DOWN"];
   const spyMeta =
     spyState === "PRE_CONFIG" ? null : `conviction ${decision.conviction}/5`;
