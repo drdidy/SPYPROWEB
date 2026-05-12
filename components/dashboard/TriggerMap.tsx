@@ -32,6 +32,47 @@ const lineStyle: Record<string, { dot: string; label: string }> = {
   DAY_OPEN: { dot: "bg-gold", label: "Day Open" },
 };
 
+function LevelCard({
+  line,
+  meta,
+  distance,
+}: {
+  line: DynamicLine;
+  meta: { dot: string; label: string };
+  distance: number;
+}) {
+  const state = lineState(distance);
+  return (
+    <div className="rounded-soft border border-rule bg-paper-2 px-4 py-3 shadow-rule">
+      <div className="mb-2 flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className={`h-2 w-2 shrink-0 rounded-full ${meta.dot}`} />
+          <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-ink">
+            {line.name}
+          </span>
+        </div>
+        <StatusPill variant={state} pulse={state === "armed"}>
+          {state}
+        </StatusPill>
+      </div>
+      <div className="font-mono text-[22px] font-semibold tabular-nums text-ink" data-num>
+        {line.currentValue.toFixed(2)}
+      </div>
+      <div className="mt-1 flex items-center justify-between gap-3 text-[12px] text-ink-3">
+        <span>{meta.label}</span>
+        <span
+          className={`font-mono tabular-nums ${
+            distance >= 0 ? "text-bear-ink" : "text-bull-ink"
+          }`}
+        >
+          {distance >= 0 ? "+" : ""}
+          {distance.toFixed(2)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function TriggerMap({
   lines,
   healthAction,
@@ -83,52 +124,41 @@ export function TriggerMap({
           <div className="grid gap-3 px-5 pb-5 sm:grid-cols-2">
             {sorted.map((l) => {
               const distance = distanceToLast(l, currentPrice);
-              const state = lineState(distance);
               const meta = lineStyle[l.kind] ?? { dot: "bg-ink-3", label: l.kind };
               return (
-                <div
+                <LevelCard
                   key={l.name}
-                  className="rounded-soft border border-rule bg-paper-2 px-4 py-3 shadow-rule"
-                >
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <span className={`h-2 w-2 rounded-full ${meta.dot}`} />
-                      <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-ink">
-                        {l.name}
-                      </span>
-                    </div>
-                    <StatusPill variant={state} pulse={state === "armed"}>
-                      {state}
-                    </StatusPill>
-                  </div>
-                  <div className="font-mono text-[22px] font-semibold tabular-nums text-ink" data-num>
-                    {l.currentValue.toFixed(2)}
-                  </div>
-                  <div className="mt-1 flex items-center justify-between gap-3 text-[12px] text-ink-3">
-                    <span>{meta.label}</span>
-                    <span
-                      className={`font-mono tabular-nums ${
-                        distance >= 0 ? "text-bear-ink" : "text-bull-ink"
-                      }`}
-                    >
-                      {distance >= 0 ? "+" : ""}
-                      {distance.toFixed(2)}
-                    </span>
-                  </div>
-                </div>
+                  line={l}
+                  meta={meta}
+                  distance={distance}
+                />
               );
             })}
           </div>
         ) : (
           <>
-        <div className="grid grid-cols-12 px-5 pb-2 eyebrow text-ink-3">
+        <div className="grid gap-3 px-5 pb-5 sm:hidden">
+          {sorted.map((l) => {
+            const distance = distanceToLast(l, currentPrice);
+            const meta = lineStyle[l.kind] ?? { dot: "bg-ink-3", label: l.kind };
+            return (
+              <LevelCard
+                key={l.name}
+                line={l}
+                meta={meta}
+                distance={distance}
+              />
+            );
+          })}
+        </div>
+        <div className="hidden grid-cols-12 px-5 pb-2 eyebrow text-ink-3 sm:grid">
           <div className="col-span-3">Line</div>
           <div className="col-span-3">Type</div>
           <div className="col-span-2 text-right">Value</div>
           <div className="col-span-2 text-right">Δ Price</div>
           <div className="col-span-2 text-right">Status</div>
         </div>
-        <ul className="divide-y divide-rule border-t border-rule">
+        <ul className="hidden divide-y divide-rule border-t border-rule sm:block">
           {sorted.map((l) => {
               const distance = distanceToLast(l, currentPrice);
               const state = lineState(distance);

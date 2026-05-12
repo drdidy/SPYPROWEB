@@ -93,7 +93,7 @@ export function SignalTape({
               <li
                 id={`spy-event-${i}`}
                 key={i}
-                className="grid grid-cols-[64px_88px_minmax(0,1fr)_auto] gap-3 px-5 py-3.5 items-start group"
+                className="grid grid-cols-[56px_minmax(0,1fr)_auto] gap-3 px-5 py-3.5 items-start group sm:grid-cols-[64px_88px_minmax(0,1fr)_auto]"
               >
                 <div className="flex items-center gap-2 pt-0.5">
                   <span className={`w-0.5 h-6 rounded-sm ${ts.bar}`} />
@@ -107,7 +107,7 @@ export function SignalTape({
                     {ts.label}
                   </span>
                 </div>
-                <div className="min-w-0">
+                <div className="col-span-2 col-start-2 min-w-0 sm:col-auto sm:col-span-1">
                   {t.line && (
                     <span className="mb-1 block font-mono text-[11px] uppercase tracking-[0.12em] text-ink-3">
                       {t.line}
@@ -123,7 +123,7 @@ export function SignalTape({
                 </div>
                 <Link
                   href={`/replay?t=${encodeURIComponent(t.time)}&engine=spy`}
-                  className="mt-0.5 grid h-7 w-7 place-items-center rounded-full border border-rule bg-paper text-ink-3 transition-colors hover:border-rule-strong hover:text-ink"
+                  className="col-start-3 row-start-1 mt-0.5 grid h-7 w-7 place-items-center rounded-full border border-rule bg-paper text-ink-3 transition-colors hover:border-rule-strong hover:text-ink sm:col-auto sm:row-auto"
                   aria-label={`Open ${t.time} in Replay`}
                 >
                   <ArrowRight size={13} aria-hidden />
