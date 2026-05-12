@@ -8,6 +8,7 @@ import { SectionLabel } from "@/components/ui/SectionLabel";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { loadOptionsIntelBundle, type UwOptionChain, type UwSymbolIntel } from "@/lib/options-intel-fetch";
 import { loadLiveSnapshot } from "@/lib/snapshot-fetch";
+import { loadSnapshot as loadSpxSnapshot } from "@/lib/spx-fetch";
 import { nearReferencePriceLabel } from "@/lib/market-data-quality";
 import { cn } from "@/lib/utils";
 
@@ -16,10 +17,12 @@ export const revalidate = 0;
 
 const SYMBOLS = ["SPY", "SPX"];
 const DISPLAY_STRIKE_WINGS = 5;
+const DISPLAY_STRIKE_COUNT = DISPLAY_STRIKE_WINGS * 2 + 1;
 
 export default async function Page() {
-  const [{ data: snap, source }, options] = await Promise.all([
+  const [{ data: snap, source }, { snap: spxSnap }, options] = await Promise.all([
     loadLiveSnapshot(),
+    loadSpxSnapshot(),
     loadOptionsIntelBundle(SYMBOLS),
   ]);
   const spy = options.data.symbols.SPY;
@@ -27,6 +30,7 @@ export default async function Page() {
   const spyChain = spy?.chain;
   const spxChain = spx?.chain;
   const spyCenter = activeCenter(spyChain, snap.currentPrice);
+  const spxSpot = spxSnap.price.last;
 
   return (
     <div className="w-full max-w-[1440px] pb-16 space-y-8">
@@ -97,13 +101,13 @@ export default async function Page() {
       <SectionLabel number="02">Dealer gamma</SectionLabel>
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <GammaPanel intel={spy} chain={spyChain} spot={snap.currentPrice} />
-        <GammaPanel intel={spx} chain={spxChain} />
+        <GammaPanel intel={spx} chain={spxChain} spot={spxSpot} />
       </div>
 
       <SectionLabel number="03">Option chains and Greeks</SectionLabel>
       <div className="space-y-4">
         <ChainPanel symbol="SPY" chain={spyChain} spot={snap.currentPrice} />
-        <ChainPanel symbol="SPX" chain={spxChain} />
+        <ChainPanel symbol="SPX" chain={spxChain} spot={spxSpot} />
       </div>
     </div>
   );
@@ -242,12 +246,17 @@ function GammaPanel({
 
 function ChainPanel({ symbol, chain, spot }: { symbol: string; chain?: UwOptionChain | null; spot?: number }) {
   const rows = chain ? chainRows(chain, spot) : [];
+  const center = activeCenter(chain, spot);
   return (
     <Card>
       <CardHeader
         eyebrow={symbol}
         title={chain ? `Expiration ${chain.expiration ?? "active"}` : "Chain waiting"}
-        meta={chain ? `ATM ±${DISPLAY_STRIKE_WINGS} strikes shown - PCR ${fmtRatio(chain.totals.pcr)}` : undefined}
+        meta={
+          chain
+            ? `Near spot ${fmtPrice(center)} - ${rows.length}/${DISPLAY_STRIKE_COUNT} strikes shown - PCR ${fmtRatio(chain.totals.pcr)}`
+            : undefined
+        }
         action={<IconBadge icon={<Layers3 className="h-4 w-4" />} />}
       />
       <CardBody className="px-0 pb-0">
