@@ -47,6 +47,7 @@ export function EngineTrackRecord({ record, feedId, className }: Props) {
     1,
     record.wins + record.losses + record.pushes + record.skips,
   );
+  const graded = record.wins + record.losses + record.pushes;
 
   return (
     <div
@@ -100,6 +101,11 @@ export function EngineTrackRecord({ record, feedId, className }: Props) {
               <div className="mt-1 font-serif text-[34px] leading-none text-ink">
                 {pct == null ? "Pending" : `${pct}%`}
               </div>
+              {record.sessions.length > 0 && (
+                <div className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.12em] text-ink-3">
+                  {graded}/{record.sessions.length} graded
+                </div>
+              )}
             </div>
             <div className="text-right font-mono text-[10px] uppercase tracking-[0.12em] text-ink-3">
               {record.wins}W · {record.losses}L · {record.skips}S
