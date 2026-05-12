@@ -38,7 +38,7 @@ interface TouchEvent {
 // ---------------------------------------------------------------------------
 
 const SPY_BAND_OFFSET = 3.4;
-const SPY_SLOPE = 0.2;
+const SPY_SLOPE = -0.2;
 
 export function ReplayPlayback({ spy, spx, intraday, playhead }: Props) {
   return (
@@ -75,7 +75,7 @@ function SPYPlaybackPanel({
 
   return (
     <PanelChart
-      title="SPY · anchors vs tape"
+      title="SPY - 03:00 to 15:00 CT"
       bars={bars}
       lines={lines}
       playhead={playhead}
@@ -91,7 +91,7 @@ function SPYPlaybackPanel({
 
 function spyAnchorProjections(anchor: AnchorGroup, slope: number): LineProjection[] {
   const t0Ms = new Date(anchor.anchorTime).getTime();
-  const slopePerMs = slope / 36e5; // pts per ms
+  const slopePerMs = slope / 36e5; // signed pts per ms
   const make = (band: "upper" | "main" | "lower"): LineProjection => {
     const base =
       band === "upper"
@@ -105,7 +105,7 @@ function spyAnchorProjections(anchor: AnchorGroup, slope: number): LineProjectio
       name: `SPY ${band}`,
       color,
       emphasized: band === "main",
-      valueAtMs: (ms: number) => base - slopePerMs * (ms - t0Ms),
+      valueAtMs: (ms: number) => base + slopePerMs * (ms - t0Ms),
     };
   };
   return [make("upper"), make("main"), make("lower")];
@@ -124,23 +124,6 @@ function SPXPlaybackPanel({
   bars: IntradayBar[];
   playhead: number;
 }) {
-  const offset = snap?._meta?.appliedOffset ?? 0;
-
-  // Convert ES bars → SPX equivalent by adding the live offset. This is a
-  // v1 approximation (offset drifts day to day) — close enough for a
-  // visual replay of the channel intersect points.
-  const spxBars = useMemo<IntradayBar[]>(
-    () =>
-      bars.map((b) => ({
-        t: b.t,
-        o: b.o + offset,
-        h: b.h + offset,
-        l: b.l + offset,
-        c: b.c + offset,
-      })),
-    [bars, offset],
-  );
-
   const lines = useMemo<LineProjection[]>(() => {
     if (!snap) return [];
     return spxLineProjections(snap.lines);
@@ -148,8 +131,8 @@ function SPXPlaybackPanel({
 
   return (
     <PanelChart
-      title="ES · channel vs tape"
-      bars={spxBars}
+      title="ES - overnight plus RTH"
+      bars={bars}
       lines={lines}
       playhead={playhead}
       priceColor="#14161A"
@@ -176,12 +159,24 @@ function spxLineProjections(lines: SPXLine[]): LineProjection[] {
     const t0Ms = new Date(l.anchorTime).getTime();
     const slopePerMs = l.slopePerHour / 36e5;
     return {
-      name: l.name,
+      name: shortEsLineName(l.kind),
       color: palette[l.kind] ?? "#9CA3AF",
       emphasized: l.kind === "SWING_HIGH_DESC" || l.kind === "SWING_LOW_ASC",
       valueAtMs: (ms: number) => l.anchorPrice + slopePerMs * (ms - t0Ms),
     };
   });
+}
+
+function shortEsLineName(kind: string): string {
+  const labels: Record<string, string> = {
+    PREV_RTH_HIGH_ASC: "PRH-A",
+    PREV_RTH_LOW_DESC: "PRL-D",
+    SWING_HIGH_ASC: "SH-A",
+    SWING_HIGH_DESC: "SH-D",
+    SWING_LOW_ASC: "SL-A",
+    SWING_LOW_DESC: "SL-D",
+  };
+  return labels[kind] ?? "ES-L";
 }
 
 // ---------------------------------------------------------------------------
@@ -203,12 +198,12 @@ function PanelChart({
   priceColor: string;
   emptyMsg: string;
 }) {
-  const W = 540;
-  const H = 280;
+  const W = 680;
+  const H = 340;
   const PAD_L = 44;
-  const PAD_R = 14;
-  const PAD_T = 18;
-  const PAD_B = 26;
+  const PAD_R = 112;
+  const PAD_T = 22;
+  const PAD_B = 32;
 
   const hasBars = bars.length > 0;
 
@@ -282,7 +277,7 @@ function PanelChart({
         <span className="eyebrow text-ink-3">{title}</span>
         {lastBar && (
           <span className="font-mono text-[11px] text-ink-3 tabular-nums">
-            {shortTime(lastBar.t)} CT ·{" "}
+            {shortTime(lastBar.t)} CT -{" "}
             <span className="text-ink font-semibold">{lastBar.c.toFixed(2)}</span>
           </span>
         )}
@@ -292,7 +287,11 @@ function PanelChart({
           {emptyMsg}
         </div>
       ) : (
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full min-h-[300px]">
+          <title>{title}</title>
+          <desc>
+            Actual replay price path with projected structure lines and exact current values.
+          </desc>
           <style>{playbackStyles}</style>
 
           {/* gridlines */}
@@ -355,18 +354,29 @@ function PanelChart({
             const x2 = xOf(tEndMs);
             const y1 = yOf(ln.valueAtMs(t0Ms));
             const y2 = yOf(ln.valueAtMs(tEndMs));
+            const currentValue = ln.valueAtMs(tNowMs);
             return (
-              <line
-                key={ln.name}
-                x1={x1}
-                y1={y1}
-                x2={x2}
-                y2={y2}
-                stroke={ln.color}
-                strokeWidth={ln.emphasized ? 1.6 : 1}
-                opacity={ln.emphasized ? 0.95 : 0.6}
-                strokeDasharray={ln.emphasized ? undefined : "3 3"}
-              />
+              <g key={ln.name}>
+                <line
+                  x1={x1}
+                  y1={y1}
+                  x2={x2}
+                  y2={y2}
+                  stroke={ln.color}
+                  strokeWidth={ln.emphasized ? 1.8 : 1.1}
+                  opacity={ln.emphasized ? 0.95 : 0.68}
+                  strokeDasharray={ln.emphasized ? undefined : "4 5"}
+                />
+                <text
+                  x={W - PAD_R + 8}
+                  y={y2 + 4}
+                  fontSize="9"
+                  fontFamily="var(--font-geist-mono)"
+                  fill={ln.color}
+                >
+                  {ln.name} {currentValue.toFixed(2)}
+                </text>
+              </g>
             );
           })}
 
@@ -412,6 +422,25 @@ function PanelChart({
                 r={3.5}
                 fill={priceColor}
               />
+              <rect
+                x={Math.min(W - PAD_R - 94, xOf(new Date(lastBar.t).getTime()) + 8)}
+                y={Math.max(PAD_T + 2, yOf(lastBar.c) - 14)}
+                width="86"
+                height="22"
+                rx="6"
+                fill="#FFFDF7"
+                stroke="#D6CCB7"
+              />
+              <text
+                x={Math.min(W - PAD_R - 51, xOf(new Date(lastBar.t).getTime()) + 51)}
+                y={Math.max(PAD_T + 17, yOf(lastBar.c) + 1)}
+                fontSize="10"
+                fontFamily="var(--font-geist-mono)"
+                fill="#14161A"
+                textAnchor="middle"
+              >
+                LAST {lastBar.c.toFixed(2)}
+              </text>
             </g>
           )}
 

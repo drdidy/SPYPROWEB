@@ -3,6 +3,11 @@ import { PanelHeartbeat } from "@/components/channel/ChannelLiveBadge";
 import { Card } from "@/components/ui/Card";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { WhyThisStateLink } from "@/components/slate/WhyThisStateLink";
+import {
+  StructurePathChart,
+  type StructureChartData,
+  type StructureChartLine,
+} from "@/components/decision-slate/StructurePathChart";
 import type { AdaptedSnapshot, AnchorGroup } from "@/lib/snapshot-adapter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowDownRight } from "lucide-react";
@@ -266,7 +271,13 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
             </div>
           )}
 
-          <AnchorDiagram snap={snap} />
+          <StructurePathChart
+            data={buildSpyChannelChart(snap)}
+            variant="paper"
+            accent={bias === "BULLISH" ? "bull" : bias === "BEARISH" ? "bear" : "gold"}
+            height={300}
+            title="SPY price vs active levels"
+          />
 
           {primary && (
             <div className="mt-3 grid grid-cols-2 gap-3 text-[11px]">
@@ -393,6 +404,47 @@ function AnchorCell({
       </div>
     </div>
   );
+}
+
+function buildSpyChannelChart(snap: AdaptedSnapshot): StructureChartData | null {
+  const primary = snap.anchor?.primary ?? null;
+  const bars = (snap.candles ?? [])
+    .filter(
+      (bar) =>
+        !!bar.t &&
+        Number.isFinite(bar.h) &&
+        Number.isFinite(bar.l) &&
+        Number.isFinite(bar.c),
+    )
+    .map((bar) => ({ t: bar.t, h: bar.h, l: bar.l, c: bar.c }))
+    .sort((a, b) => Date.parse(a.t) - Date.parse(b.t));
+  if (!primary || bars.length < 2) return null;
+  const rawSlope = Number(snap.anchor?.slopePerHour);
+  const slope = Number.isFinite(rawSlope) ? (rawSlope > 0 ? -rawSlope : rawSlope) : -Math.abs(SLOPE_PER_HOUR);
+  const lines = [
+    makeSpyChartLine("UA", primary.bands.upper.anchorPrice, primary.anchorTime, slope, "upper"),
+    makeSpyChartLine("ANC", primary.bands.main.anchorPrice, primary.anchorTime, slope, "anchor"),
+    makeSpyChartLine("LA", primary.bands.lower.anchorPrice, primary.anchorTime, slope, "lower"),
+  ].filter((line): line is StructureChartLine => line !== null);
+  if (lines.length === 0) return null;
+  return { label: "SPY", date: new Date().toISOString().slice(0, 10), bars, lines };
+}
+
+function makeSpyChartLine(
+  label: string,
+  anchorPrice: number | null,
+  anchorTime: string,
+  slopePerHour: number,
+  tone: StructureChartLine["tone"],
+): StructureChartLine | null {
+  if (!Number.isFinite(anchorPrice ?? NaN)) return null;
+  return {
+    label,
+    anchorTime,
+    anchorPrice: Number(anchorPrice),
+    slopePerHour,
+    tone,
+  };
 }
 
 // ---------- Diagram ----------

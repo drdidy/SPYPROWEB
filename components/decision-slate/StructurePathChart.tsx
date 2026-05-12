@@ -218,6 +218,7 @@ export function StructurePathChart({
           const yStart = yOf(lineValue(line, t0));
           const yEnd = yOf(lineValue(line, t1));
           const stroke = lineColor(line.tone, variant);
+          const projectedNow = lineValue(line, new Date(last.t).getTime());
           return (
             <g key={line.label}>
               <line
@@ -237,7 +238,7 @@ export function StructurePathChart({
                 fontFamily="var(--font-geist-mono)"
                 fill={stroke}
               >
-                {line.label}
+                {line.label} {projectedNow.toFixed(data?.label === "ES" ? 2 : 2)}
               </text>
             </g>
           );
@@ -306,7 +307,7 @@ export function StructurePathChart({
           {shortTime(last.t)}
         </text>
         <text x={W - 12} y={18} fontSize="10" fontFamily="var(--font-geist-mono)" fill={palette.axis} textAnchor="end">
-          {last.c.toFixed(data?.label === "ES" ? 0 : 2)}
+          LAST {last.c.toFixed(data?.label === "ES" ? 2 : 2)}
         </text>
       </svg>
     </div>

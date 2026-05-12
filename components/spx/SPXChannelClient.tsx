@@ -59,9 +59,14 @@ interface ApiErrorBody {
   trace?: string[];
 }
 
+interface IntradayReplayResponse {
+  es?: Array<{ t: string; h: number; l: number; c: number }>;
+}
+
 export function SPXChannelClient({ replayDate }: Props) {
   const [state, setState] = useState<FetchState>({ status: "loading" });
   const [optionsChain, setOptionsChain] = useState<SpxProjectionChainInput | null>(null);
+  const [esBars, setEsBars] = useState<Array<{ t: string; h: number; l: number; c: number }> | null>(null);
   const [showLoadingDetail, setShowLoadingDetail] = useState(false);
 
   useEffect(() => {
@@ -71,6 +76,7 @@ export function SPXChannelClient({ replayDate }: Props) {
     }, 3500);
     setState({ status: "loading" });
     setOptionsChain(null);
+    setEsBars(null);
     setShowLoadingDetail(false);
     const url = replayDate
       ? `/api/spx/snapshot?date=${encodeURIComponent(replayDate)}`
@@ -81,6 +87,26 @@ export function SPXChannelClient({ replayDate }: Props) {
         if (res.ok) {
           const json = (await res.json()) as SPXSnapshot;
           if (!cancelled) setState({ status: "ready", snap: json });
+          const intradayDate = replayDate ?? json.sessionDateCT;
+          fetch(`/api/replay/intraday?date=${encodeURIComponent(intradayDate)}`, {
+            cache: "no-store",
+          })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((body: IntradayReplayResponse | null) => {
+              if (cancelled) return;
+              setEsBars(
+                (body?.es ?? []).filter(
+                  (bar) =>
+                    !!bar.t &&
+                    Number.isFinite(bar.h) &&
+                    Number.isFinite(bar.l) &&
+                    Number.isFinite(bar.c),
+                ),
+              );
+            })
+            .catch(() => {
+              if (!cancelled) setEsBars(null);
+            });
           const chain = await fetchSpxOptionsChain(replayDate);
           if (!cancelled) setOptionsChain(chain);
           return;
@@ -356,7 +382,7 @@ export function SPXChannelClient({ replayDate }: Props) {
         condition={transitionCondition}
       />
 
-      <SPXChannelHero snap={snap} />
+      <SPXChannelHero snap={snap} bars={esBars} />
 
       <section className="space-y-5">
         <SectionLabel number="01">Plays</SectionLabel>
@@ -411,19 +437,24 @@ export function SPXChannelClient({ replayDate }: Props) {
 
 function heroSynthesis(snap: SPXSnapshot): string {
   if (snap.lines.length < 6) {
-    return `ES framework is resolving: ${snap.channel.reason || "overnight swing lines are still being built."} The engine is standing down until structure resolves.`;
+    return "ES framework is resolving. The engine is standing down until enough overnight structure is available.";
   }
   const action = snap.confluence.action.replace(/_/g, " ").toLowerCase();
-  const bias = snap.rthBias?.note ? ` ${snap.rthBias.note}` : "";
-  return `ES has a six-line overnight framework and a ${action} read. ${snap.scenarioExplanation}${bias}`;
+  const nearest = snap.lines
+    .slice()
+    .sort((a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice))[0];
+  const distance = nearest
+    ? ` Nearest structure is ${Math.abs(nearest.distanceFromPrice).toFixed(2)} pts away.`
+    : "";
+  return `ES framework is mapped with a ${action} read.${distance} Waiting for qualified confirmation before the next state change.`;
 }
 
 function reentryCondition(snap: SPXSnapshot): string {
   if (snap.flipCondition) return snap.flipCondition;
   if (snap.plannedEnvelope) {
-    return `Hourly rejection inside ${snap.plannedEnvelope.low.toFixed(2)}-${snap.plannedEnvelope.high.toFixed(2)} reactivates the play.`;
+    return `Qualified confirmation inside ${snap.plannedEnvelope.low.toFixed(2)}-${snap.plannedEnvelope.high.toFixed(2)} reactivates the play.`;
   }
-  return "Framework forms from the overnight swing-high close, swing-low close, previous RTH high, and previous RTH low.";
+  return "Framework resolves after the required overnight structure is available.";
 }
 
 function formatHM(iso: string): string {

@@ -6,22 +6,22 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
 
 const scenarioLabel: Record<SPXScenario, string> = {
-  ABOVE_ASCENDING: "Above the swing-high pair",
-  INSIDE_ASCENDING: "Inside the six-line framework",
-  BELOW_ASCENDING: "Below the swing-low pair",
-  ABOVE_DESCENDING: "Above the swing-high pair",
-  INSIDE_DESCENDING: "Inside the six-line framework",
-  BELOW_DESCENDING: "Below the swing-low pair",
+  ABOVE_ASCENDING: "Above active structure",
+  INSIDE_ASCENDING: "Inside the framework",
+  BELOW_ASCENDING: "Below active structure",
+  ABOVE_DESCENDING: "Above active structure",
+  INSIDE_DESCENDING: "Inside the framework",
+  BELOW_DESCENDING: "Below active structure",
   OUTSIDE_PLAY: "Outside the planned play",
 };
 
 const scenarioShort: Record<SPXScenario, string> = {
-  ABOVE_ASCENDING: "ABOVE - HIGH PAIR",
-  INSIDE_ASCENDING: "INSIDE - SIX LINE",
-  BELOW_ASCENDING: "BELOW - LOW PAIR",
-  ABOVE_DESCENDING: "ABOVE - HIGH PAIR",
-  INSIDE_DESCENDING: "INSIDE - SIX LINE",
-  BELOW_DESCENDING: "BELOW - LOW PAIR",
+  ABOVE_ASCENDING: "ABOVE STRUCTURE",
+  INSIDE_ASCENDING: "INSIDE FRAMEWORK",
+  BELOW_ASCENDING: "BELOW STRUCTURE",
+  ABOVE_DESCENDING: "ABOVE STRUCTURE",
+  INSIDE_DESCENDING: "INSIDE FRAMEWORK",
+  BELOW_DESCENDING: "BELOW STRUCTURE",
   OUTSIDE_PLAY: "OUTSIDE",
 };
 
@@ -37,7 +37,13 @@ const actionLabel: Record<SPXAction, string> = {
   STAND_DOWN: "STAND DOWN",
 };
 
-export function SPXChannelHero({ snap }: { snap: SPXSnapshot }) {
+export function SPXChannelHero({
+  snap,
+  bars,
+}: {
+  snap: SPXSnapshot;
+  bars?: Array<{ t: string; h: number; l: number; c: number }> | null;
+}) {
   const directionTone =
     snap.channel.direction === "ASCENDING"
       ? "text-bull-ink"
@@ -214,7 +220,7 @@ export function SPXChannelHero({ snap }: { snap: SPXSnapshot }) {
             />
           </div>
 
-          <ChannelDiagram snap={snap} />
+          <ChannelDiagram snap={snap} bars={bars ?? null} />
 
           <div className="mt-3 grid grid-cols-2 gap-3 text-[11px]">
             <Anchor
@@ -330,26 +336,43 @@ function Anchor({
 
 // ---------- Diagram ----------
 
-function ChannelDiagram({ snap }: { snap: SPXSnapshot }) {
-  const W = 400;
-  const H = 220; // grown from 180 - gives the diagram more visual gravity
+function ChannelDiagram({
+  snap,
+  bars,
+}: {
+  snap: SPXSnapshot;
+  bars: Array<{ t: string; h: number; l: number; c: number }> | null;
+}) {
+  const W = 560;
+  const H = 320;
   const PAD_L = 40;
-  const PAD_R = 14;
-  const PAD_T = 14;
-  const PAD_B = 22;
+  const PAD_R = 94;
+  const PAD_T = 20;
+  const PAD_B = 30;
 
-  const t0 = new Date(snap.overnight.window.start).getTime();
+  const cleanBars = (bars ?? [])
+    .filter(
+      (bar) =>
+        !!bar.t &&
+        Number.isFinite(bar.h) &&
+        Number.isFinite(bar.l) &&
+        Number.isFinite(bar.c),
+    )
+    .sort((a, b) => Date.parse(a.t) - Date.parse(b.t));
+  const t0 = cleanBars[0]?.t
+    ? new Date(cleanBars[0].t).getTime()
+    : new Date(snap.overnight.window.start).getTime();
   const tNow = new Date(snap.asOf).getTime();
-  const tEnd = tNow + 60 * 60 * 1000;
+  const tEnd = cleanBars.at(-1)?.t
+    ? new Date(cleanBars.at(-1)!.t).getTime()
+    : tNow + 60 * 60 * 1000;
 
   const ceiling = snap.lines.find((l) => l.kind === "SWING_HIGH_DESC");
   const floor = snap.lines.find((l) => l.kind === "SWING_LOW_ASC");
-  const prevHighAsc = snap.lines.find((l) => l.kind === "PREV_RTH_HIGH_ASC");
 
   const yPoints: number[] = [snap.price.last];
-  if (ceiling) yPoints.push(ceiling.currentValue, ceiling.anchorPrice);
-  if (floor) yPoints.push(floor.currentValue, floor.anchorPrice);
-  if (prevHighAsc) yPoints.push(prevHighAsc.currentValue, prevHighAsc.anchorPrice);
+  for (const bar of cleanBars) yPoints.push(bar.h, bar.l, bar.c);
+  for (const line of snap.lines) yPoints.push(line.currentValue, line.anchorPrice);
   let yMin = Math.min(...yPoints);
   let yMax = Math.max(...yPoints);
   const pad = (yMax - yMin) * 0.12 || 4;
@@ -360,6 +383,12 @@ function ChannelDiagram({ snap }: { snap: SPXSnapshot }) {
     PAD_L + ((t - t0) / (tEnd - t0)) * (W - PAD_L - PAD_R);
   const yOf = (p: number) =>
     PAD_T + (1 - (p - yMin) / (yMax - yMin)) * (H - PAD_T - PAD_B);
+  const pricePath = cleanBars
+    .map((bar, index) => {
+      const ms = Date.parse(bar.t);
+      return `${index === 0 ? "M" : "L"} ${xOf(ms).toFixed(1)},${yOf(bar.c).toFixed(1)}`;
+    })
+    .join(" ");
 
   const projectAt = (
     anchorPrice: number,
@@ -374,18 +403,6 @@ function ChannelDiagram({ snap }: { snap: SPXSnapshot }) {
   const ascending = snap.channel.direction === "ASCENDING";
   const railColor = ascending ? "#0E7C50" : "#B5301E";
   const railFill = ascending ? "rgba(14,124,80,0.09)" : "rgba(181,48,30,0.09)";
-  // Prev-day RTH refs: violet (was teal - collided with SPY's "armed" state).
-  const refColor = "#5B3FB1";
-
-  const ceilingPath =
-    ceiling && snap.channel.direction !== "NONE"
-      ? `M ${xOf(new Date(ceiling.anchorTime).getTime())},${yOf(ceiling.anchorPrice)} L ${xOf(tEnd)},${yOf(projectAt(ceiling.anchorPrice, ceiling.anchorTime, ceiling.slopePerHour, tEnd))}`
-      : "";
-  const floorPath =
-    floor && snap.channel.direction !== "NONE"
-      ? `M ${xOf(new Date(floor.anchorTime).getTime())},${yOf(floor.anchorPrice)} L ${xOf(tEnd)},${yOf(projectAt(floor.anchorPrice, floor.anchorTime, floor.slopePerHour, tEnd))}`
-      : "";
-
   let bandPath = "";
   if (ceiling && floor && snap.channel.direction !== "NONE") {
     const tCeilStart = new Date(ceiling.anchorTime).getTime();
@@ -422,11 +439,7 @@ function ChannelDiagram({ snap }: { snap: SPXSnapshot }) {
       `L ${xOf(tBandStart)},${yOf(fStart)} Z`;
   }
 
-  const prevHighPath = prevHighAsc
-    ? `M ${xOf(new Date(prevHighAsc.anchorTime).getTime())},${yOf(prevHighAsc.anchorPrice)} L ${xOf(tEnd)},${yOf(projectAt(prevHighAsc.anchorPrice, prevHighAsc.anchorTime, prevHighAsc.slopePerHour, tEnd))}`
-    : "";
-
-  const xNow = xOf(tNow);
+  const xNow = Math.max(PAD_L, Math.min(W - PAD_R, xOf(Math.min(Math.max(tNow, t0), tEnd))));
   const yPrice = yOf(snap.price.last);
 
   const rthOpen = new Date(snap.sessionDateCT + "T08:30:00-05:00").getTime();
@@ -523,43 +536,51 @@ function ChannelDiagram({ snap }: { snap: SPXSnapshot }) {
             fill="#5A5A5A"
             letterSpacing="0.08em"
           >
-            SIX-LINE FRAMEWORK AWAITS OVERNIGHT SWINGS
+            FRAMEWORK AWAITS OVERNIGHT STRUCTURE
           </text>
         </g>
       )}
       {bandPath && <path d={bandPath} fill={railFill} className="spx-band" />}
 
-      {/* prev-day RTH high asc - dashed violet reference */}
-      {prevHighPath && (
-        <path
-          d={prevHighPath}
-          stroke={refColor}
-          strokeWidth={1.1}
-          strokeDasharray="4 4"
-          fill="none"
-          opacity={0.85}
-          className="spx-ref-line"
-        />
-      )}
+      {/* all six ES framework lines with exact projected values */}
+      {snap.lines.map((line, index) => {
+        const start = new Date(line.anchorTime).getTime();
+        const endValue = projectAt(line.anchorPrice, line.anchorTime, line.slopePerHour, tEnd);
+        const color = lineStroke(line.kind);
+        return (
+          <g key={line.kind}>
+            <path
+              d={`M ${xOf(start)},${yOf(line.anchorPrice)} L ${xOf(tEnd)},${yOf(endValue)}`}
+              stroke={color}
+              strokeWidth={line.kind === "SWING_HIGH_DESC" || line.kind === "SWING_LOW_ASC" ? 1.7 : 1.05}
+              strokeDasharray={line.kind.startsWith("PREV_RTH") ? "5 5" : line.slopePerHour > 0 ? "2 4" : undefined}
+              fill="none"
+              opacity={line.kind.startsWith("PREV_RTH") ? 0.82 : 0.9}
+              className={index % 2 === 0 ? "spx-rail" : "spx-rail spx-rail-delayed"}
+              pathLength={1}
+            />
+            <text
+              x={W - PAD_R + 6}
+              y={yOf(endValue) + 3}
+              fontSize="8.5"
+              fontFamily="var(--font-geist-mono)"
+              fill={color}
+            >
+              {lineCode(line.kind)} {line.currentValue.toFixed(2)}
+            </text>
+          </g>
+        );
+      })}
 
-      {/* active swing-pair lines */}
-      {ceilingPath && (
+      {pricePath && (
         <path
-          d={ceilingPath}
-          stroke={railColor}
-          strokeWidth={1.6}
+          d={pricePath}
+          stroke="#14161A"
+          strokeWidth={2}
           fill="none"
-          className="spx-rail"
-          pathLength={1}
-        />
-      )}
-      {floorPath && (
-        <path
-          d={floorPath}
-          stroke={railColor}
-          strokeWidth={1.6}
-          fill="none"
-          className="spx-rail spx-rail-delayed"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="spx-price-path"
           pathLength={1}
         />
       )}
@@ -621,76 +642,49 @@ function ChannelDiagram({ snap }: { snap: SPXSnapshot }) {
       <g className="spx-price-marker">
         <circle cx={xNow} cy={yPrice} r={4.5} fill="#14161A" />
         <circle cx={xNow} cy={yPrice} r={8} fill="#14161A" opacity={0.12} className="spx-price-halo" />
+        <rect
+          x={Math.min(W - PAD_R - 96, xNow + 8)}
+          y={Math.max(PAD_T + 2, yPrice - 14)}
+          width="88"
+          height="22"
+          rx="6"
+          fill="#FFFDF7"
+          stroke="#D6CCB7"
+        />
+        <text
+          x={Math.min(W - PAD_R - 52, xNow + 52)}
+          y={Math.max(PAD_T + 17, yPrice + 1)}
+          fontSize="9.5"
+          fontFamily="var(--font-geist-mono)"
+          fill="#14161A"
+          textAnchor="middle"
+        >
+          LAST {snap.price.last.toFixed(2)}
+        </text>
       </g>
 
-      {/* labels at right edge */}
-      {ceiling && snap.channel.direction !== "NONE" && (
-        <text
-          x={W - PAD_R - 2}
-          y={
-            yOf(
-              projectAt(
-                ceiling.anchorPrice,
-                ceiling.anchorTime,
-                ceiling.slopePerHour,
-                tEnd,
-              ),
-            ) - 3
-          }
-          fontSize="8"
-          fontFamily="var(--font-geist-mono)"
-          fill={railColor}
-          textAnchor="end"
-          fontWeight={600}
-        >
-          SH-D {ceiling.currentValue.toFixed(2)}
-        </text>
-      )}
-      {floor && snap.channel.direction !== "NONE" && (
-        <text
-          x={W - PAD_R - 2}
-          y={
-            yOf(
-              projectAt(
-                floor.anchorPrice,
-                floor.anchorTime,
-                floor.slopePerHour,
-                tEnd,
-              ),
-            ) + 9
-          }
-          fontSize="8"
-          fontFamily="var(--font-geist-mono)"
-          fill={railColor}
-          textAnchor="end"
-          fontWeight={600}
-        >
-          SL-A {floor.currentValue.toFixed(2)}
-        </text>
-      )}
-      {prevHighAsc && (
-        <text
-          x={W - PAD_R - 2}
-          y={
-            yOf(
-              projectAt(
-                prevHighAsc.anchorPrice,
-                prevHighAsc.anchorTime,
-                prevHighAsc.slopePerHour,
-                tEnd,
-              ),
-            ) - 3
-          }
-          fontSize="7.5"
-          fontFamily="var(--font-geist-mono)"
-          fill={refColor}
-          textAnchor="end"
-        >
-          PREV-H ASC
-        </text>
-      )}
     </svg>
   );
+}
+
+function lineCode(kind: string): string {
+  const labels: Record<string, string> = {
+    PREV_RTH_HIGH_ASC: "PRH-A",
+    PREV_RTH_LOW_DESC: "PRL-D",
+    SWING_HIGH_ASC: "SH-A",
+    SWING_HIGH_DESC: "SH-D",
+    SWING_LOW_ASC: "SL-A",
+    SWING_LOW_DESC: "SL-D",
+  };
+  return labels[kind] ?? "ES-L";
+}
+
+function lineStroke(kind: string): string {
+  if (kind === "SWING_HIGH_DESC") return "#B5301E";
+  if (kind === "SWING_LOW_ASC") return "#0E7C50";
+  if (kind.startsWith("PREV_RTH")) return "#5B3FB1";
+  if (kind.includes("HIGH")) return "#B8860B";
+  return "#8A6117";
 }
 
 const spxDiagramStyles = `
@@ -721,6 +715,10 @@ const spxDiagramStyles = `
     50%  { opacity: 0.04; transform: scale(1.7); }
     100% { opacity: 0.12; transform: scale(1); }
   }
+  @keyframes spx-path-draw {
+    from { stroke-dashoffset: 1; }
+    to { stroke-dashoffset: 0; }
+  }
   .spx-diagram .spx-rail {
     stroke-dasharray: 1;
     animation: spx-rail-draw 950ms cubic-bezier(0.22, 1, 0.36, 1) 200ms both;
@@ -750,6 +748,11 @@ const spxDiagramStyles = `
   .spx-diagram .spx-price-line {
     animation: spx-breathe 3200ms ease-in-out infinite;
   }
+  .spx-diagram .spx-price-path {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: spx-path-draw 1300ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
   .spx-diagram .spx-price-marker {
     opacity: 0;
     animation: spx-fade-in 360ms ease-out 1300ms forwards;
@@ -771,9 +774,11 @@ const spxDiagramStyles = `
       transform: none !important;
     }
     .spx-diagram .spx-anchor-pulse,
+    .spx-diagram .spx-price-path,
     .spx-diagram .spx-price-line,
     .spx-diagram .spx-price-halo {
       animation: none !important;
+      stroke-dashoffset: 0 !important;
     }
   }
 `;

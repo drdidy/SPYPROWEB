@@ -408,7 +408,7 @@ function MiniStructureMap({
           Actual path
         </span>
       </div>
-      <div className="grid gap-3 md:grid-cols-[112px_1fr]">
+      <div className="grid gap-3 md:grid-cols-[132px_1fr]">
         <div className="space-y-2.5">
           {rails.map((rail) => (
             <div key={rail.label} className="grid grid-cols-[1fr_auto] gap-2">
@@ -430,8 +430,8 @@ function MiniStructureMap({
           data={chart}
           variant="paper"
           accent={accent}
-          height={112}
-          title="price vs rails"
+          height={190}
+          title={`${displayEngine(engine)} price vs levels`}
         />
       </div>
     </div>

@@ -658,12 +658,11 @@ function buildSpxStructureChart(
   intradayBars: StructureChartBar[] | null,
   date: string,
 ): StructureChartData | null {
-  const offset = snap._meta?.appliedOffset ?? 0;
   const bars = normalizeChartBars(intradayBars ?? []).map((bar) => ({
     t: bar.t,
-    h: bar.h + offset,
-    l: bar.l + offset,
-    c: bar.c + offset,
+    h: bar.h,
+    l: bar.l,
+    c: bar.c,
   }));
   const lines = snap.lines
     .map((line): StructureChartLine => ({

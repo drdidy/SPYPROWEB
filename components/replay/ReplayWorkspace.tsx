@@ -42,6 +42,7 @@ import {
   type RawSnapshot,
 } from "@/lib/snapshot-adapter";
 import type { SPXLine, SPXSnapshot } from "@/lib/types";
+import { ReplayPlayback } from "./ReplayPlayback";
 
 export interface IntradayBar {
   t: string;
@@ -397,15 +398,12 @@ export function ReplayWorkspace({ initialDate }: Props) {
             {state === "loading" ? (
               <ChartSkeleton />
             ) : (
-              <ChannelChart
+              <DualReplayChart
+                spy={spy}
                 spx={spx}
                 intraday={intraday}
                 playhead={playhead}
-                cursorAt={cursorAt}
                 state={state}
-                events={eventLog}
-                touches={touchEvents}
-                onSeek={seekToIso}
               />
             )}
             <Transport
@@ -702,6 +700,45 @@ function PanelHeader({
         </div>
       )}
     </div>
+  );
+}
+
+function DualReplayChart({
+  spy,
+  spx,
+  intraday,
+  playhead,
+  state,
+}: {
+  spy: AdaptedSnapshot | null;
+  spx: SPXSnapshot | null;
+  intraday: IntradayResponse | null;
+  playhead: number;
+  state: ReplayState;
+}) {
+  if (state === "empty") {
+    return <QuietChartState title="No date picked" body={replayCopy.chart.empty} />;
+  }
+  if (state === "error") {
+    return <QuietChartState title="Replay failed" body="The replay endpoints did not return a usable session." tone="error" />;
+  }
+  if (!intraday || ((intraday.spy?.length ?? 0) === 0 && (intraday.es?.length ?? 0) === 0)) {
+    return (
+      <QuietChartState
+        title="Intraday bars unavailable"
+        body="Showing snapshot-only panels. The dual replay charts populate when SPY 03:00-15:00 CT bars or ES overnight-through-RTH bars exist for this date."
+        tone="partial"
+      />
+    );
+  }
+
+  return (
+    <ReplayPlayback
+      spy={spy}
+      spx={spx}
+      intraday={intraday}
+      playhead={playhead}
+    />
   );
 }
 
