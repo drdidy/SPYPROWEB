@@ -4,7 +4,7 @@ import { FeedHeartbeat, useFeedHealth } from "@/components/decision-slate/FeedHe
 import type { FeedId } from "@/lib/feed-health";
 import { cn } from "@/lib/utils";
 
-type LiveState = "live" | "delayed" | "offline";
+type LiveState = "live" | "stale" | "offline";
 
 export function ChannelLiveBadge() {
   const price = useFeedHealth("price-tick");
@@ -16,11 +16,11 @@ export function ChannelLiveBadge() {
       ? "offline"
       : price.status === "live" && healthyContext
         ? "live"
-        : "delayed";
+        : "stale";
   const lagging = laggingFeed([price, anchors, tape]);
   const tone = {
     live: "bg-bull-tint text-bull-ink shadow-[inset_0_0_0_1px_rgba(14,124,80,0.30)]",
-    delayed: "bg-gold-tint text-gold-ink shadow-[inset_0_0_0_1px_rgba(184,130,31,0.30)]",
+    stale: "bg-gold-tint text-gold-ink shadow-[inset_0_0_0_1px_rgba(184,130,31,0.30)]",
     offline: "bg-bear-tint text-bear-ink shadow-[inset_0_0_0_1px_rgba(181,48,30,0.30)]",
   }[state];
   const title =
@@ -41,7 +41,7 @@ export function ChannelLiveBadge() {
       <span
         className={cn(
           "h-1 w-1 rounded-full",
-          state === "live" ? "bg-bull animate-breathe" : state === "delayed" ? "bg-gold" : "bg-bear",
+          state === "live" ? "bg-bull animate-breathe" : state === "stale" ? "bg-gold" : "bg-bear",
         )}
         aria-hidden
       />

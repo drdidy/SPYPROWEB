@@ -92,7 +92,9 @@ export const FEED_DEFAULTS = {
   lastSessionMs: 5 * 60_000,
   briefPreviewMs: 24 * 60 * 60_000,
   marketClockMs: 60_000,
-  priceTickMs: 5_000,
+  // /api/snapshot intentionally permits a 15s public cache window, so channel
+  // price freshness needs enough room to avoid labeling healthy cached data stale.
+  priceTickMs: 20_000,
   channelStructureMs: 60_000,
   channelPanelMs: 5 * 60_000,
   failedBannerDelayMs: 60_000,
