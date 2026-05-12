@@ -185,7 +185,7 @@ export function TopBar({
           number the engine actually trades on — the trader-aligned
           read. The SyntheticChip + AsOfMicrotext are gone with
           the synthesis. */}
-      <div className="hidden md:flex flex-1 items-center justify-center gap-3 lg:gap-4 min-w-0 overflow-hidden">
+      <div className="hidden xl:flex flex-none min-w-[360px] items-center justify-center gap-4 overflow-visible">
         <Quote label="SPY" wrapClass="hidden lg:flex">
           <ValueWithTooltip
             staleness={staleness}

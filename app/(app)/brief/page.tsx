@@ -8,7 +8,10 @@ import { CommandStat } from "@/components/ui/CommandStat";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { loadLiveSnapshot } from "@/lib/snapshot-fetch";
+import { loadSnapshot as loadSpxSnapshot } from "@/lib/spx-fetch";
+import { nearReferencePriceLabel } from "@/lib/market-data-quality";
 import { cn } from "@/lib/utils";
+import type { SPXSnapshot } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -107,9 +110,14 @@ async function loadBrief(): Promise<BriefResponse> {
 }
 
 export default async function Page() {
-  const [{ data: snap, source }, brief] = await Promise.all([loadLiveSnapshot(), loadBrief()]);
+  const [{ data: snap, source }, brief, esLoaded] = await Promise.all([
+    loadLiveSnapshot(),
+    loadBrief(),
+    loadSpxSnapshot(),
+  ]);
   const spy = brief.dossier?.SPY;
-  const es = brief.dossier?.ES;
+  const es = normalizeEsDossier(brief.dossier?.ES, esLoaded.snap);
+  const briefText = sanitizeEsBriefText(brief.brief, esLoaded.snap);
   const options = brief.dossier?.options;
   const spyOptions = options?.SPY;
   const spxOptions = options?.SPX;
@@ -154,7 +162,7 @@ export default async function Page() {
         <CommandStat
           label="Dealer gamma"
           value={spyOptions?.gex?.regime ?? "Waiting"}
-          note={spyOptions?.gex ? `Flip ${fmtPrice(spyOptions.gex.flipPoint)}` : "GEX not populated"}
+          note={spyOptions?.gex ? `Flip ${nearReferencePriceLabel(spyOptions.gex.flipPoint, snap.currentPrice)}` : "GEX not populated"}
           tone={gammaTone(spyOptions?.gex?.regime)}
         />
       </div>
@@ -173,9 +181,9 @@ export default async function Page() {
             }
           />
           <CardBody>
-            {brief.brief ? (
+            {briefText ? (
               <div className="space-y-5">
-                {brief.brief.split(/\n\s*\n/).map((para, i) => (
+                {briefText.split(/\n\s*\n/).map((para, i) => (
                   <BriefParagraph key={i} text={para} />
                 ))}
               </div>
@@ -247,10 +255,58 @@ export default async function Page() {
 
       <SectionLabel number="03">Options inputs</SectionLabel>
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <OptionsPanel symbol="SPY" data={spyOptions} />
+        <OptionsPanel symbol="SPY" data={spyOptions} referencePrice={snap.currentPrice} />
         <OptionsPanel symbol="SPX" data={spxOptions} />
       </div>
     </div>
+  );
+}
+
+function normalizeEsDossier(
+  es: BriefDossier["ES"] | undefined,
+  snap: SPXSnapshot,
+): BriefDossier["ES"] | undefined {
+  if (!es) return es;
+  return {
+    ...es,
+    available: true,
+    state: snap.currentState ?? es.state,
+    scenario: snap.scenario,
+    scenarioExplanation: snap.scenarioExplanation,
+    price: {
+      last: snap.price.last,
+      change: snap.price.change,
+      changePct: snap.price.changePct,
+    },
+    channel: {
+      direction: snap.channel.direction,
+      reason: snap.channel.reason,
+      noChannelReason: snap.channel.noChannelReason,
+    },
+    confluence: {
+      score: snap.confluence.score,
+      action: snap.confluence.action,
+    },
+    watchLines:
+      snap.lines.length > 0
+        ? snap.lines.slice(0, 4).map((line) => ({
+            name: line.name,
+            kind: line.kind,
+            currentValue: line.currentValue,
+            distanceFromPrice: line.distanceFromPrice,
+            status: line.kind.includes("PREV_RTH") ? "REFERENCE" : "WATCHING",
+          }))
+        : es.watchLines,
+  };
+}
+
+function sanitizeEsBriefText(text: string, snap: SPXSnapshot): string {
+  if (!text) return text;
+  const last = snap.price.last;
+  if (!Number.isFinite(last) || last <= 0) return text;
+  return text.replace(
+    /last print(?:\s+of)?\s+\d+(?:\.\d+)?/gi,
+    `ES last ${last.toFixed(2)}`,
   );
 }
 
@@ -329,7 +385,15 @@ function CompactLine({ line }: { line: WatchLine }) {
   );
 }
 
-function OptionsPanel({ symbol, data }: { symbol: string; data?: OptionsSymbol }) {
+function OptionsPanel({
+  symbol,
+  data,
+  referencePrice,
+}: {
+  symbol: string;
+  data?: OptionsSymbol;
+  referencePrice?: number;
+}) {
   return (
     <Card>
       <CardHeader
@@ -359,7 +423,14 @@ function OptionsPanel({ symbol, data }: { symbol: string; data?: OptionsSymbol }
             <MiniMetric label="Flow" value={data.flow?.lean ?? "-"} tone={leanTone(data.flow?.lean)} />
             <MiniMetric label="Net premium" value={fmtMoney(data.flow?.premiumNet)} />
             <MiniMetric label="GEX" value={data.gex?.regime ?? "-"} tone={gammaTone(data.gex?.regime)} />
-            <MiniMetric label="Flip" value={fmtPrice(data.gex?.flipPoint)} />
+            <MiniMetric
+              label="Flip"
+              value={
+                referencePrice
+                  ? nearReferencePriceLabel(data.gex?.flipPoint, referencePrice)
+                  : fmtPrice(data.gex?.flipPoint)
+              }
+            />
             <MiniMetric label="Dark premium" value={fmtMoney(data.darkPool?.totalPremium)} />
             <MiniMetric label="Dark prints" value={fmtInt(data.darkPool?.count)} />
             <MiniMetric label="PCR" value={fmtRatio(data.chain?.totals?.pcr)} />

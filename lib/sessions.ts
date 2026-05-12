@@ -195,6 +195,7 @@ function nextEvent(
   rthOpen: Date,
   rthClose: Date,
 ): { label: string; at: Date } {
+  const engineLabel = engine === "SPX" ? "ES" : engine;
   switch (phase) {
     case "CONFIG_WINDOW":
       return { label: "Config window closes", at: configEnd };
@@ -205,12 +206,12 @@ function nextEvent(
     case "PRE_CONFIG":
     case "CLOSED_WEEKEND":
     case "CLOSED_HOLIDAY":
-      return { label: `${engine} setup opens`, at: configStart };
+      return { label: `${engineLabel} setup opens`, at: configStart };
     case "POST_RTH":
       // The trading-day picker has already rolled forward to the next
       // session, so configStart here is the *next* engine cycle's
       // window opening. No recursion needed.
-      return { label: `${engine} setup opens`, at: configStart };
+      return { label: `${engineLabel} setup opens`, at: configStart };
   }
 }
 

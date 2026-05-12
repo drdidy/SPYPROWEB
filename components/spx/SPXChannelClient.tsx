@@ -36,6 +36,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { cn } from "@/lib/utils";
 import { getSessionInfo } from "@/lib/sessions";
+import { canonicalizeEsSnapshot } from "@/lib/canonical-es";
 import type { EngineState } from "@/lib/states";
 import type { SpxProjectionChainInput } from "@/lib/spx-contract-projection";
 import type { SPXSnapshot } from "@/lib/types";
@@ -186,7 +187,7 @@ export function SPXChannelClient({ replayDate }: Props) {
     );
   }
 
-  const snap = withCanonicalEsPrice(state.snap);
+  const snap = canonicalizeEsSnapshot(state.snap);
   const meta = snap._meta;
   const session = getSessionInfo("SPX", new Date());
   const currentState: EngineState =
@@ -361,20 +362,6 @@ export function SPXChannelClient({ replayDate }: Props) {
 // ---------------------------------------------------------------------
 // Local helpers
 // ---------------------------------------------------------------------
-
-function withCanonicalEsPrice(snap: SPXSnapshot): SPXSnapshot {
-  const esLast = snap._meta?.esSpot;
-  if (typeof esLast !== "number" || !Number.isFinite(esLast) || esLast <= 0) {
-    return snap;
-  }
-  return {
-    ...snap,
-    price: {
-      ...snap.price,
-      last: esLast,
-    },
-  };
-}
 
 function heroSynthesis(snap: SPXSnapshot): string {
   if (snap.channel.direction === "NONE") {

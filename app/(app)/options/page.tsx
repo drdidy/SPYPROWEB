@@ -8,6 +8,7 @@ import { SectionLabel } from "@/components/ui/SectionLabel";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { loadOptionsIntelBundle, type UwOptionChain, type UwSymbolIntel } from "@/lib/options-intel-fetch";
 import { loadLiveSnapshot } from "@/lib/snapshot-fetch";
+import { nearReferencePriceLabel } from "@/lib/market-data-quality";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -545,9 +546,7 @@ function strikeWindow(strikes: number[], center: number): number[] {
 }
 
 function nearFlipLabel(flip: number | null | undefined, center: number | null): string {
-  if (!Number.isFinite(flip ?? NaN) || flip === null || flip === undefined) return "-";
-  if (center !== null && Math.abs(flip - center) > Math.max(center * 0.12, 12)) return "No near flip";
-  return fmtPrice(flip);
+  return nearReferencePriceLabel(flip, center, { farLabel: "No near flip" });
 }
 
 function leanTone(lean?: string | null): "ink" | "bull" | "bear" | "gold" {

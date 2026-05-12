@@ -5,6 +5,7 @@ import { SectionLabel } from "@/components/ui/SectionLabel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { loadLiveSnapshot } from "@/lib/snapshot-fetch";
+import { nearReferencePriceLabel } from "@/lib/market-data-quality";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -66,8 +67,8 @@ export default async function Page() {
             />
             <CommandStat
               label="Flip point"
-              value={gex?.flipPoint !== null && gex?.flipPoint !== undefined ? gex.flipPoint.toFixed(2) : "-"}
-              note="If supplied by feed"
+              value={nearReferencePriceLabel(gex?.flipPoint, snap.currentPrice)}
+              note={gex ? "Checked against SPY spot" : "If supplied by feed"}
               tone="teal"
             />
           </div>
@@ -153,7 +154,7 @@ export default async function Page() {
                   />
                   <CommandStat
                     label="Flip point"
-                    value={gex.flipPoint !== null ? gex.flipPoint.toFixed(2) : "-"}
+                    value={nearReferencePriceLabel(gex.flipPoint, snap.currentPrice)}
                     tone="teal"
                   />
                 </div>

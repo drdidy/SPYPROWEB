@@ -11,6 +11,7 @@
 // behind raw.candles + raw.quote + raw.context. Unusual Whales
 // integration plugs in here when its endpoint lands.
 import { getSessionInfo, formatConfigWindow } from "./sessions";
+import { nearReferencePriceLabel } from "./market-data-quality";
 import type {
   BiasState,
   Candle,
@@ -653,8 +654,10 @@ function mapOptions(raw: RawSnapshot): { intel: OptionsIntel | null; strikes: Se
     );
   }
   if (raw.gex) {
+    const flipLabel = nearReferencePriceLabel(raw.gex.flipPoint, last);
+    const flipSuffix = /^\d/.test(flipLabel) ? ` (flip ${flipLabel})` : "";
     uwBits.push(
-      `Gamma ${raw.gex.regime.toLowerCase()}${raw.gex.flipPoint ? ` (flip ${raw.gex.flipPoint.toFixed(2)})` : ""}`,
+      `Gamma ${raw.gex.regime.toLowerCase()}${flipSuffix}`,
     );
   }
   const alignmentNote = uwBits.length
