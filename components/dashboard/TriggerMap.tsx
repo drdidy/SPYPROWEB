@@ -98,8 +98,12 @@ export function TriggerMap({
   const sorted = lines
     .slice()
     .sort((a, b) => Math.abs(distanceToLast(a, currentPrice)) - Math.abs(distanceToLast(b, currentPrice)));
-  const actionable = sorted.filter(isActionableReference);
-  const context = sorted.filter((line) => !isActionableReference(line));
+  const priorRangeValid = isPriorRangeValid(sorted);
+  const validatedSorted = priorRangeValid
+    ? sorted
+    : sorted.filter((line) => line.kind !== "PDH" && line.kind !== "PDL");
+  const actionable = validatedSorted.filter(isActionableReference);
+  const context = validatedSorted.filter((line) => !isActionableReference(line));
 
   if (lines.length === 0) {
     return (
@@ -141,6 +145,11 @@ export function TriggerMap({
             retained as diagnostics, but they are not equal to the active entry
             framework.
           </p>
+          {!priorRangeValid && (
+            <div className="mt-3 rounded-soft border border-gold/30 bg-gold-tint px-3 py-2 font-mono text-[10px] uppercase tracking-[0.10em] text-gold-ink">
+              Prior-day range failed validation; PDH/PDL are hidden until the feed resolves.
+            </div>
+          )}
         </div>
 
         <div className="grid gap-3 px-5 pb-5 sm:hidden">
@@ -241,4 +250,11 @@ function isActionableReference(line: DynamicLine): boolean {
   if (line.kind === "DAY_OPEN") return false;
   if (/backup/i.test(line.name)) return false;
   return line.isPrimary || /^Anchor\s/i.test(line.name);
+}
+
+function isPriorRangeValid(lines: DynamicLine[]): boolean {
+  const pdh = lines.find((line) => line.kind === "PDH");
+  const pdl = lines.find((line) => line.kind === "PDL");
+  if (!pdh || !pdl) return true;
+  return displayValue(pdh) >= displayValue(pdl);
 }

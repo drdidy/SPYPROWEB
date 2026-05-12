@@ -48,15 +48,19 @@ function entryLineValue(line: DynamicLine): number {
 function buildSpyEntryFramework(
   snap: AdaptedSnapshot,
   primary: AnchorGroup | null,
+  includePriorRange: boolean,
 ): Array<{ label: string; value: number | null; emphasized?: boolean }> {
   const findLine = (kind: string) =>
     snap.lines.find((line) => line.kind === kind || line.name.toUpperCase() === kind);
   const pdh = findLine("PDH");
   const pdl = findLine("PDL");
-  const rows: Array<{ label: string; value: number | null; emphasized?: boolean }> = [
-    { label: "PDH ref", value: pdh ? entryLineValue(pdh) : null },
-    { label: "PDL ref", value: pdl ? entryLineValue(pdl) : null },
-  ];
+  const rows: Array<{ label: string; value: number | null; emphasized?: boolean }> = [];
+  if (includePriorRange) {
+    rows.push(
+      { label: "PDH ref", value: pdh ? entryLineValue(pdh) : null },
+      { label: "PDL ref", value: pdl ? entryLineValue(pdl) : null },
+    );
+  }
   if (primary) {
     rows.push(
       { label: "Main +", value: entryBandValue(primary.bands.upper) },
@@ -87,7 +91,8 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
 
   const anchor = snap.anchor;
   const primary = anchor?.primary ?? null;
-  const entryFramework = buildSpyEntryFramework(snap, primary);
+  const priorRangeValid = isPriorRangeValid(snap.lines);
+  const entryFramework = buildSpyEntryFramework(snap, primary, priorRangeValid);
 
   // Distance to nearest line (the "first read" the trader looks for).
   // Uses live currentValue per band — already projected to "now" by the
@@ -111,6 +116,7 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
   );
   const nearestStructural = snap.lines
     .slice()
+    .filter((line) => isActionableSpyReference(line, priorRangeValid))
     .sort((a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice))[0];
   const nearestRead = nearestStructural
     ? {
@@ -276,17 +282,24 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
           />
 
           {primary ? (
-            <div className="grid grid-cols-2 gap-2 mb-4 sm:grid-cols-3 xl:grid-cols-5">
-              {entryFramework.map((item) => (
-                <BandStat
-                  key={item.label}
-                  label={item.label}
-                  value={item.value}
-                  price={snap.currentPrice}
-                  emphasized={item.emphasized}
-                />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-2 gap-2 mb-4 sm:grid-cols-3 xl:grid-cols-5">
+                {entryFramework.map((item) => (
+                  <BandStat
+                    key={item.label}
+                    label={item.label}
+                    value={item.value}
+                    price={snap.currentPrice}
+                    emphasized={item.emphasized}
+                  />
+                ))}
+              </div>
+              {!priorRangeValid && (
+                <div className="mb-4 rounded-soft border border-gold/30 bg-gold-tint px-3 py-2 font-mono text-[10px] uppercase tracking-[0.10em] text-gold-ink">
+                  Prior-day range failed validation; PDH/PDL are hidden until the feed resolves.
+                </div>
+              )}
+            </>
           ) : (
             <div className="mb-4 rounded-soft bg-paper px-3 py-3 shadow-rule">
               <div className="eyebrow text-ink-3 mb-1">Anchor lines today</div>
@@ -497,6 +510,20 @@ function capitalize(value: string): string {
   return value.slice(0, 1).toUpperCase() + value.slice(1);
 }
 
+function isPriorRangeValid(lines: DynamicLine[]): boolean {
+  const pdh = lines.find((line) => line.kind === "PDH");
+  const pdl = lines.find((line) => line.kind === "PDL");
+  if (!pdh || !pdl) return true;
+  return entryLineValue(pdh) >= entryLineValue(pdl);
+}
+
+function isActionableSpyReference(line: DynamicLine, priorRangeValid: boolean): boolean {
+  if (line.kind === "DAY_OPEN") return false;
+  if (/backup/i.test(line.name)) return false;
+  if (!priorRangeValid && (line.kind === "PDH" || line.kind === "PDL")) return false;
+  return line.isPrimary || /^Anchor\s/i.test(line.name) || line.kind === "PDH" || line.kind === "PDL";
+}
+
 function anchorTimeLabel(g: AnchorGroup): string {
   try {
     const d = new Date(g.anchorTime);
@@ -588,6 +615,15 @@ function buildSpyChannelChart(snap: AdaptedSnapshot): StructureChartData | null 
     )
     .map((bar) => ({ t: bar.t, h: bar.h, l: bar.l, c: bar.c }))
     .sort((a, b) => Date.parse(a.t) - Date.parse(b.t));
+  if (bars.length > 0 && Number.isFinite(snap.currentPrice)) {
+    const last = bars[bars.length - 1];
+    bars[bars.length - 1] = {
+      ...last,
+      h: Math.max(last.h, snap.currentPrice),
+      l: Math.min(last.l, snap.currentPrice),
+      c: snap.currentPrice,
+    };
+  }
   if (!primary || bars.length < 2) return null;
   const referenceTime = primary.entryReferenceTime ?? bars[0]?.t ?? primary.anchorTime;
   const lines = [

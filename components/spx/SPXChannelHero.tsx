@@ -363,6 +363,15 @@ function ChannelDiagram({
         Number.isFinite(bar.c),
     )
     .sort((a, b) => Date.parse(a.t) - Date.parse(b.t));
+  if (cleanBars.length > 0 && Number.isFinite(snap.price.last)) {
+    const last = cleanBars[cleanBars.length - 1];
+    cleanBars[cleanBars.length - 1] = {
+      ...last,
+      h: Math.max(last.h, snap.price.last),
+      l: Math.min(last.l, snap.price.last),
+      c: snap.price.last,
+    };
+  }
   const t0 = cleanBars[0]?.t
     ? new Date(cleanBars[0].t).getTime()
     : new Date(snap.overnight.window.start).getTime();
