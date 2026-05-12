@@ -45,17 +45,20 @@ function previousNTradingDates(
 ): string[] {
   const out: string[] = [];
   const todayISO = chicagoDateISO(now);
-  let probeOffset = 1;
+  const currentSession = getSessionInfo(engine, now);
+  const includeToday = now.getTime() >= currentSession.rthClose.getTime();
+  let probeOffset = includeToday ? 0 : 1;
   // Bound the walk at 30 calendar days for safety (covers ~21 trading
   // days, plenty for a 5- or 10-session lookback).
   while (out.length < count && probeOffset <= 30) {
     const probe = new Date(now.getTime() - probeOffset * 86_400_000);
     probeOffset++;
     const probeISO = chicagoDateISO(probe);
-    if (probeISO === todayISO) continue;
+    if (probeISO === todayISO && !includeToday) continue;
     const session = getSessionInfo(engine, probe);
     const tradingDateISO = chicagoDateISO(session.rthClose);
-    if (tradingDateISO < todayISO && !out.includes(tradingDateISO)) {
+    const eligible = includeToday ? tradingDateISO <= todayISO : tradingDateISO < todayISO;
+    if (eligible && !out.includes(tradingDateISO)) {
       out.push(tradingDateISO);
     }
   }
