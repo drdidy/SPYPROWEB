@@ -225,10 +225,7 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
           </div>
 
           <p className="mt-7 text-[15px] text-ink-2 leading-relaxed max-w-xl">
-            {cleanSpyExplanation(
-              snap.decision.finalExplanation || snap.bias.explanation || "Engine is initializing today's read.",
-              snap.currentPrice,
-            )}
+            {synthesisLine(snap, nearestRead, displayedState)}
             {primary ? (
               <span className="block mt-2 text-ink-3 text-[13.5px]">
                 {primary.role === "ANCHOR_2" ? "Anchor 2" : "Primary anchor"} ·

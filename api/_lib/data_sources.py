@@ -1407,10 +1407,19 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
     # Recompute closest line + active signal at this scope (the values
     # inside _build_decision aren't returned — recomputing keeps this
     # additive without refactoring the decision builder).
-    closest_for_flip = pc.get_closest_primary_line(primary_lines, projection_time, current_price)
+    closest_for_flip = None
+    closest_entry_distance = float("inf")
+    for line in primary_lines:
+        v = line.tradable_value_at(entry_reference_time)
+        if v is None or pd.isna(v):
+            continue
+        dist = abs(float(current_price) - float(v))
+        if dist < closest_entry_distance:
+            closest_entry_distance = dist
+            closest_for_flip = line
     if closest_for_flip is not None:
         closest_label_for_flip = pc.compact_line_name(closest_for_flip.name)
-        cv = closest_for_flip.tradable_value_at(projection_time)
+        cv = closest_for_flip.tradable_value_at(entry_reference_time)
         closest_value_for_flip = round(float(cv), 2) if cv is not None and not pd.isna(cv) else None
     else:
         closest_label_for_flip, closest_value_for_flip = None, None
