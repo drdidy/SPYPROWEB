@@ -84,7 +84,7 @@ export function SPXChannelHero({
 
       <div className="grid grid-cols-12 gap-0">
         {/* LEFT - scenario + action */}
-        <div className="col-span-12 lg:col-span-7 p-7 pr-6 pl-8 relative">
+        <div className="col-span-12 lg:col-span-5 p-5 sm:p-7 lg:pr-6 lg:pl-8 relative">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <span className="eyebrow text-ink-3">ES - Structure Slate</span>
@@ -172,10 +172,10 @@ export function SPXChannelHero({
         </div>
 
         {/* vertical rule */}
-        <div className="hidden lg:block absolute left-[58.333%] top-7 bottom-7 w-px bg-rule" />
+        <div className="hidden lg:block absolute left-[41.666%] top-7 bottom-7 w-px bg-rule" />
 
         {/* RIGHT - diagram + stat strip (rebalanced) */}
-        <div className="col-span-12 lg:col-span-5 p-7 pl-7 bg-paper-2/40 relative">
+        <div className="col-span-12 lg:col-span-7 p-5 sm:p-7 lg:pl-7 bg-paper-2/40 relative">
           <div className="flex items-start justify-between mb-4">
             <div>
               <span className="eyebrow text-ink-3">Framework</span>
@@ -349,12 +349,12 @@ function ChannelDiagram({
   bars: Array<{ t: string; h: number; l: number; c: number }> | null;
 }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const W = 560;
-  const H = 320;
-  const PAD_L = 40;
-  const PAD_R = 94;
-  const PAD_T = 20;
-  const PAD_B = 30;
+  const W = 760;
+  const H = 460;
+  const PAD_L = 54;
+  const PAD_R = 170;
+  const PAD_T = 30;
+  const PAD_B = 44;
 
   const cleanBars = (bars ?? [])
     .filter(
@@ -477,6 +477,21 @@ function ChannelDiagram({
 
   const rthOpen = new Date(snap.sessionDateCT + "T08:30:00-05:00").getTime();
   const xRTH = xOf(rthOpen);
+  const lineLabels = distributeEsChartLabels(
+    snap.lines.map((line) => {
+      const endValue = projectAt(line.anchorPrice, line.anchorTime, line.slopePerHour, tEnd);
+      return {
+        key: line.kind,
+        code: lineCode(line.kind),
+        value: entryLineValue(line),
+        endValue,
+        y: yOf(endValue),
+        color: lineStroke(line.kind),
+      };
+    }),
+    PAD_T + 16,
+    H - PAD_B - 16,
+  );
 
   return (
     <svg
@@ -596,6 +611,7 @@ function ChannelDiagram({
         const entryValue = entryLineValue(line);
         const entryTime = line.entryReferenceTime ? new Date(line.entryReferenceTime).getTime() : null;
         const color = lineStroke(line.kind);
+        const label = lineLabels.find((item) => item.key === line.kind);
         return (
           <g key={line.kind}>
             <path
@@ -608,15 +624,48 @@ function ChannelDiagram({
               className={index % 2 === 0 ? "spx-rail" : "spx-rail spx-rail-delayed"}
               pathLength={1}
             />
-            <text
-              x={W - PAD_R + 6}
-              y={yOf(endValue) + 3}
-              fontSize="8.5"
-              fontFamily="var(--font-geist-mono)"
-              fill={color}
-            >
-              {lineCode(line.kind)}
-            </text>
+            {label && (
+              <g className="spx-line-label">
+                <path
+                  d={`M ${W - PAD_R},${yOf(endValue)} L ${W - PAD_R + 10},${label.labelY}`}
+                  stroke={color}
+                  strokeWidth={0.7}
+                  strokeOpacity={0.44}
+                  fill="none"
+                />
+                <rect
+                  x={W - PAD_R + 12}
+                  y={label.labelY - 12}
+                  width="132"
+                  height="24"
+                  rx="6"
+                  fill="#FFFDF7"
+                  stroke={color}
+                  strokeOpacity="0.28"
+                />
+                <text
+                  x={W - PAD_R + 20}
+                  y={label.labelY - 2}
+                  fontSize="8"
+                  fontFamily="var(--font-geist-mono)"
+                  fontWeight="800"
+                  fill={color}
+                  letterSpacing="0.05em"
+                >
+                  {label.code}
+                </text>
+                <text
+                  x={W - PAD_R + 20}
+                  y={label.labelY + 9}
+                  fontSize="9.5"
+                  fontFamily="var(--font-geist-mono)"
+                  fontWeight="700"
+                  fill="#14161A"
+                >
+                  09 {label.value.toFixed(2)}
+                </text>
+              </g>
+            )}
             {entryTime !== null && entryTime >= t0 && entryTime <= tEnd && (
               <g>
                 <circle
@@ -627,15 +676,6 @@ function ChannelDiagram({
                   stroke={color}
                   strokeWidth={1.2}
                 />
-                <text
-                  x={Math.min(W - PAD_R - 66, xOf(entryTime) + 7)}
-                  y={yOf(entryValue) - 5}
-                  fontSize="8"
-                  fontFamily="var(--font-geist-mono)"
-                  fill={color}
-                >
-                  {lineCode(line.kind)} 09 {entryValue.toFixed(2)}
-                </text>
               </g>
             )}
           </g>
@@ -837,6 +877,49 @@ function formatChartTime(iso: string): string {
     minute: "2-digit",
     hour12: false,
   }).format(new Date(ms))} CT`;
+}
+
+type EsChartLabel = {
+  key: string;
+  code: string;
+  value: number;
+  endValue: number;
+  y: number;
+  color: string;
+  labelY: number;
+};
+
+function distributeEsChartLabels(
+  labels: Array<Omit<EsChartLabel, "labelY">>,
+  minY: number,
+  maxY: number,
+): EsChartLabel[] {
+  const minGap = 30;
+  const sorted = labels
+    .filter(
+      (label) =>
+        Number.isFinite(label.value) &&
+        Number.isFinite(label.endValue) &&
+        Number.isFinite(label.y),
+    )
+    .sort((a, b) => a.y - b.y);
+  const placed = sorted.map((label, index) => {
+    const previous = index === 0 ? minY : sorted[index - 1].y + minGap;
+    return {
+      ...label,
+      labelY: Math.max(minY, Math.min(maxY, Math.max(label.y, previous))),
+    };
+  });
+  for (let index = placed.length - 2; index >= 0; index -= 1) {
+    placed[index].labelY = Math.min(
+      placed[index].labelY,
+      placed[index + 1].labelY - minGap,
+    );
+  }
+  return placed.map((label) => ({
+    ...label,
+    labelY: Math.max(minY, Math.min(maxY, label.labelY)),
+  }));
 }
 
 function lineCode(kind: string): string {
