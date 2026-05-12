@@ -156,7 +156,7 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
                 }))}
                 flipCondition={snap.flipCondition}
                 currentStateLabel={displayedStateLabel}
-                className="hidden h-7 items-center gap-1.5 rounded-pill border border-rule bg-paper px-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-2 transition-colors hover:border-rule-strong hover:bg-paper-2 sm:inline-flex"
+                className="hidden h-7 items-center gap-1.5 whitespace-nowrap rounded-pill border border-rule bg-paper px-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-2 transition-colors hover:border-rule-strong hover:bg-paper-2 sm:inline-flex"
               />
             </div>
           </div>
@@ -244,7 +244,7 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
             )}
           </p>
 
-          <ExecutionRead items={executionRead} />
+          <ExecutionRead items={executionRead} className="hidden lg:block" />
         </div>
 
         <div className="hidden lg:block absolute left-[41.666%] top-7 bottom-7 w-px bg-rule" />
@@ -311,6 +311,7 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
               />
             </div>
           )}
+          <ExecutionRead items={executionRead} className="lg:hidden" />
         </div>
       </div>
     </Card>
@@ -415,9 +416,15 @@ function executionPostureCopy(state: EngineState, condition: string): string {
   return condition || "Trade has resolved; stand down until the next valid setup.";
 }
 
-function ExecutionRead({ items }: { items: ExecutionReadItem[] }) {
+function ExecutionRead({
+  items,
+  className = "",
+}: {
+  items: ExecutionReadItem[];
+  className?: string;
+}) {
   return (
-    <div className="mt-6 rounded-[14px] border border-rule bg-paper/80 p-4 shadow-rule">
+    <div className={`mt-6 rounded-[14px] border border-rule bg-paper/80 p-4 shadow-rule ${className}`}>
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <div className="eyebrow text-ink-3">Execution read</div>
