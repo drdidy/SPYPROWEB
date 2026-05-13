@@ -109,6 +109,17 @@ def _calendar_event(row: dict) -> dict:
     }
 
 
+def _news_session_use(now_ct: datetime, newest_at: datetime | None) -> tuple[str, str]:
+    if now_ct.hour >= 16:
+        return "recap_only", "Post-close headlines are recap context, not 0DTE trade inputs."
+    if newest_at is None:
+        return "unverified", "Headline timestamps were not available; treat news as context only."
+    age_minutes = max(0, int((now_ct - newest_at).total_seconds() // 60))
+    if age_minutes <= 90:
+        return "live_plan", "Fresh enough for the active session read."
+    return "stale_watch", "Older than 90 minutes; do not treat as a live 0DTE catalyst."
+
+
 def _http_json(url: str, headers: dict[str, str] | None = None, timeout: float = 6.0) -> Any:
     req = urllib.request.Request(url, method="GET")
     for key, value in (headers or {}).items():
@@ -127,6 +138,7 @@ def fetch_market_news(limit: int = 6) -> dict:
       - FINNHUB_API_KEY
       - NEWS_API_KEY
     """
+    now_ct = datetime.now(CT)
     finnhub = _finnhub_key()
     if finnhub:
         general_raw = _http_json(
@@ -152,9 +164,13 @@ def fetch_market_news(limit: int = 6) -> dict:
                 continue
             seen.add(headline.lower())
             rows.append(row)
+        newest_at = _newest_news_time(rows)
+        use, use_label = _news_session_use(now_ct, newest_at)
         return {
             "available": bool(rows),
             "source": "connected_news",
+            "sessionUse": use,
+            "sessionUseLabel": use_label,
             "items": [
                 {
                     "headline": _clean_text(row.get("headline"), 180),
@@ -162,6 +178,7 @@ def fetch_market_news(limit: int = 6) -> dict:
                     "source": row.get("source"),
                     "url": row.get("url"),
                     "publishedAt": row.get("datetime"),
+                    "ageMinutes": _news_age_minutes(now_ct, row.get("datetime")),
                 }
                 for row in rows[:limit]
                 if isinstance(row, dict)
@@ -181,9 +198,13 @@ def fetch_market_news(limit: int = 6) -> dict:
         )
         raw = _http_json(f"https://newsapi.org/v2/everything?{q}")
         rows = raw.get("articles") if isinstance(raw, dict) else []
+        newest_at = _newest_news_time(rows)
+        use, use_label = _news_session_use(now_ct, newest_at)
         return {
             "available": bool(rows),
             "source": "connected_news",
+            "sessionUse": use,
+            "sessionUseLabel": use_label,
             "items": [
                 {
                     "headline": _clean_text(row.get("title"), 180),
@@ -191,6 +212,7 @@ def fetch_market_news(limit: int = 6) -> dict:
                     "source": (row.get("source") or {}).get("name") if isinstance(row.get("source"), dict) else None,
                     "url": row.get("url"),
                     "publishedAt": row.get("publishedAt"),
+                    "ageMinutes": _news_age_minutes(now_ct, row.get("publishedAt")),
                 }
                 for row in (rows or [])[:limit]
                 if isinstance(row, dict)
@@ -200,9 +222,36 @@ def fetch_market_news(limit: int = 6) -> dict:
     return {
         "available": False,
         "source": None,
+        "sessionUse": "unavailable",
+        "sessionUseLabel": "No connected headline feed is available.",
         "items": [],
         "reason": "No news provider key configured.",
     }
+
+
+def _news_datetime(value: object) -> datetime | None:
+    if value is None:
+        return None
+    try:
+        if isinstance(value, (int, float)) or str(value).isdigit():
+            return datetime.fromtimestamp(float(value), tz=CT)
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return parsed.astimezone(CT)
+    except (TypeError, ValueError, OSError):
+        return None
+
+
+def _newest_news_time(rows: list[dict]) -> datetime | None:
+    times = [_news_datetime(row.get("datetime") or row.get("publishedAt")) for row in rows if isinstance(row, dict)]
+    loaded = [dt for dt in times if dt is not None]
+    return max(loaded) if loaded else None
+
+
+def _news_age_minutes(now_ct: datetime, value: object) -> int | None:
+    dt = _news_datetime(value)
+    if dt is None:
+        return None
+    return max(0, int((now_ct - dt).total_seconds() // 60))
 
 
 def fetch_economic_calendar(now: datetime | None = None) -> dict:

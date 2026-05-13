@@ -47,6 +47,7 @@ type BriefSectionKey =
 
 interface BriefResponse {
   brief: string;
+  story?: string;
   sections?: Array<{ section: BriefSectionKey; body: string }>;
   tldr?: { bias?: string | null; action?: string | null; invalidation?: string | number | null };
   bullCase?: CaseRead | null;
@@ -103,6 +104,8 @@ interface BriefDossier {
       source?: string | null;
       reason?: string;
       items?: Array<{ headline?: string; source?: string | null; publishedAt?: string | number | null }>;
+      sessionUse?: "live_plan" | "recap_only" | "stale_watch" | "unverified" | "unavailable" | string;
+      sessionUseLabel?: string;
     };
     economicCalendar?: {
       available?: boolean;
@@ -272,10 +275,12 @@ export default async function Page() {
               meta={brief.degraded ? "Generated from safe engine template" : "Structured session plan"}
               action={<CircleDot className="h-5 w-5 text-gold-soft" />}
             />
-            <CardBody className="grid gap-2">
-              {sections.map((section) => (
-                <NarrativeSection key={section.section} section={section.section} body={section.body} />
-              ))}
+            <CardBody className="grid gap-4">
+              <StoryNarrative story={brief.story || storyFromSections(sections)} />
+              <div className="grid gap-3 lg:grid-cols-2">
+                <StoryDetail title="What changes the plan" body={sectionBody(sections, "WHAT_CHANGES_THE_PLAN")} />
+                <StoryDetail title="Operator checklist" body={sectionBody(sections, "OPENING_CHECKLIST")} />
+              </div>
             </CardBody>
           </Card>
           <OperatorRail spy={spy} es={es} spyOptions={spyOptions} spxOptions={spxOptions} snap={snap} tldr={tldr} />
@@ -517,11 +522,20 @@ function SectionTitle({ number, title }: { number: string; title: string }) {
   );
 }
 
-function NarrativeSection({ section, body }: { section: BriefSectionKey; body: string }) {
+function StoryNarrative({ story }: { story: string }) {
   return (
-    <section className="border-l-2 border-gold/70 pl-4">
-      <h3 className="font-mono text-[14px] font-bold uppercase tracking-[0.12em] text-gold-soft">{SECTION_LABELS[section]}</h3>
-      <p className="mt-2 text-[16px] leading-[1.55] text-paper/82 print:text-ink-2">{renderTokenized(body)}</p>
+    <section className="rounded-[14px] border border-paper/10 bg-paper/[0.045] p-4">
+      <h3 className="font-mono text-[13px] font-bold uppercase tracking-[0.12em] text-gold-soft">Session story</h3>
+      <p className="mt-3 max-w-4xl text-[17px] leading-[1.65] text-paper/88 print:text-ink-2">{renderTokenized(story)}</p>
+    </section>
+  );
+}
+
+function StoryDetail({ title, body }: { title: string; body: string }) {
+  return (
+    <section className="rounded-[12px] border border-paper/10 bg-[#050D12]/45 p-4">
+      <h3 className="font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-gold-soft">{title}</h3>
+      <p className="mt-2 text-[14px] leading-[1.55] text-paper/74 print:text-ink-2">{renderTokenized(body)}</p>
     </section>
   );
 }
@@ -655,13 +669,24 @@ function MacroPanel({ macro }: { macro?: BriefDossier["macro"] }) {
   const calendar = macro?.economicCalendar;
   const newsItems = news?.items ?? [];
   const events = normalizeCalendarEvents(calendar?.events ?? []);
+  const recapOnly = news?.sessionUse === "recap_only" || news?.sessionUse === "stale_watch";
   return (
     <div className="grid gap-4 xl:grid-cols-2">
       <Card>
-        <CardHeader eyebrow="Market news" title={news?.available ? "Headlines" : "Headlines unavailable"} action={<Newspaper className="h-5 w-5 text-gold-ink" />} />
+        <CardHeader
+          eyebrow="Market news"
+          title={news?.available ? (recapOnly ? "Context, not a trigger" : "Headlines") : "Headlines unavailable"}
+          meta={news?.sessionUseLabel}
+          action={<Newspaper className="h-5 w-5 text-gold-ink" />}
+        />
         <CardBody>
           {newsItems.length > 0 ? (
             <div className="space-y-3">
+              {recapOnly && (
+                <div className="rounded-[12px] border border-gold/25 bg-gold/10 px-3 py-2 text-[12px] leading-relaxed text-gold-ink">
+                  These headlines are post-close context. They are not used as live 0DTE trade triggers.
+                </div>
+              )}
               {newsItems.slice(0, 5).map((item, i) => (
                 <div key={`${item.headline}-${i}`} className="rounded-[12px] border border-rule bg-paper-2/60 px-3 py-3">
                   <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-3">
@@ -772,6 +797,18 @@ function normalizedSections(brief: BriefResponse): Array<{ section: BriefSection
       return key ? { section: key, body: stripPublicArtifacts(match[2]) } : null;
     })
     .filter(Boolean) as Array<{ section: BriefSectionKey; body: string }>;
+}
+
+function sectionBody(sections: Array<{ section: BriefSectionKey; body: string }>, key: BriefSectionKey): string {
+  return sections.find((section) => section.section === key)?.body || "No additional condition is available for this session.";
+}
+
+function storyFromSections(sections: Array<{ section: BriefSectionKey; body: string }>): string {
+  const order: BriefSectionKey[] = ["MARKET_READ", "SPY_PLAN", "ES_PLAN", "OPTIONS_PRESSURE", "NEWS_AND_CALENDAR"];
+  return order
+    .map((key) => sections.find((section) => section.section === key)?.body)
+    .filter((body): body is string => Boolean(body))
+    .join(" ");
 }
 
 function stripPublicArtifacts(text: string): string {

@@ -78,6 +78,7 @@ and when to stand down.
 
 Return JSON only, with this exact shape:
 {
+  "story": "One plain-English session story in 120-190 words.",
   "sections": [
     {"section": "MARKET_READ", "body": "..."},
     {"section": "SPY_PLAN", "body": "..."},
@@ -110,14 +111,20 @@ Return JSON only, with this exact shape:
 
 Rules:
 - No markdown. No bullets. No literal asterisks.
+- Lead with the story. It should read like a calm trading-room recap:
+  first the market backdrop, then SPY, then ES, then options/news,
+  then the exact decision. A novice should understand why the plan is
+  stand down, watch, or act without reading a glossary first.
 - Never mention the model, provider, infrastructure, or env vars.
+- If macro.news.sessionUse is recap_only or stale_watch, say headlines are
+  context only and do not treat them as a current 0DTE trigger.
 - Expand acronyms on first use within a section when useful.
 - Prices must include the ticker when the sentence could be ambiguous.
 - Cap prices to two decimals.
 - Do not invent confidence or probability numbers. Use null when absent.
 - Word caps: MARKET_READ 80, SPY_PLAN 100, ES_PLAN 100,
   OPTIONS_PRESSURE 90, NEWS_AND_CALENDAR 80, WHAT_CHANGES_THE_PLAN 80,
-  OPENING_CHECKLIST 70."""
+  OPENING_CHECKLIST 70. Story cap: 190 words."""
 
 
 REVIEW_PROMPT = """You are the final reviewer for the SPY Prophet Daily
@@ -418,6 +425,17 @@ def _engine_fallback_sections(dossier: dict) -> dict:
     gex = spy_opts.get("gex") or {}
     first_lines = spy.get("watchLines") or []
     first_line = first_lines[0] if first_lines else {}
+    macro = dossier.get("macro") or {}
+    news = macro.get("news") if isinstance(macro.get("news"), dict) else {}
+    news_use = news.get("sessionUseLabel") or "Headline feed is context only."
+    story = (
+        f"SPY is trading around {spy_price if spy_price is not None else 'an unavailable last price'} while the engine is in "
+        f"{spy_state}. The important point is discipline: {spy_reason} ES is {es_state}"
+        + (f" with {es_scenario} context" if es_scenario else "")
+        + f", so the futures read is a backdrop, not a reason to force a trade. Options flow is {flow.get('lean', 'unavailable')} "
+        f"and dealer gamma is {gex.get('regime', 'unavailable')}; missing options data remains a no-read. "
+        f"{news_use} The plan is to respect the nearest line, wait for confirmation, and stand down if price breaks structure instead of reacting cleanly."
+    )
 
     sections = [
         {
@@ -452,6 +470,7 @@ def _engine_fallback_sections(dossier: dict) -> dict:
         },
     ]
     return {
+        "story": story,
         "sections": sections,
         "tldr": {
             "bias": str((spy.get("bias") or {}).get("label") or "Neutral").title(),
@@ -486,6 +505,9 @@ def _sections_to_text(structured: dict) -> str:
         "OPENING_CHECKLIST": "Opening checklist",
     }
     rows = []
+    story = structured.get("story")
+    if isinstance(story, str) and story.strip():
+        rows.append(f"Session story: {story.strip()}")
     for row in structured.get("sections") or []:
         if not isinstance(row, dict):
             continue
@@ -527,6 +549,10 @@ def _validate_structured_brief(payload: dict | None) -> dict | None:
     serialized = json.dumps(payload, ensure_ascii=False)
     if any(token in serialized for token in FORBIDDEN_PUBLIC_TOKENS):
         return None
+    story = payload.get("story")
+    if not isinstance(story, str) or not story.strip() or _word_count(story) > 190:
+        return None
+    payload["story"] = story.strip()
     sections = payload.get("sections")
     if not isinstance(sections, list):
         return None
@@ -642,6 +668,7 @@ def _build_brief() -> dict:
     review_ready = getattr(ai_router, "has_" + "open" + "ai_key")()
     payload = {
         "brief": brief,
+        "story": structured.get("story"),
         "sections": structured.get("sections"),
         "tldr": structured.get("tldr"),
         "bullCase": structured.get("bullCase"),
