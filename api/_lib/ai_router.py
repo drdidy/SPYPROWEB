@@ -160,7 +160,7 @@ def daily_brief(
             user=f"{review_user_prefix}\n\nDeepSeek draft:\n{draft}",
             temperature=0.1,
             max_tokens=max_tokens,
-            timeout=min(timeout, 10.0),
+            timeout=timeout,
         )
         if reviewed:
             return AIResult(
