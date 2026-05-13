@@ -12,13 +12,25 @@ import { useMemo, useState, type KeyboardEvent, type PointerEvent } from "react"
 
 import type { AdaptedSnapshot, AnchorGroup } from "@/lib/snapshot-adapter";
 import type { SPXSnapshot, SPXLine } from "@/lib/types";
+import { PLAYBACK_SPEEDS, type PlaybackSpeed } from "@/lib/replay/config";
 import type { IntradayBar, IntradayResponse } from "./ReplayWorkspace";
 
 interface Props {
   spy: AdaptedSnapshot | null;
   spx: SPXSnapshot | null;
   intraday: IntradayResponse;
+  spyPlayback: ReplayChartPlayback;
+  esPlayback: ReplayChartPlayback;
+}
+
+export interface ReplayChartPlayback {
   playhead: number;
+  playing: boolean;
+  speed: PlaybackSpeed;
+  onToggle: () => void;
+  onStep: (delta: number) => void;
+  onScrub: (value: number) => void;
+  onSpeed: (value: PlaybackSpeed) => void;
 }
 
 interface LineProjection {
@@ -40,14 +52,14 @@ interface TouchEvent {
 const SPY_BAND_OFFSET = 3.4;
 const SPY_SLOPE = -0.2;
 
-export function ReplayPlayback({ spy, spx, intraday, playhead }: Props) {
+export function ReplayPlayback({ spy, spx, intraday, spyPlayback, esPlayback }: Props) {
   return (
     <div className="grid grid-cols-1 gap-5">
-      <SPYPlaybackPanel snap={spy} bars={intraday.spy} playhead={playhead} />
+      <SPYPlaybackPanel snap={spy} bars={intraday.spy} playback={spyPlayback} />
       <SPXPlaybackPanel
         snap={spx}
         bars={intraday.es}
-        playhead={playhead}
+        playback={esPlayback}
       />
     </div>
   );
@@ -60,11 +72,11 @@ export function ReplayPlayback({ spy, spx, intraday, playhead }: Props) {
 function SPYPlaybackPanel({
   snap,
   bars,
-  playhead,
+  playback,
 }: {
   snap: AdaptedSnapshot | null;
   bars: IntradayBar[];
-  playhead: number;
+  playback: ReplayChartPlayback;
 }) {
   const anchor = snap?.anchor?.primary ?? null;
 
@@ -78,7 +90,7 @@ function SPYPlaybackPanel({
       title="SPY - 03:00 to 15:00 CT"
       bars={bars}
       lines={lines}
-      playhead={playhead}
+      playback={playback}
       priceColor="#F4E4C0"
       emptyMsg={
         anchor
@@ -118,11 +130,11 @@ function spyAnchorProjections(anchor: AnchorGroup, slope: number): LineProjectio
 function SPXPlaybackPanel({
   snap,
   bars,
-  playhead,
+  playback,
 }: {
   snap: SPXSnapshot | null;
   bars: IntradayBar[];
-  playhead: number;
+  playback: ReplayChartPlayback;
 }) {
   const lines = useMemo<LineProjection[]>(() => {
     if (!snap) return [];
@@ -134,7 +146,7 @@ function SPXPlaybackPanel({
       title="ES - overnight plus RTH"
       bars={bars}
       lines={lines}
-      playhead={playhead}
+      playback={playback}
       priceColor="#F4E4C0"
       emptyMsg={
         snap
@@ -187,14 +199,14 @@ function PanelChart({
   title,
   bars,
   lines,
-  playhead,
+  playback,
   priceColor,
   emptyMsg,
 }: {
   title: string;
   bars: IntradayBar[];
   lines: LineProjection[];
-  playhead: number;
+  playback: ReplayChartPlayback;
   priceColor: string;
   emptyMsg: string;
 }) {
@@ -207,6 +219,7 @@ function PanelChart({
 
   const hasBars = bars.length > 0;
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const { playhead } = playback;
 
   // Time axis: from first bar to last bar.
   const t0Ms = hasBars ? new Date(bars[0].t).getTime() : 0;
@@ -617,6 +630,8 @@ function PanelChart({
         </svg>
       )}
 
+      <ChartTransport title={title} disabled={!hasBars || lines.length === 0} playback={playback} />
+
       {/* touch event log */}
       {visibleTouches.length > 0 && (
         <div className="mt-3 max-h-32 overflow-y-auto space-y-1">
@@ -637,6 +652,76 @@ function PanelChart({
             ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function ChartTransport({
+  title,
+  disabled,
+  playback,
+}: {
+  title: string;
+  disabled: boolean;
+  playback: ReplayChartPlayback;
+}) {
+  return (
+    <div className="mt-3 rounded-[12px] border border-paper/10 bg-paper/[0.04] px-3 py-3">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => playback.onStep(-1)}
+            className="h-9 rounded-[8px] border border-paper/10 bg-paper/[0.06] px-3 font-mono text-[12px] uppercase tracking-[0.08em] text-paper/70 transition hover:text-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:cursor-not-allowed disabled:opacity-35"
+          >
+            Back
+          </button>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={playback.onToggle}
+            className="inline-flex h-9 items-center justify-center rounded-[8px] bg-paper px-4 font-mono text-[12px] uppercase tracking-[0.08em] text-ink transition hover:bg-gold-tint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:cursor-not-allowed disabled:opacity-35"
+            aria-label={`${playback.playing ? "Pause" : "Play"} ${title}`}
+          >
+            {playback.playing ? "Pause" : "Play"}
+          </button>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => playback.onStep(1)}
+            className="h-9 rounded-[8px] border border-paper/10 bg-paper/[0.06] px-3 font-mono text-[12px] uppercase tracking-[0.08em] text-paper/70 transition hover:text-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:cursor-not-allowed disabled:opacity-35"
+          >
+            Forward
+          </button>
+        </div>
+        <input
+          aria-label={`${title} replay timeline`}
+          type="range"
+          min={0}
+          max={1}
+          step={0.005}
+          value={playback.playhead}
+          disabled={disabled}
+          onChange={(event) => playback.onScrub(Number(event.target.value))}
+          className="min-w-[180px] flex-1 accent-gold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+        />
+        <div className="flex items-center gap-1 rounded-pill border border-paper/10 p-1">
+          {PLAYBACK_SPEEDS.map((item) => (
+            <button
+              key={item}
+              type="button"
+              disabled={disabled}
+              onClick={() => playback.onSpeed(item)}
+              className={`h-7 rounded-pill px-3 font-mono text-[12px] tabular-nums transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:cursor-not-allowed disabled:opacity-40 ${
+                playback.speed === item ? "bg-paper text-ink" : "text-paper/64 hover:text-paper"
+              }`}
+            >
+              {item}x
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

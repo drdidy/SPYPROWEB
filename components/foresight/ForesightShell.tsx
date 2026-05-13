@@ -76,6 +76,7 @@ export function ForesightShell({
           <ScenariosPanel
             activeScenarioKeys={activeScenarioKeys}
             mockParam={mockParam}
+            engine={snapshot.engine}
           />
         </section>
         <section className="space-y-3">
@@ -109,6 +110,7 @@ function Hero({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <EngineToggle active={snapshot.engine} />
           <StatusChip status={snapshot.status} />
           <span className="rounded-pill border border-rule-strong bg-paper px-3 py-2 font-mono text-[11px] uppercase tracking-[0.10em] text-ink-2">
             {snapshot.sessionId}
@@ -121,6 +123,28 @@ function Hero({
         </p>
       )}
     </header>
+  );
+}
+
+function EngineToggle({ active }: { active: "spy" | "es" }) {
+  return (
+    <div className="inline-flex rounded-pill border border-rule bg-paper p-1">
+      {(["spy", "es"] as const).map((engine) => (
+        <a
+          key={engine}
+          href={engine === "spy" ? "/foresight?engine=spy" : "/foresight?engine=es"}
+          aria-current={active === engine ? "page" : undefined}
+          className={cn(
+            "rounded-pill px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.10em] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/40",
+            active === engine
+              ? "bg-ink text-paper"
+              : "text-ink-3 hover:text-ink",
+          )}
+        >
+          {engine}
+        </a>
+      ))}
+    </div>
   );
 }
 
@@ -430,9 +454,11 @@ function MatrixCell({
 function ScenariosPanel({
   activeScenarioKeys,
   mockParam,
+  engine,
 }: {
   activeScenarioKeys: ScenarioKind[];
   mockParam?: string | null;
+  engine: "spy" | "es";
 }) {
   const active = new Set(activeScenarioKeys);
 
@@ -453,7 +479,7 @@ function ScenariosPanel({
                 key={kind}
                 role="button"
                 aria-pressed={isActive}
-                href={scenarioHref(activeScenarioKeys, kind, mockParam)}
+                href={scenarioHref(activeScenarioKeys, kind, mockParam, engine)}
                 className={cn(
                   "block min-h-11 rounded-soft border px-3 py-3 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-gold/40",
                   isActive
@@ -473,7 +499,7 @@ function ScenariosPanel({
         </div>
         {activeScenarioKeys.length > 0 && (
           <a
-            href={baseHref(mockParam)}
+            href={baseHref(mockParam, engine)}
             className="inline-flex min-h-11 items-center gap-2 rounded-soft border border-rule bg-paper px-3 py-2 font-mono text-[11px] uppercase tracking-[0.10em] text-ink outline-none focus-visible:ring-2 focus-visible:ring-gold/40"
           >
             <RotateCcw className="h-3.5 w-3.5" aria-hidden />
@@ -616,11 +642,13 @@ function scenarioHref(
   activeScenarioKeys: ScenarioKind[],
   kind: ScenarioKind,
   mockParam?: string | null,
+  engine: "spy" | "es" = "spy",
 ) {
   const values = new Set(activeScenarioKeys);
   if (values.has(kind)) values.delete(kind);
   else values.add(kind);
   const params = new URLSearchParams();
+  params.set("engine", engine);
   if (mockParam) params.set("mock", mockParam);
   const serialized = Array.from(values).join(",");
   if (serialized) params.set("scenarios", serialized);
@@ -628,9 +656,11 @@ function scenarioHref(
   return query ? `/foresight?${query}` : "/foresight";
 }
 
-function baseHref(mockParam?: string | null) {
-  if (!mockParam) return "/foresight";
-  return `/foresight?${new URLSearchParams({ mock: mockParam }).toString()}`;
+function baseHref(mockParam?: string | null, engine: "spy" | "es" = "spy") {
+  const params = new URLSearchParams();
+  params.set("engine", engine);
+  if (mockParam) params.set("mock", mockParam);
+  return `/foresight?${params.toString()}`;
 }
 
 function formatPrice(value: number) {

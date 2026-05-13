@@ -1,5 +1,5 @@
 import type { AdaptedSnapshot } from "@/lib/snapshot-adapter";
-import type { LineCode, LineType } from "@/lib/contracts/channel";
+import type { Engine, LineCode, LineType } from "@/lib/contracts/channel";
 import { ProjectionSnapshot as ProjectionSnapshotSchema } from "@/lib/contracts/foresight";
 import type {
   ForesightStatus,
@@ -12,6 +12,7 @@ import type {
   ScenarioInput,
 } from "@/lib/contracts/foresight";
 import type { DynamicLine } from "@/lib/types";
+import type { SPXLine, SPXSnapshot } from "@/lib/types";
 import {
   currentPrice as mockCurrentPrice,
   lines as mockLines,
@@ -46,9 +47,10 @@ export function buildForesightSnapshot({
   const last = shouldUseMockLines(mock, snap.lines.length)
     ? mockCurrentPrice
     : snap.currentPrice;
-  const lines = rawLines
+  const selectedRawLines = selectSpyForesightLines(rawLines, mock);
+  const lines = selectedRawLines
     .map(toProjectionLine)
-    .slice(0, mock === "foresight:live-dense" ? 12 : 12);
+    .slice(0, mock === "foresight:live-dense" ? 12 : 6);
   const status = resolveStatus({ mock, source, lineCount: lines.length, generatedAt });
   const adjustedLines = activeScenarios.length
     ? lines.map((line) => applyScenarios(line, activeScenarios, last))
@@ -79,6 +81,54 @@ export function buildForesightSnapshot({
   });
 }
 
+export function buildEsForesightSnapshot({
+  snap,
+  source,
+  mock,
+  activeScenarios = [],
+}: {
+  snap: SPXSnapshot;
+  source: string;
+  mock?: string | null;
+  activeScenarios?: ScenarioInput[];
+}): ProjectionSnapshot {
+  const generatedAt = snap.asOf || new Date().toISOString();
+  const sessionId = snap.sessionDateCT || toCtSessionId(new Date(generatedAt));
+  const projectionId = `proj_es_${sessionId.replaceAll("-", "")}_${hashSeed(generatedAt)}`;
+  const hours = buildHourBuckets(new Date(generatedAt), sessionId);
+  const rawLines = selectEsForesightLines(snap.lines);
+  const lines = rawLines.map(toEsProjectionLine).slice(0, 6);
+  const last = snap.price.last;
+  const status = resolveStatus({ mock, source, lineCount: lines.length, generatedAt });
+  const adjustedLines = activeScenarios.length
+    ? lines.map((line) => applyScenarios(line, activeScenarios, last))
+    : lines;
+  const matrix = buildMatrix({
+    engine: "es",
+    sessionId,
+    last,
+    generatedAt,
+    projectionId,
+    hours,
+    lines: adjustedLines,
+  });
+
+  return ProjectionSnapshotSchema.parse({
+    status,
+    engine: "es",
+    sessionId,
+    matrix,
+    generatedAt,
+    ruleVersion: FORESIGHT_RULE_VERSION,
+    sourceLastTick: snap._meta?.quoteCapturedAt ?? snap.asOf ?? generatedAt,
+    nextRefreshAt: new Date(
+      Date.parse(generatedAt) + FORESIGHT_CONFIDENCE_THRESHOLDS.refreshMs,
+    ).toISOString(),
+    projectionId,
+    diagnostics: diagnosticsFor(status, lines.length),
+  });
+}
+
 function shouldUseMockLines(mock: string | null | undefined, lineCount: number) {
   return Boolean(mock?.startsWith("foresight:") && mock !== "foresight:failed" && lineCount === 0);
 }
@@ -92,7 +142,7 @@ function buildMatrix({
   hours,
   lines,
 }: {
-  engine: "spy";
+  engine: Engine;
   sessionId: string;
   last: number;
   generatedAt: string;
@@ -141,6 +191,88 @@ function buildMatrix({
     lines,
     cells,
   };
+}
+
+function selectSpyForesightLines(lines: DynamicLine[], mock: string | null | undefined): DynamicLine[] {
+  if (mock === "foresight:live-dense") return lines;
+  const seen = new Set<string>();
+  const add = (out: DynamicLine[], line: DynamicLine | undefined) => {
+    if (!line) return;
+    const key = `${line.kind}:${line.name}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(line);
+  };
+  const out: DynamicLine[] = [];
+  const primaryAnchors = lines.filter(
+    (line) =>
+      (line.kind === "ANC_ASC" || line.kind === "ANC_DESC") &&
+      line.isPrimary &&
+      !/backup|secondary/i.test(line.name),
+  );
+  const fallbackAnchors = lines.filter(
+    (line) =>
+      (line.kind === "ANC_ASC" || line.kind === "ANC_DESC") &&
+      !/backup|secondary/i.test(line.name),
+  );
+  for (const line of (primaryAnchors.length ? primaryAnchors : fallbackAnchors).slice(0, 3)) {
+    add(out, line);
+  }
+  add(out, lines.find((line) => line.kind === "PDH"));
+  add(out, lines.find((line) => line.kind === "PDL"));
+  add(out, lines.find((line) => line.kind === "DAY_OPEN"));
+  for (const line of lines) {
+    if (out.length >= 6) break;
+    if (/backup|secondary/i.test(line.name)) continue;
+    add(out, line);
+  }
+  return out.slice(0, 6);
+}
+
+function selectEsForesightLines(lines: SPXLine[]): SPXLine[] {
+  const order = [
+    "PREV_RTH_HIGH_ASC",
+    "PREV_RTH_LOW_DESC",
+    "SWING_HIGH_ASC",
+    "SWING_HIGH_DESC",
+    "SWING_LOW_ASC",
+    "SWING_LOW_DESC",
+  ];
+  return order
+    .map((kind) => lines.find((line) => line.kind === kind))
+    .filter((line): line is SPXLine => Boolean(line));
+}
+
+function toEsProjectionLine(line: SPXLine): ProjectionLine {
+  const codeByKind: Record<string, LineCode> = {
+    PREV_RTH_HIGH_ASC: "UR",
+    PREV_RTH_LOW_DESC: "LR",
+    SWING_HIGH_ASC: "UA",
+    SWING_HIGH_DESC: "UD",
+    SWING_LOW_ASC: "LA",
+    SWING_LOW_DESC: "LD",
+  };
+  return {
+    id: stableId(line.kind, 0),
+    code: codeByKind[line.kind] ?? "MR",
+    type: line.slopePerHour === 0 ? "horizontal" : line.slopePerHour > 0 ? "ascending" : "descending",
+    label: esLineLabel(line.kind),
+    sourceName: line.name || line.kind,
+    slopePerHour: Number.isFinite(line.slopePerHour) ? line.slopePerHour : 0,
+    currentValue: Number.isFinite(line.currentValue) ? line.currentValue : line.anchorPrice,
+  };
+}
+
+function esLineLabel(kind: string): string {
+  const labels: Record<string, string> = {
+    PREV_RTH_HIGH_ASC: "Previous RTH high ascending",
+    PREV_RTH_LOW_DESC: "Previous RTH low descending",
+    SWING_HIGH_ASC: "Swing high ascending",
+    SWING_HIGH_DESC: "Swing high descending",
+    SWING_LOW_ASC: "Swing low ascending",
+    SWING_LOW_DESC: "Swing low descending",
+  };
+  return labels[kind] ?? kind.replaceAll("_", " ").toLowerCase();
 }
 
 function projectedValue(line: ProjectionLine, generatedAt: string, at: string) {

@@ -6,8 +6,10 @@ import {
   useMemo,
   useRef,
   useState,
+  type Dispatch,
   type ReactNode,
   type RefObject,
+  type SetStateAction,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -42,7 +44,7 @@ import {
   type RawSnapshot,
 } from "@/lib/snapshot-adapter";
 import type { SPXLine, SPXSnapshot } from "@/lib/types";
-import { ReplayPlayback } from "./ReplayPlayback";
+import { ReplayPlayback, type ReplayChartPlayback } from "./ReplayPlayback";
 
 export interface IntradayBar {
   t: string;
@@ -96,6 +98,7 @@ export function ReplayWorkspace({ initialDate }: Props) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const initialTimeRef = useRef(searchParams?.get("t") ?? null);
 
   const [draft, setDraft] = useState(initialDate ?? "");
   const [date, setDate] = useState<string | null>(initialDate);
@@ -108,8 +111,10 @@ export function ReplayWorkspace({ initialDate }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [playhead, setPlayhead] = useState(0);
-  const [playing, setPlaying] = useState(false);
+  const [spyPlayhead, setSpyPlayhead] = useState(0);
+  const [esPlayhead, setEsPlayhead] = useState(0);
+  const [spyPlaying, setSpyPlaying] = useState(false);
+  const [esPlaying, setEsPlaying] = useState(false);
   const [speed, setSpeed] = useState<PlaybackSpeed>(() =>
     parseSpeed(searchParams?.get("speed")),
   );
@@ -138,6 +143,7 @@ export function ReplayWorkspace({ initialDate }: Props) {
     const sp = new URLSearchParams(searchParams?.toString() ?? "");
     if (normalized) sp.set("date", normalized);
     else sp.delete("date");
+    sp.delete("t");
     const qs = sp.toString();
     router.push(qs ? `${pathname}?${qs}` : pathname);
     setDraft(normalized ?? "");
@@ -151,15 +157,18 @@ export function ReplayWorkspace({ initialDate }: Props) {
       setIntraday(null);
       setError(null);
       setLoading(false);
-      setPlaying(false);
-      setPlayhead(0);
+      setSpyPlaying(false);
+      setEsPlaying(false);
+      setSpyPlayhead(0);
+      setEsPlayhead(0);
       return;
     }
 
     let abort = false;
     setLoading(true);
     setError(null);
-    setPlaying(false);
+    setSpyPlaying(false);
+    setEsPlaying(false);
 
     Promise.all([
       fetch(`/api/snapshot?date=${date}`, { cache: "no-store" })
@@ -190,19 +199,25 @@ export function ReplayWorkspace({ initialDate }: Props) {
       setIntraday(nextIntraday);
       setError(errs.length ? errs.join(" ") : null);
       setLoading(false);
-      const initialTime = searchParams?.get("t");
-      const initialPlayhead =
-        initialTime && nextIntraday
-          ? playheadForTime(nextIntraday.es.length ? nextIntraday.es : nextIntraday.spy, initialTime)
+      const initialTime = initialTimeRef.current;
+      initialTimeRef.current = null;
+      const initialSpyPlayhead =
+        initialTime && nextIntraday?.spy?.length
+          ? playheadForTime(nextIntraday.spy, initialTime)
           : null;
-      setPlayhead(initialPlayhead ?? 0);
+      const initialEsPlayhead =
+        initialTime && nextIntraday?.es?.length
+          ? playheadForTime(nextIntraday.es, initialTime)
+          : null;
+      setSpyPlayhead(initialSpyPlayhead ?? 0);
+      setEsPlayhead(initialEsPlayhead ?? 0);
       rememberDate(date);
     });
 
     return () => {
       abort = true;
     };
-  }, [date, searchParams]);
+  }, [date]);
 
   const rememberDate = (loadedDate: string) => {
     setRecentDates((existing) => {
@@ -212,31 +227,8 @@ export function ReplayWorkspace({ initialDate }: Props) {
     });
   };
 
-  const rafRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (!playing) {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      return;
-    }
-    let last = performance.now();
-    const tick = (now: number) => {
-      const dt = (now - last) / 1000;
-      last = now;
-      setPlayhead((current) => {
-        const next = current + dt / (10 / speed);
-        if (next >= 1) {
-          setPlaying(false);
-          return 1;
-        }
-        return next;
-      });
-      rafRef.current = requestAnimationFrame(tick);
-    };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    };
-  }, [playing, speed]);
+  useReplayClock(spyPlaying, speed, setSpyPlayhead, setSpyPlaying);
+  useReplayClock(esPlaying, speed, setEsPlayhead, setEsPlaying);
 
   const barsCount = (intraday?.spy.length ?? 0) + (intraday?.es.length ?? 0);
   const hasBars = barsCount > 0;
@@ -261,8 +253,8 @@ export function ReplayWorkspace({ initialDate }: Props) {
     [intraday],
   );
   const cursorIndex = useMemo(
-    () => barIndexAtPlayhead(activeBars, playhead),
-    [activeBars, playhead],
+    () => barIndexAtPlayhead(activeBars, esPlayhead),
+    [activeBars, esPlayhead],
   );
   const cursorAt = activeBars[cursorIndex]?.t ?? null;
   const playheadTime = useMemo(
@@ -273,8 +265,10 @@ export function ReplayWorkspace({ initialDate }: Props) {
     (iso: string) => {
       const next = playheadForIso(activeBars, iso);
       if (next != null) {
-        setPlaying(false);
-        setPlayhead(next);
+        setSpyPlaying(false);
+        setEsPlaying(false);
+        setSpyPlayhead(next);
+        setEsPlayhead(next);
       }
     },
     [activeBars],
@@ -310,40 +304,53 @@ export function ReplayWorkspace({ initialDate }: Props) {
       if (!hasBars) return;
       if (event.code === "Space" || key === "k") {
         event.preventDefault();
-        setPlaying((current) => !current);
+        setSpyPlaying((current) => !current);
+        setEsPlaying((current) => !current);
         return;
       }
       if (key === "arrowleft" || key === "j") {
         event.preventDefault();
-        setPlaying(false);
-        setPlayhead((current) =>
-          stepPlayhead(activeBars, current, event.shiftKey || key === "j" ? -10 : -1),
+        setSpyPlaying(false);
+        setEsPlaying(false);
+        setSpyPlayhead((current) =>
+          stepPlayhead(intraday?.spy ?? [], current, event.shiftKey || key === "j" ? -10 : -1),
+        );
+        setEsPlayhead((current) =>
+          stepPlayhead(intraday?.es ?? [], current, event.shiftKey || key === "j" ? -10 : -1),
         );
         return;
       }
       if (key === "arrowright" || key === "l") {
         event.preventDefault();
-        setPlaying(key === "l");
-        setPlayhead((current) =>
-          stepPlayhead(activeBars, current, event.shiftKey || key === "l" ? 10 : 1),
+        setSpyPlaying(key === "l");
+        setEsPlaying(key === "l");
+        setSpyPlayhead((current) =>
+          stepPlayhead(intraday?.spy ?? [], current, event.shiftKey || key === "l" ? 10 : 1),
+        );
+        setEsPlayhead((current) =>
+          stepPlayhead(intraday?.es ?? [], current, event.shiftKey || key === "l" ? 10 : 1),
         );
         return;
       }
       if (key === "home") {
         event.preventDefault();
-        setPlaying(false);
-        setPlayhead(0);
+        setSpyPlaying(false);
+        setEsPlaying(false);
+        setSpyPlayhead(0);
+        setEsPlayhead(0);
         return;
       }
       if (key === "end") {
         event.preventDefault();
-        setPlaying(false);
-        setPlayhead(1);
+        setSpyPlaying(false);
+        setEsPlaying(false);
+        setSpyPlayhead(1);
+        setEsPlayhead(1);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeBars, hasBars]);
+  }, [hasBars, intraday]);
   const todayISO = new Date().toISOString().slice(0, 10);
   const presets = useMemo(() => buildPresets(new Date()), []);
   const marketOpen = useMemo(() => isMarketOpenNow(new Date()), []);
@@ -402,37 +409,62 @@ export function ReplayWorkspace({ initialDate }: Props) {
                 spy={spy}
                 spx={spx}
                 intraday={intraday}
-                playhead={playhead}
+                spyPlayback={{
+                  playhead: spyPlayhead,
+                  playing: spyPlaying,
+                  speed,
+                  onToggle: () => {
+                    if (!(intraday?.spy?.length)) return;
+                    if (spyPlayhead >= 1) setSpyPlayhead(0);
+                    setSpyPlaying((current) => !current);
+                  },
+                  onStep: (delta) => {
+                    setSpyPlaying(false);
+                    setSpyPlayhead((current) => stepPlayhead(intraday?.spy ?? [], current, delta));
+                  },
+                  onScrub: (value) => {
+                    setSpyPlaying(false);
+                    setSpyPlayhead(value);
+                  },
+                  onSpeed: setSpeed,
+                }}
+                esPlayback={{
+                  playhead: esPlayhead,
+                  playing: esPlaying,
+                  speed,
+                  onToggle: () => {
+                    if (!(intraday?.es?.length)) return;
+                    if (esPlayhead >= 1) setEsPlayhead(0);
+                    setEsPlaying((current) => !current);
+                  },
+                  onStep: (delta) => {
+                    setEsPlaying(false);
+                    setEsPlayhead((current) => stepPlayhead(intraday?.es ?? [], current, delta));
+                  },
+                  onScrub: (value) => {
+                    setEsPlaying(false);
+                    setEsPlayhead(value);
+                  },
+                  onSpeed: setSpeed,
+                }}
                 state={state}
               />
             )}
-            <Transport
+            <JumpToTimeControl
               disabled={!hasBars || state === "loading" || state === "error"}
-              playing={playing}
-              playhead={playhead}
-              speed={speed}
-              onToggle={() => {
-                if (!hasBars) return;
-                if (playhead >= 1) setPlayhead(0);
-                setPlaying((current) => !current);
-              }}
-              onStep={(delta) => {
-                setPlaying(false);
-                setPlayhead((current) => stepPlayhead(activeBars, current, delta));
-              }}
-              onScrub={(value) => {
-                setPlaying(false);
-                setPlayhead(value);
-              }}
-              onSpeed={setSpeed}
               jumpValue={playheadTime}
               jumpDraft={jumpDraft}
               onJumpDraft={setJumpDraft}
               onJump={() => {
-                const next = playheadForTime(activeBars, jumpDraft);
-                if (next != null) {
-                  setPlaying(false);
-                  setPlayhead(next);
+                const nextSpy = playheadForTime(intraday?.spy ?? [], jumpDraft);
+                const nextEs = playheadForTime(intraday?.es ?? [], jumpDraft);
+                if (nextSpy != null) {
+                  setSpyPlaying(false);
+                  setSpyPlayhead(nextSpy);
+                }
+                if (nextEs != null) {
+                  setEsPlaying(false);
+                  setEsPlayhead(nextEs);
                 }
               }}
             />
@@ -483,6 +515,39 @@ export function ReplayWorkspace({ initialDate }: Props) {
       `}</style>
     </div>
   );
+}
+
+function useReplayClock(
+  playing: boolean,
+  speed: PlaybackSpeed,
+  setPlayhead: Dispatch<SetStateAction<number>>,
+  setPlaying: Dispatch<SetStateAction<boolean>>,
+) {
+  const rafRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!playing) {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      return;
+    }
+    let last = performance.now();
+    const tick = (now: number) => {
+      const dt = (now - last) / 1000;
+      last = now;
+      setPlayhead((current) => {
+        const next = current + dt / (10 / speed);
+        if (next >= 1) {
+          setPlaying(false);
+          return 1;
+        }
+        return next;
+      });
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [playing, setPlayhead, setPlaying, speed]);
 }
 
 function ReplayHeader({
@@ -707,13 +772,15 @@ function DualReplayChart({
   spy,
   spx,
   intraday,
-  playhead,
+  spyPlayback,
+  esPlayback,
   state,
 }: {
   spy: AdaptedSnapshot | null;
   spx: SPXSnapshot | null;
   intraday: IntradayResponse | null;
-  playhead: number;
+  spyPlayback: ReplayChartPlayback;
+  esPlayback: ReplayChartPlayback;
   state: ReplayState;
 }) {
   if (state === "empty") {
@@ -737,7 +804,8 @@ function DualReplayChart({
       spy={spy}
       spx={spx}
       intraday={intraday}
-      playhead={playhead}
+      spyPlayback={spyPlayback}
+      esPlayback={esPlayback}
     />
   );
 }
@@ -1054,6 +1122,62 @@ function ReplaySvg({
           </g>
         )}
       </svg>
+    </div>
+  );
+}
+
+function JumpToTimeControl({
+  disabled,
+  jumpValue,
+  jumpDraft,
+  onJump,
+  onJumpDraft,
+}: {
+  disabled: boolean;
+  jumpValue: string | null;
+  jumpDraft: string;
+  onJump: () => void;
+  onJumpDraft: (value: string) => void;
+}) {
+  return (
+    <div className="mt-4 rounded-[12px] border border-paper/10 bg-paper/[0.04] px-3 py-3">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <div className="font-mono text-[11px] uppercase tracking-[0.10em] text-gold-soft">
+            Jump both charts
+          </div>
+          <div className="mt-1 text-[12px] text-paper/62">
+            SPY and ES have separate play buttons; this jumps both clocks to the same wall time.
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-16 text-right font-mono text-[12px] tabular-nums text-paper/62">
+            {jumpValue ?? "--:--"}
+          </span>
+          <label className="sr-only" htmlFor="replay-jump-time">
+            Jump to time
+          </label>
+          <input
+            id="replay-jump-time"
+            type="time"
+            value={jumpDraft}
+            disabled={disabled}
+            onChange={(event) => onJumpDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") onJump();
+            }}
+            className="h-9 rounded-[8px] border border-paper/10 bg-paper/[0.06] px-2 font-mono text-[12px] tabular-nums text-paper outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-35"
+          />
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={onJump}
+            className="h-9 rounded-[8px] border border-paper/10 bg-paper/[0.06] px-3 font-mono text-[12px] uppercase tracking-[0.08em] text-paper/70 transition hover:text-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:cursor-not-allowed disabled:opacity-35"
+          >
+            Jump
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
