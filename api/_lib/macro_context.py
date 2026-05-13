@@ -25,8 +25,6 @@ NEWS_KEYWORDS = (
     "spx",
     "market",
     "markets",
-    "stock",
-    "stocks",
     "inflation",
     "cpi",
     "pce",
@@ -91,12 +89,9 @@ def _news_relevant(row: dict) -> bool:
 def _calendar_relevant(row: dict) -> bool:
     country = _clean_text(row.get("country")).upper()
     event = _clean_text(row.get("event")).lower()
-    impact = _clean_text(row.get("impact")).lower()
     if country in {"US", "USA", "UNITED STATES"}:
         return True
-    if impact in {"high", "medium"} and any(keyword in event for keyword in CALENDAR_KEYWORDS):
-        return True
-    return any(keyword in event for keyword in CALENDAR_KEYWORDS)
+    return not country and any(keyword in event for keyword in CALENDAR_KEYWORDS)
 
 
 def _calendar_event(row: dict) -> dict:
