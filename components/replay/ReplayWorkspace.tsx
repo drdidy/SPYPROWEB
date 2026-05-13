@@ -36,6 +36,10 @@ import {
   type PlaybackSpeed,
 } from "@/lib/replay/config";
 import {
+  buildReplayPriceLens,
+  lineTouchesSafeBar,
+} from "@/lib/replay/bar-quality";
+import {
   adaptSnapshot,
   type AdaptedSnapshot,
   type AnchorGroup,
@@ -1810,11 +1814,12 @@ function touchesFor(
   lines: ProjectedLine[],
 ): TouchEvent[] {
   const events: TouchEvent[] = [];
+  const lens = buildReplayPriceLens(bars);
   for (const bar of bars) {
     const ms = new Date(bar.t).getTime();
     for (const line of lines) {
       const value = line.valueAt(ms);
-      if (bar.l <= value && bar.h >= value) {
+      if (lineTouchesSafeBar(bar, value, lens)) {
         events.push({
           engine,
           line: line.label,

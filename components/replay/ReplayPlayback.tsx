@@ -13,6 +13,11 @@ import { useMemo, useState, type KeyboardEvent, type PointerEvent } from "react"
 import type { AdaptedSnapshot, AnchorGroup } from "@/lib/snapshot-adapter";
 import type { SPXSnapshot, SPXLine } from "@/lib/types";
 import { PLAYBACK_SPEEDS, type PlaybackSpeed } from "@/lib/replay/config";
+import {
+  buildReplayPriceLens,
+  buildReplayYDomain,
+  lineTouchesSafeBar,
+} from "@/lib/replay/bar-quality";
 import type { IntradayBar, IntradayResponse } from "./ReplayWorkspace";
 
 interface Props {
@@ -226,25 +231,14 @@ function PanelChart({
   const tEndMs = hasBars ? new Date(bars[bars.length - 1].t).getTime() : 0;
   const tNowMs = hasBars ? t0Ms + (tEndMs - t0Ms) * playhead : 0;
 
-  // Y range: include all bars + each line's value across the session.
-  const yPoints: number[] = [];
-  if (hasBars) {
-    for (const b of bars) {
-      yPoints.push(b.l, b.h);
-    }
-    for (const ln of lines) {
-      yPoints.push(ln.valueAtMs(t0Ms), ln.valueAtMs(tEndMs));
-    }
-  }
-  let yMin = yPoints.length ? Math.min(...yPoints) : 0;
-  let yMax = yPoints.length ? Math.max(...yPoints) : 1;
-  if (yMin === yMax) {
-    yMin -= 1;
-    yMax += 1;
-  }
-  const pad = (yMax - yMin) * 0.12;
-  yMin -= pad;
-  yMax += pad;
+  const lineSamples = hasBars
+    ? lines.flatMap((ln) => [
+        ln.valueAtMs(t0Ms),
+        ln.valueAtMs(tNowMs),
+        ln.valueAtMs(tEndMs),
+      ])
+    : [];
+  const { min: yMin, max: yMax } = buildReplayYDomain(bars, lineSamples);
 
   const xOf = (ms: number) =>
     PAD_L + ((ms - t0Ms) / (tEndMs - t0Ms || 1)) * (W - PAD_L - PAD_R);
@@ -256,12 +250,13 @@ function PanelChart({
   // only render the ones whose time is <= the playhead.
   const touches = useMemo<TouchEvent[]>(() => {
     if (!hasBars) return [];
+    const touchLens = buildReplayPriceLens(bars);
     const out: TouchEvent[] = [];
     for (const b of bars) {
       const ms = new Date(b.t).getTime();
       for (const ln of lines) {
         const v = ln.valueAtMs(ms);
-        if (b.l <= v && b.h >= v) {
+        if (lineTouchesSafeBar(b, v, touchLens)) {
           out.push({ lineName: ln.name, timeMs: ms, price: v });
         }
       }
