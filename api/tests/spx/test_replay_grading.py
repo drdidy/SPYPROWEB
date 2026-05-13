@@ -127,7 +127,7 @@ def test_replay_grades_alternate_when_it_is_first_touched_entry():
     assert block["verdictPnl"] == 2.0
 
 
-def test_replay_touch_without_old_rejection_pattern_is_still_graded():
+def test_replay_touch_that_closes_below_line_is_sell_even_from_above():
     with (
         patch("spx.snapshot._spx_session_ohlc", return_value=_ohlc()),
         patch("spx.snapshot._spx_session_intraday", return_value=[
@@ -135,8 +135,44 @@ def test_replay_touch_without_old_rejection_pattern_is_still_graded():
         ]),
     ):
         block = _build_spx_replay_block(_payload(), date(2026, 5, 8))
-    assert block["verdictOutcome"] == "LOSS"
-    assert block["verdictPnl"] == -2.0
+    assert block["verdictOutcome"] == "WIN"
+    assert block["verdictPnl"] == 2.0
+
+
+def test_replay_touch_from_below_that_closes_above_line_flips_to_buy():
+    with (
+        patch("spx.snapshot._spx_session_ohlc", return_value=_ohlc()),
+        patch("spx.snapshot._spx_session_intraday", return_value=[
+            _bar(9, high=101.5, low=98.0, close=101.0, open_=98.5),
+        ]),
+    ):
+        block = _build_spx_replay_block(_payload(), date(2026, 5, 8))
+    assert block["verdictOutcome"] == "WIN"
+    assert block["verdictPnl"] == 1.0
+
+
+def test_replay_touch_from_above_that_closes_below_line_flips_to_sell():
+    with (
+        patch("spx.snapshot._spx_session_ohlc", return_value=_ohlc()),
+        patch("spx.snapshot._spx_session_intraday", return_value=[
+            _bar(9, high=102.0, low=98.0, close=99.0, open_=101.5),
+        ]),
+    ):
+        block = _build_spx_replay_block(_payload(), date(2026, 5, 8))
+    assert block["verdictOutcome"] == "WIN"
+    assert block["verdictPnl"] == 1.0
+
+
+def test_replay_touch_closing_on_line_is_ambiguous_skip():
+    with (
+        patch("spx.snapshot._spx_session_ohlc", return_value=_ohlc()),
+        patch("spx.snapshot._spx_session_intraday", return_value=[
+            _bar(9, high=102.0, low=98.0, close=100.0, open_=101.5),
+        ]),
+    ):
+        block = _build_spx_replay_block(_payload(), date(2026, 5, 8))
+    assert block["verdictOutcome"] == "N_A"
+    assert block["verdictPnl"] is None
 
 
 def test_replay_grades_six_line_framework_even_without_old_channel_direction():

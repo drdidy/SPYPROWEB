@@ -255,25 +255,18 @@ def _grade_replay_from_rail_tag(payload: dict, replay_date: date, offset: float)
 
 
 def _qualified_rejection_side(bar: dict, line_value: float, line_kind: str = "") -> str | None:
-    open_ = float(bar["open"])
     high = float(bar["high"])
     low = float(bar["low"])
     close = float(bar["close"])
     touched = low <= line_value <= high
     if not touched:
         return None
-    # The current ES rule treats any 9/10/11 CT touch of an 08:00
-    # operating line as a graded event. Direction comes from where the
-    # candle opened relative to the line; outcome comes from that hour's
-    # close. Do not silently turn a touched line into SKIP just because
-    # the old candle-color confirmation did not appear.
-    if open_ > line_value:
+    # A 09/10/11 CT touch is a graded event. Direction is determined by
+    # the resolution of that hourly candle: close above the touched line
+    # is a buy/reclaim; close below it is a sell/rejection.
+    if close > line_value:
         return "BUY"
-    if open_ < line_value:
-        return "SELL"
-    if close > open_:
-        return "BUY"
-    if close < open_:
+    if close < line_value:
         return "SELL"
     return None
 
