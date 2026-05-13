@@ -24,6 +24,14 @@ def _env(name: str) -> str | None:
     return value.strip() if isinstance(value, str) and value.strip() else None
 
 
+def _finnhub_key() -> str | None:
+    for name in ("FINNHUB_API_KEY", "FINNHUB", "FINNHUB_KEY", "FINNHUB_TOKEN"):
+        value = _env(name)
+        if value:
+            return value
+    return None
+
+
 def _http_json(url: str, headers: dict[str, str] | None = None, timeout: float = 6.0) -> Any:
     req = urllib.request.Request(url, method="GET")
     for key, value in (headers or {}).items():
@@ -42,7 +50,7 @@ def fetch_market_news(limit: int = 6) -> dict:
       - FINNHUB_API_KEY
       - NEWS_API_KEY
     """
-    finnhub = _env("FINNHUB_API_KEY")
+    finnhub = _finnhub_key()
     if finnhub:
         general_raw = _http_json(
             "https://finnhub.io/api/v1/news?category=general&token="
@@ -125,7 +133,7 @@ def fetch_economic_calendar(now: datetime | None = None) -> dict:
     Otherwise return the repo's known replay macro dates plus explicit no-feed.
     """
     now_ct = (now or datetime.now(CT)).astimezone(CT)
-    finnhub = _env("FINNHUB_API_KEY")
+    finnhub = _finnhub_key()
     if finnhub:
         start = now_ct.date().isoformat()
         end = (now_ct + timedelta(days=14)).date().isoformat()
@@ -195,7 +203,7 @@ def fetch_economic_calendar(now: datetime | None = None) -> dict:
 
 
 def fetch_market_status() -> dict:
-    finnhub = _env("FINNHUB_API_KEY")
+    finnhub = _finnhub_key()
     if not finnhub:
         return {"available": False, "reason": "No market-status feed configured."}
     raw = _http_json(

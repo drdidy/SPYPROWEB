@@ -190,10 +190,12 @@ async function loadBrief(): Promise<BriefResponse> {
 
 export async function generateMetadata(): Promise<Metadata> {
   const brief = await loadBrief();
-  const label = sessionLabel(brief.asOf).replace(" · ", " ");
+  const label = sessionLabel(brief.asOf).replace(/·|\?\?/g, "-");
   const tldr = brief.tldr?.action || "Session plan";
   return {
-    title: `Open Brief · ${label} · SPY Prophet`,
+    title: {
+      absolute: `Open Brief - ${label} - SPY Prophet`,
+    },
     description: `Open Brief: ${tldr}. SPY Prophet is intelligence software for disciplined session planning.`,
   };
 }
@@ -224,10 +226,8 @@ export default async function Page() {
 
   return (
     <div className="w-full max-w-[1600px] pb-14 print:max-w-none print:bg-white">
-      <StickySubnav />
-
-      <section className="mt-5 overflow-hidden rounded-[20px] border border-[#D6BC75]/45 bg-[#071116] text-paper shadow-[0_24px_60px_-42px_rgba(7,17,22,0.95)] print:border-rule print:bg-white print:text-ink">
-        <div className="grid gap-5 px-5 py-5 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px]">
+      <section className="overflow-hidden rounded-[20px] border border-[#D6BC75]/45 bg-[#071116] text-paper shadow-[0_24px_60px_-42px_rgba(7,17,22,0.95)] print:border-rule print:bg-white print:text-ink">
+        <div className="grid gap-5 px-4 py-5 sm:px-5 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px]">
           <div className="min-w-0">
             <div className="font-mono text-[12px] uppercase tracking-[0.08em] text-gold-soft">
               Session Plan · {session}
@@ -254,6 +254,8 @@ export default async function Page() {
           <TlDrCard tldr={tldr} planLabel={planLabel} />
         </div>
       </section>
+
+      <StickySubnav />
 
       <section className="mt-5 grid gap-4 lg:grid-cols-2" aria-label="Bull and bear case">
         <CasePanel tone="bull" read={brief.bullCase} fallbackTrigger={`SPY closes > ${fmtPrice(spyLines[0] ? lineLevel(spyLines[0]) : undefined)}`} fallbackInvalidation={tldr.invalidation} confidence={confidenceLabel(spy?.conviction)} />
@@ -428,12 +430,12 @@ function Pill({ label }: { label: string }) {
 
 function StateHeroChip({ label, value, note, term, tone }: { label: string; value?: string | null; note?: string; term: BriefGlossaryKey; tone: "ink" | "bull" | "bear" | "gold" | "teal" }) {
   return (
-    <div className="rounded-[14px] border border-paper/10 bg-paper/[0.055] p-3">
+    <div className="min-w-0 rounded-[14px] border border-paper/10 bg-paper/[0.055] p-3">
       <div className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.14em] text-paper/54">
         {label}
         <TermHelp term={term} />
       </div>
-      <div className={cn("mt-2 font-serif text-[24px] leading-none", toneText(tone))}>{formatState(value)}</div>
+      <div className={cn("mt-2 break-words font-serif text-[22px] leading-[1.02] tracking-[-0.01em] xl:text-[20px] 2xl:text-[22px]", toneText(tone))}>{formatState(value)}</div>
       {note && <div className="mt-2 font-mono text-[11px] text-paper/62" data-num>{note}</div>}
     </div>
   );

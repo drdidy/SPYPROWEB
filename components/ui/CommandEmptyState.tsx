@@ -76,7 +76,7 @@ function ReadinessPanel({
   return (
     <div className="hidden lg:flex min-h-[220px] flex-col rounded-card border border-paper/10 bg-paper/[0.035] p-5">
       <div className="font-mono text-[10px] uppercase tracking-[0.20em] text-gold-soft">
-        Source readiness
+        Current status
       </div>
       <div className="mt-4 space-y-2.5">
         {readinessRows.map((row) => (
