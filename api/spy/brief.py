@@ -6,10 +6,11 @@ The Daily Brief is the synthesis layer. It gathers:
   - options intelligence from Unusual Whales
   - market context from the existing market-data pipeline
 
-OpenAI receives a compact JSON dossier and writes the brief. If the
-OpenAI call is unavailable, the endpoint returns a deterministic
-engine-written fallback from the same dossier. No synthetic market
-values are invented in either path.
+DeepSeek receives a compact JSON dossier and drafts the brief. OpenAI
+reviews/polishes the draft when available, or serves as fallback if
+DeepSeek is unavailable. If both providers fail, the endpoint returns a
+deterministic engine-written fallback from the same dossier. No synthetic
+market values are invented in any path.
 """
 from __future__ import annotations
 
@@ -27,7 +28,7 @@ _API_ROOT = Path(__file__).resolve().parents[1]
 if str(_API_ROOT) not in sys.path:
     sys.path.insert(0, str(_API_ROOT))
 
-from _lib import data_sources, openai_client, unusual_whales  # noqa: E402
+from _lib import ai_router, data_sources, unusual_whales  # noqa: E402
 from _lib.spx_data import build_default_fetcher, build_snapshot_with_provenance  # noqa: E402
 
 CT = ZoneInfo("America/Chicago")
@@ -62,6 +63,14 @@ What changes the plan:
 Opening checklist:
 
 Keep the total around 220-320 words. No markdown bullets."""
+
+
+REVIEW_PROMPT = """You are the final reviewer for the SPY Prophet Daily
+Brief. Preserve the six labeled paragraphs exactly. Use only facts already
+present in the draft and dossier. Improve clarity for a novice trader, remove
+hype, remove guarantees, and avoid exposing proprietary rule mechanics beyond
+the labels and levels already present. Do not add new prices, trades, news, or
+probabilities."""
 
 
 def _round(v: object, dp: int = 2) -> object:
@@ -370,16 +379,25 @@ def _build_brief() -> dict:
 
     brief: str | None = None
     source = "engine"
-    if openai_client.has_key():
-        brief = openai_client.chat(
-            system=SYSTEM_PROMPT,
-            user=f"App dossier JSON:\n{dossier_json}\n\nWrite the Daily Brief.",
-            temperature=0.2,
-            max_tokens=950,
-            timeout=14.0,
-        )
-        if brief:
-            source = "openai"
+    draft_provider = None
+    review_provider = None
+    ai_result = ai_router.daily_brief(
+        system=SYSTEM_PROMPT,
+        user=f"App dossier JSON:\n{dossier_json}\n\nWrite the Daily Brief.",
+        review_system=REVIEW_PROMPT,
+        review_user_prefix=(
+            "App dossier JSON follows. Check that the draft only uses these facts, "
+            "then return the final brief text only.\n"
+            f"{dossier_json}"
+        ),
+        max_tokens=950,
+        timeout=14.0,
+    )
+    if ai_result is not None:
+        brief = ai_result.text
+        source = ai_result.source
+        draft_provider = ai_result.draft_provider
+        review_provider = ai_result.review_provider
 
     if not brief:
         brief = _engine_fallback_brief(dossier)
@@ -387,6 +405,12 @@ def _build_brief() -> dict:
     return {
         "brief": brief,
         "source": source,
+        "providers": {
+            "draft": draft_provider,
+            "review": review_provider,
+            "deepseekConfigured": ai_router.has_deepseek_key(),
+            "openaiConfigured": ai_router.has_openai_key(),
+        },
         "asOf": dossier.get("generatedAt"),
         "dossier": {
             "SPY": dossier.get("SPY"),

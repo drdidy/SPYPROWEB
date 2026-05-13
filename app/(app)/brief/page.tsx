@@ -1,12 +1,11 @@
 import type { ReactNode } from "react";
-import { BrainCircuit, CheckCircle2, Crosshair, Gauge, LineChart, ShieldAlert } from "lucide-react";
+import { BrainCircuit, CheckCircle2, Crosshair, Gauge, LineChart, ShieldAlert, Sparkles } from "lucide-react";
 import { headers } from "next/headers";
 
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { CommandEmptyState } from "@/components/ui/CommandEmptyState";
 import { CommandStat } from "@/components/ui/CommandStat";
 import { SectionLabel } from "@/components/ui/SectionLabel";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { loadLiveSnapshot } from "@/lib/snapshot-fetch";
 import { loadSnapshot as loadSpxSnapshot } from "@/lib/spx-fetch";
 import { nearReferencePriceLabel } from "@/lib/market-data-quality";
@@ -18,9 +17,15 @@ export const revalidate = 0;
 
 interface BriefResponse {
   brief: string;
-  source: "openai" | "engine" | "error";
+  source: "deepseek+openai" | "deepseek" | "openai" | "engine" | "error";
   asOf?: string;
   dossier?: BriefDossier;
+  providers?: {
+    draft?: string | null;
+    review?: string | null;
+    deepseekConfigured?: boolean;
+    openaiConfigured?: boolean;
+  };
 }
 
 interface BriefDossier {
@@ -121,6 +126,7 @@ export default async function Page() {
   const options = brief.dossier?.options;
   const spyOptions = options?.SPY;
   const spxOptions = options?.SPX;
+  const paragraphs = splitBrief(briefText);
   const fallbackLines: WatchLine[] = snap.lines.slice(0, 5).map((line) => ({
     name: line.name,
     kind: line.kind,
@@ -132,13 +138,34 @@ export default async function Page() {
   const esLines = (es?.watchLines ?? []).slice(0, 4);
 
   return (
-    <div className="w-full max-w-[1440px] pb-16 space-y-8">
-      <PageHeader
-        eyebrow="Intelligence - 10"
-        title="Daily Brief"
-        lede="Pre-open plan built from market data, options pressure, and the app's own SPY and ES structure."
-        source={source}
-      />
+    <div className="w-full max-w-[1500px] pb-16 space-y-7">
+      <section className="relative overflow-hidden rounded-[22px] border border-[#D6BC75]/45 bg-[#071116] text-paper shadow-[0_24px_60px_-42px_rgba(7,17,22,0.95)]">
+        <div
+          aria-hidden
+          className="absolute inset-0 opacity-[0.16] bg-[linear-gradient(rgba(244,228,192,0.13)_1px,transparent_1px),linear-gradient(90deg,rgba(244,228,192,0.10)_1px,transparent_1px)] bg-[size:44px_44px]"
+        />
+        <div className="relative grid gap-5 px-5 py-5 md:px-7 lg:grid-cols-[minmax(0,1fr)_440px]">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="font-mono text-[10px] uppercase tracking-[0.20em] text-gold-soft/82">
+                Daily Brief · Session plan
+              </span>
+              <span className="h-px w-10 bg-gold/45" aria-hidden />
+              <span className="inline-flex items-center gap-1.5 rounded-pill border border-paper/10 bg-paper/[0.055] px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.12em] text-paper/72">
+                <span className="h-1.5 w-1.5 rounded-full bg-bull" />
+                {sourceLabel(brief.source)}
+              </span>
+            </div>
+            <h1 className="mt-4 max-w-4xl font-serif text-[44px] leading-[0.96] tracking-tight text-paper md:text-[64px]">
+              Open Brief
+            </h1>
+            <p className="mt-4 max-w-3xl text-[15px] leading-relaxed text-paper/68">
+              A plain-English operating read from SPY structure, ES context, options pressure, and the app's own discipline rules.
+            </p>
+          </div>
+          <BriefProviderStack brief={brief} asOf={brief.asOf} />
+        </div>
+      </section>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
         <CommandStat
@@ -148,7 +175,7 @@ export default async function Page() {
           tone={stateTone(spy?.state ?? snap.currentState)}
         />
         <CommandStat
-          label="ES channel"
+          label="ES context"
           value={es?.channel?.direction ?? (es?.available === false ? "No read" : "Waiting")}
           note={es?.scenario ? es.scenario.replace(/_/g, " ") : "Overnight structure"}
           tone={directionTone(es?.channel?.direction)}
@@ -167,11 +194,11 @@ export default async function Page() {
         />
       </div>
 
-      <SectionLabel number="01">Pre-open read</SectionLabel>
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-5">
+      <SectionLabel number="01">Read first</SectionLabel>
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_390px] gap-5">
         <Card className="bg-[#071116] text-paper border-[#243138]">
           <CardHeader
-            eyebrow={<span className="text-gold-soft">{brief.source === "openai" ? "OpenAI synthesis" : "Engine fallback"}</span>}
+            eyebrow={<span className="text-gold-soft">{sourceLabel(brief.source)}</span>}
             title={<span className="text-paper">Morning trading plan</span>}
             meta={<span className="text-paper/45">{brief.asOf ? formatBriefTime(brief.asOf) : "Current session"}</span>}
             action={
@@ -181,10 +208,10 @@ export default async function Page() {
             }
           />
           <CardBody>
-            {briefText ? (
-              <div className="space-y-5">
-                {briefText.split(/\n\s*\n/).map((para, i) => (
-                  <BriefParagraph key={i} text={para} />
+            {paragraphs.length ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                {paragraphs.map((para, i) => (
+                  <BriefParagraph key={i} text={para} featured={i === 0} />
                 ))}
               </div>
             ) : (
@@ -196,7 +223,7 @@ export default async function Page() {
         </Card>
 
         <Card>
-          <CardHeader eyebrow="Dossier" title="What the brief read" />
+          <CardHeader eyebrow="Operator rail" title="What matters now" />
           <CardBody className="space-y-3">
             <DossierRow icon={<LineChart className="h-4 w-4" />} label="SPY structure" value={spy?.verdict ?? snap.decision.verdict} note={spy?.rationale ?? snap.decision.finalExplanation} />
             <DossierRow icon={<Crosshair className="h-4 w-4" />} label="ES structure" value={es?.scenario?.replace(/_/g, " ") ?? "Waiting"} note={es?.scenarioExplanation ?? es?.channel?.reason} />
@@ -206,7 +233,7 @@ export default async function Page() {
         </Card>
       </div>
 
-      <SectionLabel number="02">Lines and triggers</SectionLabel>
+      <SectionLabel number="02">Respect these first</SectionLabel>
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] gap-5">
         <Card>
           <CardHeader eyebrow="SPY" title="First structure to respect" meta="Closest app lines, not hand-drawn levels" />
@@ -312,15 +339,78 @@ function sanitizeEsBriefText(text: string, snap: SPXSnapshot): string {
   );
 }
 
-function BriefParagraph({ text }: { text: string }) {
+function BriefProviderStack({ brief, asOf }: { brief: BriefResponse; asOf?: string }) {
+  const deepseekReady = brief.providers?.deepseekConfigured;
+  const openaiReady = brief.providers?.openaiConfigured;
+  return (
+    <div className="rounded-[16px] border border-paper/10 bg-paper/[0.055] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+      <div className="flex items-center justify-between gap-3 border-b border-paper/10 pb-3">
+        <div>
+          <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-gold-soft/82">
+            AI desk
+          </div>
+          <div className="mt-1 font-serif text-[20px] text-paper">
+            DeepSeek drafts. OpenAI reviews.
+          </div>
+        </div>
+        <div className="grid h-10 w-10 place-items-center rounded-[12px] border border-gold/25 bg-paper/5 text-gold-soft">
+          <Sparkles className="h-4 w-4" />
+        </div>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <ProviderPill label="DeepSeek" value={brief.providers?.draft === "deepseek" ? "Drafted" : deepseekReady ? "Ready" : "Missing"} active={brief.providers?.draft === "deepseek"} />
+        <ProviderPill label="OpenAI" value={brief.providers?.review === "openai" ? "Reviewed" : openaiReady ? "Fallback" : "Missing"} active={brief.providers?.review === "openai"} />
+      </div>
+      <div className="mt-4 rounded-[12px] border border-paper/10 bg-[#050D12]/55 px-3 py-3">
+        <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-paper/42">Generated</div>
+        <div className="mt-1 font-mono text-[12px] tabular-nums text-paper/75">
+          {asOf ? formatBriefTime(asOf) : "Current session"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProviderPill({ label, value, active }: { label: string; value: string; active?: boolean }) {
+  return (
+    <div
+      className={cn(
+        "rounded-[12px] border px-3 py-2",
+        active
+          ? "border-bull/40 bg-bull/15 text-paper"
+          : "border-paper/10 bg-paper/[0.035] text-paper/68",
+      )}
+    >
+      <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-paper/42">{label}</div>
+      <div className="mt-1 font-mono text-[12px] font-semibold uppercase tracking-[0.08em]">{value}</div>
+    </div>
+  );
+}
+
+function splitBrief(text: string): string[] {
+  return text
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .slice(0, 6);
+}
+
+function BriefParagraph({ text, featured = false }: { text: string; featured?: boolean }) {
   const match = text.match(/^([^:]{3,34}):\s*(.*)$/s);
   if (!match) {
     return <p className="font-serif text-[20px] leading-[1.55] text-paper/82">{text}</p>;
   }
   return (
-    <section>
+    <section
+      className={cn(
+        "rounded-[14px] border border-paper/10 bg-paper/[0.04] p-4",
+        featured && "md:col-span-2 bg-paper/[0.065]",
+      )}
+    >
       <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-gold-soft">{match[1]}</div>
-      <p className="mt-1 font-serif text-[20px] leading-[1.55] text-paper/82">{match[2]}</p>
+      <p className={cn("mt-2 font-serif leading-[1.55] text-paper/82", featured ? "text-[24px]" : "text-[19px]")}>
+        {match[2]}
+      </p>
     </section>
   );
 }
@@ -523,6 +613,21 @@ function gammaTone(regime?: string | null): "ink" | "bull" | "bear" | "gold" {
   if (regime === "NEGATIVE") return "bear";
   if (regime === "FLAT") return "gold";
   return "ink";
+}
+
+function sourceLabel(source: BriefResponse["source"]): string {
+  switch (source) {
+    case "deepseek+openai":
+      return "DeepSeek draft · OpenAI review";
+    case "deepseek":
+      return "DeepSeek synthesis";
+    case "openai":
+      return "OpenAI synthesis";
+    case "engine":
+      return "Engine fallback";
+    case "error":
+      return "Brief unavailable";
+  }
 }
 
 function fmtPrice(n: unknown): string {
