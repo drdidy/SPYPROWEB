@@ -187,6 +187,31 @@ export function getSessionInfo(engine: Engine, now: Date): SessionInfo {
   };
 }
 
+/** RTH close for an explicit Chicago trading-date ISO, or null on closed days. */
+export function getTradingDayCloseForDate(dateISO: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateISO);
+  if (!match) return null;
+
+  const day: DayKey = {
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3]),
+    iso: dateISO,
+    weekday: new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12, 0)).getUTCDay(),
+  };
+
+  if (!isTradingDay(day)) return null;
+
+  const earlyClose = EARLY_CLOSE_2026.has(day.iso);
+  return chicagoDateAt(
+    day.year,
+    day.month,
+    day.day,
+    earlyClose ? EARLY_CLOSE_H : RTH_CLOSE_H,
+    RTH_CLOSE_M,
+  );
+}
+
 function nextEvent(
   phase: SessionPhase,
   engine: Engine,

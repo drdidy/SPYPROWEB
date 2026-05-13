@@ -8,7 +8,7 @@
 
 import { loadLiveSnapshot } from "@/lib/snapshot-fetch";
 import { loadSnapshot as loadSpxSnapshot } from "@/lib/spx-fetch";
-import { getSessionInfo, type Engine } from "@/lib/sessions";
+import { getTradingDayCloseForDate, type Engine } from "@/lib/sessions";
 
 export interface SessionOutcome {
   date: string; // YYYY-MM-DD
@@ -38,29 +38,29 @@ function chicagoDateISO(d: Date): string {
   }).format(d);
 }
 
-function previousNTradingDates(
-  engine: Engine,
-  now: Date,
-  count: number,
-): string[] {
+function addDaysISO(dateISO: string, offsetDays: number): string {
+  const [year, month, day] = dateISO.split("-").map(Number);
+  const next = new Date(Date.UTC(year, month - 1, day + offsetDays, 12, 0, 0));
+  return [
+    next.getUTCFullYear().toString().padStart(4, "0"),
+    (next.getUTCMonth() + 1).toString().padStart(2, "0"),
+    next.getUTCDate().toString().padStart(2, "0"),
+  ].join("-");
+}
+
+function previousNTradingDates(now: Date, count: number): string[] {
   const out: string[] = [];
   const todayISO = chicagoDateISO(now);
-  const currentSession = getSessionInfo(engine, now);
-  const includeToday = now.getTime() >= currentSession.rthClose.getTime();
+  const todayClose = getTradingDayCloseForDate(todayISO);
+  const includeToday = todayClose !== null && now.getTime() >= todayClose.getTime();
   let probeOffset = includeToday ? 0 : 1;
   // Bound the walk at 30 calendar days for safety (covers ~21 trading
   // days, plenty for a 5- or 10-session lookback).
   while (out.length < count && probeOffset <= 30) {
-    const probe = new Date(now.getTime() - probeOffset * 86_400_000);
+    const probeISO = addDaysISO(todayISO, -probeOffset);
     probeOffset++;
-    const probeISO = chicagoDateISO(probe);
-    if (probeISO === todayISO && !includeToday) continue;
-    const session = getSessionInfo(engine, probe);
-    const tradingDateISO = chicagoDateISO(session.rthClose);
-    const eligible = includeToday ? tradingDateISO <= todayISO : tradingDateISO < todayISO;
-    if (eligible && !out.includes(tradingDateISO)) {
-      out.push(tradingDateISO);
-    }
+    if (getTradingDayCloseForDate(probeISO) === null) continue;
+    out.push(probeISO);
   }
   return out;
 }
@@ -98,7 +98,7 @@ export async function fetchTrackRecord(
   now: Date = new Date(),
   lookback: number = DEFAULT_LOOKBACK,
 ): Promise<EngineTrackRecord> {
-  const dates = previousNTradingDates(engine, now, lookback);
+  const dates = previousNTradingDates(now, lookback);
   const fetcher = engine === "SPY" ? loadLiveSnapshot : loadSpxSnapshot;
   const settled = await Promise.allSettled(dates.map((d) => fetcher(d)));
 
