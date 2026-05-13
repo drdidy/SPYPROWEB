@@ -44,14 +44,30 @@ def fetch_market_news(limit: int = 6) -> dict:
     """
     finnhub = _env("FINNHUB_API_KEY")
     if finnhub:
-        raw = _http_json(
+        general_raw = _http_json(
             "https://finnhub.io/api/v1/news?category=general&token="
             + urllib.parse.quote(finnhub),
         )
-        rows = raw if isinstance(raw, list) else []
+        today = datetime.now(CT).date()
+        from_date = (today - timedelta(days=3)).isoformat()
+        to_date = today.isoformat()
+        company_raw = _http_json(
+            "https://finnhub.io/api/v1/company-news?"
+            + urllib.parse.urlencode({"symbol": "SPY", "from": from_date, "to": to_date, "token": finnhub}),
+        )
+        rows = []
+        seen = set()
+        for row in (company_raw if isinstance(company_raw, list) else []) + (general_raw if isinstance(general_raw, list) else []):
+            if not isinstance(row, dict):
+                continue
+            headline = str(row.get("headline") or "").strip()
+            if not headline or headline.lower() in seen:
+                continue
+            seen.add(headline.lower())
+            rows.append(row)
         return {
             "available": bool(rows),
-            "source": "finnhub",
+            "source": "connected_news",
             "items": [
                 {
                     "headline": str(row.get("headline") or "")[:180],
@@ -80,7 +96,7 @@ def fetch_market_news(limit: int = 6) -> dict:
         rows = raw.get("articles") if isinstance(raw, dict) else []
         return {
             "available": bool(rows),
-            "source": "newsapi",
+            "source": "connected_news",
             "items": [
                 {
                     "headline": str(row.get("title") or "")[:180],
@@ -109,6 +125,35 @@ def fetch_economic_calendar(now: datetime | None = None) -> dict:
     Otherwise return the repo's known replay macro dates plus explicit no-feed.
     """
     now_ct = (now or datetime.now(CT)).astimezone(CT)
+    finnhub = _env("FINNHUB_API_KEY")
+    if finnhub:
+        start = now_ct.date().isoformat()
+        end = (now_ct + timedelta(days=14)).date().isoformat()
+        q = urllib.parse.urlencode({"from": start, "to": end, "token": finnhub})
+        raw = _http_json(f"https://finnhub.io/api/v1/calendar/economic?{q}")
+        rows = raw.get("economicCalendar") if isinstance(raw, dict) else []
+        if rows:
+            return {
+                "available": True,
+                "source": "connected_calendar",
+                "events": [
+                    {
+                        "date": (row.get("time") or row.get("date") or "")[:10],
+                        "time": row.get("time"),
+                        "event": row.get("event"),
+                        "country": row.get("country"),
+                        "impact": row.get("impact"),
+                        "actual": row.get("actual"),
+                        "estimate": row.get("estimate"),
+                        "forecast": row.get("estimate"),
+                        "previous": row.get("prev") or row.get("previous"),
+                        "unit": row.get("unit"),
+                    }
+                    for row in rows[:20]
+                    if isinstance(row, dict)
+                ],
+            }
+
     fmp = _env("FMP_API_KEY")
     if fmp:
         start = now_ct.date().isoformat()
@@ -118,7 +163,7 @@ def fetch_economic_calendar(now: datetime | None = None) -> dict:
         rows = raw if isinstance(raw, list) else []
         return {
             "available": bool(rows),
-            "source": "financialmodelingprep",
+            "source": "connected_calendar",
             "events": [
                 {
                     "date": row.get("date"),
@@ -149,9 +194,30 @@ def fetch_economic_calendar(now: datetime | None = None) -> dict:
     }
 
 
+def fetch_market_status() -> dict:
+    finnhub = _env("FINNHUB_API_KEY")
+    if not finnhub:
+        return {"available": False, "reason": "No market-status feed configured."}
+    raw = _http_json(
+        "https://finnhub.io/api/v1/stock/market-status?"
+        + urllib.parse.urlencode({"exchange": "US", "token": finnhub}),
+    )
+    if not isinstance(raw, dict):
+        return {"available": False, "reason": "Market-status feed unavailable."}
+    return {
+        "available": True,
+        "isOpen": raw.get("isOpen"),
+        "holiday": raw.get("holiday"),
+        "sessionOpen": raw.get("sessionOpen"),
+        "sessionClose": raw.get("sessionClose"),
+        "timestamp": raw.get("t"),
+    }
+
+
 def fetch_macro_context() -> dict:
     return {
         "asOf": datetime.now(CT).isoformat(),
         "news": fetch_market_news(),
         "economicCalendar": fetch_economic_calendar(),
+        "marketStatus": fetch_market_status(),
     }

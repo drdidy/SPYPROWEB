@@ -663,7 +663,7 @@ function MacroPanel({ macro }: { macro?: BriefDossier["macro"] }) {
               {newsItems.slice(0, 5).map((item, i) => (
                 <div key={`${item.headline}-${i}`} className="rounded-[12px] border border-rule bg-paper-2/60 px-3 py-3">
                   <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-3">
-                    {(item.source ?? "News").slice(0, 24)} {item.publishedAt ? `· ${dateShort(String(item.publishedAt))}` : ""}
+                    Market headline {item.publishedAt ? `· ${dateShort(String(item.publishedAt))}` : ""}
                   </div>
                   <div className="mt-1 text-[14px] leading-snug text-ink-2">{item.headline}</div>
                 </div>

@@ -112,9 +112,10 @@ export function Sidebar({
               const Icon = it.icon;
               const isActive = pathname === it.href;
               return (
-                <a
+                <Link
                   key={it.href}
                   href={it.href}
+                  prefetch
                   // v7 P1-5: stronger active state. The previous
                   // 2px sidebar-edge accent was easy to miss. Now
                   // a 3px brand-tinted left bar runs the full row
@@ -146,7 +147,7 @@ export function Sidebar({
                     <Icon size={15} strokeWidth={1.65} className="text-paper/42 transition-colors group-hover:text-gold-soft/80" />
                   )}
                   {it.label}
-                </a>
+                </Link>
               );
             })}
           </div>

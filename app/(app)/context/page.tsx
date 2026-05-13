@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { CommandEmptyState } from "@/components/ui/CommandEmptyState";
 import { CommandStat } from "@/components/ui/CommandStat";
@@ -5,9 +6,37 @@ import { SectionLabel } from "@/components/ui/SectionLabel";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { loadLiveSnapshot } from "@/lib/snapshot-fetch";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+type MacroContext = {
+  asOf?: string;
+  marketStatus?: {
+    available?: boolean;
+    isOpen?: boolean | null;
+    holiday?: string | null;
+    sessionOpen?: string | null;
+    sessionClose?: string | null;
+  };
+  news?: {
+    available?: boolean;
+    items?: Array<{ headline?: string; summary?: string; publishedAt?: string | number | null; url?: string | null }>;
+  };
+  economicCalendar?: {
+    available?: boolean;
+    events?: Array<{
+      date?: string;
+      time?: string | null;
+      event?: string | null;
+      country?: string | null;
+      impact?: string | null;
+      forecast?: string | number | null;
+      previous?: string | number | null;
+    }>;
+  };
+};
 
 const toneToVariant: Record<string, "confirmed" | "watching" | "breached" | "stale"> = {
   green: "confirmed",
@@ -16,8 +45,33 @@ const toneToVariant: Record<string, "confirmed" | "watching" | "breached" | "sta
   neutral: "stale",
 };
 
+async function loadMacroContext(): Promise<MacroContext | null> {
+  try {
+    const h = headers();
+    const host = h.get("x-forwarded-host") || h.get("host");
+    if (!host) return null;
+    const proto = h.get("x-forwarded-proto") || (host.startsWith("localhost") ? "http" : "https");
+    const out: Record<string, string> = {};
+    const cookie = h.get("cookie");
+    if (cookie) out.cookie = cookie;
+    const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+    if (bypass) {
+      out["x-vercel-protection-bypass"] = bypass;
+      out["x-vercel-set-bypass-cookie"] = "samesitenone";
+    }
+    const res = await fetch(`${proto}://${host}/api/macro/context`, {
+      cache: "no-store",
+      headers: out,
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as MacroContext;
+  } catch {
+    return null;
+  }
+}
+
 export default async function Page() {
-  const { data: snap, source } = await loadLiveSnapshot();
+  const [{ data: snap, source }, macro] = await Promise.all([loadLiveSnapshot(), loadMacroContext()]);
   const ctx = snap.marketContext;
 
   return (
@@ -109,6 +163,91 @@ export default async function Page() {
           </div>
         </>
       )}
+
+      <SectionLabel number="02">Headlines & scheduled risk</SectionLabel>
+      <div className="grid grid-cols-1 xl:grid-cols-[360px_minmax(0,1fr)_420px] gap-5">
+        <Card>
+          <CardHeader eyebrow="US session" title="Market status" meta={macro?.asOf ? `Updated ${timeOnly(macro.asOf)}` : "Waiting"} />
+          <CardBody>
+            <div className="rounded-card border border-rule bg-paper-2/55 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="eyebrow text-ink-3">Status</div>
+                  <div className="mt-2 font-serif text-[28px] leading-none text-ink">
+                    {macro?.marketStatus?.available ? (macro.marketStatus.isOpen ? "Open" : "Closed") : "Unavailable"}
+                  </div>
+                </div>
+                <StatusPill variant={macro?.marketStatus?.isOpen ? "confirmed" : "stale"}>
+                  {macro?.marketStatus?.isOpen ? "Live" : "Standby"}
+                </StatusPill>
+              </div>
+              <div className="mt-4 grid gap-2 text-[12px] text-ink-3">
+                <div className="flex justify-between gap-3">
+                  <span>Session open</span>
+                  <span className="font-mono tabular-nums" data-num>{sessionClock(macro?.marketStatus?.sessionOpen)}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span>Session close</span>
+                  <span className="font-mono tabular-nums" data-num>{sessionClock(macro?.marketStatus?.sessionClose)}</span>
+                </div>
+                {macro?.marketStatus?.holiday && (
+                  <div className="rounded-soft bg-gold/10 px-2 py-1 font-mono text-[11px] uppercase tracking-[0.10em] text-gold-ink">
+                    {macro.marketStatus.holiday}
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader eyebrow="Market news" title={macro?.news?.available ? "Headlines" : "Headlines unavailable"} meta="Provider-neutral feed" />
+          <CardBody>
+            {macro?.news?.items?.length ? (
+              <div className="grid gap-3">
+                {macro.news.items.slice(0, 5).map((item, i) => (
+                  <HeadlineRow key={`${item.headline}-${i}`} item={item} />
+                ))}
+              </div>
+            ) : (
+              <CommandEmptyState
+                eyebrow="News context"
+                title="Headlines unavailable"
+                body="Live headlines will appear here when the connected feed returns market news. The pressure board remains structure-first."
+                rows={[
+                  { label: "Treatment", value: "No-read" },
+                  { label: "Plan impact", value: "Do not infer news" },
+                  { label: "Retry", value: "Automatic" },
+                ]}
+              />
+            )}
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader eyebrow="Economic calendar" title="Scheduled risk" meta="Next 14 days" />
+          <CardBody>
+            {macro?.economicCalendar?.events?.length ? (
+              <div className="space-y-3">
+                {macro.economicCalendar.events.slice(0, 8).map((event, i) => (
+                  <CalendarRow key={`${event.date}-${event.event}-${i}`} event={event} />
+                ))}
+              </div>
+            ) : (
+              <CommandEmptyState
+                eyebrow="Calendar"
+                title="No scheduled events returned."
+                body="The app will keep the brief structure-first until a connected calendar returns macro events."
+                rows={[
+                  { label: "Events", value: "0" },
+                  { label: "Window", value: "Next 14 days" },
+                  { label: "Status", value: "Waiting" },
+                ]}
+              />
+            )}
+          </CardBody>
+        </Card>
+      </div>
     </div>
   );
 }
@@ -176,6 +315,54 @@ function Radar({
   );
 }
 
+function HeadlineRow({
+  item,
+}: {
+  item: { headline?: string; summary?: string; publishedAt?: string | number | null; url?: string | null };
+}) {
+  const body = (
+    <div className="rounded-[12px] border border-rule bg-paper-2/60 px-3 py-3 transition-colors hover:bg-paper-2">
+      <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-3">
+        Market headline {item.publishedAt ? `· ${dateShort(String(item.publishedAt))}` : ""}
+      </div>
+      <div className="mt-1 text-[14px] font-semibold leading-snug text-ink-2">{item.headline ?? "Untitled headline"}</div>
+      {item.summary && <div className="mt-1 line-clamp-2 text-[12px] leading-snug text-ink-3">{item.summary}</div>}
+    </div>
+  );
+  return item.url ? (
+    <a href={item.url} target="_blank" rel="noreferrer" className="block outline-none focus-visible:ring-2 focus-visible:ring-gold/45 rounded-[12px]">
+      {body}
+    </a>
+  ) : (
+    body
+  );
+}
+
+function CalendarRow({
+  event,
+}: {
+  event: { date?: string; time?: string | null; event?: string | null; country?: string | null; impact?: string | null; forecast?: string | number | null; previous?: string | number | null };
+}) {
+  const impact = normalizeImpact(event.impact);
+  return (
+    <div className="grid grid-cols-[104px_minmax(0,1fr)_64px] items-center gap-3 rounded-[12px] border border-rule bg-paper-2/60 px-3 py-3">
+      <div>
+        <div className="font-mono text-[11px] text-ink tabular-nums" data-num>{relativeDate(event.date)}</div>
+        <div className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.12em] text-ink-3">{shortDate(event.date)}</div>
+      </div>
+      <div className="min-w-0">
+        <div className="truncate text-[14px] font-semibold text-ink-2" title={event.event ?? undefined}>{event.event ?? "Scheduled event"}</div>
+        <div className="mt-0.5 truncate text-[11px] text-ink-3">
+          {event.country ?? "US"} {event.forecast ? `· F ${event.forecast}` : ""} {event.previous ? `· P ${event.previous}` : ""}
+        </div>
+      </div>
+      <div className={cn("rounded-pill px-2 py-1 text-center font-mono text-[10px] uppercase tracking-[0.10em]", impactTone(impact))}>
+        {impact}
+      </div>
+    </div>
+  );
+}
+
 function toneFor(tone?: string): "ink" | "bull" | "bear" | "gold" | "teal" {
   if (tone === "green") return "bull";
   if (tone === "red") return "bear";
@@ -196,4 +383,75 @@ function pctNote(n: number | null | undefined): string | undefined {
 function bpsNote(n: number | null | undefined): string | undefined {
   if (!Number.isFinite(n ?? NaN)) return undefined;
   return `${Number(n) > 0 ? "+" : ""}${Number(n).toFixed(1)} bps`;
+}
+
+function sessionClock(value?: string | null): string {
+  if (!value) return "-";
+  return value.length > 5 ? value.slice(0, 5) : value;
+}
+
+function timeOnly(value?: string | null): string {
+  if (!value) return "-";
+  const dt = new Date(value);
+  if (Number.isNaN(dt.getTime())) return "-";
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(dt);
+}
+
+function dateShort(value?: string | null): string {
+  if (!value) return "";
+  const numeric = Number(value);
+  const dt = Number.isFinite(numeric) && String(value).length <= 10 ? new Date(numeric * 1000) : new Date(value);
+  if (Number.isNaN(dt.getTime())) return "";
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(dt);
+}
+
+function relativeDate(value?: string | null): string {
+  if (!value) return "Pending";
+  const today = new Date();
+  const date = new Date(`${value.slice(0, 10)}T12:00:00-05:00`);
+  if (Number.isNaN(date.getTime())) return "Pending";
+  const todayKey = today.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  const tomorrowKey = tomorrow.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  const key = date.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  if (key === todayKey) return "Today";
+  if (key === tomorrowKey) return "Tomorrow";
+  return new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", weekday: "short" }).format(date);
+}
+
+function shortDate(value?: string | null): string {
+  if (!value) return "-";
+  const date = new Date(`${value.slice(0, 10)}T12:00:00-05:00`);
+  if (Number.isNaN(date.getTime())) return "-";
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
+
+function normalizeImpact(value?: string | null): "Low" | "Med" | "High" {
+  const raw = String(value ?? "").toLowerCase();
+  if (raw.includes("high") || raw === "3") return "High";
+  if (raw.includes("medium") || raw.includes("med") || raw === "2") return "Med";
+  return "Low";
+}
+
+function impactTone(impact: "Low" | "Med" | "High"): string {
+  if (impact === "High") return "bg-bear-tint text-bear-ink";
+  if (impact === "Med") return "bg-gold/15 text-gold-ink";
+  return "bg-paper-2 text-ink-3";
 }
