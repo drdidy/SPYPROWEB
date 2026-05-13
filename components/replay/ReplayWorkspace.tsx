@@ -108,7 +108,7 @@ export function ReplayWorkspace({ initialDate }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [playhead, setPlayhead] = useState(1);
+  const [playhead, setPlayhead] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState<PlaybackSpeed>(() =>
     parseSpeed(searchParams?.get("speed")),
@@ -152,7 +152,7 @@ export function ReplayWorkspace({ initialDate }: Props) {
       setError(null);
       setLoading(false);
       setPlaying(false);
-      setPlayhead(1);
+      setPlayhead(0);
       return;
     }
 
@@ -195,7 +195,7 @@ export function ReplayWorkspace({ initialDate }: Props) {
         initialTime && nextIntraday
           ? playheadForTime(nextIntraday.es.length ? nextIntraday.es : nextIntraday.spy, initialTime)
           : null;
-      setPlayhead(initialPlayhead ?? 1);
+      setPlayhead(initialPlayhead ?? 0);
       rememberDate(date);
     });
 

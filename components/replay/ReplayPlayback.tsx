@@ -8,7 +8,7 @@
 //   - pops a marker at every line "touch" event whose timestamp is
 //     <= the current playhead time.
 
-import { useMemo } from "react";
+import { useMemo, useState, type KeyboardEvent, type PointerEvent } from "react";
 
 import type { AdaptedSnapshot, AnchorGroup } from "@/lib/snapshot-adapter";
 import type { SPXSnapshot, SPXLine } from "@/lib/types";
@@ -42,7 +42,7 @@ const SPY_SLOPE = -0.2;
 
 export function ReplayPlayback({ spy, spx, intraday, playhead }: Props) {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+    <div className="grid grid-cols-1 gap-5">
       <SPYPlaybackPanel snap={spy} bars={intraday.spy} playhead={playhead} />
       <SPXPlaybackPanel
         snap={spx}
@@ -79,7 +79,7 @@ function SPYPlaybackPanel({
       bars={bars}
       lines={lines}
       playhead={playhead}
-      priceColor="#14161A"
+      priceColor="#F4E4C0"
       emptyMsg={
         anchor
           ? "No 5-minute SPY bars for this date"
@@ -135,7 +135,7 @@ function SPXPlaybackPanel({
       bars={bars}
       lines={lines}
       playhead={playhead}
-      priceColor="#14161A"
+      priceColor="#F4E4C0"
       emptyMsg={
         snap
           ? "No 5-minute ES bars for this date"
@@ -198,14 +198,15 @@ function PanelChart({
   priceColor: string;
   emptyMsg: string;
 }) {
-  const W = 680;
-  const H = 340;
-  const PAD_L = 44;
-  const PAD_R = 112;
-  const PAD_T = 22;
-  const PAD_B = 32;
+  const W = 1040;
+  const H = 440;
+  const PAD_L = 62;
+  const PAD_R = 172;
+  const PAD_T = 34;
+  const PAD_B = 44;
 
   const hasBars = bars.length > 0;
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   // Time axis: from first bar to last bar.
   const t0Ms = hasBars ? new Date(bars[0].t).getTime() : 0;
@@ -268,17 +269,41 @@ function PanelChart({
       return `${i === 0 ? "M" : "L"} ${x.toFixed(1)},${y.toFixed(1)}`;
     })
     .join(" ");
+  const fullPricePath = bars
+    .map((b, i) => {
+      const x = xOf(new Date(b.t).getTime());
+      const y = yOf(b.c);
+      return `${i === 0 ? "M" : "L"} ${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
 
   const lastBar = visibleBars[visibleBars.length - 1] ?? null;
+  const selectedIndex = activeIndex ?? (lastBar ? Math.max(0, visibleBars.length - 1) : 0);
+  const selected = bars[Math.max(0, Math.min(bars.length - 1, selectedIndex))] ?? null;
+  const selectedMs = selected ? new Date(selected.t).getTime() : tNowMs;
+  const selectedX = selected ? xOf(selectedMs) : xOf(tNowMs);
+  const selectedY = selected ? yOf(selected.c) : 0;
+  const selectedLine = selected
+    ? lines
+        .slice()
+        .sort(
+          (a, b) =>
+            Math.abs(a.valueAtMs(selectedMs) - selected.c) -
+            Math.abs(b.valueAtMs(selectedMs) - selected.c),
+        )[0] ?? null
+    : null;
+  const selectedLineValue = selectedLine ? selectedLine.valueAtMs(selectedMs) : null;
+  const tooltipX = Math.min(W - PAD_R - 148, Math.max(PAD_L + 4, selectedX + 12));
+  const tooltipY = Math.min(H - PAD_B - 66, Math.max(PAD_T + 4, selectedY - 38));
 
   return (
-    <div>
-      <div className="flex items-baseline justify-between mb-2">
-        <span className="eyebrow text-ink-3">{title}</span>
+    <div className="rounded-[14px] border border-paper/10 bg-paper/[0.035] p-3 md:p-4">
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-gold-soft">{title}</span>
         {lastBar && (
-          <span className="font-mono text-[11px] text-ink-3 tabular-nums">
+          <span className="font-mono text-[12px] text-paper/70 tabular-nums">
             {shortTime(lastBar.t)} CT -{" "}
-            <span className="text-ink font-semibold">{lastBar.c.toFixed(2)}</span>
+            <span className="text-paper font-semibold">{lastBar.c.toFixed(2)}</span>
           </span>
         )}
       </div>
@@ -287,7 +312,24 @@ function PanelChart({
           {emptyMsg}
         </div>
       ) : (
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full min-h-[300px]">
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          className="h-[360px] w-full outline-none md:h-[430px]"
+          tabIndex={0}
+          role="img"
+          aria-label={`${title} interactive replay chart`}
+          onPointerMove={(event) =>
+            setActiveIndex(nearestReplayBarIndex(event, bars, W, PAD_L, W - PAD_R, xOf))
+          }
+          onPointerLeave={() => setActiveIndex(null)}
+          onFocus={() =>
+            setActiveIndex((value) => value ?? Math.max(0, visibleBars.length - 1))
+          }
+          onKeyDown={(event) => {
+            const next = stepReplayIndex(event, activeIndex ?? selectedIndex, bars.length);
+            if (next !== activeIndex) setActiveIndex(next);
+          }}
+        >
           <title>{title}</title>
           <desc>
             Actual replay price path with projected structure lines and exact current values.
@@ -321,10 +363,10 @@ function PanelChart({
                 y={PAD_T + f * (H - PAD_T - PAD_B) + 3}
                 fontSize="9"
                 fontFamily="var(--font-geist-mono)"
-                fill="#9CA3AF"
+                fill="rgba(244,228,192,0.56)"
                 textAnchor="end"
               >
-                {p.toFixed(1)}
+                {p.toFixed(2)}
               </text>
             );
           })}
@@ -338,9 +380,9 @@ function PanelChart({
                   key={i}
                   x={PAD_L + f * (W - PAD_L - PAD_R)}
                   y={H - 8}
-                  fontSize="9"
+                  fontSize="11"
                   fontFamily="var(--font-geist-mono)"
-                  fill="#9CA3AF"
+                  fill="rgba(244,228,192,0.56)"
                   textAnchor={i === 0 ? "start" : i === 2 ? "end" : "middle"}
                 >
                   {shortTime(new Date(ms).toISOString())}
@@ -355,6 +397,7 @@ function PanelChart({
             const y1 = yOf(ln.valueAtMs(t0Ms));
             const y2 = yOf(ln.valueAtMs(tEndMs));
             const currentValue = ln.valueAtMs(tNowMs);
+            const labelY = Math.max(PAD_T + 12, Math.min(H - PAD_B - 8, yOf(currentValue)));
             return (
               <g key={ln.name}>
                 <line
@@ -367,10 +410,17 @@ function PanelChart({
                   opacity={ln.emphasized ? 0.95 : 0.68}
                   strokeDasharray={ln.emphasized ? undefined : "4 5"}
                 />
+                <circle
+                  cx={xOf(tNowMs)}
+                  cy={yOf(currentValue)}
+                  r={ln.emphasized ? 3.2 : 2.4}
+                  fill={ln.color}
+                  opacity={0.9}
+                />
                 <text
                   x={W - PAD_R + 8}
-                  y={y2 + 4}
-                  fontSize="9"
+                  y={labelY + 4}
+                  fontSize="12"
                   fontFamily="var(--font-geist-mono)"
                   fill={ln.color}
                 >
@@ -380,13 +430,26 @@ function PanelChart({
             );
           })}
 
-          {/* price path */}
+          {/* future context path */}
+          {fullPricePath && (
+            <path
+              d={fullPricePath}
+              fill="none"
+              stroke={priceColor}
+              strokeWidth={1.2}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              opacity={0.18}
+            />
+          )}
+
+          {/* revealed price path */}
           {pricePath && (
             <path
               d={pricePath}
               fill="none"
               stroke={priceColor}
-              strokeWidth={1.6}
+              strokeWidth={2.1}
               strokeLinejoin="round"
               strokeLinecap="round"
             />
@@ -409,38 +472,124 @@ function PanelChart({
           {/* current price marker */}
           {lastBar && (
             <g>
+              <line
+                x1={PAD_L}
+                x2={W - PAD_R}
+                y1={yOf(lastBar.c)}
+                y2={yOf(lastBar.c)}
+                stroke={priceColor}
+                strokeWidth={0.8}
+                opacity={0.22}
+                strokeDasharray="6 7"
+              />
               <circle
                 cx={xOf(new Date(lastBar.t).getTime())}
                 cy={yOf(lastBar.c)}
-                r={9}
+                r={12}
                 fill={priceColor}
                 opacity={0.12}
               />
               <circle
                 cx={xOf(new Date(lastBar.t).getTime())}
                 cy={yOf(lastBar.c)}
-                r={3.5}
+                r={4.5}
                 fill={priceColor}
               />
               <rect
-                x={Math.min(W - PAD_R - 94, xOf(new Date(lastBar.t).getTime()) + 8)}
-                y={Math.max(PAD_T + 2, yOf(lastBar.c) - 14)}
-                width="86"
-                height="22"
-                rx="6"
+                x={Math.min(W - PAD_R - 126, xOf(new Date(lastBar.t).getTime()) + 10)}
+                y={Math.max(PAD_T + 3, yOf(lastBar.c) - 18)}
+                width="118"
+                height="32"
+                rx="8"
                 fill="#FFFDF7"
                 stroke="#D6CCB7"
               />
               <text
-                x={Math.min(W - PAD_R - 51, xOf(new Date(lastBar.t).getTime()) + 51)}
-                y={Math.max(PAD_T + 17, yOf(lastBar.c) + 1)}
-                fontSize="10"
+                x={Math.min(W - PAD_R - 67, xOf(new Date(lastBar.t).getTime()) + 69)}
+                y={Math.max(PAD_T + 23, yOf(lastBar.c) + 5)}
+                fontSize="12"
                 fontFamily="var(--font-geist-mono)"
                 fill="#14161A"
                 textAnchor="middle"
               >
                 LAST {lastBar.c.toFixed(2)}
               </text>
+            </g>
+          )}
+
+          {/* interactive inspection crosshair */}
+          {selected && (
+            <g>
+              <line
+                x1={selectedX}
+                x2={selectedX}
+                y1={PAD_T}
+                y2={H - PAD_B}
+                stroke="#F4E4C0"
+                strokeWidth={0.8}
+                opacity={0.38}
+                strokeDasharray="3 5"
+              />
+              <line
+                x1={PAD_L}
+                x2={W - PAD_R}
+                y1={selectedY}
+                y2={selectedY}
+                stroke="#F4E4C0"
+                strokeWidth={0.7}
+                opacity={0.22}
+                strokeDasharray="2 6"
+              />
+              <circle
+                cx={selectedX}
+                cy={selectedY}
+                r={5}
+                fill="#F4E4C0"
+                stroke="#B8821F"
+                strokeWidth={1.4}
+              />
+              <g transform={`translate(${tooltipX},${tooltipY})`}>
+                <rect
+                  width="144"
+                  height="62"
+                  rx="8"
+                  fill="#FFFDF7"
+                  stroke="#D6CCB7"
+                />
+                <text
+                  x="9"
+                  y="13"
+                  fontSize="8"
+                  fontFamily="var(--font-geist-mono)"
+                  fontWeight="800"
+                  fill="#5A5A5A"
+                  letterSpacing="0.06em"
+                >
+                  {shortTime(selected.t)} CT
+                </text>
+                <text
+                  x="9"
+                  y="32"
+                  fontSize="14"
+                  fontFamily="var(--font-geist-mono)"
+                  fontWeight="900"
+                  fill="#14161A"
+                >
+                  {selected.c.toFixed(2)}
+                </text>
+                {selectedLine && selectedLineValue !== null && (
+                  <text
+                    x="9"
+                    y="50"
+                    fontSize="9"
+                    fontFamily="var(--font-geist-mono)"
+                    fontWeight="700"
+                    fill={selectedLine.color}
+                  >
+                    {selectedLine.name} {selectedLineValue.toFixed(2)}
+                  </text>
+                )}
+              </g>
             </g>
           )}
 
@@ -490,6 +639,49 @@ function PanelChart({
       )}
     </div>
   );
+}
+
+function nearestReplayBarIndex(
+  event: PointerEvent<SVGSVGElement>,
+  bars: IntradayBar[],
+  width: number,
+  minX: number,
+  maxX: number,
+  xOf: (ms: number) => number,
+): number | null {
+  if (bars.length === 0) return null;
+  const rect = event.currentTarget.getBoundingClientRect();
+  const viewX = (event.clientX - rect.left) * (width / Math.max(1, rect.width));
+  const x = Math.max(minX, Math.min(maxX, viewX));
+  let best = 0;
+  let bestDistance = Infinity;
+  for (let i = 0; i < bars.length; i += 1) {
+    const ms = Date.parse(bars[i].t);
+    if (!Number.isFinite(ms)) continue;
+    const distance = Math.abs(xOf(ms) - x);
+    if (distance < bestDistance) {
+      best = i;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
+function stepReplayIndex(
+  event: KeyboardEvent<SVGSVGElement>,
+  current: number,
+  length: number,
+): number {
+  if (length <= 0) return 0;
+  if (event.key !== "ArrowLeft" && event.key !== "ArrowRight" && event.key !== "Home" && event.key !== "End") {
+    return current;
+  }
+  event.preventDefault();
+  if (event.key === "Home") return 0;
+  if (event.key === "End") return length - 1;
+  const delta = event.shiftKey ? 10 : 1;
+  const next = event.key === "ArrowLeft" ? current - delta : current + delta;
+  return Math.max(0, Math.min(length - 1, next));
 }
 
 const playbackStyles = `
