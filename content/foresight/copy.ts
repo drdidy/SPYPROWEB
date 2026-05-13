@@ -9,7 +9,7 @@ export const foresightCopy = {
     resolving:
       "The engine is still resolving today's structure. Use the latest resolved session as context until today's inputs qualify.",
     standby:
-      "Markets are outside the active resolution window. Showing the most recent resolved projection.",
+      "The active projection window is closed. Showing the most recent resolved projection as planning context, not a live 0DTE trigger.",
     live:
       "Projection is current against the latest structural inputs.",
     stale:

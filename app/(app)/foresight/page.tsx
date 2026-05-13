@@ -27,7 +27,14 @@ export default async function Page({
     mock: mockParam,
     activeScenarios,
   });
-  const feedStatus = snapshot.status === "failed" ? "failed" : snapshot.status === "stale" ? "stale" : "live";
+  const feedStatus =
+    snapshot.status === "failed"
+      ? "failed"
+      : snapshot.status === "stale"
+        ? "stale"
+        : snapshot.status === "standby" || snapshot.status === "resolving"
+          ? "loading"
+          : "live";
   const feeds = [
     buildFeedSeed("projection-engine", {
       lastUpdatedAt: snapshot.generatedAt,

@@ -301,11 +301,24 @@ function resolveStatus({
   if (mock === "foresight:failed") return "failed";
   if (source === "error") return "failed";
   if (lineCount === 0) return "resolving";
+  if (!isProjectionWindow(generatedAt)) return "standby";
   const ageMs = Date.now() - Date.parse(generatedAt);
   if (Number.isFinite(ageMs) && ageMs > FORESIGHT_CONFIDENCE_THRESHOLDS.staleMs) {
     return "stale";
   }
   return "live";
+}
+
+function isProjectionWindow(iso: string): boolean {
+  const date = new Date(iso);
+  const parts = ctParts(date);
+  const minutes = parts.hour * 60 + parts.minute;
+  const day = new Intl.DateTimeFormat("en-US", {
+    timeZone: CT_TIME_ZONE,
+    weekday: "short",
+  }).format(date);
+  if (day === "Sat" || day === "Sun") return false;
+  return minutes >= 3 * 60 && minutes <= 15 * 60 + 15;
 }
 
 function diagnosticsFor(status: ForesightStatus, lineCount: number) {

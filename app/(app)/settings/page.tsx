@@ -6,9 +6,9 @@ export const dynamic = "force-static";
 
 const integrations = [
   { name: "Market data sync", detail: "Server-side credentials for quotes and engine inputs", lane: "Market data" },
-  { name: "Unusual Whales", detail: "Flow, dark pools, GEX, SPY/SPX chains, and Greeks", lane: "Options" },
+  { name: "Options flow feed", detail: "Flow, dark pools, GEX, SPY/SPX chains, and Greeks", lane: "Options" },
   { name: "Market data feed", detail: "ES/SPY hourly bars plus VIX/DXY/^TNX", lane: "Market data" },
-  { name: "OpenAI", detail: "Daily brief synthesis from market, options, and engine structure", lane: "Brief" },
+  { name: "Brief synthesis", detail: "Session narrative generated from market, options, and engine structure", lane: "Brief" },
 ];
 
 const preferences = [

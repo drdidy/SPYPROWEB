@@ -22,7 +22,9 @@ type MacroContext = {
   };
   news?: {
     available?: boolean;
-    items?: Array<{ headline?: string; summary?: string; publishedAt?: string | number | null; url?: string | null }>;
+    sessionUse?: string;
+    sessionUseLabel?: string;
+    items?: Array<{ headline?: string; summary?: string; publishedAt?: string | number | null; url?: string | null; ageMinutes?: number | null }>;
   };
   economicCalendar?: {
     available?: boolean;
@@ -73,6 +75,8 @@ async function loadMacroContext(): Promise<MacroContext | null> {
 export default async function Page() {
   const [{ data: snap, source }, macro] = await Promise.all([loadLiveSnapshot(), loadMacroContext()]);
   const ctx = snap.marketContext;
+  const newsRecapOnly = macro?.news?.sessionUse === "recap_only" || macro?.news?.sessionUse === "stale_watch";
+  const calendarEvents = normalizeCalendarEvents(macro?.economicCalendar?.events ?? []);
 
   return (
     <div className="w-full max-w-[1440px] pb-16 space-y-8">
@@ -201,10 +205,19 @@ export default async function Page() {
         </Card>
 
         <Card>
-          <CardHeader eyebrow="Market news" title={macro?.news?.available ? "Headlines" : "Headlines unavailable"} meta="Provider-neutral feed" />
+          <CardHeader
+            eyebrow="Market news"
+            title={macro?.news?.available ? (newsRecapOnly ? "Context, not a trigger" : "Headlines") : "Headlines unavailable"}
+            meta={macro?.news?.sessionUseLabel ?? "Provider-neutral feed"}
+          />
           <CardBody>
             {macro?.news?.items?.length ? (
               <div className="grid gap-3">
+                {newsRecapOnly && (
+                  <div className="rounded-[12px] border border-gold/25 bg-gold/10 px-3 py-2 text-[12px] leading-relaxed text-gold-ink">
+                    These headlines are recap context. They are not used as live 0DTE trade triggers.
+                  </div>
+                )}
                 {macro.news.items.slice(0, 5).map((item, i) => (
                   <HeadlineRow key={`${item.headline}-${i}`} item={item} />
                 ))}
@@ -227,9 +240,9 @@ export default async function Page() {
         <Card>
           <CardHeader eyebrow="Economic calendar" title="Scheduled risk" meta="Next 14 days" />
           <CardBody>
-            {macro?.economicCalendar?.events?.length ? (
+            {calendarEvents.length ? (
               <div className="space-y-3">
-                {macro.economicCalendar.events.slice(0, 8).map((event, i) => (
+                {calendarEvents.slice(0, 8).map((event, i) => (
                   <CalendarRow key={`${event.date}-${event.event}-${i}`} event={event} />
                 ))}
               </div>
@@ -361,6 +374,30 @@ function CalendarRow({
       </div>
     </div>
   );
+}
+
+function normalizeCalendarEvents(
+  events?: Array<{ date?: string; time?: string | null; event?: string | null; country?: string | null; impact?: string | null; forecast?: string | number | null; previous?: string | number | null }>,
+) {
+  const now = new Date();
+  const freshnessFloor = now.getTime() - 30 * 60 * 1000;
+  const cutoff = now.getTime() + 14 * 24 * 60 * 60 * 1000;
+  return (events ?? [])
+    .map((event) => ({ ...event, sortDate: parseCalendarEventTime(event) }))
+    .filter((event) => {
+      const time = event.sortDate.getTime();
+      return Number.isFinite(time) && time >= freshnessFloor && time <= cutoff;
+    })
+    .sort((a, b) => a.sortDate.getTime() - b.sortDate.getTime());
+}
+
+function parseCalendarEventTime(event: { date?: string; time?: string | null }): Date {
+  const raw = String(event.time || "").trim();
+  if (raw) {
+    if (raw.includes("T")) return new Date(raw.endsWith("Z") || /[+-]\d\d:?\d\d$/.test(raw) ? raw : `${raw}Z`);
+    return new Date(`${raw.replace(" ", "T")}Z`);
+  }
+  return new Date(`${event.date}T08:30:00-04:00`);
 }
 
 function toneFor(tone?: string): "ink" | "bull" | "bear" | "gold" | "teal" {

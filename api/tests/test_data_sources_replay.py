@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from _lib.data_sources import _build_replay_block, _spy_state_from_touch_window
+from _lib.data_sources import _build_replay_block, _spy_state_from_touch_window, _triggers_from_lines
 from _lib.prophet_core import DynamicLine
 
 CT = ZoneInfo("America/Chicago")
@@ -87,6 +87,22 @@ def test_spy_replay_grades_first_9_to_11_reference_touch_to_hour_close():
     assert block["entry"]["rule"] == "ENTRY_WINDOW_TOUCH"
     assert block["entry"]["line"] == "Upper ref"
     assert block["exit"]["rule"] == "HOURLY_CLOSE"
+
+
+def test_spy_triggers_use_8am_reference_but_9_to_11_touch_window():
+    rows = _triggers_from_lines(
+        primary_lines=[_line("UPPER", 100.0)],
+        current_dt=_ts(10).to_pydatetime(),
+        current_price=101.0,
+        rth_today=pd.DataFrame(),
+        rth_yesterday=pd.DataFrame(),
+        entry_reference_dt=_ts(8).to_pydatetime(),
+        slope=0.0,
+    )
+
+    assert rows[0]["entryReferenceTime"] == _ts(8).isoformat()
+    assert rows[0]["touchWindowStart"] == _ts(9).isoformat()
+    assert rows[0]["touchWindowEnd"] == _ts(11).isoformat()
 
 
 def test_spy_replay_includes_11am_ct_candle_in_plan_window():

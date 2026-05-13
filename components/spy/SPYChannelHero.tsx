@@ -236,7 +236,7 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
           <p className="mt-7 text-[15px] text-ink-2 leading-relaxed max-w-xl">
             {primary ? (
               <span className="block text-ink-3 text-[13.5px]">
-                Reference set <span className="font-mono">{anchorTimeLabel(primary)}</span> CT.{" "}
+                Source candle <span className="font-mono">{anchorTimeLabel(primary)}</span> CT.{" "}
                 {/* v9: slope value hidden — proprietary engine
                     parameter. The bands themselves still render
                     using the const above. */}

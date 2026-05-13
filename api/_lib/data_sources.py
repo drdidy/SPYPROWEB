@@ -27,7 +27,10 @@ from . import seed_snapshot
 from . import tastytrade
 from . import unusual_whales
 
-ENTRY_REFERENCE_HOUR_CT = 9
+# Entry levels are the 08:00 CT values on the structure lines. The operator
+# then evaluates the 09:00, 10:00, and 11:00 CT candles against those fixed
+# references.
+ENTRY_REFERENCE_HOUR_CT = 8
 ENTRY_WINDOW_START_HOUR_CT = 9
 ENTRY_WINDOW_END_HOUR_CT = 11
 
@@ -364,8 +367,9 @@ def _triggers_from_lines(
 
     def _touch_window(dt: datetime) -> tuple[str, str]:
         ref = pd.Timestamp(dt)
+        start = ref.replace(hour=ENTRY_WINDOW_START_HOUR_CT, minute=0, second=0, microsecond=0)
         end = ref.replace(hour=ENTRY_WINDOW_END_HOUR_CT, minute=0, second=0, microsecond=0)
-        return ref.isoformat(), end.isoformat()
+        return start.isoformat(), end.isoformat()
 
     entry_window_start, entry_window_end = _touch_window(entry_reference_dt)
 
@@ -1488,10 +1492,8 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
     # Anchor band values are projected to a "display reference" time.
     # On live, that's the engine's rolling projection (now floored to
     # the hour). On replay we lock it to 09:00 CT — the moment the
-    # first RTH hour closes and the framework becomes the trader's
-    # entry reference. Otherwise the replay shows lines after 9 hours
-    # of decay, which is correct math but useless for backtesting the
-    # entry decision.
+    # first institutional reference is set. The 09:00/10:00/11:00 CT
+    # candles are evaluated against these fixed 08:00 values.
     anchor_payload_for_ui = _anchor_payload_for_ui(
         primary_lines,
         projection_time,
