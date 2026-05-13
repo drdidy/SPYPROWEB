@@ -5,6 +5,7 @@ The Daily Brief is the synthesis layer. It gathers:
   - ES channel snapshot data
   - options intelligence from Unusual Whales
   - market context from the existing market-data pipeline
+  - optional news and economic-calendar context
 
 DeepSeek receives a compact JSON dossier and drafts the brief. OpenAI
 reviews/polishes the draft when available, or serves as fallback if
@@ -28,7 +29,7 @@ _API_ROOT = Path(__file__).resolve().parents[1]
 if str(_API_ROOT) not in sys.path:
     sys.path.insert(0, str(_API_ROOT))
 
-from _lib import ai_router, data_sources, unusual_whales  # noqa: E402
+from _lib import ai_router, data_sources, macro_context, unusual_whales  # noqa: E402
 from _lib.spx_data import build_default_fetcher, build_snapshot_with_provenance  # noqa: E402
 
 CT = ZoneInfo("America/Chicago")
@@ -45,24 +46,27 @@ the day.
 You receive a compact JSON dossier from the app. It contains market
 data, SPY premarket-anchor structure, ES overnight-channel structure,
 options flow, dark-pool, GEX, and option-chain summaries. Use only the
-facts provided. Do not invent news, prices, entries, probabilities, or
-levels. If a section is unavailable, say that quietly and work with
-the structure that is present.
+facts provided. Also read the macro/news block when available; if it is
+unavailable, say the macro feed is not connected rather than saying there is
+no news. Do not invent news, prices, entries, probabilities, or levels. If a
+section is unavailable, say that quietly and work with the structure that is
+present.
 
 Write in simple trader language. No hype. No guarantees. Make it
 practical: what the tape is saying, which side has the cleaner setup,
 which lines matter first, what confirms the idea, what invalidates it,
 and when to stand down.
 
-Format exactly six short labeled paragraphs:
+Format exactly seven short labeled paragraphs:
 Market read:
 SPY plan:
 ES plan:
 Options pressure:
+News and calendar:
 What changes the plan:
 Opening checklist:
 
-Keep the total around 220-320 words. No markdown bullets."""
+Keep the total around 260-360 words. No markdown bullets."""
 
 
 REVIEW_PROMPT = """You are the final reviewer for the SPY Prophet Daily
@@ -338,10 +342,11 @@ def _brief_dossier() -> dict:
         "generatedAt": datetime.now(CT).isoformat(),
         "purpose": "pre-open planning brief for SPY/SPX options trading",
         "dataPolicy": "use provided values only; no synthetic market values",
-        "SPY": _spy_facts(spy_snapshot),
-        "ES": _spx_facts(),
-        "options": _options_facts(),
-    }
+            "SPY": _spy_facts(spy_snapshot),
+            "ES": _spx_facts(),
+            "options": _options_facts(),
+            "macro": macro_context.fetch_macro_context(),
+        }
 
 
 def _engine_fallback_brief(dossier: dict) -> str:
@@ -392,6 +397,7 @@ def _build_brief() -> dict:
             "watchLines": ((dossier.get("ES") or {}).get("watchLines") or [])[:4],
         },
         "optionsAvailable": (dossier.get("options") or {}).get("available"),
+        "macro": dossier.get("macro"),
     }
     review_json = json.dumps(review_context, default=str, sort_keys=True)
 
@@ -434,6 +440,7 @@ def _build_brief() -> dict:
             "SPY": dossier.get("SPY"),
             "ES": dossier.get("ES"),
             "options": dossier.get("options"),
+            "macro": dossier.get("macro"),
         },
     }
 

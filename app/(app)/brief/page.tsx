@@ -59,6 +59,20 @@ interface BriefDossier {
     SPY?: OptionsSymbol;
     SPX?: OptionsSymbol;
   };
+  macro?: {
+    news?: {
+      available?: boolean;
+      source?: string | null;
+      reason?: string;
+      items?: Array<{ headline?: string; source?: string | null; publishedAt?: string | number | null }>;
+    };
+    economicCalendar?: {
+      available?: boolean;
+      source?: string | null;
+      reason?: string;
+      events?: Array<{ date?: string; event?: string; impact?: string; country?: string }>;
+    };
+  };
 }
 
 interface WatchLine {
@@ -127,6 +141,7 @@ export default async function Page() {
   const spyOptions = options?.SPY;
   const spxOptions = options?.SPX;
   const paragraphs = splitBrief(briefText);
+  const macro = brief.dossier?.macro;
   const fallbackLines: WatchLine[] = snap.lines.slice(0, 5).map((line) => ({
     name: line.name,
     kind: line.kind,
@@ -287,6 +302,9 @@ export default async function Page() {
         <OptionsPanel symbol="SPY" data={spyOptions} referencePrice={snap.currentPrice} />
         <OptionsPanel symbol="SPX" data={spxOptions} />
       </div>
+
+      <SectionLabel number="04">News and calendar</SectionLabel>
+      <MacroPanel macro={macro} />
     </div>
   );
 }
@@ -655,6 +673,82 @@ function OptionsPanel({
         )}
       </CardBody>
     </Card>
+  );
+}
+
+function MacroPanel({ macro }: { macro?: BriefDossier["macro"] }) {
+  const news = macro?.news;
+  const calendar = macro?.economicCalendar;
+  const newsItems = news?.items ?? [];
+  const events = calendar?.events ?? [];
+  return (
+    <div className="grid gap-4 xl:grid-cols-2">
+      <Card>
+        <CardHeader
+          eyebrow="Market news"
+          title={news?.available ? "Headlines in the model" : "News feed not connected"}
+          meta={news?.source ? `Source ${news.source}` : news?.reason ?? "Optional provider"}
+        />
+        <CardBody>
+          {newsItems.length > 0 ? (
+            <div className="space-y-3">
+              {newsItems.slice(0, 5).map((item, i) => (
+                <div key={`${item.headline}-${i}`} className="rounded-[12px] border border-rule bg-paper-2/60 px-3 py-3">
+                  <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-3">
+                    {item.source ?? "News"} {item.publishedAt ? `· ${String(item.publishedAt).slice(0, 10)}` : ""}
+                  </div>
+                  <div className="mt-1 text-[14px] leading-snug text-ink-2">{item.headline}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <CommandEmptyState
+              eyebrow="News context"
+              title="No live headline feed is wired yet."
+              body="The AI sees this as a missing feed, not as a quiet-news signal. Add FINNHUB_API_KEY or NEWS_API_KEY in Vercel to populate this layer."
+              rows={[
+                { label: "DeepSeek", value: "Ready to read" },
+                { label: "OpenAI", value: "Ready to review" },
+                { label: "Status", value: news?.reason ?? "No provider key" },
+              ]}
+            />
+          )}
+        </CardBody>
+      </Card>
+      <Card>
+        <CardHeader
+          eyebrow="Economic calendar"
+          title={calendar?.available ? "Scheduled risk" : "Calendar watchlist"}
+          meta={calendar?.source ? `Source ${calendar.source}` : calendar?.reason ?? "Static watchlist"}
+        />
+        <CardBody>
+          {events.length > 0 ? (
+            <div className="space-y-3">
+              {events.slice(0, 6).map((event, i) => (
+                <div key={`${event.date}-${event.event}-${i}`} className="grid grid-cols-[88px_minmax(0,1fr)_72px] items-center gap-3 rounded-[12px] border border-rule bg-paper-2/60 px-3 py-3">
+                  <div className="font-mono text-[11px] text-ink tabular-nums">{event.date ?? "-"}</div>
+                  <div className="text-[14px] text-ink-2">{event.event ?? "Macro event"}</div>
+                  <div className="text-right font-mono text-[10px] uppercase tracking-[0.12em] text-gold-ink">
+                    {event.impact ?? event.country ?? "watch"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <CommandEmptyState
+              eyebrow="Calendar"
+              title="No economic-calendar events returned."
+              body="The brief can still synthesize structure and options, but it will label macro calendar as unavailable until a live provider is configured."
+              rows={[
+                { label: "Source", value: calendar?.source ?? "None" },
+                { label: "Events", value: "0" },
+                { label: "Treatment", value: "No-read" },
+              ]}
+            />
+          )}
+        </CardBody>
+      </Card>
+    </div>
   );
 }
 
