@@ -18,6 +18,46 @@ from zoneinfo import ZoneInfo
 
 CT = ZoneInfo("America/Chicago")
 
+NEWS_KEYWORDS = (
+    "spy",
+    "s&p",
+    "s&p 500",
+    "spx",
+    "market",
+    "markets",
+    "stock",
+    "stocks",
+    "inflation",
+    "cpi",
+    "pce",
+    "federal reserve",
+    "fed",
+    "treasury",
+    "yield",
+    "yields",
+    "vix",
+    "etf",
+    "earnings",
+)
+
+CALENDAR_KEYWORDS = (
+    "cpi",
+    "pce",
+    "fomc",
+    "federal reserve",
+    "fed",
+    "payroll",
+    "jobless",
+    "unemployment",
+    "gdp",
+    "retail sales",
+    "ism",
+    "pmi",
+    "consumer confidence",
+    "treasury",
+    "auction",
+)
+
 
 def _env(name: str) -> str | None:
     value = os.environ.get(name)
@@ -30,6 +70,48 @@ def _finnhub_key() -> str | None:
         if value:
             return value
     return None
+
+
+def _clean_text(value: object, limit: int | None = None) -> str:
+    text = str(value or "").strip()
+    if "Ã" in text or "â" in text:
+        try:
+            text = text.encode("latin-1").decode("utf-8")
+        except UnicodeError:
+            pass
+    text = " ".join(text.split())
+    return text[:limit] if limit else text
+
+
+def _news_relevant(row: dict) -> bool:
+    text = f"{row.get('headline') or ''} {row.get('summary') or ''}".lower()
+    return any(keyword in text for keyword in NEWS_KEYWORDS)
+
+
+def _calendar_relevant(row: dict) -> bool:
+    country = _clean_text(row.get("country")).upper()
+    event = _clean_text(row.get("event")).lower()
+    impact = _clean_text(row.get("impact")).lower()
+    if country in {"US", "USA", "UNITED STATES"}:
+        return True
+    if impact in {"high", "medium"} and any(keyword in event for keyword in CALENDAR_KEYWORDS):
+        return True
+    return any(keyword in event for keyword in CALENDAR_KEYWORDS)
+
+
+def _calendar_event(row: dict) -> dict:
+    return {
+        "date": (_clean_text(row.get("time") or row.get("date")) or "")[:10],
+        "time": row.get("time"),
+        "event": _clean_text(row.get("event"), 120),
+        "country": _clean_text(row.get("country"), 24),
+        "impact": _clean_text(row.get("impact"), 16),
+        "actual": row.get("actual"),
+        "estimate": row.get("estimate"),
+        "forecast": row.get("estimate"),
+        "previous": row.get("prev") or row.get("previous"),
+        "unit": row.get("unit"),
+    }
 
 
 def _http_json(url: str, headers: dict[str, str] | None = None, timeout: float = 6.0) -> Any:
@@ -68,8 +150,10 @@ def fetch_market_news(limit: int = 6) -> dict:
         for row in (company_raw if isinstance(company_raw, list) else []) + (general_raw if isinstance(general_raw, list) else []):
             if not isinstance(row, dict):
                 continue
-            headline = str(row.get("headline") or "").strip()
+            headline = _clean_text(row.get("headline"))
             if not headline or headline.lower() in seen:
+                continue
+            if not _news_relevant(row):
                 continue
             seen.add(headline.lower())
             rows.append(row)
@@ -78,8 +162,8 @@ def fetch_market_news(limit: int = 6) -> dict:
             "source": "connected_news",
             "items": [
                 {
-                    "headline": str(row.get("headline") or "")[:180],
-                    "summary": str(row.get("summary") or "")[:260],
+                    "headline": _clean_text(row.get("headline"), 180),
+                    "summary": _clean_text(row.get("summary"), 260),
                     "source": row.get("source"),
                     "url": row.get("url"),
                     "publishedAt": row.get("datetime"),
@@ -107,8 +191,8 @@ def fetch_market_news(limit: int = 6) -> dict:
             "source": "connected_news",
             "items": [
                 {
-                    "headline": str(row.get("title") or "")[:180],
-                    "summary": str(row.get("description") or "")[:260],
+                    "headline": _clean_text(row.get("title"), 180),
+                    "summary": _clean_text(row.get("description"), 260),
                     "source": (row.get("source") or {}).get("name") if isinstance(row.get("source"), dict) else None,
                     "url": row.get("url"),
                     "publishedAt": row.get("publishedAt"),
@@ -140,26 +224,12 @@ def fetch_economic_calendar(now: datetime | None = None) -> dict:
         q = urllib.parse.urlencode({"from": start, "to": end, "token": finnhub})
         raw = _http_json(f"https://finnhub.io/api/v1/calendar/economic?{q}")
         rows = raw.get("economicCalendar") if isinstance(raw, dict) else []
-        if rows:
+        relevant = [row for row in rows if isinstance(row, dict) and _calendar_relevant(row)]
+        if relevant:
             return {
                 "available": True,
                 "source": "connected_calendar",
-                "events": [
-                    {
-                        "date": (row.get("time") or row.get("date") or "")[:10],
-                        "time": row.get("time"),
-                        "event": row.get("event"),
-                        "country": row.get("country"),
-                        "impact": row.get("impact"),
-                        "actual": row.get("actual"),
-                        "estimate": row.get("estimate"),
-                        "forecast": row.get("estimate"),
-                        "previous": row.get("prev") or row.get("previous"),
-                        "unit": row.get("unit"),
-                    }
-                    for row in rows[:20]
-                    if isinstance(row, dict)
-                ],
+                "events": [_calendar_event(row) for row in relevant[:20]],
             }
 
     fmp = _env("FMP_API_KEY")
