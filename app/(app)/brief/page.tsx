@@ -220,22 +220,10 @@ export default async function Page() {
   const esLast = num(es?.price?.last);
   const esChangePct = num(es?.price?.changePct);
   const vix = num(spy?.context?.vix);
-  const freshness = freshnessState(brief.asOf);
   const tldr = resolveTldr(brief, spy, snap);
 
   return (
     <div className="w-full max-w-[1600px] pb-14 print:max-w-none print:bg-white">
-      <BriefTopStatusBar
-        spyLast={spyLast}
-        spyChangePct={spyChangePct}
-        esLast={esLast}
-        esChangePct={esChangePct}
-        vix={vix}
-        spyState={spy?.state ?? snap.currentState}
-        esState={es?.scenario ?? es?.state}
-        freshness={freshness}
-        asOf={brief.asOf}
-      />
       <StickySubnav />
 
       <section className="mt-5 overflow-hidden rounded-[20px] border border-[#D6BC75]/45 bg-[#071116] text-paper shadow-[0_24px_60px_-42px_rgba(7,17,22,0.95)] print:border-rule print:bg-white print:text-ink">

@@ -40,7 +40,7 @@ export function GlossaryDrawerButton() {
 
   return (
     <>
-      <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>
+      <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)} className="bg-paper text-ink hover:bg-paper-2">
         <HelpCircle className="h-4 w-4" />
         Glossary
       </Button>
