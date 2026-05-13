@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { BrainCircuit, CheckCircle2, Crosshair, Gauge, LineChart, ShieldAlert, Sparkles } from "lucide-react";
+import { BrainCircuit, CheckCircle2, Crosshair, Gauge, LineChart, ShieldAlert, Sparkles, TrendingDown, TrendingUp } from "lucide-react";
 import { headers } from "next/headers";
 
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
@@ -194,6 +194,8 @@ export default async function Page() {
         />
       </div>
 
+      <BullBearDesk spy={spy} es={es} spyOptions={spyOptions} snap={snap} />
+
       <SectionLabel number="01">Read first</SectionLabel>
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_390px] gap-5">
         <Card className="bg-[#071116] text-paper border-[#243138]">
@@ -387,12 +389,134 @@ function ProviderPill({ label, value, active }: { label: string; value: string; 
   );
 }
 
+function BullBearDesk({
+  spy,
+  es,
+  spyOptions,
+  snap,
+}: {
+  spy?: BriefDossier["SPY"];
+  es?: BriefDossier["ES"];
+  spyOptions?: OptionsSymbol;
+  snap: Awaited<ReturnType<typeof loadLiveSnapshot>>["data"];
+}) {
+  const spyState = spy?.state ?? snap.currentState;
+  const esScenario = es?.scenario?.replace(/_/g, " ").toLowerCase() ?? "ES context waiting";
+  const flow = spyOptions?.flow?.lean?.toLowerCase() ?? "options flow waiting";
+  const firstLine = normalizeCaseLine(spy?.watchLines?.[0]) ?? normalizeCaseLine(snap.lines[0]);
+  const firstLineLabel = firstLine?.label ?? "nearest structure";
+  const level = firstLine?.level;
+
+  return (
+    <section className="grid gap-4 lg:grid-cols-2" aria-label="Bull and bear case">
+      <CasePanel
+        icon={<TrendingUp className="h-4 w-4" />}
+        label="Bull case"
+        title="What must improve"
+        body={`A long read needs price to reclaim and hold structure near ${firstLineLabel}${level ? ` (${fmtPrice(level)})` : ""}, with ES no longer pushing against the setup and options pressure not opposing the move.`}
+        facts={[
+          `SPY state: ${spyState}`,
+          `ES: ${esScenario}`,
+          `Flow: ${flow}`,
+        ]}
+        tone="bull"
+      />
+      <CasePanel
+        icon={<TrendingDown className="h-4 w-4" />}
+        label="Bear case"
+        title="What keeps pressure lower"
+        body={`The short read stays cleaner if SPY fails the nearest structure test, ES remains heavy or selective, and options pressure confirms rather than fights the downside read.`}
+        facts={[
+          `Invalidation: ${spy?.flipCondition ?? "engine level pending"}`,
+          `ES confluence: ${es?.confluence?.score ?? "-"} / 100`,
+          `Gamma: ${spyOptions?.gex?.regime?.toLowerCase() ?? "waiting"}`,
+        ]}
+        tone="bear"
+      />
+    </section>
+  );
+}
+
+function normalizeCaseLine(line: unknown): { label: string; level?: number } | null {
+  if (!line || typeof line !== "object") return null;
+  const row = line as Record<string, unknown>;
+  const label = row.line ?? row.name ?? row.kind;
+  const level = row.level ?? row.currentValue;
+  return {
+    label: typeof label === "string" && label.trim() ? label : "nearest structure",
+    level: typeof level === "number" && Number.isFinite(level) ? level : undefined,
+  };
+}
+
+function CasePanel({
+  icon,
+  label,
+  title,
+  body,
+  facts,
+  tone,
+}: {
+  icon: ReactNode;
+  label: string;
+  title: string;
+  body: string;
+  facts: string[];
+  tone: "bull" | "bear";
+}) {
+  const color =
+    tone === "bull"
+      ? "border-bull/20 bg-bull-tint/60 text-bull-ink"
+      : "border-bear/20 bg-bear-tint/55 text-bear-ink";
+  return (
+    <Card className="min-h-[220px]">
+      <CardBody className="p-0">
+        <div className="grid min-h-[220px] grid-cols-[88px_minmax(0,1fr)]">
+          <div className={cn("flex flex-col items-center justify-between border-r border-rule p-4", color)}>
+            <div className="grid h-10 w-10 place-items-center rounded-[12px] border border-current/20 bg-paper/70">
+              {icon}
+            </div>
+            <div className="font-serif text-[42px] leading-none opacity-15">
+              {tone === "bull" ? "B" : "S"}
+            </div>
+          </div>
+          <div className="p-5">
+            <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-gold-ink/80">
+              {label}
+            </div>
+            <h2 className="mt-2 font-serif text-[26px] leading-tight text-ink">
+              {title}
+            </h2>
+            <p className="mt-3 text-[14px] leading-relaxed text-ink-2">
+              {body}
+            </p>
+            <div className="mt-4 grid gap-2 sm:grid-cols-3">
+              {facts.map((fact) => (
+                <div key={fact} className="rounded-[10px] border border-rule bg-paper-2/65 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.10em] text-ink-3">
+                  {fact}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </CardBody>
+    </Card>
+  );
+}
+
 function splitBrief(text: string): string[] {
   return text
     .split(/\n\s*\n/)
-    .map((p) => p.trim())
+    .map(cleanBriefParagraph)
     .filter(Boolean)
     .slice(0, 6);
+}
+
+function cleanBriefParagraph(text: string): string {
+  return text
+    .trim()
+    .replace(/^\*\*([^:*]{3,34}):\*\*/s, "$1:")
+    .replace(/^\*\*([^:*]{3,34})\*\*:/s, "$1:")
+    .replace(/\*\*/g, "");
 }
 
 function BriefParagraph({ text, featured = false }: { text: string; featured?: boolean }) {

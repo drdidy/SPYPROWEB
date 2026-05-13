@@ -376,6 +376,24 @@ def _engine_fallback_brief(dossier: dict) -> str:
 def _build_brief() -> dict:
     dossier = _brief_dossier()
     dossier_json = json.dumps(dossier, default=str, sort_keys=True)
+    review_context = {
+        "policy": dossier.get("dataPolicy"),
+        "SPY": {
+            "state": (dossier.get("SPY") or {}).get("state"),
+            "verdict": (dossier.get("SPY") or {}).get("verdict"),
+            "price": (dossier.get("SPY") or {}).get("price"),
+            "watchLines": ((dossier.get("SPY") or {}).get("watchLines") or [])[:4],
+            "signals": ((dossier.get("SPY") or {}).get("signals") or [])[:3],
+        },
+        "ES": {
+            "state": (dossier.get("ES") or {}).get("state"),
+            "scenario": (dossier.get("ES") or {}).get("scenario"),
+            "price": (dossier.get("ES") or {}).get("price"),
+            "watchLines": ((dossier.get("ES") or {}).get("watchLines") or [])[:4],
+        },
+        "optionsAvailable": (dossier.get("options") or {}).get("available"),
+    }
+    review_json = json.dumps(review_context, default=str, sort_keys=True)
 
     brief: str | None = None
     source = "engine"
@@ -386,9 +404,9 @@ def _build_brief() -> dict:
         user=f"App dossier JSON:\n{dossier_json}\n\nWrite the Daily Brief.",
         review_system=REVIEW_PROMPT,
         review_user_prefix=(
-            "App dossier JSON follows. Check that the draft only uses these facts, "
+            "Compact app facts follow. Check that the draft only uses these facts, "
             "then return the final brief text only.\n"
-            f"{dossier_json}"
+            f"{review_json}"
         ),
         max_tokens=950,
         timeout=14.0,
