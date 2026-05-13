@@ -55,8 +55,15 @@ interface BriefResponse {
   source: string;
   asOf?: string;
   briefId?: string;
+  coversSession?: BriefCoveredSession;
   degraded?: boolean;
   dossier?: BriefDossier;
+}
+
+interface BriefCoveredSession {
+  date?: string;
+  phase?: "pre_open" | "mid_session" | "post_close" | string;
+  label?: string;
 }
 
 interface CaseRead {
@@ -193,7 +200,7 @@ async function loadBrief(): Promise<BriefResponse> {
 
 export async function generateMetadata(): Promise<Metadata> {
   const brief = await loadBrief();
-  const label = sessionLabel(brief.asOf).replace(/·|\?\?/g, "-");
+  const label = sessionLabel(brief.coversSession, brief.asOf).replace(/·|\?\?/g, "-");
   const tldr = brief.tldr?.action || "Session plan";
   return {
     title: {
@@ -216,8 +223,8 @@ export default async function Page() {
   const spxOptions = options?.SPX;
   const sections = normalizedSections(brief);
   const briefText = sections.map((section) => `${SECTION_LABELS[section.section]}: ${section.body}`).join("\n\n");
-  const session = sessionLabel(brief.asOf);
-  const planLabel = planTitle(brief.asOf);
+  const session = sessionLabel(brief.coversSession, brief.asOf);
+  const planLabel = planTitle(brief.coversSession, brief.asOf);
   const spyLines = (spy?.watchLines?.length ? spy.watchLines : fallbackSpyLines(snap)).slice(0, 6);
   const esLines = (es?.watchLines ?? []).slice(0, 4);
   const spyLast = num(spy?.price?.last ?? snap.currentPrice);
@@ -933,19 +940,36 @@ function impactTone(impact: "Low" | "Med" | "High") {
   return "bg-paper text-ink-3 border border-rule";
 }
 
-function sessionLabel(iso?: string): string {
-  const date = safeDate(iso);
-  const phase = sessionPhase(date);
+function sessionLabel(coversSession?: BriefCoveredSession, generatedAt?: string): string {
+  const date = coveredSessionDate(coversSession, generatedAt);
+  const phase = coveredSessionPhase(coversSession, generatedAt);
   return `${date.toLocaleDateString("en-US", { timeZone: "America/Chicago", weekday: "short", month: "short", day: "numeric", year: "numeric" })} · ${phase}`;
 }
 
-function planTitle(iso?: string): string {
-  const date = safeDate(iso);
-  const phase = sessionPhase(date);
+function planTitle(coversSession?: BriefCoveredSession, generatedAt?: string): string {
+  const date = coveredSessionDate(coversSession, generatedAt);
+  const phase = coveredSessionPhase(coversSession, generatedAt);
   const day = date.toLocaleDateString("en-US", { timeZone: "America/Chicago", weekday: "short", month: "short", day: "numeric" });
   if (phase === "Pre-Open") return `Pre-Open Plan · ${day}`;
   if (phase === "Post-Close") return `Post-Close Recap · ${day}`;
   return `Mid-Session Update · ${day}`;
+}
+
+function coveredSessionDate(coversSession?: BriefCoveredSession, generatedAt?: string): Date {
+  if (coversSession?.date && /^\d{4}-\d{2}-\d{2}$/.test(coversSession.date)) {
+    return safeDate(`${coversSession.date}T12:00:00-05:00`);
+  }
+  return safeDate(generatedAt);
+}
+
+function coveredSessionPhase(
+  coversSession?: BriefCoveredSession,
+  generatedAt?: string,
+): "Pre-Open" | "Mid-Session" | "Post-Close" {
+  if (coversSession?.phase === "pre_open") return "Pre-Open";
+  if (coversSession?.phase === "mid_session") return "Mid-Session";
+  if (coversSession?.phase === "post_close") return "Post-Close";
+  return sessionPhase(safeDate(generatedAt));
 }
 
 function sessionPhase(date: Date): "Pre-Open" | "Mid-Session" | "Post-Close" {
@@ -1138,3 +1162,4 @@ function deltaTone(delta: number): string {
   if (!Number.isFinite(delta) || Math.abs(delta) < 0.005) return "text-ink-3";
   return delta > 0 ? "text-bull-ink" : "text-bear-ink";
 }
+

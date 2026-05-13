@@ -18,7 +18,7 @@ import json
 import os
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 from threading import Lock
@@ -33,6 +33,8 @@ from _lib.spx_data import build_default_fetcher, build_snapshot_with_provenance 
 
 CT = ZoneInfo("America/Chicago")
 BRIEF_TTL_SECONDS = 600.0
+RTH_OPEN_MINUTE_CT = 8 * 60 + 30
+RTH_CLOSE_MINUTE_CT = 15 * 60
 
 _cache: dict[str, object] = {"value": None, "expires_at": 0.0}
 _cache_lock = Lock()
@@ -394,10 +396,55 @@ def _options_facts() -> dict:
     }
 
 
+def _is_trading_day(day: datetime) -> bool:
+    return day.weekday() < 5
+
+
+def _next_trading_day(day: datetime) -> datetime:
+    cursor = day + timedelta(days=1)
+    while not _is_trading_day(cursor):
+        cursor += timedelta(days=1)
+    return cursor
+
+
+def _session_covered_by(now: datetime) -> dict:
+    """Return the trading session this brief is meant to prepare.
+
+    A brief generated after the cash close is not a post-close artifact for
+    operators; it is the next session's pre-open plan. Keeping this separate
+    from generatedAt prevents Tuesday-night briefs from wearing Tuesday labels.
+    """
+    local = now.astimezone(CT)
+    minutes = local.hour * 60 + local.minute
+
+    if not _is_trading_day(local):
+        covered = local
+        while not _is_trading_day(covered):
+            covered += timedelta(days=1)
+        phase = "pre_open"
+    elif minutes < RTH_OPEN_MINUTE_CT:
+        covered = local
+        phase = "pre_open"
+    elif minutes < RTH_CLOSE_MINUTE_CT:
+        covered = local
+        phase = "mid_session"
+    else:
+        covered = _next_trading_day(local)
+        phase = "pre_open"
+
+    return {
+        "date": covered.strftime("%Y-%m-%d"),
+        "phase": phase,
+        "label": covered.strftime("%a, %b %-d, %Y") if os.name != "nt" else covered.strftime("%a, %b %#d, %Y"),
+    }
+
+
 def _brief_dossier() -> dict:
+    generated_at = datetime.now(CT)
     spy_snapshot = data_sources.build_snapshot_with_fallback()
     return {
-        "generatedAt": datetime.now(CT).isoformat(),
+        "generatedAt": generated_at.isoformat(),
+        "coversSession": _session_covered_by(generated_at),
         "purpose": "pre-open planning brief for SPY/SPX options trading",
         "dataPolicy": "use provided values only; no synthetic market values",
             "SPY": _spy_facts(spy_snapshot),
@@ -576,7 +623,15 @@ def _validate_structured_brief(payload: dict | None) -> dict | None:
     return payload
 
 
-def _brief_id(generated_at: object) -> str:
+def _brief_id(generated_at: object, covers_session: object) -> str:
+    phase = None
+    date = None
+    if isinstance(covers_session, dict):
+        phase = covers_session.get("phase")
+        date = covers_session.get("date")
+    if isinstance(date, str) and date:
+        label = "pre" if phase == "pre_open" else "mid" if phase == "mid_session" else "post"
+        return f"brief-{date}-{label}"
     try:
         dt = datetime.fromisoformat(str(generated_at))
     except (TypeError, ValueError):
@@ -674,7 +729,8 @@ def _build_brief() -> dict:
         "bullCase": structured.get("bullCase"),
         "bearCase": structured.get("bearCase"),
         "source": "synthesis" if source not in {"engine", "error"} else source,
-        "briefId": _brief_id(dossier.get("generatedAt")),
+        "briefId": _brief_id(dossier.get("generatedAt"), dossier.get("coversSession")),
+        "coversSession": dossier.get("coversSession"),
         "degraded": degraded,
         "providers": {
             "primary": "configured" if primary_ready else "missing",
