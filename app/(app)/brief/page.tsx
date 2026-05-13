@@ -111,7 +111,7 @@ interface BriefDossier {
       available?: boolean;
       source?: string | null;
       reason?: string;
-      events?: Array<{ date?: string; event?: string; impact?: string; country?: string; agency?: string; forecast?: string | number; previous?: string | number }>;
+      events?: Array<{ date?: string; time?: string | null; event?: string; impact?: string; country?: string; agency?: string; forecast?: string | number; previous?: string | number }>;
     };
   };
 }
@@ -858,10 +858,11 @@ function sentenceLine(text: string, maxWords: number): string {
 
 function normalizeCalendarEvents(events?: CalendarEvent[]): NormalizedCalendarEvent[] {
   const now = new Date();
+  const freshnessFloor = now.getTime() - 30 * 60 * 1000;
   const cutoff = now.getTime() + 14 * 24 * 60 * 60 * 1000;
   return (events ?? [])
     .map((event: CalendarEvent): NormalizedCalendarEvent => {
-      const date = new Date(`${event.date}T08:30:00-04:00`);
+      const date = parseCalendarEventTime(event);
       return {
         date,
         relative: relativeDay(date),
@@ -873,8 +874,20 @@ function normalizeCalendarEvents(events?: CalendarEvent[]): NormalizedCalendarEv
         previous: event.previous,
       };
     })
-    .filter((event: NormalizedCalendarEvent) => Number.isFinite(event.date.getTime()) && event.date.getTime() <= cutoff)
+    .filter((event: NormalizedCalendarEvent) => {
+      const time = event.date.getTime();
+      return Number.isFinite(time) && time >= freshnessFloor && time <= cutoff;
+    })
     .sort((a: NormalizedCalendarEvent, b: NormalizedCalendarEvent) => a.date.getTime() - b.date.getTime());
+}
+
+function parseCalendarEventTime(event: CalendarEvent): Date {
+  const raw = String(event.time || "").trim();
+  if (raw) {
+    if (raw.includes("T")) return new Date(raw.endsWith("Z") || /[+-]\d\d:?\d\d$/.test(raw) ? raw : `${raw}Z`);
+    return new Date(`${raw.replace(" ", "T")}Z`);
+  }
+  return new Date(`${event.date}T08:30:00-04:00`);
 }
 
 function agencyForEvent(name?: string): string {
@@ -886,12 +899,25 @@ function agencyForEvent(name?: string): string {
 
 function relativeDay(date: Date): string {
   const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const then = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const today = ctDateKey(now);
+  const then = ctDateKey(date);
   const days = Math.round((then - today) / 86400000);
   if (days === 0) return "Today";
   if (days === 1) return "Tomorrow";
-  return `In ${days} days`;
+  return days > 1 ? `In ${days} days` : "Earlier";
+}
+
+function ctDateKey(date: Date): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const year = Number(parts.find((part) => part.type === "year")?.value);
+  const month = Number(parts.find((part) => part.type === "month")?.value);
+  const day = Number(parts.find((part) => part.type === "day")?.value);
+  return Date.UTC(year, month - 1, day);
 }
 
 function titleImpact(impact?: string): "Low" | "Med" | "High" {
