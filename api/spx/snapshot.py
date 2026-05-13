@@ -37,6 +37,8 @@ from _lib.spx.time_utils import hours_between  # noqa: E402
 
 CT = ZoneInfo("America/Chicago")
 SNAPSHOT_TTL = float(os.environ.get("SPX_SNAPSHOT_TTL", "30"))
+ES_TICK_SIZE = 0.25
+ES_TOUCH_TOLERANCE = ES_TICK_SIZE / 2
 
 
 def _resolve_offset_override() -> float | None:
@@ -258,7 +260,7 @@ def _qualified_rejection_side(bar: dict, line_value: float, line_kind: str = "")
     high = float(bar["high"])
     low = float(bar["low"])
     close = float(bar["close"])
-    touched = low <= line_value <= high
+    touched = (low - ES_TOUCH_TOLERANCE) <= line_value <= (high + ES_TOUCH_TOLERANCE)
     if not touched:
         return None
     # A 09/10/11 CT touch is a graded event. Direction is determined by

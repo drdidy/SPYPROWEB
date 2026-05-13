@@ -90,6 +90,28 @@ def test_replay_no_tag_is_not_credited_by_day_net():
     assert block["verdictPnl"] is None
 
 
+def test_replay_allows_half_tick_touch_tolerance():
+    line = {
+        "kind": "PREV_RTH_LOW_DESC",
+        "anchorPrice": 100.10,
+        "anchorTime": "2026-05-08T09:00:00-05:00",
+        "slopePerHour": 0.0,
+        "entryValue": 100.10,
+    }
+    with (
+        patch("spx.snapshot._spx_session_ohlc", return_value=_ohlc()),
+        patch("spx.snapshot._spx_session_intraday", return_value=[
+            _bar(9, high=100.00, low=97.50, close=98.00, open_=99.25),
+        ]),
+    ):
+        block = _build_spx_replay_block(
+            _payload(direction="NONE", lines=[line]),
+            date(2026, 5, 8),
+        )
+    assert block["verdictOutcome"] == "WIN"
+    assert block["verdictPnl"] == 2.1
+
+
 def test_replay_ignores_tags_outside_9_to_11_window():
     with (
         patch("spx.snapshot._spx_session_ohlc", return_value=_ohlc(open_=100.0, close=120.0)),
