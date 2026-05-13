@@ -523,6 +523,7 @@ function useReplayClock(
   setPlayhead: Dispatch<SetStateAction<number>>,
   setPlaying: Dispatch<SetStateAction<boolean>>,
 ) {
+  const secondsPerFullSessionAt1x = 90;
   const rafRef = useRef<number | null>(null);
   useEffect(() => {
     if (!playing) {
@@ -534,7 +535,7 @@ function useReplayClock(
       const dt = (now - last) / 1000;
       last = now;
       setPlayhead((current) => {
-        const next = current + dt / (10 / speed);
+        const next = current + dt / (secondsPerFullSessionAt1x / speed);
         if (next >= 1) {
           setPlaying(false);
           return 1;
