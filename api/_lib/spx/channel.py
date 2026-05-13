@@ -2,18 +2,18 @@
 
 This module implements the geometry that defines the ES session:
 
-  1. Previous RTH swing-high close and swing-low close.
+  1. Previous RTH swing-high close and post-noon RTH low wick.
   2. Line construction: four lines per active session.
        PREV_RTH_HIGH_ASC  anchor=prev RTH high close, slope=+1.04
        PREV_RTH_HIGH_DESC anchor=prev RTH high close, slope=-1.04
-       PREV_RTH_LOW_ASC   anchor=prev RTH low close,  slope=+1.04
-       PREV_RTH_LOW_DESC  anchor=prev RTH low close,  slope=-1.04
+       PREV_RTH_LOW_ASC   anchor=post-noon RTH low wick, slope=+1.04
+       PREV_RTH_LOW_DESC  anchor=post-noon RTH low wick, slope=-1.04
   4. Projection: anchor_price + slope_per_hour * hours_since_anchor.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, time
 from typing import Literal, Optional
 
 from .candles import Candle, in_window, range_high_low, range_high_low_close
@@ -118,7 +118,7 @@ def tokyo_range(candles: list[Candle], session_date: date) -> Optional[SessionRa
 def prev_rth_anchors(
     candles: list[Candle], session_date: date
 ) -> Optional[tuple[Anchor, Anchor]]:
-    """Previous trading day's RTH swing-high close and swing-low close.
+    """Previous trading day's RTH high close and post-noon low wick.
 
     Returns None if no candles fall in the prior RTH window; this happens on
     Mondays if the caller didn't supply Friday's bars.
@@ -128,7 +128,15 @@ def prev_rth_anchors(
     res = range_high_low_close(bars)
     if res is None:
         return None
-    high, low, t_hi, t_lo = res
+
+    post_noon = [bar for bar in bars if to_ct(bar.t).time() >= time(12, 0)]
+    if not post_noon:
+        return None
+
+    high, _, t_hi, _ = res
+    low_bar = min(post_noon, key=lambda bar: bar.l)
+    low = low_bar.l
+    t_lo = to_ct(low_bar.t)
     return Anchor(price=high, time=t_hi), Anchor(price=low, time=t_lo)
 
 
@@ -209,8 +217,8 @@ def build_lines(
     """Build the ES structure lines for the active session.
 
     Direction and overnight anchors are retained for call-site compatibility.
-    The live ES framework is previous-RTH-close based: highest RTH close and
-    lowest RTH close each project both ascending and descending lines.
+    The live ES framework uses the highest RTH close plus the lowest post-noon
+    RTH wick; each pivot projects both ascending and descending lines.
     """
     lines: list[Line] = []
 

@@ -5,7 +5,7 @@ Pydantic mirror of the TypeScript ``SPXSnapshot`` contract in
 return this shape; the Next.js shell consumes it directly.
 
 The contract is symbol-agnostic about *where the engine lives* — once the
-SPX core (previous-RTH swing-close projection, scenario
+SPX core (previous-RTH pivot projection, scenario
 classifier, confluence) is integrated under ``api/``, an adapter populates
 ``SPXSnapshot`` and the surface starts rendering live.
 """

@@ -146,10 +146,11 @@ def test_prev_rth_anchors_reads_thursday(es_candles_ascending_inside, es_offset,
     assert res is not None
     high, low = res
     assert high.price == pytest.approx(5876.00)
-    assert low.price == pytest.approx(5849.50)
+    assert low.price == pytest.approx(5867.00)
+    assert low.time == datetime(2026, 5, 7, 12, 0, tzinfo=CT)
 
 
-def test_build_lines_builds_previous_rth_close_framework(es_candles_ascending_inside, es_offset, session_date):
+def test_build_lines_builds_previous_rth_framework(es_candles_ascending_inside, es_offset, session_date):
     spx = _spx(es_candles_ascending_inside, es_offset)
     high, low = overnight_anchors(spx, session_date)
     prev = prev_rth_anchors(spx, session_date)

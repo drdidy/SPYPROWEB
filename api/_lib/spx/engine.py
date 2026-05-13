@@ -162,7 +162,7 @@ def _flip_condition_for(scenario: str, projected: list[ProjectedLine]) -> str:
         return f"Watch previous RTH high ascending at {high_asc:.2f}; the major high-descending line remains the decision reference."
     if scenario.startswith("BELOW_") and low_desc is not None:
         return f"Watch previous RTH low descending at {low_desc:.2f}; the major high-descending line remains the decision reference."
-    return "Previous-RTH swing-close ES framework pending."
+    return "Previous-RTH ES framework pending."
 
 def _decision_trace(
     *, as_of_iso: str, scenario: str, scenario_text: str,
@@ -364,9 +364,9 @@ def compute_snapshot(
     channel = Channel(
         direction="ASCENDING",
         reason=(
-            "Previous-RTH swing-close framework active: ascending and "
-            "descending lines are projected from the prior RTH swing-high "
-            "close and swing-low close. The high-descending line is the major flow reference."
+            "Previous-RTH framework active: ascending and descending lines "
+            "are projected from the prior RTH swing-high close and the "
+            "post-noon RTH low wick. The high-descending line is the major flow reference."
         ),
     )
 

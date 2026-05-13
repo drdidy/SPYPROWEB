@@ -1,4 +1,4 @@
-"""Scenario classifier + plays for the ES previous-RTH swing-close framework."""
+"""Scenario classifier + plays for the ES previous-RTH pivot framework."""
 
 from _lib.spx.scenario import ProjectedLine, build_plays, classify, explain_scenario
 

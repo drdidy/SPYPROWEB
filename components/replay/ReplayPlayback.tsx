@@ -163,7 +163,7 @@ function SPXPlaybackPanel({
 }
 
 function spxLineProjections(lines: SPXLine[]): LineProjection[] {
-  // Colors map to the ES previous-RTH swing-close framework.
+  // Colors map to the ES previous-RTH pivot framework.
   const palette: Record<string, string> = {
     PREV_RTH_HIGH_ASC: "#7E5BAE",
     PREV_RTH_HIGH_DESC: "#B5301E",

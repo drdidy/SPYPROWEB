@@ -437,7 +437,7 @@ export function SPXChannelClient({ replayDate }: Props) {
 
 function heroSynthesis(snap: SPXSnapshot): string {
   if (snap.lines.length < 4) {
-    return "ES framework is resolving. The engine is standing down until previous RTH swing-close pivots are available.";
+    return "ES framework is resolving. The engine is standing down until the previous RTH high close and post-noon low wick are available.";
   }
   const action = snap.confluence.action.replace(/_/g, " ").toLowerCase();
   const nearest = snap.lines
@@ -454,7 +454,7 @@ function reentryCondition(snap: SPXSnapshot): string {
   if (snap.plannedEnvelope) {
     return `Qualified confirmation inside ${snap.plannedEnvelope.low.toFixed(2)}-${snap.plannedEnvelope.high.toFixed(2)} reactivates the play.`;
   }
-  return "Framework resolves after previous RTH swing-close pivots are available.";
+  return "Framework resolves after the previous RTH high close and post-noon low wick are available.";
 }
 
 function formatHM(iso: string): string {

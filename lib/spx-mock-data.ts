@@ -3,13 +3,13 @@ import type { SPXSnapshot } from "./types";
 // ---------------------------------------------------------------------------
 // SPX mock snapshot - demo scenario: INSIDE_DESCENDING.
 // Numbers are mathematically self-consistent against the ES previous-RTH
-// swing-close framework
+// previous-RTH pivot framework
 // so surfaces render the same line vocabulary in dev and production.
 //
 // Session date (CT): 2026-05-08
 // As-of:             2026-05-08 09:35 CT (5 min into RTH)
 //
-// Previous RTH swing-high and swing-low closes are selected as pivots.
+// Previous RTH high close and post-noon low wick are selected as pivots.
 // Ascending and descending lines are projected from both points.
 // ---------------------------------------------------------------------------
 
@@ -47,10 +47,10 @@ export const spxSnapshot: SPXSnapshot = {
   channel: {
     direction: "ASCENDING",
     reason:
-      "Previous-RTH swing-close framework active with four projected references.",
+      "Previous-RTH pivot framework active with four projected references.",
   },
 
-  // Four projected lines from previous RTH swing-close pivots.
+  // Four projected lines from previous RTH high-close / post-noon-low pivots.
   lines: [
     {
       kind: "PREV_RTH_HIGH_ASC",
@@ -96,7 +96,7 @@ export const spxSnapshot: SPXSnapshot = {
     changePct: 0.11,
   },
 
-  // 5872.00 is inside the previous-RTH swing-close framework.
+  // 5872.00 is inside the previous-RTH pivot framework.
   scenario: "INSIDE_DESCENDING",
   scenarioExplanation:
     "Last print 5872.00 sits inside the ES framework. Wait for qualified confirmation near active structure.",

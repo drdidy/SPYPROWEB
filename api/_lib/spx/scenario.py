@@ -1,9 +1,9 @@
 """Scenario classifier + primary/alternate play construction.
 
-ES now classifies price against a previous-RTH swing-close framework:
+ES now classifies price against a previous-RTH pivot framework:
 
   - previous RTH swing-high close ascending and descending
-  - previous RTH swing-low close ascending and descending
+  - previous RTH post-noon low wick ascending and descending
   - the previous RTH high descending line is the major flow/bias reference
 
 Hourly confirmation remains rule-based: buys require a bearish touch that
@@ -68,7 +68,7 @@ def classify(
 
     The direction parameter is retained for compatibility. ES no longer
     relies on Sydney/Tokyo direction; it reads price against the previous
-    RTH swing-close projections. The high-descending line is the major flow
+    RTH pivot projections. The high-descending line is the major flow
     reference.
     """
     by = _by_kind(lines)
@@ -97,7 +97,7 @@ def explain_scenario(scenario: Scenario, price: float, lines: list[ProjectedLine
     high_asc = by.get("PREV_RTH_HIGH_ASC")
     low_desc = by.get("PREV_RTH_LOW_DESC")
     if scenario == "OUTSIDE_PLAY":
-        return f"Last print {price:.2f} does not have the previous-RTH swing-close ES framework yet."
+        return f"Last print {price:.2f} does not have the previous-RTH ES framework yet."
     if scenario in ("INSIDE_ASCENDING", "INSIDE_DESCENDING"):
         assert high_desc is not None
         relation = _relative_phrase(price, high_desc, "PREV_RTH_HIGH_DESC")

@@ -16,7 +16,7 @@ export function SPXSessionOrigin({ snap }: { snap: SPXSnapshot }) {
       <CardHeader
         eyebrow="Origin"
         title="Why today's framework"
-        meta="Previous RTH swing-high close and swing-low close"
+        meta="Previous RTH high close and post-noon low wick"
       />
       <CardBody className="px-0 pb-0">
         <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-rule">
@@ -217,6 +217,6 @@ function determinationText(snap: SPXSnapshot): string {
   if (snap.lines.length >= 4) {
     return snap.channel.reason;
   }
-  return "The ES framework resolves after the previous RTH swing-close pivots are available.";
+  return "The ES framework resolves after the previous RTH high close and post-noon low wick are available.";
 }
 

@@ -1603,9 +1603,9 @@ function spxLineHint(kind: string): string {
     SWING_HIGH_DESC: "Engine-generated descending ES reference line.",
     SWING_LOW_ASC: "Engine-generated ascending ES reference line.",
     PREV_RTH_HIGH_DESC: "Major flow line projected down from yesterday's RTH swing-high close.",
-    PREV_RTH_LOW_ASC: "Yesterday's RTH swing-low close, projected upward.",
+    PREV_RTH_LOW_ASC: "Yesterday's post-noon RTH low wick, projected upward.",
     PREV_RTH_HIGH_ASC: "Yesterday's RTH high, projected upward.",
-    PREV_RTH_LOW_DESC: "Yesterday's RTH low, projected downward.",
+    PREV_RTH_LOW_DESC: "Yesterday's post-noon RTH low wick, projected downward.",
     SWING_HIGH_ASC: "Engine-generated ascending ES reference line.",
     SWING_LOW_DESC: "Engine-generated descending ES reference line.",
   };

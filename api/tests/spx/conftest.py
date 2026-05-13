@@ -54,8 +54,8 @@ def es_candles_ascending_inside() -> list[Candle]:
         Highest CLOSE 5870.00 at 23:00 (Tokyo bar)
         Lowest  CLOSE 5850.00 at 17:00 (Sydney first bar)
 
-      Prev RTH high (raw):  5878.50 at 13:00
-      Prev RTH low  (raw):  5849.00 at 09:00
+      Prev RTH high close:       5876.00 at 13:00
+      Prev RTH post-noon low:    5867.00 at 12:00
     """
     prev_day = datetime(2026, 5, 7, tzinfo=CT)
     bars: list[Candle] = []

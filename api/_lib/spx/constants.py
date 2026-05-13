@@ -17,7 +17,7 @@ CENTRAL_TZ_NAME = "America/Chicago"
 
 # ---------------------------------------------------------------------------
 # Slope: applied positive to ascending lines and negative to descending lines.
-# The previous-RTH swing-close ES framework uses the same magnitude on every structure line.
+# The previous-RTH ES framework uses the same magnitude on every structure line.
 # ---------------------------------------------------------------------------
 
 DEFAULT_SLOPE_PER_HOUR = 1.04
@@ -27,8 +27,8 @@ DEFAULT_SLOPE_PER_HOUR = 1.04
 # time_utils to get tz-aware bounds).
 #
 # OVERNIGHT spans 15:00 prev-day -> 02:00 today CT (11 hours). It is retained
-#   for diagnostics; the active ES pivots come from the previous RTH swing
-#   high/low closes.
+#   for diagnostics; the active ES pivots come from the previous RTH high
+#   close and post-noon RTH low wick.
 # SYDNEY 17:00 -> 20:00 (3h). Retained for diagnostics and confluence.
 # TOKYO  21:00 -> 02:00 (5h, crossing midnight). Retained for diagnostics and
 #   confluence; ends at the session boundary so it doesn't reach into the next

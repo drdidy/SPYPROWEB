@@ -8,7 +8,7 @@ def test_snapshot_basic_shape(es_candles_ascending_inside, es_offset, as_of):
     snap = compute_snapshot(es_candles_ascending_inside, es_offset, as_of)
     assert snap.symbol == "SPX"
     assert snap.session_date_ct == "2026-05-08"
-    # Four-line framework is active after previous RTH swing-close pivots resolve.
+    # Four-line framework is active after previous RTH pivots resolve.
     assert snap.channel.direction == "ASCENDING"
     assert len(snap.lines) == 4
     kinds = {l.kind for l in snap.lines}
@@ -79,7 +79,7 @@ def test_snapshot_price_is_last_close_in_native_es_space(es_candles_ascending_in
     assert snap.price.last == pytest.approx(5860.00)
 
 
-def test_snapshot_prev_rth_close_lines_do_not_apply_es_to_spx_offset(es_candles_ascending_inside, es_offset, as_of):
+def test_snapshot_prev_rth_lines_do_not_apply_es_to_spx_offset(es_candles_ascending_inside, es_offset, as_of):
     snap = compute_snapshot(es_candles_ascending_inside, es_offset, as_of)
     by_kind = {line.kind: line for line in snap.lines}
 
@@ -87,10 +87,10 @@ def test_snapshot_prev_rth_close_lines_do_not_apply_es_to_spx_offset(es_candles_
     assert by_kind["PREV_RTH_HIGH_ASC"].entry_value == pytest.approx(5883.76)
     assert by_kind["PREV_RTH_HIGH_DESC"].anchor_price == pytest.approx(5864.00)
     assert by_kind["PREV_RTH_HIGH_DESC"].entry_value == pytest.approx(5844.24)
-    assert by_kind["PREV_RTH_LOW_ASC"].anchor_price == pytest.approx(5837.50)
-    assert by_kind["PREV_RTH_LOW_ASC"].entry_value == pytest.approx(5861.42)
-    assert by_kind["PREV_RTH_LOW_DESC"].anchor_price == pytest.approx(5837.50)
-    assert by_kind["PREV_RTH_LOW_DESC"].entry_value == pytest.approx(5813.58)
+    assert by_kind["PREV_RTH_LOW_ASC"].anchor_price == pytest.approx(5855.00)
+    assert by_kind["PREV_RTH_LOW_ASC"].entry_value == pytest.approx(5875.80)
+    assert by_kind["PREV_RTH_LOW_DESC"].anchor_price == pytest.approx(5855.00)
+    assert by_kind["PREV_RTH_LOW_DESC"].entry_value == pytest.approx(5834.20)
 
 
 def test_snapshot_rejects_empty_candles(as_of):
