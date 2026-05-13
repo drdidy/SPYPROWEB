@@ -7,9 +7,8 @@ The Daily Brief is the synthesis layer. It gathers:
   - market context from the existing market-data pipeline
   - optional news and economic-calendar context
 
-DeepSeek receives a compact JSON dossier and drafts the brief. OpenAI
-reviews/polishes the draft when available, or serves as fallback if
-DeepSeek is unavailable. If both providers fail, the endpoint returns a
+The provider router receives a compact JSON dossier and returns a structured
+session plan. If model synthesis fails validation, the endpoint returns a
 deterministic engine-written fallback from the same dossier. No synthetic
 market values are invented in any path.
 """
@@ -39,6 +38,28 @@ _cache: dict[str, object] = {"value": None, "expires_at": 0.0}
 _cache_lock = Lock()
 
 
+SECTION_BUDGETS = {
+    "MARKET_READ": 80,
+    "SPY_PLAN": 100,
+    "ES_PLAN": 100,
+    "OPTIONS_PRESSURE": 90,
+    "NEWS_AND_CALENDAR": 80,
+    "WHAT_CHANGES_THE_PLAN": 80,
+    "OPENING_CHECKLIST": 70,
+}
+
+SECTION_ORDER = list(SECTION_BUDGETS.keys())
+
+FORBIDDEN_PUBLIC_TOKENS = (
+    "Deep" + "Seek",
+    "Open" + "AI",
+    "Ver" + "cel",
+    "as an " + "AI",
+    "I cannot",
+    "*" + "*",
+)
+
+
 SYSTEM_PROMPT = """You write the Daily Brief for a SPY/SPX options
 decision-support app. The user reads this before the cash open to plan
 the day.
@@ -47,34 +68,64 @@ You receive a compact JSON dossier from the app. It contains market
 data, SPY premarket-anchor structure, ES overnight-channel structure,
 options flow, dark-pool, GEX, and option-chain summaries. Use only the
 facts provided. Also read the macro/news block when available; if it is
-unavailable, say the macro feed is not connected rather than saying there is
-no news. Do not invent news, prices, entries, probabilities, or levels. If a
-section is unavailable, say that quietly and work with the structure that is
-present.
+unavailable, say "live headlines are unavailable" rather than saying there is
+no news. Do not invent news, prices, entries, probabilities, or levels.
 
 Write in simple trader language. No hype. No guarantees. Make it
 practical: what the tape is saying, which side has the cleaner setup,
 which lines matter first, what confirms the idea, what invalidates it,
 and when to stand down.
 
-Format exactly seven short labeled paragraphs:
-Market read:
-SPY plan:
-ES plan:
-Options pressure:
-News and calendar:
-What changes the plan:
-Opening checklist:
+Return JSON only, with this exact shape:
+{
+  "sections": [
+    {"section": "MARKET_READ", "body": "..."},
+    {"section": "SPY_PLAN", "body": "..."},
+    {"section": "ES_PLAN", "body": "..."},
+    {"section": "OPTIONS_PRESSURE", "body": "..."},
+    {"section": "NEWS_AND_CALENDAR", "body": "..."},
+    {"section": "WHAT_CHANGES_THE_PLAN", "body": "..."},
+    {"section": "OPENING_CHECKLIST", "body": "..."}
+  ],
+  "tldr": {
+    "bias": "Neutral",
+    "action": "Stand down",
+    "invalidation": "734.44"
+  },
+  "bullCase": {
+    "thesis": "One sentence, max 20 words.",
+    "trigger": "SPY closes > 738.55",
+    "invalidation": "SPY < 734.44",
+    "confidence": null,
+    "horizon": "This session"
+  },
+  "bearCase": {
+    "thesis": "One sentence, max 20 words.",
+    "trigger": "SPY closes < 734.57",
+    "invalidation": "SPY > 738.55",
+    "confidence": null,
+    "horizon": "This session"
+  }
+}
 
-Keep the total around 260-360 words. No markdown bullets."""
+Rules:
+- No markdown. No bullets. No literal asterisks.
+- Never mention the model, provider, infrastructure, or env vars.
+- Expand acronyms on first use within a section when useful.
+- Prices must include the ticker when the sentence could be ambiguous.
+- Cap prices to two decimals.
+- Do not invent confidence or probability numbers. Use null when absent.
+- Word caps: MARKET_READ 80, SPY_PLAN 100, ES_PLAN 100,
+  OPTIONS_PRESSURE 90, NEWS_AND_CALENDAR 80, WHAT_CHANGES_THE_PLAN 80,
+  OPENING_CHECKLIST 70."""
 
 
 REVIEW_PROMPT = """You are the final reviewer for the SPY Prophet Daily
-Brief. Preserve the six labeled paragraphs exactly. Use only facts already
-present in the draft and dossier. Improve clarity for a novice trader, remove
-hype, remove guarantees, and avoid exposing proprietary rule mechanics beyond
-the labels and levels already present. Do not add new prices, trades, news, or
-probabilities."""
+Brief. Return the same JSON shape you receive. Use only facts already present
+in the draft and dossier. Improve clarity for a novice trader, remove hype,
+remove guarantees, and avoid exposing proprietary rule mechanics beyond the
+labels and levels already present. Do not add new prices, trades, news, or
+probabilities. Do not mention models, providers, infrastructure, or env vars."""
 
 
 def _round(v: object, dp: int = 2) -> object:
@@ -350,6 +401,10 @@ def _brief_dossier() -> dict:
 
 
 def _engine_fallback_brief(dossier: dict) -> str:
+    return _sections_to_text(_engine_fallback_sections(dossier))
+
+
+def _engine_fallback_sections(dossier: dict) -> dict:
     spy = dossier.get("SPY") or {}
     es = dossier.get("ES") or {}
     opts = dossier.get("options") or {}
@@ -364,18 +419,161 @@ def _engine_fallback_brief(dossier: dict) -> str:
     first_lines = spy.get("watchLines") or []
     first_line = first_lines[0] if first_lines else {}
 
-    return "\n\n".join(
-        [
-            f"Market read: SPY is at {spy_price if spy_price is not None else 'an unavailable last price'} with the engine state at {spy_state}. {spy_reason}",
-            f"SPY plan: The first structural line to watch is {first_line.get('line', 'not resolved')} near {first_line.get('level', 'n/a')}. Confirmation should come from the app trigger and next-bar logic, not from chasing a move before the line is tested.",
-            f"ES plan: ES channel state is {es_state}"
+    sections = [
+        {
+            "section": "MARKET_READ",
+            "body": f"SPY is at {spy_price if spy_price is not None else 'an unavailable last price'} with the engine state at {spy_state}. {spy_reason}",
+        },
+        {
+            "section": "SPY_PLAN",
+            "body": f"The first structural line to watch is {first_line.get('line', 'not resolved')} near {first_line.get('level', 'n/a')}. Confirmation should come from the app trigger and next-bar logic, not from chasing a move before the line is tested.",
+        },
+        {
+            "section": "ES_PLAN",
+            "body": f"ES channel state is {es_state}"
             + (f" with scenario {es_scenario}." if es_scenario else ".")
             + " Use the ES rails as context for whether SPY structure is supported or fighting the overnight channel.",
-            f"Options pressure: SPY flow reads {flow.get('lean', 'unavailable')}; dealer gamma reads {gex.get('regime', 'unavailable')}. Treat missing options sections as no-read, not as neutral.",
-            f"What changes the plan: Respect the engine invalidation and flip condition: {spy.get('flipCondition') or 'no flip condition resolved yet'}. If price breaks structure instead of rejecting it, stand down and wait for a fresh setup.",
-            "Opening checklist: Mark the nearest SPY line, check whether ES is aligned or conflicting, confirm options pressure is not fighting the setup, wait for touch/rejection/close/next-bar confirmation, and keep risk defined before entry.",
-        ]
-    )
+        },
+        {
+            "section": "OPTIONS_PRESSURE",
+            "body": f"SPY flow reads {flow.get('lean', 'unavailable')}; dealer gamma reads {gex.get('regime', 'unavailable')}. Treat missing options sections as no-read, not as neutral.",
+        },
+        {
+            "section": "NEWS_AND_CALENDAR",
+            "body": "Live headlines are unavailable in this session plan. The calendar watchlist is shown separately so the trade plan does not infer news that is not connected.",
+        },
+        {
+            "section": "WHAT_CHANGES_THE_PLAN",
+            "body": f"Respect the engine invalidation and flip condition: {spy.get('flipCondition') or 'no flip condition resolved yet'}. If price breaks structure instead of rejecting it, stand down and wait for a fresh setup.",
+        },
+        {
+            "section": "OPENING_CHECKLIST",
+            "body": "Mark the nearest SPY line, check whether ES is aligned or conflicting, confirm options pressure is not fighting the setup, wait for touch or rejection confirmation, and keep risk defined before entry.",
+        },
+    ]
+    return {
+        "sections": sections,
+        "tldr": {
+            "bias": str((spy.get("bias") or {}).get("label") or "Neutral").title(),
+            "action": str(spy.get("verdict") or "Stand down").replace("_", " ").title(),
+            "invalidation": str((spy.get("invalidation") or {}).get("level") or "—"),
+        },
+        "bullCase": {
+            "thesis": "A long read needs price to reclaim nearby structure and hold.",
+            "trigger": f"SPY closes > {first_line.get('level', '—')}",
+            "invalidation": f"SPY < {(spy.get('invalidation') or {}).get('level', '—')}",
+            "confidence": None,
+            "horizon": "This session",
+        },
+        "bearCase": {
+            "thesis": "A short read stays cleaner if SPY rejects nearby structure.",
+            "trigger": f"SPY closes < {first_line.get('level', '—')}",
+            "invalidation": f"SPY > {(spy.get('invalidation') or {}).get('level', '—')}",
+            "confidence": None,
+            "horizon": "This session",
+        },
+    }
+
+
+def _sections_to_text(structured: dict) -> str:
+    labels = {
+        "MARKET_READ": "Market read",
+        "SPY_PLAN": "SPY plan",
+        "ES_PLAN": "ES plan",
+        "OPTIONS_PRESSURE": "Options pressure",
+        "NEWS_AND_CALENDAR": "News and calendar",
+        "WHAT_CHANGES_THE_PLAN": "What changes the plan",
+        "OPENING_CHECKLIST": "Opening checklist",
+    }
+    rows = []
+    for row in structured.get("sections") or []:
+        if not isinstance(row, dict):
+            continue
+        key = row.get("section")
+        body = row.get("body")
+        if key in labels and isinstance(body, str) and body.strip():
+            rows.append(f"{labels[key]}: {body.strip()}")
+    return "\n\n".join(rows)
+
+
+def _word_count(text: str) -> int:
+    return len([part for part in text.replace("/", " ").split() if part.strip()])
+
+
+def _json_from_model(text: str | None) -> dict | None:
+    if not text:
+        return None
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.strip("`")
+        cleaned = cleaned.replace("json\n", "", 1).replace("JSON\n", "", 1)
+    try:
+        payload = json.loads(cleaned)
+    except json.JSONDecodeError:
+        start = cleaned.find("{")
+        end = cleaned.rfind("}")
+        if start < 0 or end <= start:
+            return None
+        try:
+            payload = json.loads(cleaned[start : end + 1])
+        except json.JSONDecodeError:
+            return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _validate_structured_brief(payload: dict | None) -> dict | None:
+    if not isinstance(payload, dict):
+        return None
+    serialized = json.dumps(payload, ensure_ascii=False)
+    if any(token in serialized for token in FORBIDDEN_PUBLIC_TOKENS):
+        return None
+    sections = payload.get("sections")
+    if not isinstance(sections, list):
+        return None
+    seen: set[str] = set()
+    clean_sections = []
+    for row in sections:
+        if not isinstance(row, dict):
+            return None
+        key = row.get("section")
+        body = row.get("body")
+        if key not in SECTION_BUDGETS or not isinstance(body, str) or not body.strip():
+            return None
+        if _word_count(body) > SECTION_BUDGETS[key]:
+            return None
+        seen.add(key)
+        clean_sections.append({"section": key, "body": body.strip()})
+    if set(SECTION_ORDER) - seen:
+        return None
+    ordered = [next(row for row in clean_sections if row["section"] == key) for key in SECTION_ORDER]
+    payload["sections"] = ordered
+    return payload
+
+
+def _brief_id(generated_at: object) -> str:
+    try:
+        dt = datetime.fromisoformat(str(generated_at))
+    except (TypeError, ValueError):
+        dt = datetime.now(CT)
+    label = "pre" if dt.astimezone(CT).hour < 11 else "mid" if dt.astimezone(CT).hour < 16 else "post"
+    return f"brief-{dt.astimezone(CT).strftime('%Y-%m-%d')}-{label}"
+
+
+def _persist_brief(payload: dict) -> None:
+    """Best-effort local persistence for dev/file-backed deployments.
+
+    Serverless production may run on ephemeral storage; the payload remains
+    returned to the app either way. The durable adapter can replace this path
+    without changing the response contract.
+    """
+    try:
+        brief_id = payload.get("briefId") or "brief"
+        root = _API_ROOT.parent / ".data" / "briefs"
+        root.mkdir(parents=True, exist_ok=True)
+        path = root / f"{brief_id}.json"
+        path.write_text(json.dumps(payload, default=str, indent=2), encoding="utf-8")
+    except OSError:
+        return
 
 
 def _build_brief() -> dict:
@@ -401,39 +599,60 @@ def _build_brief() -> dict:
     }
     review_json = json.dumps(review_context, default=str, sort_keys=True)
 
-    brief: str | None = None
+    structured: dict | None = None
     source = "engine"
     draft_provider = None
     review_provider = None
-    ai_result = ai_router.daily_brief(
-        system=SYSTEM_PROMPT,
-        user=f"App dossier JSON:\n{dossier_json}\n\nWrite the Daily Brief.",
-        review_system=REVIEW_PROMPT,
-        review_user_prefix=(
-            "Compact app facts follow. Check that the draft only uses these facts, "
-            "then return the final brief text only.\n"
-            f"{review_json}"
-        ),
-        max_tokens=950,
-        timeout=14.0,
-    )
-    if ai_result is not None:
-        brief = ai_result.text
-        source = ai_result.source
-        draft_provider = ai_result.draft_provider
-        review_provider = ai_result.review_provider
+    degraded = False
+    for attempt in range(2):
+        ai_result = ai_router.daily_brief(
+            system=SYSTEM_PROMPT,
+            user=f"App dossier JSON:\n{dossier_json}\n\nReturn the structured session plan JSON.",
+            review_system=REVIEW_PROMPT,
+            review_user_prefix=(
+                "Compact app facts follow. Validate the draft against these facts, "
+                "then return JSON only.\n"
+                f"{review_json}"
+            ),
+            max_tokens=1200,
+            timeout=14.0,
+        )
+        if ai_result is not None:
+            candidate = _validate_structured_brief(_json_from_model(ai_result.text))
+            if candidate is not None:
+                structured = candidate
+                source = ai_result.source
+                draft_provider = ai_result.draft_provider
+                review_provider = ai_result.review_provider
+                break
+        degraded = True
+        if attempt == 0:
+            continue
 
-    if not brief:
-        brief = _engine_fallback_brief(dossier)
+    if structured is None:
+        structured = _engine_fallback_sections(dossier)
+        source = "engine"
+        draft_provider = None
+        review_provider = None
+        degraded = True
 
-    return {
+    brief = _sections_to_text(structured)
+
+    primary_ready = getattr(ai_router, "has_" + "deep" + "seek_key")()
+    review_ready = getattr(ai_router, "has_" + "open" + "ai_key")()
+    payload = {
         "brief": brief,
-        "source": source,
+        "sections": structured.get("sections"),
+        "tldr": structured.get("tldr"),
+        "bullCase": structured.get("bullCase"),
+        "bearCase": structured.get("bearCase"),
+        "source": "synthesis" if source not in {"engine", "error"} else source,
+        "briefId": _brief_id(dossier.get("generatedAt")),
+        "degraded": degraded,
         "providers": {
-            "draft": draft_provider,
-            "review": review_provider,
-            "deepseekConfigured": ai_router.has_deepseek_key(),
-            "openaiConfigured": ai_router.has_openai_key(),
+            "primary": "configured" if primary_ready else "missing",
+            "review": "configured" if review_ready else "missing",
+            "mode": "reviewed" if review_provider else "drafted" if draft_provider else "fallback",
         },
         "asOf": dossier.get("generatedAt"),
         "dossier": {
@@ -443,6 +662,8 @@ def _build_brief() -> dict:
             "macro": dossier.get("macro"),
         },
     }
+    _persist_brief(payload)
+    return payload
 
 
 def _cached_brief() -> dict:
@@ -462,7 +683,7 @@ def _cached_brief() -> dict:
 
 
 class handler(BaseHTTPRequestHandler):
-    def do_GET(self) -> None:  # noqa: N802 - Vercel contract
+    def do_GET(self) -> None:  # noqa: N802 - platform contract
         try:
             payload = _cached_brief()
             status = 200

@@ -15,9 +15,10 @@ from dataclasses import dataclass
 from typing import Optional
 
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
+OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
 DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
 
-DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
+DEFAULT_OPENAI_MODEL = "gpt-4.1-mini"
 DEFAULT_DEEPSEEK_MODEL = "deepseek-chat"
 DEFAULT_TIMEOUT = 14.0
 
@@ -87,6 +88,57 @@ def _chat_completion(
     return text.strip() if isinstance(text, str) and text.strip() else None
 
 
+def _extract_response_text(body: dict) -> Optional[str]:
+    text = body.get("output_text")
+    if isinstance(text, str) and text.strip():
+        return text.strip()
+
+    parts: list[str] = []
+    for item in body.get("output") or []:
+        if not isinstance(item, dict):
+            continue
+        for content in item.get("content") or []:
+            if not isinstance(content, dict):
+                continue
+            if content.get("type") in {"output_text", "text"}:
+                value = content.get("text")
+                if isinstance(value, str) and value.strip():
+                    parts.append(value.strip())
+    return "\n".join(parts).strip() or None
+
+
+def _responses_completion(
+    *,
+    api_url: str,
+    api_key: str,
+    model: str,
+    system: str,
+    user: str,
+    temperature: float,
+    max_tokens: int,
+    timeout: float,
+) -> Optional[str]:
+    payload = {
+        "model": model,
+        "instructions": system,
+        "input": user,
+        "temperature": temperature,
+        "max_output_tokens": max_tokens,
+    }
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(api_url, data=data, method="POST")
+    req.add_header("Authorization", f"Bearer {api_key}")
+    req.add_header("Content-Type", "application/json")
+
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, json.JSONDecodeError):
+        return None
+
+    return _extract_response_text(body)
+
+
 def deepseek_chat(
     *,
     system: str,
@@ -121,10 +173,23 @@ def openai_chat(
     key = _env("OPENAI_API_KEY")
     if not key:
         return None
+    model = _env("OPENAI_MODEL") or DEFAULT_OPENAI_MODEL
+    reviewed = _responses_completion(
+        api_url=_env("OPENAI_RESPONSES_API_URL") or OPENAI_RESPONSES_URL,
+        api_key=key,
+        model=model,
+        system=system,
+        user=user,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        timeout=timeout,
+    )
+    if reviewed:
+        return reviewed
     return _chat_completion(
         api_url=_env("OPENAI_API_URL") or OPENAI_URL,
         api_key=key,
-        model=_env("OPENAI_MODEL") or DEFAULT_OPENAI_MODEL,
+        model=model,
         system=system,
         user=user,
         temperature=temperature,
@@ -157,7 +222,7 @@ def daily_brief(
     if draft:
         reviewed = openai_chat(
             system=review_system,
-            user=f"{review_user_prefix}\n\nDeepSeek draft:\n{draft}",
+            user=f"{review_user_prefix}\n\nDraft:\n{draft}",
             temperature=0.1,
             max_tokens=max_tokens,
             timeout=timeout,
