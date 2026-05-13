@@ -11,7 +11,6 @@ import { FreshnessPill } from "@/components/decision-slate/FreshnessPill";
 import {
   getSessionInfo,
   priceStalenessLabel,
-  renderSessionSegment,
 } from "@/lib/sessions";
 import { formatNumber, isLoadedNumber } from "@/lib/format-number";
 import { deriveProvenance } from "@/lib/spx-provenance";
@@ -62,19 +61,19 @@ const verbPalette: Record<string, string> = {
 };
 
 const SPX_SCENARIO_TAG: Record<string, string> = {
-  ABOVE_ASCENDING: "ABOVE · ASC",
-  INSIDE_ASCENDING: "INSIDE · ASC",
-  BELOW_ASCENDING: "BELOW · ASC",
-  ABOVE_DESCENDING: "ABOVE · DESC",
-  INSIDE_DESCENDING: "INSIDE · DESC",
-  BELOW_DESCENDING: "BELOW · DESC",
+  ABOVE_ASCENDING: "ABOVE ASCENDING",
+  INSIDE_ASCENDING: "INSIDE ASCENDING",
+  BELOW_ASCENDING: "BELOW ASCENDING",
+  ABOVE_DESCENDING: "ABOVE DESCENDING",
+  INSIDE_DESCENDING: "INSIDE DESCENDING",
+  BELOW_DESCENDING: "BELOW DESCENDING",
   OUTSIDE_PLAY: "OUTSIDE",
 };
 
 function engineStateChipLabel(state: EngineState, fallback: string): string {
   if (state === "PRE_CONFIG") return "PRE-CONFIG";
-  if (state === "STAND_DOWN") return "STAND";
-  if (state === "COOLDOWN") return "COOL";
+  if (state === "STAND_DOWN") return "STAND DOWN";
+  if (state === "COOLDOWN") return "COOLDOWN";
   if (state === "WATCH" || state === "WAIT" || state === "ARMED" || state === "GO") {
     return state;
   }
@@ -92,7 +91,7 @@ export function TopBar({
   const spxSnapshot = useLiveSPX();
   const decision = spy.decision;
   const t = spy.shell;
-  const sessionLine = useSessionLine();
+  const nextRefreshLine = useRefreshCountdown(t.feedHealth.lastTickTs);
   const staleness = useStalenessLabel();
   const stalenessAt = useStalenessTimestamp();
 
@@ -101,8 +100,7 @@ export function TopBar({
 
   const spyVerb = engineStateChipLabel(spyState, decision.verdict);
   const spyTone = verbPalette[spyVerb] ?? verbPalette["STAND DOWN"];
-  const spyMeta =
-    spyState === "PRE_CONFIG" ? null : `conviction ${decision.conviction}/5`;
+  const spyMeta = null;
 
   const rawSpxVerb = spxSnapshot.confluence.action.replace(/_/g, " ");
   const spxVerb = spxState === "PRE_CONFIG" ? "PRE-CONFIG" : rawSpxVerb;
@@ -142,7 +140,7 @@ export function TopBar({
       className={cn(
         "h-[46px] sticky top-0 z-30 bg-[#071116] text-paper backdrop-blur-md",
         "border-b border-[#C9A227]/35 shadow-[0_12px_32px_-30px_rgba(7,17,22,0.95)]",
-        "flex items-center gap-3 md:gap-4 px-3 md:px-5 overflow-hidden min-w-0",
+        "flex items-center gap-3 md:gap-4 px-3 md:px-5 overflow-x-auto overflow-y-hidden min-w-0",
       )}
       data-testid="topbar"
     >
@@ -200,7 +198,7 @@ export function TopBar({
           read. The SyntheticChip + AsOfMicrotext are gone with
           the synthesis. */}
       <div className="hidden xl:flex flex-none min-w-[360px] items-center justify-center gap-4 overflow-visible">
-        <Quote label="SPY" wrapClass="hidden lg:flex">
+        <Quote href="/spy" label="SPY" wrapClass="hidden lg:flex">
           <ValueWithTooltip
             staleness={staleness}
             stalenessAt={stalenessAt}
@@ -212,7 +210,7 @@ export function TopBar({
             }
           />
         </Quote>
-        <Quote label="ES" wrapClass="hidden lg:flex" accent="violet">
+        <Quote href="/es" label="ES" wrapClass="hidden lg:flex" accent="violet">
           <ValueWithTooltip
             staleness={staleness}
             stalenessAt={stalenessAt}
@@ -227,7 +225,7 @@ export function TopBar({
             }
           />
         </Quote>
-        <Quote label="VIX">
+        <Quote href="/context" label="VIX">
           {/* v10 P1-1: VIX delta uses neutral tone — a rising VIX
               isn't bullish/bearish-relative, so green/red would
               mislead. No pct (the shell shape doesn't carry it
@@ -251,11 +249,9 @@ export function TopBar({
         data-cluster="session"
         className="hidden lg:flex items-center gap-3 shrink-0 whitespace-nowrap"
       >
-        {sessionLine && (
-          <span className="font-mono text-[10px] text-ink-3 tabular-nums uppercase tracking-[0.06em]">
-            {sessionLine}
-          </span>
-        )}
+        <span className="font-mono text-[10px] text-paper/66 tabular-nums uppercase tracking-[0.06em]">
+          Next refresh in {nextRefreshLine}
+        </span>
         <FreshnessPill
           freshnessISO={t.feedHealth.lastTickTs}
           source={t.feedHealth.source}
@@ -365,12 +361,12 @@ function SymbolChip({
       <span className="text-paper/25 text-[10px]" aria-hidden>
         ·
       </span>
-      <span className="text-[11px] tracking-[0.02em] lowercase">
-        {verb.toLowerCase()}
+      <span className="text-[11px] tracking-[0.02em] uppercase">
+        {verb}
       </span>
       {meta && (
-        <span className="text-[10px] font-mono text-paper/45 lowercase tracking-[0.02em]">
-          · {meta.toLowerCase()}
+        <span className="text-[10px] font-mono text-paper/45 uppercase tracking-[0.02em]">
+          · {meta}
         </span>
       )}
     </Link>
@@ -397,11 +393,13 @@ function symbolChipTitle(
 }
 
 function Quote({
+  href,
   label,
   children,
   wrapClass,
   accent,
 }: {
+  href: string;
   label: string;
   children: React.ReactNode;
   wrapClass?: string;
@@ -411,9 +409,10 @@ function Quote({
 }) {
   const labelTone = accent === "violet" ? "text-violet-soft" : "text-paper/55";
   return (
-    <div
+    <Link
+      href={href}
       className={cn(
-        "flex items-baseline gap-2 whitespace-nowrap shrink-0",
+        "flex items-baseline gap-2 whitespace-nowrap shrink-0 rounded-soft px-1 py-0.5 hover:bg-paper/10",
         wrapClass,
       )}
     >
@@ -421,7 +420,7 @@ function Quote({
       <span className="text-[13px] font-mono font-semibold text-paper tabular-nums">
         {children}
       </span>
-    </div>
+    </Link>
   );
 }
 
@@ -538,19 +537,21 @@ function DeltaTag({
   );
 }
 
-function useSessionLine(): string | null {
-  const [line, setLine] = useState<string | null>(null);
+function useRefreshCountdown(lastTickISO?: string | null): string {
+  const [line, setLine] = useState("—");
   useEffect(() => {
     const tick = () => {
-      const now = new Date();
-      const spy = getSessionInfo("SPY", now);
-      const spx = getSessionInfo("SPX", now);
-      setLine(renderSessionSegment(spy, spx, now));
+      const last = lastTickISO ? new Date(lastTickISO).getTime() : Date.now();
+      const next = last + 10 * 60_000;
+      const ms = Math.max(0, next - Date.now());
+      const mins = Math.ceil(ms / 60_000);
+      if (mins < 60) setLine(`${mins}m`);
+      else setLine(`${Math.floor(mins / 60)}h ${mins % 60}m`);
     };
     tick();
     const id = window.setInterval(tick, 30_000);
     return () => window.clearInterval(id);
-  }, []);
+  }, [lastTickISO]);
   return line;
 }
 
@@ -596,3 +597,4 @@ function useStalenessTimestamp(): string | null {
   }, []);
   return ts;
 }
+
