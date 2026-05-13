@@ -1770,9 +1770,9 @@ function buildEsLines(spx: SPXSnapshot | null): ProjectedLine[] {
     return {
       label: esLineLabel(line.kind),
       tone:
-        line.kind === "SWING_HIGH_DESC"
+        line.kind === "PREV_RTH_HIGH_DESC" || line.kind === "SWING_HIGH_DESC"
           ? "ceiling"
-          : line.kind === "SWING_LOW_ASC"
+          : line.kind === "PREV_RTH_LOW_DESC" || line.kind === "SWING_LOW_ASC"
             ? "floor"
             : "reference",
       valueAt: (ms: number) => line.anchorPrice + slopePerMs * (ms - anchorMs),
@@ -2045,6 +2045,8 @@ function lineColor(tone: ProjectedLine["tone"]): string {
 function esLineLabel(kind: SPXLine["kind"]): string {
   const map: Record<SPXLine["kind"], string> = {
     PREV_RTH_HIGH_ASC: "Prev high",
+    PREV_RTH_HIGH_DESC: "Prev high desc",
+    PREV_RTH_LOW_ASC: "Prev low asc",
     PREV_RTH_LOW_DESC: "Prev low",
     SWING_HIGH_ASC: "Swing high asc",
     SWING_HIGH_DESC: "Swing high desc",

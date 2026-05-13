@@ -232,11 +232,9 @@ function selectSpyForesightLines(lines: DynamicLine[], mock: string | null | und
 function selectEsForesightLines(lines: SPXLine[]): SPXLine[] {
   const order = [
     "PREV_RTH_HIGH_ASC",
+    "PREV_RTH_HIGH_DESC",
+    "PREV_RTH_LOW_ASC",
     "PREV_RTH_LOW_DESC",
-    "SWING_HIGH_ASC",
-    "SWING_HIGH_DESC",
-    "SWING_LOW_ASC",
-    "SWING_LOW_DESC",
   ];
   return order
     .map((kind) => lines.find((line) => line.kind === kind))
@@ -246,6 +244,8 @@ function selectEsForesightLines(lines: SPXLine[]): SPXLine[] {
 function toEsProjectionLine(line: SPXLine): ProjectionLine {
   const codeByKind: Record<string, LineCode> = {
     PREV_RTH_HIGH_ASC: "UR",
+    PREV_RTH_HIGH_DESC: "UD",
+    PREV_RTH_LOW_ASC: "LA",
     PREV_RTH_LOW_DESC: "LR",
     SWING_HIGH_ASC: "UA",
     SWING_HIGH_DESC: "UD",
@@ -266,6 +266,8 @@ function toEsProjectionLine(line: SPXLine): ProjectionLine {
 function esLineLabel(kind: string): string {
   const labels: Record<string, string> = {
     PREV_RTH_HIGH_ASC: "Previous RTH high ascending",
+    PREV_RTH_HIGH_DESC: "Previous RTH high descending",
+    PREV_RTH_LOW_ASC: "Previous RTH low ascending",
     PREV_RTH_LOW_DESC: "Previous RTH low descending",
     SWING_HIGH_ASC: "Swing high ascending",
     SWING_HIGH_DESC: "Swing high descending",

@@ -256,7 +256,7 @@ export default async function Page() {
             </div>
             <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <StateHeroChip label="SPY state" value={formatState(spy?.state ?? snap.currentState)} term="COOLDOWN" note={fmtPrice(spyLast)} tone={stateTone(spy?.state ?? snap.currentState)} />
-              <StateHeroChip label="ES context" value={formatState(es?.scenario ?? es?.state)} term="INSIDE DESCENDING" note={es?.channel?.direction?.replace(/_/g, " ") ?? "Six-line read"} tone={directionTone(es?.channel?.direction)} />
+              <StateHeroChip label="ES context" value={formatState(es?.scenario ?? es?.state)} term="INSIDE DESCENDING" note={es?.channel?.direction?.replace(/_/g, " ") ?? "RTH pivot read"} tone={directionTone(es?.channel?.direction)} />
               <StateHeroChip label="Options flow" value={spyOptions?.flow?.lean ?? "Waiting"} term="NET PREMIUM" note={fmtMoney(spyOptions?.flow?.premiumNet)} tone={leanTone(spyOptions?.flow?.lean)} />
               <StateHeroChip label="Dealer gamma" value={spyOptions?.gex?.regime ?? "Waiting"} term="GEX" note={`Flip ${nearReferencePriceLabel(spyOptions?.gex?.flipPoint, spyLast ?? snap.currentPrice)}`} tone={gammaTone(spyOptions?.gex?.regime)} />
             </div>

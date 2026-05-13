@@ -8,30 +8,29 @@ def test_snapshot_basic_shape(es_candles_ascending_inside, es_offset, as_of):
     snap = compute_snapshot(es_candles_ascending_inside, es_offset, as_of)
     assert snap.symbol == "SPX"
     assert snap.session_date_ct == "2026-05-08"
-    # Six-line framework is active after overnight swing closes resolve.
+    # Four-line framework is active after previous RTH swing-close pivots resolve.
     assert snap.channel.direction == "ASCENDING"
-    assert len(snap.lines) == 6
+    assert len(snap.lines) == 4
     kinds = {l.kind for l in snap.lines}
     assert kinds == {
         "PREV_RTH_HIGH_ASC",
+        "PREV_RTH_HIGH_DESC",
+        "PREV_RTH_LOW_ASC",
         "PREV_RTH_LOW_DESC",
-        "SWING_HIGH_ASC",
-        "SWING_HIGH_DESC",
-        "SWING_LOW_ASC",
-        "SWING_LOW_DESC",
     }
     assert snap.rth_bias is not None
-    assert snap.rth_bias.reference_line in ("SWING_HIGH_DESC", "SWING_LOW_ASC")
+    assert snap.rth_bias.reference_line == "PREV_RTH_HIGH_DESC"
 
 
 def test_snapshot_inside_ascending_with_plays(es_candles_ascending_inside, es_offset, as_of):
     snap = compute_snapshot(es_candles_ascending_inside, es_offset, as_of)
-    assert snap.scenario == "INSIDE_DESCENDING"
+    assert snap.scenario == "ABOVE_DESCENDING"
     assert snap.plays.primary is not None
     assert snap.plays.alternate is not None
-    assert snap.plays.primary.side == "BUY"
-    assert snap.plays.primary.entry_line in ("SWING_HIGH_DESC", "SWING_LOW_ASC")
-    assert snap.plays.alternate.side == "SELL"
+    assert snap.plays.primary.side == "SELL"
+    assert snap.plays.primary.entry_line == "PREV_RTH_HIGH_ASC"
+    assert snap.plays.primary.exit_line == "PREV_RTH_HIGH_DESC"
+    assert snap.plays.alternate.side == "BUY"
 
 
 def test_snapshot_invalidation_uses_entry_rail(es_candles_ascending_inside, es_offset, as_of):
@@ -45,8 +44,8 @@ def test_snapshot_contracts_match_play_sides(es_candles_ascending_inside, es_off
     snap = compute_snapshot(es_candles_ascending_inside, es_offset, as_of)
     assert snap.contracts.for_primary is not None
     assert snap.contracts.for_alternate is not None
-    assert snap.contracts.for_primary.type == "CALL"   # primary is BUY
-    assert snap.contracts.for_alternate.type == "PUT"  # alternate is SELL
+    assert snap.contracts.for_primary.type == "PUT"   # primary is SELL
+    assert snap.contracts.for_alternate.type == "CALL"  # alternate is BUY
     # SPX 5pt board.
     assert snap.contracts.for_primary.strike % 5 == 0
     assert snap.contracts.for_alternate.strike % 5 == 0
@@ -80,20 +79,18 @@ def test_snapshot_price_is_last_close_in_native_es_space(es_candles_ascending_in
     assert snap.price.last == pytest.approx(5860.00)
 
 
-def test_snapshot_six_lines_do_not_apply_es_to_spx_offset(es_candles_ascending_inside, es_offset, as_of):
+def test_snapshot_prev_rth_close_lines_do_not_apply_es_to_spx_offset(es_candles_ascending_inside, es_offset, as_of):
     snap = compute_snapshot(es_candles_ascending_inside, es_offset, as_of)
     by_kind = {line.kind: line for line in snap.lines}
 
-    assert by_kind["SWING_HIGH_ASC"].anchor_price == pytest.approx(5858.00)
-    assert by_kind["SWING_HIGH_ASC"].entry_value == pytest.approx(5867.36)
-    assert by_kind["SWING_HIGH_DESC"].entry_value == pytest.approx(5848.64)
-    assert by_kind["SWING_LOW_ASC"].anchor_price == pytest.approx(5838.00)
-    assert by_kind["SWING_LOW_ASC"].entry_value == pytest.approx(5853.60)
-    assert by_kind["SWING_LOW_DESC"].entry_value == pytest.approx(5822.40)
-    assert by_kind["PREV_RTH_HIGH_ASC"].anchor_price == pytest.approx(5866.50)
-    assert by_kind["PREV_RTH_HIGH_ASC"].entry_value == pytest.approx(5886.26)
-    assert by_kind["PREV_RTH_LOW_DESC"].anchor_price == pytest.approx(5837.00)
-    assert by_kind["PREV_RTH_LOW_DESC"].entry_value == pytest.approx(5813.08)
+    assert by_kind["PREV_RTH_HIGH_ASC"].anchor_price == pytest.approx(5864.00)
+    assert by_kind["PREV_RTH_HIGH_ASC"].entry_value == pytest.approx(5883.76)
+    assert by_kind["PREV_RTH_HIGH_DESC"].anchor_price == pytest.approx(5864.00)
+    assert by_kind["PREV_RTH_HIGH_DESC"].entry_value == pytest.approx(5844.24)
+    assert by_kind["PREV_RTH_LOW_ASC"].anchor_price == pytest.approx(5837.50)
+    assert by_kind["PREV_RTH_LOW_ASC"].entry_value == pytest.approx(5861.42)
+    assert by_kind["PREV_RTH_LOW_DESC"].anchor_price == pytest.approx(5837.50)
+    assert by_kind["PREV_RTH_LOW_DESC"].entry_value == pytest.approx(5813.58)
 
 
 def test_snapshot_rejects_empty_candles(as_of):

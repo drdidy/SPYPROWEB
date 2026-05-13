@@ -61,9 +61,11 @@ export function SPXChannelHero({
   const heroBg = selective ? "bg-gold-tint/40" : "bg-paper";
 
   // Compose right-rail stat strip values
-  const swingHighDesc = snap.lines.find((l) => l.kind === "SWING_HIGH_DESC");
-  const swingLowAsc = snap.lines.find((l) => l.kind === "SWING_LOW_ASC");
-  const activePair = [swingHighDesc, swingLowAsc]
+  const majorHighDesc =
+    snap.lines.find((l) => l.kind === "PREV_RTH_HIGH_DESC") ??
+    snap.lines.find((l) => l.kind === "SWING_HIGH_DESC");
+  const lowDesc = snap.lines.find((l) => l.kind === "PREV_RTH_LOW_DESC");
+  const activePair = [majorHighDesc, lowDesc]
     .filter((line): line is NonNullable<typeof line> => Boolean(line))
     .sort((a, b) => entryLineValue(a) - entryLineValue(b));
   const lowerLine = activePair[0] ?? null;
@@ -205,12 +207,12 @@ export function SPXChannelHero({
           {/* 3-stat band - gives the right rail visual gravity */}
           <div className="grid grid-cols-3 gap-2 mb-4">
             <RailStat
-              label="Active gap"
+              label="Major range"
               value={activeGap !== null ? `${activeGap.toFixed(2)}` : "-"}
               suffix="pts"
             />
             <RailStat
-              label="To upper"
+              label="To major"
               value={distToUpper !== null ? distToUpper.toFixed(2) : "-"}
               tone={
                 distToUpper !== null && distToUpper >= 0 ? "bear" : "bull"
@@ -218,7 +220,7 @@ export function SPXChannelHero({
               suffix="pts"
             />
             <RailStat
-              label="To lower"
+              label="To low ref"
               value={distToLower !== null ? distToLower.toFixed(2) : "-"}
               tone={distToLower !== null && distToLower >= 0 ? "bull" : "bear"}
               suffix="pts"
@@ -382,8 +384,12 @@ function ChannelDiagram({
     ? new Date(cleanBars.at(-1)!.t).getTime()
     : tNow + 60 * 60 * 1000;
 
-  const ceiling = snap.lines.find((l) => l.kind === "SWING_HIGH_DESC");
-  const floor = snap.lines.find((l) => l.kind === "SWING_LOW_ASC");
+  const ceiling =
+    snap.lines.find((l) => l.kind === "PREV_RTH_HIGH_DESC") ??
+    snap.lines.find((l) => l.kind === "SWING_HIGH_DESC");
+  const floor =
+    snap.lines.find((l) => l.kind === "PREV_RTH_LOW_DESC") ??
+    snap.lines.find((l) => l.kind === "SWING_LOW_ASC");
 
   const yPoints: number[] = [snap.price.last];
   for (const bar of cleanBars) yPoints.push(bar.h, bar.l, bar.c);
@@ -598,13 +604,13 @@ function ChannelDiagram({
             fill="#5A5A5A"
             letterSpacing="0.08em"
           >
-            FRAMEWORK AWAITS OVERNIGHT STRUCTURE
+            FRAMEWORK AWAITS RTH PIVOTS
           </text>
         </g>
       )}
       {bandPath && <path d={bandPath} fill={railFill} className="spx-band" />}
 
-      {/* all six ES framework lines with exact projected values */}
+      {/* ES framework lines with exact projected values */}
       {snap.lines.map((line, index) => {
         const start = new Date(line.anchorTime).getTime();
         const endValue = projectAt(line.anchorPrice, line.anchorTime, line.slopePerHour, tEnd);
@@ -617,7 +623,7 @@ function ChannelDiagram({
             <path
               d={`M ${xOf(start)},${yOf(line.anchorPrice)} L ${xOf(tEnd)},${yOf(endValue)}`}
               stroke={color}
-              strokeWidth={line.kind === "SWING_HIGH_DESC" || line.kind === "SWING_LOW_ASC" ? 1.7 : 1.05}
+              strokeWidth={line.kind === "PREV_RTH_HIGH_DESC" || line.kind === "PREV_RTH_LOW_DESC" ? 1.7 : 1.05}
               strokeDasharray={line.kind.startsWith("PREV_RTH") ? "5 5" : line.slopePerHour > 0 ? "2 4" : undefined}
               fill="none"
               opacity={line.kind.startsWith("PREV_RTH") ? 0.82 : 0.9}
@@ -662,7 +668,7 @@ function ChannelDiagram({
                   fontWeight="700"
                   fill="#14161A"
                 >
-                  09 {label.value.toFixed(2)}
+                  08 {label.value.toFixed(2)}
                 </text>
               </g>
             )}
@@ -925,6 +931,8 @@ function distributeEsChartLabels(
 function lineCode(kind: string): string {
   const labels: Record<string, string> = {
     PREV_RTH_HIGH_ASC: "PRH-A",
+    PREV_RTH_HIGH_DESC: "PRH-D",
+    PREV_RTH_LOW_ASC: "PRL-A",
     PREV_RTH_LOW_DESC: "PRL-D",
     SWING_HIGH_ASC: "SH-A",
     SWING_HIGH_DESC: "SH-D",
@@ -935,6 +943,8 @@ function lineCode(kind: string): string {
 }
 
 function lineStroke(kind: string): string {
+  if (kind === "PREV_RTH_HIGH_DESC") return "#B5301E";
+  if (kind === "PREV_RTH_LOW_ASC") return "#0E7C50";
   if (kind === "SWING_HIGH_DESC") return "#B5301E";
   if (kind === "SWING_LOW_ASC") return "#0E7C50";
   if (kind.startsWith("PREV_RTH")) return "#5B3FB1";

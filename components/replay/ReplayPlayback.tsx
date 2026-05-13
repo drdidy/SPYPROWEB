@@ -163,9 +163,11 @@ function SPXPlaybackPanel({
 }
 
 function spxLineProjections(lines: SPXLine[]): LineProjection[] {
-  // Colors map to the ES six-line framework.
+  // Colors map to the ES previous-RTH swing-close framework.
   const palette: Record<string, string> = {
     PREV_RTH_HIGH_ASC: "#7E5BAE",
+    PREV_RTH_HIGH_DESC: "#B5301E",
+    PREV_RTH_LOW_ASC: "#0E7C50",
     PREV_RTH_LOW_DESC: "#7E5BAE",
     SWING_HIGH_ASC: "#B8860B",
     SWING_HIGH_DESC: "#B5301E",
@@ -178,7 +180,7 @@ function spxLineProjections(lines: SPXLine[]): LineProjection[] {
     return {
       name: shortEsLineName(l.kind),
       color: palette[l.kind] ?? "#9CA3AF",
-      emphasized: l.kind === "SWING_HIGH_DESC" || l.kind === "SWING_LOW_ASC",
+      emphasized: l.kind === "PREV_RTH_HIGH_DESC" || l.kind === "PREV_RTH_LOW_DESC",
       valueAtMs: (ms: number) => l.anchorPrice + slopePerMs * (ms - t0Ms),
     };
   });
@@ -187,6 +189,8 @@ function spxLineProjections(lines: SPXLine[]): LineProjection[] {
 function shortEsLineName(kind: string): string {
   const labels: Record<string, string> = {
     PREV_RTH_HIGH_ASC: "PRH-A",
+    PREV_RTH_HIGH_DESC: "PRH-D",
+    PREV_RTH_LOW_ASC: "PRL-A",
     PREV_RTH_LOW_DESC: "PRL-D",
     SWING_HIGH_ASC: "SH-A",
     SWING_HIGH_DESC: "SH-D",

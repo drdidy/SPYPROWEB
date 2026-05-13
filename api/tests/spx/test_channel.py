@@ -145,11 +145,11 @@ def test_prev_rth_anchors_reads_thursday(es_candles_ascending_inside, es_offset,
     res = prev_rth_anchors(spx, session_date)
     assert res is not None
     high, low = res
-    assert high.price == pytest.approx(5878.50)
-    assert low.price == pytest.approx(5849.00)
+    assert high.price == pytest.approx(5876.00)
+    assert low.price == pytest.approx(5849.50)
 
 
-def test_build_lines_builds_six_line_framework(es_candles_ascending_inside, es_offset, session_date):
+def test_build_lines_builds_previous_rth_close_framework(es_candles_ascending_inside, es_offset, session_date):
     spx = _spx(es_candles_ascending_inside, es_offset)
     high, low = overnight_anchors(spx, session_date)
     prev = prev_rth_anchors(spx, session_date)
@@ -163,31 +163,24 @@ def test_build_lines_builds_six_line_framework(es_candles_ascending_inside, es_o
     kinds = {l.kind for l in lines}
     assert kinds == {
         "PREV_RTH_HIGH_ASC",
+        "PREV_RTH_HIGH_DESC",
+        "PREV_RTH_LOW_ASC",
         "PREV_RTH_LOW_DESC",
-        "SWING_HIGH_ASC",
-        "SWING_HIGH_DESC",
-        "SWING_LOW_ASC",
-        "SWING_LOW_DESC",
     }
 
 
-def test_build_lines_none_direction_still_builds_swing_framework():
+def test_build_lines_without_previous_rth_pivots_resolves_empty():
     high = Anchor(price=5872.40, time=datetime(2026, 5, 7, 23, tzinfo=CT))
     low = Anchor(price=5848.20, time=datetime(2026, 5, 7, 17, tzinfo=CT))
     lines = build_lines(direction="NONE", overnight_high=high, overnight_low=low,
                         prev_rth_high=None, prev_rth_low=None)
-    assert {l.kind for l in lines} == {
-        "SWING_HIGH_ASC",
-        "SWING_HIGH_DESC",
-        "SWING_LOW_ASC",
-        "SWING_LOW_DESC",
-    }
+    assert lines == []
 
 
 def test_project_line_arithmetic():
     from _lib.spx.channel import Line
     anchor_t = datetime(2026, 5, 7, 17, tzinfo=CT)
-    line = Line("SWING_LOW_ASC", Anchor(5848.20, anchor_t), 1.04)
+    line = Line("PREV_RTH_LOW_ASC", Anchor(5848.20, anchor_t), 1.04)
     # 16 hours later: 5848.20 + 16 * 1.04 = 5864.84
     later = datetime(2026, 5, 8, 9, tzinfo=CT)
     assert project_line(line, later) == pytest.approx(5864.84)

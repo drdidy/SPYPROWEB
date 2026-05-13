@@ -123,7 +123,7 @@ def build_snapshot_with_provenance(
     computed_offset = quote.offset
     requested_offset = offset_override if offset_override is not None else computed_offset
     # ES structure is native. Keep the computed/requested basis in metadata for
-    # transparency, but do not feed it into the six-line engine.
+    # transparency, but do not feed it into the native ES structure engine.
     applied_offset = 0.0
     snap = compute_snapshot(bars, applied_offset, as_of, **engine_kwargs)
     meta = {

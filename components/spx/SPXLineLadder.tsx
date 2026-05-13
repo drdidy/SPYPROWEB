@@ -7,12 +7,22 @@ const lineMeta: Record<SPXLineKind, { dot: string; label: string; group: string 
   PREV_RTH_HIGH_ASC: {
     dot: "bg-ink-4",
     label: "Prev RTH High - Asc",
-    group: "Outer reference",
+    group: "RTH swing close",
+  },
+  PREV_RTH_HIGH_DESC: {
+    dot: "bg-bear",
+    label: "Prev RTH High - Desc",
+    group: "Major flow",
+  },
+  PREV_RTH_LOW_ASC: {
+    dot: "bg-bull",
+    label: "Prev RTH Low - Asc",
+    group: "RTH swing close",
   },
   PREV_RTH_LOW_DESC: {
     dot: "bg-ink-4",
     label: "Prev RTH Low - Desc",
-    group: "Outer reference",
+    group: "RTH swing close",
   },
   SWING_HIGH_ASC: {
     dot: "bg-gold",
@@ -37,7 +47,8 @@ const lineMeta: Record<SPXLineKind, { dot: string; label: string; group: string 
 };
 
 function lineState(kind: SPXLineKind, distance: number): "armed" | "watching" | "stale" | "reference" | "bias" {
-  if (lineMeta[kind].group === "Outer reference") return "reference";
+  if (kind === "PREV_RTH_HIGH_DESC") return "bias";
+  if (lineMeta[kind].group === "RTH swing close") return "reference";
   const a = Math.abs(distance);
   if (a <= 3) return "armed";
   if (a <= 15) return "watching";

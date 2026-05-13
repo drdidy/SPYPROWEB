@@ -2,15 +2,15 @@ import type { SPXSnapshot } from "./types";
 
 // ---------------------------------------------------------------------------
 // SPX mock snapshot - demo scenario: INSIDE_DESCENDING.
-// Numbers are mathematically self-consistent against the ES six-line framework
+// Numbers are mathematically self-consistent against the ES previous-RTH
+// swing-close framework
 // so surfaces render the same line vocabulary in dev and production.
 //
 // Session date (CT): 2026-05-08
 // As-of:             2026-05-08 09:35 CT (5 min into RTH)
 //
-// Overnight swing-high and swing-low closes are selected before 02:00 CT.
-// Ascending and descending lines are projected from both points; previous RTH
-// high/low references complete the six-line framework.
+// Previous RTH swing-high and swing-low closes are selected as pivots.
+// Ascending and descending lines are projected from both points.
 // ---------------------------------------------------------------------------
 
 export const spxSnapshot: SPXSnapshot = {
@@ -47,47 +47,11 @@ export const spxSnapshot: SPXSnapshot = {
   channel: {
     direction: "ASCENDING",
     reason:
-      "ES framework active with measured overnight and prior-session references.",
+      "Previous-RTH swing-close framework active with four projected references.",
   },
 
-  // Six projected lines from overnight swing closes and previous RTH anchors.
+  // Four projected lines from previous RTH swing-close pivots.
   lines: [
-    {
-      kind: "SWING_HIGH_ASC",
-      name: "Swing High - Ascending",
-      anchorPrice: 5872.40,
-      anchorTime: "2026-05-07T23:14:00-05:00",
-      slopePerHour: 1.04,
-      currentValue: 5883.16,
-      distanceFromPrice: 11.16,
-    },
-    {
-      kind: "SWING_HIGH_DESC",
-      name: "Swing High - Descending",
-      anchorPrice: 5872.40,
-      anchorTime: "2026-05-07T23:14:00-05:00",
-      slopePerHour: -1.04,
-      currentValue: 5861.64,
-      distanceFromPrice: -10.36,
-    },
-    {
-      kind: "SWING_LOW_ASC",
-      name: "Swing Low - Ascending",
-      anchorPrice: 5848.20,
-      anchorTime: "2026-05-07T17:38:00-05:00",
-      slopePerHour: 1.04,
-      currentValue: 5864.79,
-      distanceFromPrice: -7.21,
-    },
-    {
-      kind: "SWING_LOW_DESC",
-      name: "Swing Low - Descending",
-      anchorPrice: 5848.20,
-      anchorTime: "2026-05-07T17:38:00-05:00",
-      slopePerHour: -1.04,
-      currentValue: 5831.61,
-      distanceFromPrice: -40.39,
-    },
     {
       kind: "PREV_RTH_HIGH_ASC",
       name: "Prev RTH High - Ascending",
@@ -96,6 +60,24 @@ export const spxSnapshot: SPXSnapshot = {
       slopePerHour: 1.04,
       currentValue: 5899.48,
       distanceFromPrice: 27.48,
+    },
+    {
+      kind: "PREV_RTH_HIGH_DESC",
+      name: "Prev RTH High - Descending",
+      anchorPrice: 5878.50,
+      anchorTime: "2026-05-07T13:25:00-05:00",
+      slopePerHour: -1.04,
+      currentValue: 5857.52,
+      distanceFromPrice: -14.48,
+    },
+    {
+      kind: "PREV_RTH_LOW_ASC",
+      name: "Prev RTH Low - Ascending",
+      anchorPrice: 5849.00,
+      anchorTime: "2026-05-07T09:42:00-05:00",
+      slopePerHour: 1.04,
+      currentValue: 5873.84,
+      distanceFromPrice: 1.84,
     },
     {
       kind: "PREV_RTH_LOW_DESC",
@@ -114,7 +96,7 @@ export const spxSnapshot: SPXSnapshot = {
     changePct: 0.11,
   },
 
-  // 5872.00 is inside the six-line framework.
+  // 5872.00 is inside the previous-RTH swing-close framework.
   scenario: "INSIDE_DESCENDING",
   scenarioExplanation:
     "Last print 5872.00 sits inside the ES framework. Wait for qualified confirmation near active structure.",
@@ -122,17 +104,17 @@ export const spxSnapshot: SPXSnapshot = {
   plays: {
     primary: {
       side: "BUY",
-      entryLine: "SWING_HIGH_DESC",
-      entryPrice: 5861.64,
-      exitLine: "SWING_LOW_ASC",
-      exitPrice: 5864.79,
+      entryLine: "PREV_RTH_LOW_DESC",
+      entryPrice: 5824.16,
+      exitLine: "PREV_RTH_HIGH_DESC",
+      exitPrice: 5857.52,
     },
     alternate: {
       side: "SELL",
-      entryLine: "SWING_LOW_ASC",
-      entryPrice: 5864.79,
-      exitLine: "SWING_HIGH_DESC",
-      exitPrice: 5861.64,
+      entryLine: "PREV_RTH_HIGH_DESC",
+      entryPrice: 5857.52,
+      exitLine: "PREV_RTH_LOW_DESC",
+      exitPrice: 5824.16,
     },
   },
 
@@ -143,14 +125,14 @@ export const spxSnapshot: SPXSnapshot = {
       strike: 5890,
       expiration: "2026-05-08",
       dteLabel: "0DTE",
-      distanceFromSpot: 5890 - 5861.64,
+      distanceFromSpot: 5890 - 5824.16,
     },
     forAlternate: {
       type: "PUT",
       strike: 5840,
       expiration: "2026-05-08",
       dteLabel: "0DTE",
-      distanceFromSpot: 5840 - 5864.79,
+      distanceFromSpot: 5840 - 5857.52,
     },
   },
 

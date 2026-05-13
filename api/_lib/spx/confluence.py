@@ -64,7 +64,7 @@ class Confluence:
 def _factor_asian(channel: Channel, sydney: Optional[SessionRange], tokyo: Optional[SessionRange]) -> FactorResult:
     """Whether the overnight swing framework has usable range data.
 
-    This no longer determines direction. Direction comes from the six-line
+    This no longer determines direction. Direction comes from the previous-RTH swing-close
     framework; the Asian factor only answers whether the overnight build has
     enough measured range to be useful.
     """
@@ -186,7 +186,7 @@ def _factor_reaction(
     else:
         # Bar built inside the framework without touching either active line.
         value = 0.55
-        note = "First RTH bar built inside the six-line framework without testing an active line."
+        note = "First RTH bar built inside the previous-RTH swing-close framework without testing an active line."
     return FactorResult(
         key="reaction", label="RTH reaction", value=value,
         weight=weight, contribution=value * weight, note=note,

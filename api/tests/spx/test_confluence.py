@@ -7,6 +7,7 @@ from _lib.spx.channel import (
     SessionRange,
     determine_channel,
     overnight_anchors,
+    prev_rth_anchors,
     sydney_range,
     tokyo_range,
     build_lines,
@@ -24,10 +25,11 @@ def test_score_in_range_and_action_take(es_candles_ascending_inside, es_offset, 
     tky = tokyo_range(spx, session_date)
     ch = determine_channel(syd, tky)
     high, low = overnight_anchors(spx, session_date)
+    prev_high, prev_low = prev_rth_anchors(spx, session_date)
     lines = build_lines(direction=ch.direction, overnight_high=high, overnight_low=low,
-                       prev_rth_high=None, prev_rth_low=None)
-    ceiling = next((l for l in lines if l.kind == "SWING_HIGH_DESC"), None)
-    floor = next((l for l in lines if l.kind == "SWING_LOW_ASC"), None)
+                       prev_rth_high=prev_high, prev_rth_low=prev_low)
+    ceiling = next((l for l in lines if l.kind == "PREV_RTH_HIGH_DESC"), None)
+    floor = next((l for l in lines if l.kind == "PREV_RTH_LOW_DESC"), None)
 
     res = evaluate(
         candles=spx, session_date=session_date, channel=ch,
@@ -48,8 +50,9 @@ def test_outside_play_forces_stand_down(es_candles_ascending_inside, es_offset, 
     tky = tokyo_range(spx, session_date)
     ch = determine_channel(syd, tky)
     high, low = overnight_anchors(spx, session_date)
+    prev_high, prev_low = prev_rth_anchors(spx, session_date)
     lines = build_lines(direction=ch.direction, overnight_high=high, overnight_low=low,
-                       prev_rth_high=None, prev_rth_low=None)
+                       prev_rth_high=prev_high, prev_rth_low=prev_low)
 
     res = evaluate(
         candles=spx, session_date=session_date, channel=ch,
@@ -66,10 +69,11 @@ def test_factors_contain_only_implemented_slots(es_candles_ascending_inside, es_
     tky = tokyo_range(spx, session_date)
     ch = determine_channel(syd, tky)
     high, low = overnight_anchors(spx, session_date)
+    prev_high, prev_low = prev_rth_anchors(spx, session_date)
     lines = build_lines(direction=ch.direction, overnight_high=high, overnight_low=low,
-                       prev_rth_high=None, prev_rth_low=None)
-    ceiling = next((l for l in lines if l.kind == "SWING_HIGH_DESC"), None)
-    floor = next((l for l in lines if l.kind == "SWING_LOW_ASC"), None)
+                       prev_rth_high=prev_high, prev_rth_low=prev_low)
+    ceiling = next((l for l in lines if l.kind == "PREV_RTH_HIGH_DESC"), None)
+    floor = next((l for l in lines if l.kind == "PREV_RTH_LOW_DESC"), None)
 
     res = evaluate(
         candles=spx, session_date=session_date, channel=ch,
@@ -86,10 +90,11 @@ def test_no_unimplemented_placeholder_factors_are_emitted(es_candles_ascending_i
     tky = tokyo_range(spx, session_date)
     ch = determine_channel(syd, tky)
     high, low = overnight_anchors(spx, session_date)
+    prev_high, prev_low = prev_rth_anchors(spx, session_date)
     lines = build_lines(direction=ch.direction, overnight_high=high, overnight_low=low,
-                       prev_rth_high=None, prev_rth_low=None)
-    ceiling = next((l for l in lines if l.kind == "SWING_HIGH_DESC"), None)
-    floor = next((l for l in lines if l.kind == "SWING_LOW_ASC"), None)
+                       prev_rth_high=prev_high, prev_rth_low=prev_low)
+    ceiling = next((l for l in lines if l.kind == "PREV_RTH_HIGH_DESC"), None)
+    floor = next((l for l in lines if l.kind == "PREV_RTH_LOW_DESC"), None)
 
     res = evaluate(
         candles=spx, session_date=session_date, channel=ch,

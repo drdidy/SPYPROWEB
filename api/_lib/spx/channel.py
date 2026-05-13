@@ -2,15 +2,12 @@
 
 This module implements the geometry that defines the ES session:
 
-  1. Overnight swing-high close and swing-low close before 02:00 CT.
-  2. Previous RTH high and previous RTH low.
-  3. Line construction: six lines per active session.
-       PREV_RTH_HIGH_ASC anchor=prev RTH high, slope=+1.04
-       PREV_RTH_LOW_DESC anchor=prev RTH low,  slope=-1.04
-       SWING_HIGH_ASC    anchor=overnight swing-high close, slope=+1.04
-       SWING_HIGH_DESC   anchor=overnight swing-high close, slope=-1.04
-       SWING_LOW_ASC     anchor=overnight swing-low close,  slope=+1.04
-       SWING_LOW_DESC    anchor=overnight swing-low close,  slope=-1.04
+  1. Previous RTH swing-high close and swing-low close.
+  2. Line construction: four lines per active session.
+       PREV_RTH_HIGH_ASC  anchor=prev RTH high close, slope=+1.04
+       PREV_RTH_HIGH_DESC anchor=prev RTH high close, slope=-1.04
+       PREV_RTH_LOW_ASC   anchor=prev RTH low close,  slope=+1.04
+       PREV_RTH_LOW_DESC  anchor=prev RTH low close,  slope=-1.04
   4. Projection: anchor_price + slope_per_hour * hours_since_anchor.
 """
 from __future__ import annotations
@@ -35,6 +32,8 @@ ChannelDirection = Literal["ASCENDING", "DESCENDING", "NONE"]
 NoChannelReason = Literal["EXPANSION", "CONTRACTION"]
 LineKind = Literal[
     "PREV_RTH_HIGH_ASC",
+    "PREV_RTH_HIGH_DESC",
+    "PREV_RTH_LOW_ASC",
     "PREV_RTH_LOW_DESC",
     "SWING_HIGH_ASC",
     "SWING_HIGH_DESC",
@@ -119,14 +118,14 @@ def tokyo_range(candles: list[Candle], session_date: date) -> Optional[SessionRa
 def prev_rth_anchors(
     candles: list[Candle], session_date: date
 ) -> Optional[tuple[Anchor, Anchor]]:
-    """Previous trading day's RTH high and low.
+    """Previous trading day's RTH swing-high close and swing-low close.
 
     Returns None if no candles fall in the prior RTH window; this happens on
     Mondays if the caller didn't supply Friday's bars.
     """
     prev = previous_session_date(session_date)
     bars = in_window(candles, rth_window(prev))
-    res = range_high_low(bars)
+    res = range_high_low_close(bars)
     if res is None:
         return None
     high, low, t_hi, t_lo = res
@@ -207,23 +206,19 @@ def build_lines(
     prev_rth_low: Optional[Anchor],
     slope_per_hour: float = DEFAULT_SLOPE_PER_HOUR,
 ) -> list[Line]:
-    """Build the six ES structure lines for the active session.
+    """Build the ES structure lines for the active session.
 
-    Direction is retained for call-site compatibility but does not gate the
-    six-line framework. Once the overnight swing closes and previous RTH
-    anchors exist, ES has both ascending and descending references.
+    Direction and overnight anchors are retained for call-site compatibility.
+    The live ES framework is previous-RTH-close based: highest RTH close and
+    lowest RTH close each project both ascending and descending lines.
     """
     lines: list[Line] = []
 
-    lines.append(Line("SWING_HIGH_ASC", overnight_high, +slope_per_hour))
-    lines.append(Line("SWING_HIGH_DESC", overnight_high, -slope_per_hour))
-    lines.append(Line("SWING_LOW_ASC", overnight_low, +slope_per_hour))
-    lines.append(Line("SWING_LOW_DESC", overnight_low, -slope_per_hour))
-
-    # Prev-RTH references used for plays/targets.
     if prev_rth_high is not None:
         lines.append(Line("PREV_RTH_HIGH_ASC", prev_rth_high, +slope_per_hour))
+        lines.append(Line("PREV_RTH_HIGH_DESC", prev_rth_high, -slope_per_hour))
     if prev_rth_low is not None:
+        lines.append(Line("PREV_RTH_LOW_ASC", prev_rth_low, +slope_per_hour))
         lines.append(Line("PREV_RTH_LOW_DESC", prev_rth_low, -slope_per_hour))
 
     return lines

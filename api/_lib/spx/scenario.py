@@ -1,11 +1,10 @@
 """Scenario classifier + primary/alternate play construction.
 
-ES now classifies price against a six-line framework:
+ES now classifies price against a previous-RTH swing-close framework:
 
-  - ascending and descending projections from the overnight swing-high close
-  - ascending and descending projections from the overnight swing-low close
-  - previous RTH high ascending for high-side sell entries or buy exits
-  - previous RTH low descending for low-side buy entries or sell exits
+  - previous RTH swing-high close ascending and descending
+  - previous RTH swing-low close ascending and descending
+  - the previous RTH high descending line is the major flow/bias reference
 
 Hourly confirmation remains rule-based: buys require a bearish touch that
 closes above the line, and sells require a bullish touch that closes below the
@@ -68,31 +67,25 @@ def classify(
     """Map price and projected lines to one of the existing scenario tags.
 
     The direction parameter is retained for compatibility. ES no longer
-    relies on Sydney/Tokyo direction; it reads price against the swing-high
-    and swing-low ascending/descending pairs.
+    relies on Sydney/Tokyo direction; it reads price against the previous
+    RTH swing-close projections. The high-descending line is the major flow
+    reference.
     """
     by = _by_kind(lines)
-    swing_high_asc = by.get("SWING_HIGH_ASC")
-    swing_high_desc = by.get("SWING_HIGH_DESC")
-    swing_low_asc = by.get("SWING_LOW_ASC")
-    swing_low_desc = by.get("SWING_LOW_DESC")
-    prev_high = by.get("PREV_RTH_HIGH_ASC")
-    prev_low = by.get("PREV_RTH_LOW_DESC")
+    high_asc = by.get("PREV_RTH_HIGH_ASC")
+    high_desc = by.get("PREV_RTH_HIGH_DESC") or by.get("SWING_HIGH_DESC")
+    low_asc = by.get("PREV_RTH_LOW_ASC") or by.get("SWING_LOW_ASC")
+    low_desc = by.get("PREV_RTH_LOW_DESC")
 
-    if None in (swing_high_asc, swing_high_desc, swing_low_asc, swing_low_desc):
+    if None in (high_asc, high_desc, low_asc, low_desc):
         return "OUTSIDE_PLAY"
 
-    if prev_high is not None and price > prev_high:
-        return "ABOVE_ASCENDING"
-    if prev_low is not None and price < prev_low:
-        return "BELOW_DESCENDING"
+    assert high_desc is not None
+    assert low_desc is not None
 
-    assert swing_high_asc is not None and swing_high_desc is not None
-    assert swing_low_asc is not None and swing_low_desc is not None
-
-    if price > swing_high_asc and price > swing_high_desc:
-        return "ABOVE_ASCENDING"
-    if price < swing_low_asc and price < swing_low_desc:
+    if price > high_desc:
+        return "ABOVE_DESCENDING"
+    if price < low_desc:
         return "BELOW_DESCENDING"
     return "INSIDE_DESCENDING"
 
@@ -100,29 +93,30 @@ def classify(
 def explain_scenario(scenario: Scenario, price: float, lines: list[ProjectedLine]) -> str:
     """Human-readable one-liner describing where price sits."""
     by = _by_kind(lines)
-    upper = by.get("SWING_HIGH_DESC")
-    lower = by.get("SWING_LOW_ASC")
+    high_desc = by.get("PREV_RTH_HIGH_DESC") or by.get("SWING_HIGH_DESC")
+    high_asc = by.get("PREV_RTH_HIGH_ASC")
+    low_desc = by.get("PREV_RTH_LOW_DESC")
     if scenario == "OUTSIDE_PLAY":
-        return f"Last print {price:.2f} does not have a complete six-line ES framework yet."
+        return f"Last print {price:.2f} does not have the previous-RTH swing-close ES framework yet."
     if scenario in ("INSIDE_ASCENDING", "INSIDE_DESCENDING"):
-        pair = _ordered_swing_pair(by)
-        assert pair is not None
-        lower_pair, upper_pair = pair
-        lower_relation = _relative_phrase(price, lower_pair[1], lower_pair[0])
-        upper_relation = _relative_phrase(price, upper_pair[1], upper_pair[0])
+        assert high_desc is not None
+        relation = _relative_phrase(price, high_desc, "PREV_RTH_HIGH_DESC")
         return (
-            f"Last print {price:.2f} sits inside the ES six-line framework - "
-            f"{lower_relation}, {upper_relation}. "
-            "Wait for an hourly rejection into a line."
+            f"Last print {price:.2f} is near the major previous-RTH high descending line - "
+            f"{relation}. Wait for the hourly touch-and-close confirmation."
         )
     if scenario in ("ABOVE_ASCENDING", "ABOVE_DESCENDING"):
+        target = f" toward previous RTH high ascending {high_asc:.2f}" if high_asc is not None else ""
         return (
-            f"Last print {price:.2f} is above both swing-high lines - "
-            "previous RTH high ascending becomes the sell entry or buy-exit reference."
+            f"Last print {price:.2f} is above the major previous-RTH high descending line{target}. "
+            "If price returns to the major line and closes above it, the buy continuation is active; "
+            "if it extends first, the high ascending line is the sell or buy-exit reference."
         )
+    target = f" toward previous RTH low descending {low_desc:.2f}" if low_desc is not None else ""
     return (
-        f"Last print {price:.2f} is below both swing-low lines - "
-        "previous RTH low descending becomes the buy entry or sell-exit reference."
+        f"Last print {price:.2f} is below the major previous-RTH high descending line{target}. "
+        "If price returns to the major line and closes below it, the sell continuation is active; "
+        "if it drops first, the low descending line is the buy or sell-exit reference."
     )
 
 # ---------------------------------------------------------------------------
@@ -172,6 +166,8 @@ def _ordered_swing_pair(
 def _line_label(kind: LineKind) -> str:
     labels: dict[LineKind, str] = {
         "PREV_RTH_HIGH_ASC": "previous RTH high ascending",
+        "PREV_RTH_HIGH_DESC": "previous RTH high descending",
+        "PREV_RTH_LOW_ASC": "previous RTH low ascending",
         "PREV_RTH_LOW_DESC": "previous RTH low descending",
         "SWING_HIGH_ASC": "swing-high ascending",
         "SWING_HIGH_DESC": "swing-high descending",
@@ -201,21 +197,22 @@ def build_plays(scenario: Scenario, lines: list[ProjectedLine]) -> Plays:
     if scenario == "OUTSIDE_PLAY":
         return Plays(None, None)
 
+    high_desc = "PREV_RTH_HIGH_DESC" if "PREV_RTH_HIGH_DESC" in by else "SWING_HIGH_DESC"
+    low_desc = "PREV_RTH_LOW_DESC"
+
     if scenario in ("ABOVE_ASCENDING", "ABOVE_DESCENDING"):
-        primary = _trade("SELL", "PREV_RTH_HIGH_ASC", "SWING_HIGH_DESC", by)
-        alternate = _trade("BUY", "SWING_HIGH_DESC", "PREV_RTH_HIGH_ASC", by)
+        primary = _trade("SELL", "PREV_RTH_HIGH_ASC", high_desc, by)
+        alternate = _trade("BUY", high_desc, "PREV_RTH_HIGH_ASC", by)
         return Plays(primary, alternate)
 
     if scenario in ("INSIDE_ASCENDING", "INSIDE_DESCENDING"):
-        pair = _ordered_swing_pair(by)
-        if pair is None:
+        if high_desc not in by or low_desc not in by:
             return Plays(None, None)
-        low, high = pair
-        primary = Trade("BUY", low[0], low[1], high[0], high[1])
-        alternate = Trade("SELL", high[0], high[1], low[0], low[1])
+        primary = Trade("BUY", low_desc, by[low_desc], high_desc, by[high_desc])
+        alternate = Trade("SELL", high_desc, by[high_desc], low_desc, by[low_desc])
         return Plays(primary, alternate)
 
     # BELOW_*
-    primary = _trade("BUY", "PREV_RTH_LOW_DESC", "SWING_LOW_ASC", by)
-    alternate = _trade("SELL", "SWING_LOW_ASC", "PREV_RTH_LOW_DESC", by)
+    primary = _trade("BUY", low_desc, high_desc, by)
+    alternate = _trade("SELL", high_desc, low_desc, by)
     return Plays(primary, alternate)

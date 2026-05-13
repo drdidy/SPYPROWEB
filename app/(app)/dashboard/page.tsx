@@ -600,8 +600,12 @@ function spyStructureLevels(snap: AdaptedSnapshot): StructureLevels {
 }
 
 function spxStructureLevels(snap: SPXSnapshot): StructureLevels {
-  const ceiling = snap.lines.find((line) => line.kind === "SWING_HIGH_DESC");
-  const floor = snap.lines.find((line) => line.kind === "SWING_LOW_ASC");
+  const ceiling =
+    snap.lines.find((line) => line.kind === "PREV_RTH_HIGH_DESC") ??
+    snap.lines.find((line) => line.kind === "SWING_HIGH_DESC");
+  const floor =
+    snap.lines.find((line) => line.kind === "PREV_RTH_LOW_DESC") ??
+    snap.lines.find((line) => line.kind === "SWING_LOW_ASC");
   const upper = ceiling?.entryValue ?? ceiling?.currentValue ?? snap.overnight.high.price ?? null;
   const lower = floor?.entryValue ?? floor?.currentValue ?? snap.overnight.low.price ?? null;
   const anchor =
@@ -701,9 +705,9 @@ function buildSpxStructureChart(
       anchorPrice: line.entryValue ?? line.currentValue,
       slopePerHour: 0,
       tone:
-        line.kind === "SWING_HIGH_DESC"
+        line.kind === "PREV_RTH_HIGH_DESC" || line.kind === "SWING_HIGH_DESC"
           ? "upper"
-          : line.kind === "SWING_LOW_ASC"
+          : line.kind === "PREV_RTH_LOW_DESC" || line.kind === "SWING_LOW_ASC"
             ? "lower"
             : "reference",
     }))
@@ -731,8 +735,10 @@ function shortSpxLineLabel(kind: string): string {
   const m: Record<string, string> = {
     SWING_HIGH_DESC: "Swing H dn",
     SWING_LOW_ASC: "Swing L up",
-    PREV_RTH_HIGH_ASC: "Prev H",
-    PREV_RTH_LOW_DESC: "Prev L",
+    PREV_RTH_HIGH_ASC: "PRH-A",
+    PREV_RTH_HIGH_DESC: "PRH-D",
+    PREV_RTH_LOW_ASC: "PRL-A",
+    PREV_RTH_LOW_DESC: "PRL-D",
     SWING_HIGH_ASC: "Swing H up",
     SWING_LOW_DESC: "Swing L dn",
   };
@@ -1582,6 +1588,8 @@ function spxLineLabel(kind: string): string {
   const m: Record<string, string> = {
     SWING_HIGH_DESC: "Swing high descending",
     SWING_LOW_ASC: "Swing low ascending",
+    PREV_RTH_HIGH_DESC: "Prev RTH high - descending",
+    PREV_RTH_LOW_ASC: "Prev RTH low - ascending",
     PREV_RTH_HIGH_ASC: "Prev RTH high · ascending",
     PREV_RTH_LOW_DESC: "Prev RTH low · descending",
     SWING_HIGH_ASC: "Swing high ascending",
@@ -1594,6 +1602,8 @@ function spxLineHint(kind: string): string {
   const m: Record<string, string> = {
     SWING_HIGH_DESC: "Engine-generated descending ES reference line.",
     SWING_LOW_ASC: "Engine-generated ascending ES reference line.",
+    PREV_RTH_HIGH_DESC: "Major flow line projected down from yesterday's RTH swing-high close.",
+    PREV_RTH_LOW_ASC: "Yesterday's RTH swing-low close, projected upward.",
     PREV_RTH_HIGH_ASC: "Yesterday's RTH high, projected upward.",
     PREV_RTH_LOW_DESC: "Yesterday's RTH low, projected downward.",
     SWING_HIGH_ASC: "Engine-generated ascending ES reference line.",

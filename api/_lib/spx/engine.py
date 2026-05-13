@@ -94,7 +94,7 @@ def _project_all(lines: list[Line], at: datetime, price: float) -> list[Projecte
 
 
 # ---------------------------------------------------------------------------
-# Phase-1 hardening helpers — engine-state, flip condition, decision trace,
+# Phase-1 hardening helpers - engine-state, flip condition, decision trace,
 # invalidation, planned envelope, and score bands. These are pure derivations
 # from the existing scenario / confluence / projected-line surface so they
 # stay in sync without a parallel state machine.
@@ -141,30 +141,28 @@ def _engine_state_from(
 def _flip_condition_for(scenario: str, projected: list[ProjectedLine]) -> str:
     """One-sentence description of what would flip the current scenario."""
     by_kind = {p.kind: p.value for p in projected}
-    upper = by_kind.get("SWING_HIGH_DESC")
-    lower = by_kind.get("SWING_LOW_ASC")
     high_asc = by_kind.get("PREV_RTH_HIGH_ASC")
+    high_desc = by_kind.get("PREV_RTH_HIGH_DESC") or by_kind.get("SWING_HIGH_DESC")
     low_desc = by_kind.get("PREV_RTH_LOW_DESC")
 
     if scenario == "OUTSIDE_PLAY":
-        if high_asc is not None and low_desc is not None:
+        if high_desc is not None and low_desc is not None:
             return (
                 f"Re-entry into the planned envelope "
-                f"({low_desc:.2f}–{high_asc:.2f}) reactivates the play."
+                f"({low_desc:.2f}-{high_desc:.2f}) reactivates the play."
             )
         return "Re-entry into the planned envelope reactivates the play."
     if scenario.startswith("INSIDE_"):
-        if upper is not None and lower is not None:
+        if high_desc is not None:
             return (
-                f"Confirmed hourly rejection at {upper:.2f} or {lower:.2f} "
-                f"arms the next-candle ES entry."
+                f"Confirmed hourly close through the major previous-RTH high descending "
+                f"line at {high_desc:.2f} arms the next ES entry."
             )
     if scenario.startswith("ABOVE_") and high_asc is not None:
-        return f"Watch the previous RTH high ascending line at {high_asc:.2f} for sell entry or buy exit."
+        return f"Watch previous RTH high ascending at {high_asc:.2f}; the major high-descending line remains the decision reference."
     if scenario.startswith("BELOW_") and low_desc is not None:
-        return f"Watch the previous RTH low descending line at {low_desc:.2f} for buy entry or sell exit."
-    return "Six-line ES structure pending."
-
+        return f"Watch previous RTH low descending at {low_desc:.2f}; the major high-descending line remains the decision reference."
+    return "Previous-RTH swing-close ES framework pending."
 
 def _decision_trace(
     *, as_of_iso: str, scenario: str, scenario_text: str,
@@ -176,7 +174,7 @@ def _decision_trace(
     trace.append({"ts": as_of_iso, "event": f"Scenario {scenario.replace('_', ' ').lower()}", "weight": "key"})
     trace.append({
         "ts": as_of_iso,
-        "event": f"Confluence {confluence_score:.0f}/100 → {action.replace('_', ' ').lower()}",
+        "event": f"Confluence {confluence_score:.0f}/100 -> {action.replace('_', ' ').lower()}",
         "weight": "key" if action == "TAKE" else "info",
     })
     if scenario_text:
@@ -212,7 +210,7 @@ def _invalidation_for(
 
 
 def _planned_envelope_for(projected: list[ProjectedLine]) -> Optional[dict]:
-    """Envelope for outside-play visualization: prev-RTH low → prev-RTH high."""
+    """Envelope for outside-play visualization: prev-RTH low -> prev-RTH high."""
     by_kind = {p.kind: p.value for p in projected}
     low = by_kind.get("PREV_RTH_LOW_DESC")
     high = by_kind.get("PREV_RTH_HIGH_ASC")
@@ -241,77 +239,59 @@ def _rth_open_price(candles: list[Candle], session: date) -> Optional[float]:
 
 
 def _rth_bias_for(lines: list[Line], candles: list[Candle], session: date) -> Optional[dict]:
-    """RTH-open posture from the six-line ES framework."""
-    swing_high_asc = next((l for l in lines if l.kind == "SWING_HIGH_ASC"), None)
-    swing_high_desc = next((l for l in lines if l.kind == "SWING_HIGH_DESC"), None)
-    swing_low_asc = next((l for l in lines if l.kind == "SWING_LOW_ASC"), None)
-    swing_low_desc = next((l for l in lines if l.kind == "SWING_LOW_DESC"), None)
-    high_up = next((l for l in lines if l.kind == "PREV_RTH_HIGH_ASC"), None)
-    low_down = next((l for l in lines if l.kind == "PREV_RTH_LOW_DESC"), None)
-    if swing_high_asc is None or swing_high_desc is None or swing_low_asc is None or swing_low_desc is None:
+    """RTH-open posture from the previous-RTH high-descending major line."""
+    high_asc = next((l for l in lines if l.kind == "PREV_RTH_HIGH_ASC"), None)
+    high_desc = next((l for l in lines if l.kind == "PREV_RTH_HIGH_DESC"), None)
+    low_desc = next((l for l in lines if l.kind == "PREV_RTH_LOW_DESC"), None)
+    if high_desc is None:
         return None
 
     open_at = rth_window(session).start
     open_price = _rth_open_price(candles, session)
-    high_asc_val = project_line(swing_high_asc, open_at)
-    high_desc_val = project_line(swing_high_desc, open_at)
-    low_asc_val = project_line(swing_low_asc, open_at)
-    low_desc_val = project_line(swing_low_desc, open_at)
+    high_desc_val = project_line(high_desc, open_at)
 
     if open_price is None:
         return {
             "direction": "PENDING",
             "openPrice": None,
-            "referenceLine": "SWING_HIGH_DESC",
+            "referenceLine": "PREV_RTH_HIGH_DESC",
             "referenceValue": round(high_desc_val, 2),
             "continuationLine": "PREV_RTH_HIGH_ASC",
-            "continuationValue": round(project_line(high_up, open_at), 2) if high_up else None,
+            "continuationValue": round(project_line(high_asc, open_at), 2) if high_asc else None,
             "note": (
-                "RTH posture pending: compare the opening print to the "
-                "swing high and swing low line pairs."
+                "RTH posture pending: compare the opening print to the major "
+                "previous-RTH high descending line."
             ),
         }
 
-    if open_price > high_asc_val and open_price > high_desc_val:
-        cont = project_line(high_up, open_at) if high_up else None
-        return {
-            "direction": "BULLISH",
-            "openPrice": round(open_price, 2),
-            "referenceLine": "SWING_HIGH_DESC",
-            "referenceValue": round(high_desc_val, 2),
-            "continuationLine": "PREV_RTH_HIGH_ASC",
-            "continuationValue": round(cont, 2) if cont is not None else None,
-            "note": (
-                "RTH opened above both swing-high lines; upside posture stays "
-                "active until a qualified hourly rejection says otherwise."
-            ),
-        }
-
-    if open_price < low_asc_val and open_price < low_desc_val:
-        cont = project_line(low_down, open_at) if low_down else None
+    if open_price > high_desc_val:
+        cont = project_line(high_asc, open_at) if high_asc else None
         return {
             "direction": "BEARISH",
             "openPrice": round(open_price, 2),
-            "referenceLine": "SWING_LOW_ASC",
-            "referenceValue": round(low_asc_val, 2),
-            "continuationLine": "PREV_RTH_LOW_DESC",
+            "referenceLine": "PREV_RTH_HIGH_DESC",
+            "referenceValue": round(high_desc_val, 2),
+            "continuationLine": "PREV_RTH_HIGH_ASC",
             "continuationValue": round(cont, 2) if cont is not None else None,
             "note": (
-                "RTH opened below both swing-low lines; downside posture stays "
-                "active until a qualified hourly rejection says otherwise."
+                "RTH opened above the major previous-RTH high descending line; "
+                "watch for a push toward the high ascending line, then a return "
+                "to the major line for the buy/sell decision."
             ),
         }
 
+    cont = project_line(low_desc, open_at) if low_desc else None
     return {
-        "direction": "PENDING",
+        "direction": "BULLISH",
         "openPrice": round(open_price, 2),
-        "referenceLine": "SWING_HIGH_DESC",
+        "referenceLine": "PREV_RTH_HIGH_DESC",
         "referenceValue": round(high_desc_val, 2),
-        "continuationLine": None,
-        "continuationValue": None,
+        "continuationLine": "PREV_RTH_LOW_DESC",
+        "continuationValue": round(cont, 2) if cont is not None else None,
         "note": (
-            "RTH opened inside the swing-line framework; wait for an hourly "
-            "close rejection at one of the six ES lines."
+            "RTH opened below the major previous-RTH high descending line; "
+            "watch for a push toward that line, or a drop first toward the "
+            "previous-RTH low descending buy/sell-exit reference."
         ),
     }
 
@@ -380,14 +360,13 @@ def compute_snapshot(
     sydney = sydney_range(spx_candles, session)
     tokyo = tokyo_range(spx_candles, session)
 
-    # 3. Direction — must come before overnight anchor extraction since
-    # the anchor rule depends on direction (close vs wick).
+    # 3. Canonical ES framework. Sydney/Tokyo ranges are diagnostics only.
     channel = Channel(
         direction="ASCENDING",
         reason=(
-            "Six-line ES framework active: previous RTH high ascending, "
-            "previous RTH low descending, and ascending/descending lines "
-            "from the overnight swing-high and swing-low closes before 02:00 CT."
+            "Previous-RTH swing-close framework active: ascending and "
+            "descending lines are projected from the prior RTH swing-high "
+            "close and swing-low close. The high-descending line is the major flow reference."
         ),
     )
 
@@ -427,8 +406,8 @@ def compute_snapshot(
     )
 
     # 9. Re-entry watch.
-    ceiling_line = next((l for l in lines if l.kind == "SWING_HIGH_DESC"), None)
-    floor_line = next((l for l in lines if l.kind == "SWING_LOW_ASC"), None)
+    ceiling_line = next((l for l in lines if l.kind == "PREV_RTH_HIGH_DESC"), None)
+    floor_line = next((l for l in lines if l.kind == "PREV_RTH_LOW_DESC"), None)
     reentry = evaluate_reentry(
         scenario,
         _last_candle_at(spx_candles, as_of_ct),
@@ -582,12 +561,14 @@ def _line_model(l: Line, projected: list[ProjectedLine], price: float, session: 
     """Convert internal Line + projection into the schema's SPXLine."""
     from .schema import SPXLine
     name_map = {
-        "PREV_RTH_HIGH_ASC": "Prev RTH High · Ascending",
-        "PREV_RTH_LOW_DESC": "Prev RTH Low · Descending",
-        "SWING_HIGH_ASC": "Overnight Swing High · Ascending",
-        "SWING_HIGH_DESC": "Overnight Swing High · Descending",
-        "SWING_LOW_ASC": "Overnight Swing Low · Ascending",
-        "SWING_LOW_DESC": "Overnight Swing Low · Descending",
+        "PREV_RTH_HIGH_ASC": "Prev RTH High - Ascending",
+        "PREV_RTH_HIGH_DESC": "Prev RTH High - Descending",
+        "PREV_RTH_LOW_ASC": "Prev RTH Low - Ascending",
+        "PREV_RTH_LOW_DESC": "Prev RTH Low - Descending",
+        "SWING_HIGH_ASC": "Overnight Swing High - Ascending",
+        "SWING_HIGH_DESC": "Overnight Swing High - Descending",
+        "SWING_LOW_ASC": "Overnight Swing Low - Ascending",
+        "SWING_LOW_DESC": "Overnight Swing Low - Descending",
     }
     cur = next(p.value for p in projected if p.kind == l.kind)
     entry_reference = at_ct(session, time(8, 0))

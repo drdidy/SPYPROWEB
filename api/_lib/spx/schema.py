@@ -5,7 +5,7 @@ Pydantic mirror of the TypeScript ``SPXSnapshot`` contract in
 return this shape; the Next.js shell consumes it directly.
 
 The contract is symbol-agnostic about *where the engine lives* — once the
-SPX core (overnight channel determination, six-line projection, scenario
+SPX core (previous-RTH swing-close projection, scenario
 classifier, confluence) is integrated under ``api/``, an adapter populates
 ``SPXSnapshot`` and the surface starts rendering live.
 """
@@ -30,6 +30,8 @@ SPXScenario = Literal[
 ]
 SPXLineKind = Literal[
     "PREV_RTH_HIGH_ASC",
+    "PREV_RTH_HIGH_DESC",
+    "PREV_RTH_LOW_ASC",
     "PREV_RTH_LOW_DESC",
     "SWING_HIGH_ASC",
     "SWING_HIGH_DESC",

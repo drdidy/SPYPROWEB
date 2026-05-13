@@ -367,7 +367,7 @@ export function SPXChannelClient({ replayDate }: Props) {
         </div>
         <div className="hidden md:flex items-center gap-6 text-right">
           <Stat label="Last" value={snap.price.last.toFixed(2)} />
-          <Stat label="Framework" value="SIX LINE" highlight={snap.scenario} />
+          <Stat label="Framework" value="RTH PIVOTS" highlight={snap.scenario} />
           <Stat label="Scenario" value={snap.scenario.replace(/_/g, " ")} />
           {/* v9: Slope stat removed - proprietary engine parameter. */}
         </div>
@@ -436,8 +436,8 @@ export function SPXChannelClient({ replayDate }: Props) {
 // ---------------------------------------------------------------------
 
 function heroSynthesis(snap: SPXSnapshot): string {
-  if (snap.lines.length < 6) {
-    return "ES framework is resolving. The engine is standing down until enough overnight structure is available.";
+  if (snap.lines.length < 4) {
+    return "ES framework is resolving. The engine is standing down until previous RTH swing-close pivots are available.";
   }
   const action = snap.confluence.action.replace(/_/g, " ").toLowerCase();
   const nearest = snap.lines
@@ -446,7 +446,7 @@ function heroSynthesis(snap: SPXSnapshot): string {
   const distance = nearest
     ? ` Nearest structure is ${Math.abs(nearest.distanceFromPrice).toFixed(2)} pts away.`
     : "";
-  return `ES framework is mapped with a ${action} read.${distance} Waiting for qualified confirmation before the next state change.`;
+  return `ES structure is mapped with a ${action} read.${distance} Waiting for qualified confirmation at the active line.`;
 }
 
 function reentryCondition(snap: SPXSnapshot): string {
@@ -454,7 +454,7 @@ function reentryCondition(snap: SPXSnapshot): string {
   if (snap.plannedEnvelope) {
     return `Qualified confirmation inside ${snap.plannedEnvelope.low.toFixed(2)}-${snap.plannedEnvelope.high.toFixed(2)} reactivates the play.`;
   }
-  return "Framework resolves after the required overnight structure is available.";
+  return "Framework resolves after previous RTH swing-close pivots are available.";
 }
 
 function formatHM(iso: string): string {

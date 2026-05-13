@@ -9,7 +9,7 @@ Per current ES rules:
     A bullish candle rises to a watched line and CLOSES BELOW it.
 
 The watch state lives between hourly bars: inside means dormant; outside the
-six-line framework arms and waits for the touch-and-close pattern.
+previous-RTH swing-close framework arms and waits for the touch-and-close pattern.
 """
 from __future__ import annotations
 
@@ -49,7 +49,7 @@ def evaluate_reentry(
         return ReentryWatch(
             active=False,
             side=None,
-            detail="Inside the six-line ES framework - rejection watch dormant.",
+            detail="Inside the previous-RTH swing-close ES framework - rejection watch dormant.",
         )
 
     if scenario == "OUTSIDE_PLAY":

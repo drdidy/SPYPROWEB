@@ -165,6 +165,8 @@ export type SPXScenario =
 
 export type SPXLineKind =
   | "PREV_RTH_HIGH_ASC"
+  | "PREV_RTH_HIGH_DESC"
+  | "PREV_RTH_LOW_ASC"
   | "PREV_RTH_LOW_DESC"
   | "SWING_HIGH_ASC"
   | "SWING_HIGH_DESC"

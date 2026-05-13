@@ -16,7 +16,7 @@ export function SPXSessionOrigin({ snap }: { snap: SPXSnapshot }) {
       <CardHeader
         eyebrow="Origin"
         title="Why today's framework"
-        meta="Overnight swing closes before 02:00 CT - previous RTH references"
+        meta="Previous RTH swing-high close and swing-low close"
       />
       <CardBody className="px-0 pb-0">
         <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-rule">
@@ -62,7 +62,10 @@ export function SPXSessionOrigin({ snap }: { snap: SPXSnapshot }) {
           />
           <div className="p-5">
             <div className="flex items-center justify-between mb-3">
-              <span className="eyebrow text-ink-3">Framework</span>\n              <StatusPill variant={snap.lines.length >= 6 ? "confirmed" : "stale"}>\n                {snap.lines.length >= 6 ? "SIX LINE" : "RESOLVING"}\n              </StatusPill>
+              <span className="eyebrow text-ink-3">Framework</span>
+              <StatusPill variant={snap.lines.length >= 4 ? "confirmed" : "stale"}>
+                {snap.lines.length >= 4 ? "FOUR LINE" : "RESOLVING"}
+              </StatusPill>
             </div>
             <div className="text-[13px] text-ink-2 leading-relaxed">
               {determinationText(snap)}
@@ -211,9 +214,9 @@ function formatClock(time: string): string {
 }
 
 function determinationText(snap: SPXSnapshot): string {
-  if (snap.lines.length >= 6) {
+  if (snap.lines.length >= 4) {
     return snap.channel.reason;
   }
-  return "The ES framework resolves after the required overnight and prior-session references are available.";
+  return "The ES framework resolves after the previous RTH swing-close pivots are available.";
 }
 

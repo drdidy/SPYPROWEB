@@ -15,6 +15,8 @@ import { ArrowDown, ArrowUp } from "lucide-react";
 
 const lineLabel: Record<SPXLineKind, string> = {
   PREV_RTH_HIGH_ASC: "Prev RTH High - Asc",
+  PREV_RTH_HIGH_DESC: "Prev RTH High - Desc",
+  PREV_RTH_LOW_ASC: "Prev RTH Low - Asc",
   PREV_RTH_LOW_DESC: "Prev RTH Low - Desc",
   SWING_HIGH_ASC: "Swing High - Asc",
   SWING_HIGH_DESC: "Swing High - Desc",

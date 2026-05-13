@@ -181,9 +181,9 @@ function buildSpxHeroChart(
       anchorPrice: line.anchorPrice,
       slopePerHour: line.slopePerHour,
       tone:
-        line.kind === "SWING_HIGH_DESC"
+        line.kind === "PREV_RTH_HIGH_DESC" || line.kind === "SWING_HIGH_DESC"
           ? "upper"
-          : line.kind === "SWING_LOW_ASC"
+          : line.kind === "PREV_RTH_LOW_DESC" || line.kind === "SWING_LOW_ASC"
             ? "lower"
             : "reference",
     }))
@@ -216,8 +216,10 @@ function shortSpxLineLabel(kind: string): string {
   const labels: Record<string, string> = {
     SWING_HIGH_DESC: "Swing H dn",
     SWING_LOW_ASC: "Swing L up",
-    PREV_RTH_HIGH_ASC: "Prev H",
-    PREV_RTH_LOW_DESC: "Prev L",
+    PREV_RTH_HIGH_ASC: "PRH-A",
+    PREV_RTH_HIGH_DESC: "PRH-D",
+    PREV_RTH_LOW_ASC: "PRL-A",
+    PREV_RTH_LOW_DESC: "PRL-D",
     SWING_HIGH_ASC: "Swing H up",
     SWING_LOW_DESC: "Swing L dn",
   };
