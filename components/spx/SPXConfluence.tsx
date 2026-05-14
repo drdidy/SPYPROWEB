@@ -49,7 +49,7 @@ export function SPXConfluence({
               Confluence not scored yet.
             </div>
             <p className="mt-2 text-[13px] leading-relaxed text-ink-3">
-              The channel needs usable session, London, or RTH reaction data
+              The fan read needs usable session, London, or RTH reaction data
               before this panel can add evidence.
             </p>
           </div>

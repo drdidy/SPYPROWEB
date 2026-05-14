@@ -161,7 +161,7 @@ export function SPXChannelClient({ replayDate }: Props) {
             <div>
               <div className="flex flex-wrap items-center gap-3">
                 <span className="font-mono text-[10px] text-gold-soft/82 tracking-[0.20em] uppercase">
-                  ES - Channel - resolving
+                  ES - Pivot Fan - resolving
                 </span>
                 <span className="h-px w-10 bg-gold/45" />
                 <span className="font-mono text-[10px] text-paper/48 tracking-[0.20em] uppercase">
@@ -215,7 +215,7 @@ export function SPXChannelClient({ replayDate }: Props) {
           className="rounded-card border border-rule bg-paper-2/50 px-5 py-6 md:px-6 md:py-8"
         >
           <p className="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-3 mb-2">
-            ES - Channel
+            ES - Pivot Fan
           </p>
           <h1 className="font-serif text-h2 text-ink tracking-tight">
             Structure map forms after the configuration window
@@ -289,7 +289,7 @@ export function SPXChannelClient({ replayDate }: Props) {
         <div>
           <div className="flex items-center gap-3">
             <span className="font-mono text-[10px] text-gold-soft/82 tracking-[0.20em] uppercase">
-              ES - Channel - session {snap.sessionDateCT}
+              ES - Pivot Fan - session {snap.sessionDateCT}
             </span>
             <span className="h-px w-10 bg-gold/45" />
             <span className="font-mono text-[10px] text-paper/48 tracking-[0.20em] uppercase">
@@ -297,8 +297,8 @@ export function SPXChannelClient({ replayDate }: Props) {
             </span>
           </div>
           <h1 className="mt-3 text-[36px] font-serif leading-none tracking-tight text-paper md:text-[46px]">
-            ES structure{" "}
-            <span className="text-gold-soft/72 italic font-light">map.</span>
+            ES Pivot Fan{" "}
+            <span className="text-gold-soft/72 italic font-light">read.</span>
           </h1>
           <p className="mt-4 max-w-3xl text-[15px] leading-relaxed text-paper/72">
             {heroSynthesis(snap)}
@@ -367,8 +367,8 @@ export function SPXChannelClient({ replayDate }: Props) {
         </div>
         <div className="hidden md:flex items-center gap-6 text-right">
           <Stat label="Last" value={snap.price.last.toFixed(2)} />
-          <Stat label="Framework" value="RTH PIVOTS" highlight={snap.scenario} />
-          <Stat label="Scenario" value={snap.scenario.replace(/_/g, " ")} />
+          <Stat label="Fan zone" value={snap.fanRead?.label ?? "Resolving"} highlight={snap.scenario} />
+          <Stat label="Read" value={snap.scenario.replace(/_/g, " ")} />
           {/* v9: Slope stat removed - proprietary engine parameter. */}
         </div>
         </div>
@@ -424,7 +424,7 @@ export function SPXChannelClient({ replayDate }: Props) {
           <span>Build 0.9.7</span>
           <Link href="/contact" className="hover:text-ink">Report an issue</Link>
         </span>
-        <span className="hidden">Prophet - ES channel</span>
+        <span className="hidden">Prophet - ES Pivot Fan</span>
         <span className="hidden">Session surface</span>
       </footer>
     </div>
@@ -437,7 +437,7 @@ export function SPXChannelClient({ replayDate }: Props) {
 
 function heroSynthesis(snap: SPXSnapshot): string {
   if (snap.lines.length < 4) {
-    return "ES framework is resolving. The engine is standing down until the previous RTH high close and post-noon low wick are available.";
+    return "ES Pivot Fan is resolving. The engine is standing down until the previous RTH high close and post-noon low wick are available.";
   }
   const action = snap.confluence.action.replace(/_/g, " ").toLowerCase();
   const nearest = snap.lines
@@ -446,7 +446,7 @@ function heroSynthesis(snap: SPXSnapshot): string {
   const distance = nearest
     ? ` Nearest structure is ${Math.abs(nearest.distanceFromPrice).toFixed(2)} pts away.`
     : "";
-  return `ES structure is mapped with a ${action} read.${distance} Waiting for qualified confirmation at the active line.`;
+  return `ES Pivot Fan is mapped with a ${action} read.${distance} Waiting for qualified confirmation at the active fan reference.`;
 }
 
 function reentryCondition(snap: SPXSnapshot): string {
@@ -454,7 +454,7 @@ function reentryCondition(snap: SPXSnapshot): string {
   if (snap.plannedEnvelope) {
     return `Qualified confirmation inside ${snap.plannedEnvelope.low.toFixed(2)}-${snap.plannedEnvelope.high.toFixed(2)} reactivates the play.`;
   }
-  return "Framework resolves after the previous RTH high close and post-noon low wick are available.";
+  return "Pivot Fan resolves after the previous RTH high close and post-noon low wick are available.";
 }
 
 function formatHM(iso: string): string {
@@ -573,7 +573,7 @@ function ReplayBanner({ date }: { date: string }) {
         </span>
         <span aria-hidden className="h-3 w-px bg-gold/40" />
         <span className="text-ink-2 font-medium">
-          Showing the historical ES framework for{" "}
+          Showing the historical ES Pivot Fan for{" "}
           <span className="font-mono tabular-nums text-ink">{date}</span>
         </span>
       </div>

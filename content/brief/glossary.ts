@@ -59,9 +59,9 @@ export const briefGlossary: Record<string, BriefGlossaryTerm> = {
     term: "Day open",
     definition: "The regular-session opening price for the current trading day.",
   },
-  "SIX-LINE FRAMEWORK": {
-    term: "Six-line framework",
-    definition: "The ES structure set built from previous RTH references and overnight swing closes.",
+  "PIVOT FAN": {
+    term: "Pivot Fan",
+    definition: "The ES reference model built from the prior RTH high close and the post-noon RTH low wick.",
   },
   "SWING HIGH ASC/DESC": {
     term: "Swing high asc/desc",

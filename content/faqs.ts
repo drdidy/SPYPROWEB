@@ -25,7 +25,7 @@ export const FAQS = [
   },
   {
     q: "What's included today?",
-    a: "Today's decision, the ES channel, the levels in play, the structure read, the day's foresight, the options cockpit, the signal log, and a daily brief.",
+    a: "Today's decision, the ES Pivot Fan, the levels in play, the structure read, the day's foresight, the options cockpit, the signal log, and a daily brief.",
   },
   {
     q: "Is it advice?",

@@ -141,9 +141,9 @@ def _build_spx_replay_block(payload: dict, replay_date: date | None) -> dict:
     reading verdictOutcome (WIN/LOSS/PUSH/N_A). Without scoring it
     always reads N_A and the dashboard renders "no graded sessions".
 
-    Grading rule for SPX/ES (v10 — six-line 09:00 framework):
+    Grading rule for SPX/ES (v11 - Pivot Fan 09:00-11:00 framework):
       - Every ES structure line is projected to its 08:00 CT operating
-        point. Replay grading evaluates the real line set, not
+        point. Replay grading evaluates the real Pivot Fan line set, not
         the old primary/alternate play proxy.
       - Only the 09:00, 10:00, and 11:00 CT hourly candles are eligible.
       - BUY trigger: price is above the line, drops into it on a
@@ -155,7 +155,7 @@ def _build_spx_replay_block(payload: dict, replay_date: date | None) -> dict:
         honest grade — do not mark a loss just because price touched.
 
     The previous rule used `plays.primary` / `plays.alternate` only.
-    That dropped valid touches from the six-line framework, especially
+    That dropped valid touches from the Pivot Fan framework, especially
     the previous-RTH continuation references. The replay score must
     grade what the framework actually offered through the 09:00-11:00
     institutional window.

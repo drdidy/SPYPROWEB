@@ -7,22 +7,22 @@ import { ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
 import { useState, type KeyboardEvent, type PointerEvent } from "react";
 
 const scenarioLabel: Record<SPXScenario, string> = {
-  ABOVE_ASCENDING: "Above active structure",
-  INSIDE_ASCENDING: "Inside the framework",
+  ABOVE_ASCENDING: "Above both fan ceilings",
+  INSIDE_ASCENDING: "Between fan ceilings",
   BELOW_ASCENDING: "Below active structure",
-  ABOVE_DESCENDING: "Above active structure",
-  INSIDE_DESCENDING: "Inside the framework",
-  BELOW_DESCENDING: "Below active structure",
+  ABOVE_DESCENDING: "Below both ceilings",
+  INSIDE_DESCENDING: "Between fan references",
+  BELOW_DESCENDING: "Below High Fan Floor",
   OUTSIDE_PLAY: "Outside the planned play",
 };
 
 const scenarioShort: Record<SPXScenario, string> = {
-  ABOVE_ASCENDING: "ABOVE STRUCTURE",
-  INSIDE_ASCENDING: "INSIDE FRAMEWORK",
+  ABOVE_ASCENDING: "ABOVE CEILINGS",
+  INSIDE_ASCENDING: "BETWEEN CEILINGS",
   BELOW_ASCENDING: "BELOW STRUCTURE",
-  ABOVE_DESCENDING: "ABOVE STRUCTURE",
-  INSIDE_DESCENDING: "INSIDE FRAMEWORK",
-  BELOW_DESCENDING: "BELOW STRUCTURE",
+  ABOVE_DESCENDING: "BELOW CEILINGS",
+  INSIDE_DESCENDING: "FAN RANGE",
+  BELOW_DESCENDING: "BELOW HIGH FLOOR",
   OUTSIDE_PLAY: "OUTSIDE",
 };
 
@@ -89,7 +89,7 @@ export function SPXChannelHero({
         <div className="col-span-12 lg:col-span-5 p-5 sm:p-7 lg:pr-6 lg:pl-8 relative">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="eyebrow text-ink-3">ES - Structure Slate</span>
+              <span className="eyebrow text-ink-3">ES - Pivot Fan</span>
               {/* v9: slope value hidden - proprietary engine
                   parameter, not for surface display. */}
               <span className="text-[10px] text-ink-4 font-mono">
@@ -156,11 +156,11 @@ export function SPXChannelHero({
             </div>
           </div>
 
-          {/* Single combined paragraph - scenario explanation followed by the
-              framework context as a leader sentence. The previous
+          {/* Single combined paragraph - fan explanation followed by the
+              pivot context as a leader sentence. The previous
               version stacked two italic blocks which read as sentimental. */}
           <p className="mt-7 text-[15px] text-ink-2 leading-relaxed max-w-xl">
-            {snap.scenarioExplanation}
+            {snap.fanRead?.summary ?? snap.scenarioExplanation}
             <span className="text-ink-3 ml-1.5">{snap.channel.reason}</span>
           </p>
           {snap.rthBias && (
@@ -180,9 +180,9 @@ export function SPXChannelHero({
         <div className="col-span-12 lg:col-span-7 p-5 sm:p-7 lg:pl-7 bg-paper-2/40 relative">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <span className="eyebrow text-ink-3">Framework</span>
+              <span className="eyebrow text-ink-3">Fan read</span>
               <div className="mt-1.5 text-title font-serif text-ink">
-                {snap.channel.direction === "NONE" ? "Resolving" : "Mapped"}
+                {snap.fanRead?.label ?? (snap.channel.direction === "NONE" ? "Resolving" : "Mapped")}
               </div>
             </div>
             <div className="text-right">
@@ -227,7 +227,7 @@ export function SPXChannelHero({
             />
           </div>
 
-          <ChannelDiagram snap={snap} bars={bars ?? null} />
+          <FanDiagram snap={snap} bars={bars ?? null} />
 
           <div className="mt-3 grid grid-cols-2 gap-3 text-[11px]">
             <Anchor
@@ -343,7 +343,7 @@ function Anchor({
 
 // ---------- Diagram ----------
 
-function ChannelDiagram({
+function FanDiagram({
   snap,
   bars,
 }: {
@@ -505,7 +505,7 @@ function ChannelDiagram({
       className="w-full spx-diagram"
       tabIndex={0}
       role="img"
-      aria-label="ES framework chart with interactive price crosshair"
+      aria-label="ES Pivot Fan chart with interactive price crosshair"
       onPointerMove={(event) => {
         setActiveIndex(nearestEsBarIndexFromPointer(event, cleanBars, W, PAD_L, W - PAD_R, xOf));
       }}
@@ -577,7 +577,7 @@ function ChannelDiagram({
         </>
       )}
 
-      {/* framework fill */}
+      {/* fan fill */}
       {snap.channel.direction === "NONE" && (
         <g className="spx-ghost-channel">
           <path
@@ -604,13 +604,13 @@ function ChannelDiagram({
             fill="#5A5A5A"
             letterSpacing="0.08em"
           >
-            FRAMEWORK AWAITS RTH PIVOTS
+            PIVOT FAN AWAITS RTH PIVOTS
           </text>
         </g>
       )}
       {bandPath && <path d={bandPath} fill={railFill} className="spx-band" />}
 
-      {/* ES framework lines with exact projected values */}
+      {/* ES Pivot Fan lines with exact projected values */}
       {snap.lines.map((line, index) => {
         const start = new Date(line.anchorTime).getTime();
         const endValue = projectAt(line.anchorPrice, line.anchorTime, line.slopePerHour, tEnd);
@@ -930,10 +930,10 @@ function distributeEsChartLabels(
 
 function lineCode(kind: string): string {
   const labels: Record<string, string> = {
-    PREV_RTH_HIGH_ASC: "PRH-A",
-    PREV_RTH_HIGH_DESC: "PRH-D",
-    PREV_RTH_LOW_ASC: "PRL-A",
-    PREV_RTH_LOW_DESC: "PRL-D",
+    PREV_RTH_HIGH_ASC: "HF-C",
+    PREV_RTH_HIGH_DESC: "HF-F",
+    PREV_RTH_LOW_ASC: "LF-C",
+    PREV_RTH_LOW_DESC: "LF-F",
     SWING_HIGH_ASC: "SH-A",
     SWING_HIGH_DESC: "SH-D",
     SWING_LOW_ASC: "SL-A",

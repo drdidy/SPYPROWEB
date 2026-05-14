@@ -527,13 +527,13 @@ function spyExplanation(state: EngineState, snap: AdaptedSnapshot): string {
 
 function spxExplanation(state: EngineState, snap: SPXSnapshot): string {
   if (state === "PRE_CONFIG") {
-    return "Channel forms during the 17:00–02:00 CT overnight window. No envelope yet.";
+    return "Pivot Fan resolves once the prior RTH high close and post-noon low wick are available.";
   }
   if (state === "STAND_DOWN") {
-    return "Channel is plotted, but price isn't sitting where a setup can qualify.";
+    return "Pivot Fan is plotted, but price is not sitting where a setup can qualify.";
   }
   if (state === "WATCH") {
-    return "Price is approaching active structure. Keep the channel open.";
+    return "Price is approaching a fan reference. Keep the ES read open.";
   }
   if (state === "WAIT") {
     return "Structure is active. Waiting for qualified confirmation.";
@@ -542,12 +542,12 @@ function spxExplanation(state: EngineState, snap: SPXSnapshot): string {
     return "Qualified confirmation is in. The setup is armed.";
   }
   if (state === "GO") {
-    return "Trigger fired. The channel trade is live.";
+    return "Trigger fired. The fan trade is live.";
   }
   if (state === "COOLDOWN") {
     return "Trade has resolved. No new signals until the next overnight window.";
   }
-  return snap.scenarioExplanation || snap.channel.reason || "";
+  return snap.fanRead?.summary || snap.scenarioExplanation || snap.channel.reason || "";
 }
 
 function spyStructureLevels(snap: AdaptedSnapshot): StructureLevels {
@@ -735,10 +735,10 @@ function shortSpxLineLabel(kind: string): string {
   const m: Record<string, string> = {
     SWING_HIGH_DESC: "Swing H dn",
     SWING_LOW_ASC: "Swing L up",
-    PREV_RTH_HIGH_ASC: "PRH-A",
-    PREV_RTH_HIGH_DESC: "PRH-D",
-    PREV_RTH_LOW_ASC: "PRL-A",
-    PREV_RTH_LOW_DESC: "PRL-D",
+    PREV_RTH_HIGH_ASC: "HF-C",
+    PREV_RTH_HIGH_DESC: "HF-F",
+    PREV_RTH_LOW_ASC: "LF-C",
+    PREV_RTH_LOW_DESC: "LF-F",
     SWING_HIGH_ASC: "Swing H up",
     SWING_LOW_DESC: "Swing L dn",
   };
@@ -1071,11 +1071,12 @@ function SpxVerdictCard({
     >
       <p className="sr-only">{SLATE_COPY.spxSubtitle}</p>
       <p className="text-body text-ink-2 leading-relaxed">
-        {snap.scenarioExplanation ||
+        {snap.fanRead?.summary ||
+          snap.scenarioExplanation ||
           snap.channel.reason ||
           (isPreConfig
-            ? "Channel and confluence populate when the overnight window opens."
-            : "Channel is initializing.")}
+            ? "Pivot Fan and confluence populate when ES pivots are available."
+            : "Pivot Fan is initializing.")}
       </p>
       <div className="grid grid-cols-3 gap-3 pt-3 border-t border-rule">
         <MetricSlot
@@ -1094,12 +1095,12 @@ function SpxVerdictCard({
           )}
         </MetricSlot>
         <MetricSlot
-          label="Channel"
+          label="Fan zone"
           hint={SLATE_COPY.metric.channel}
           example={SLATE_COPY.metricExample.channel}
           helperWhenEmpty={SLATE_COPY.metricEmptyHelper.channel}
         >
-          {!isPreConfig && <ChannelValue direction={snap.channel.direction} />}
+          {!isPreConfig && <FanZoneValue snap={snap} />}
         </MetricSlot>
         <MetricSlot
           label="Grade"
@@ -1206,15 +1207,15 @@ function SpxReadCard({ snap }: { snap: SPXSnapshot }) {
 
 // ---- shared bits ----
 
-function ChannelValue({ direction }: { direction: string }) {
-  if (direction === "NONE" || !direction) {
+function FanZoneValue({ snap }: { snap: SPXSnapshot }) {
+  if (!snap.fanRead || snap.fanRead.zone === "PENDING") {
     return (
       <InfoTooltip
-        label="Channel"
-        content="The channel forms after the first qualifying overnight pivot."
+        label="Pivot Fan"
+        content="The ES Pivot Fan resolves from the prior RTH high close and post-noon low wick."
       >
         <span className="text-meta text-state-neutral italic cursor-help">
-          not yet formed
+          resolving
         </span>
       </InfoTooltip>
     );
@@ -1224,7 +1225,7 @@ function ChannelValue({ direction }: { direction: string }) {
       className="font-mono text-meta font-semibold text-ink tabular-nums"
       data-num
     >
-      {direction.toLowerCase()}
+      {snap.fanRead.label.toLowerCase()}
     </span>
   );
 }
@@ -1520,12 +1521,12 @@ function spyHeadline(state: EngineState, verdict: string): string {
 }
 
 function spxHeadline(state: EngineState, action: string): string {
-  if (action === "TAKE") return "Take the channel";
+  if (action === "TAKE") return "Take the fan read";
   if (action === "SELECTIVE") return "Trading selectively";
   if (state === "GO") return "Trade allowed";
   if (state === "ARMED") return "Armed for entry";
   if (state === "STAND_DOWN" || action === "STAND_DOWN") return "Standing down";
-  return "Watching the channel";
+  return "Watching the fan read";
 }
 
 function formatSlateDate(d: Date): string {
@@ -1588,10 +1589,10 @@ function spxLineLabel(kind: string): string {
   const m: Record<string, string> = {
     SWING_HIGH_DESC: "Swing high descending",
     SWING_LOW_ASC: "Swing low ascending",
-    PREV_RTH_HIGH_DESC: "Prev RTH high - descending",
-    PREV_RTH_LOW_ASC: "Prev RTH low - ascending",
-    PREV_RTH_HIGH_ASC: "Prev RTH high · ascending",
-    PREV_RTH_LOW_DESC: "Prev RTH low · descending",
+    PREV_RTH_HIGH_DESC: "High Fan Floor",
+    PREV_RTH_LOW_ASC: "Low Fan Ceiling",
+    PREV_RTH_HIGH_ASC: "High Fan Ceiling",
+    PREV_RTH_LOW_DESC: "Low Fan Floor",
     SWING_HIGH_ASC: "Swing high ascending",
     SWING_LOW_DESC: "Swing low descending",
   };
@@ -1602,10 +1603,10 @@ function spxLineHint(kind: string): string {
   const m: Record<string, string> = {
     SWING_HIGH_DESC: "Engine-generated descending ES reference line.",
     SWING_LOW_ASC: "Engine-generated ascending ES reference line.",
-    PREV_RTH_HIGH_DESC: "Major flow line projected down from yesterday's RTH swing-high close.",
-    PREV_RTH_LOW_ASC: "Yesterday's post-noon RTH low wick, projected upward.",
-    PREV_RTH_HIGH_ASC: "Yesterday's RTH high, projected upward.",
-    PREV_RTH_LOW_DESC: "Yesterday's post-noon RTH low wick, projected downward.",
+    PREV_RTH_HIGH_DESC: "High Pivot Fan floor projected down from yesterday's RTH high close.",
+    PREV_RTH_LOW_ASC: "Low Pivot Fan ceiling projected up from yesterday's post-noon RTH low wick.",
+    PREV_RTH_HIGH_ASC: "High Pivot Fan ceiling projected up from yesterday's RTH high close.",
+    PREV_RTH_LOW_DESC: "Low Pivot Fan floor projected down from yesterday's post-noon RTH low wick.",
     SWING_HIGH_ASC: "Engine-generated ascending ES reference line.",
     SWING_LOW_DESC: "Engine-generated descending ES reference line.",
   };

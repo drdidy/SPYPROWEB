@@ -3,7 +3,7 @@ import type { SPXSnapshot } from "./types";
 // ---------------------------------------------------------------------------
 // SPX mock snapshot - demo scenario: INSIDE_DESCENDING.
 // Numbers are mathematically self-consistent against the ES previous-RTH
-// previous-RTH pivot framework
+// ES Pivot Fan framework
 // so surfaces render the same line vocabulary in dev and production.
 //
 // Session date (CT): 2026-05-08
@@ -47,92 +47,101 @@ export const spxSnapshot: SPXSnapshot = {
   channel: {
     direction: "ASCENDING",
     reason:
-      "Previous-RTH pivot framework active with four projected references.",
+      "ES Pivot Fan active with High Fan and Low Fan references.",
+  },
+
+  fanRead: {
+    zone: "BETWEEN_CEILINGS",
+    label: "Between fan ceilings",
+    summary:
+      "Price is between High Fan Ceiling and Low Fan Ceiling; sell rejection at the high fan can rotate toward High Fan Floor, while a low-fan reclaim can press through High Fan Ceiling.",
+    primaryReference: "PREV_RTH_HIGH_ASC",
+    secondaryReference: "PREV_RTH_LOW_ASC",
   },
 
   // Four projected lines from previous RTH high-close / post-noon-low pivots.
   lines: [
     {
       kind: "PREV_RTH_HIGH_ASC",
-      name: "Prev RTH High - Ascending",
+      name: "High Fan Ceiling",
       anchorPrice: 5878.50,
       anchorTime: "2026-05-07T13:25:00-05:00",
       slopePerHour: 1.04,
       currentValue: 5899.48,
-      distanceFromPrice: 27.48,
+      distanceFromPrice: 19.48,
     },
     {
       kind: "PREV_RTH_HIGH_DESC",
-      name: "Prev RTH High - Descending",
+      name: "High Fan Floor",
       anchorPrice: 5878.50,
       anchorTime: "2026-05-07T13:25:00-05:00",
       slopePerHour: -1.04,
       currentValue: 5857.52,
-      distanceFromPrice: -14.48,
+      distanceFromPrice: -22.48,
     },
     {
       kind: "PREV_RTH_LOW_ASC",
-      name: "Prev RTH Low - Ascending",
+      name: "Low Fan Ceiling",
       anchorPrice: 5849.00,
       anchorTime: "2026-05-07T09:42:00-05:00",
       slopePerHour: 1.04,
       currentValue: 5873.84,
-      distanceFromPrice: 1.84,
+      distanceFromPrice: -6.16,
     },
     {
       kind: "PREV_RTH_LOW_DESC",
-      name: "Prev RTH Low - Descending",
+      name: "Low Fan Floor",
       anchorPrice: 5849.00,
       anchorTime: "2026-05-07T09:42:00-05:00",
       slopePerHour: -1.04,
       currentValue: 5824.16,
-      distanceFromPrice: -47.84,
+      distanceFromPrice: -55.84,
     },
   ],
 
   price: {
-    last: 5872.00,
-    change: 6.40,
-    changePct: 0.11,
+    last: 5880.00,
+    change: 14.40,
+    changePct: 0.25,
   },
 
-  // 5872.00 is inside the previous-RTH pivot framework.
-  scenario: "INSIDE_DESCENDING",
+  // 5880.00 is between the two fan ceilings.
+  scenario: "INSIDE_ASCENDING",
   scenarioExplanation:
-    "Last print 5872.00 sits inside the ES framework. Wait for qualified confirmation near active structure.",
+    "Last print 5880.00 sits between the fan ceilings. Wait for qualified confirmation near active structure.",
 
   plays: {
     primary: {
-      side: "BUY",
-      entryLine: "PREV_RTH_LOW_DESC",
-      entryPrice: 5824.16,
+      side: "SELL",
+      entryLine: "PREV_RTH_HIGH_ASC",
+      entryPrice: 5899.48,
       exitLine: "PREV_RTH_HIGH_DESC",
       exitPrice: 5857.52,
     },
     alternate: {
-      side: "SELL",
-      entryLine: "PREV_RTH_HIGH_DESC",
-      entryPrice: 5857.52,
-      exitLine: "PREV_RTH_LOW_DESC",
-      exitPrice: 5824.16,
+      side: "BUY",
+      entryLine: "PREV_RTH_LOW_ASC",
+      entryPrice: 5873.84,
+      exitLine: "PREV_RTH_HIGH_ASC",
+      exitPrice: 5899.48,
     },
   },
 
   contracts: {
     // SPX strikes are 5pt; round to standard board.
     forPrimary: {
-      type: "CALL",
-      strike: 5890,
+      type: "PUT",
+      strike: 5900,
       expiration: "2026-05-08",
       dteLabel: "0DTE",
-      distanceFromSpot: 5890 - 5824.16,
+      distanceFromSpot: 5900 - 5899.48,
     },
     forAlternate: {
-      type: "PUT",
-      strike: 5840,
+      type: "CALL",
+      strike: 5875,
       expiration: "2026-05-08",
       dteLabel: "0DTE",
-      distanceFromSpot: 5840 - 5857.52,
+      distanceFromSpot: 5875 - 5873.84,
     },
   },
 
@@ -140,7 +149,7 @@ export const spxSnapshot: SPXSnapshot = {
     active: false,
     side: null,
     detail:
-      "Inside the ES framework - re-entry watch dormant. Watch reactivates when active structure qualifies.",
+      "Inside the ES Pivot Fan - re-entry watch dormant. Watch reactivates when active structure qualifies.",
   },
 
   confluence: {

@@ -26,6 +26,13 @@ Scenario = Literal[
     "BELOW_DESCENDING",
     "OUTSIDE_PLAY",
 ]
+FanZone = Literal[
+    "ABOVE_BOTH_CEILINGS",
+    "BETWEEN_CEILINGS",
+    "BELOW_BOTH_CEILINGS",
+    "BELOW_HIGH_FLOOR",
+    "PENDING",
+]
 Side = Literal["BUY", "SELL"]
 
 
@@ -52,6 +59,15 @@ class Plays:
     alternate: Optional[Trade]
 
 
+@dataclass(frozen=True)
+class FanRead:
+    zone: FanZone
+    label: str
+    summary: str
+    primary_reference: Optional[LineKind]
+    secondary_reference: Optional[LineKind]
+
+
 # ---------------------------------------------------------------------------
 # Classifier
 # ---------------------------------------------------------------------------
@@ -71,52 +87,120 @@ def classify(
     RTH pivot projections. The high-descending line is the major flow
     reference.
     """
-    by = _by_kind(lines)
-    high_asc = by.get("PREV_RTH_HIGH_ASC")
-    high_desc = by.get("PREV_RTH_HIGH_DESC") or by.get("SWING_HIGH_DESC")
-    low_asc = by.get("PREV_RTH_LOW_ASC") or by.get("SWING_LOW_ASC")
-    low_desc = by.get("PREV_RTH_LOW_DESC")
-
-    if None in (high_asc, high_desc, low_asc, low_desc):
+    zone = fan_zone(price, lines)
+    if zone == "PENDING":
         return "OUTSIDE_PLAY"
-
-    assert high_desc is not None
-    assert low_desc is not None
-
-    if price > high_desc:
+    if zone == "ABOVE_BOTH_CEILINGS":
+        return "ABOVE_ASCENDING"
+    if zone == "BETWEEN_CEILINGS":
+        return "INSIDE_ASCENDING"
+    if zone == "BELOW_BOTH_CEILINGS":
         return "ABOVE_DESCENDING"
-    if price < low_desc:
-        return "BELOW_DESCENDING"
-    return "INSIDE_DESCENDING"
+    return "BELOW_DESCENDING"
+
+
+def fan_zone(price: float, lines: list[ProjectedLine]) -> FanZone:
+    by = _by_kind(lines)
+    high_ceiling = by.get("PREV_RTH_HIGH_ASC")
+    high_floor = by.get("PREV_RTH_HIGH_DESC") or by.get("SWING_HIGH_DESC")
+    low_ceiling = by.get("PREV_RTH_LOW_ASC") or by.get("SWING_LOW_ASC")
+    low_floor = by.get("PREV_RTH_LOW_DESC")
+
+    if None in (high_ceiling, high_floor, low_ceiling, low_floor):
+        return "PENDING"
+
+    assert high_ceiling is not None
+    assert high_floor is not None
+    assert low_ceiling is not None
+
+    upper_ceiling = max(high_ceiling, low_ceiling)
+    lower_ceiling = min(high_ceiling, low_ceiling)
+
+    if price >= upper_ceiling:
+        return "ABOVE_BOTH_CEILINGS"
+    if price >= lower_ceiling:
+        return "BETWEEN_CEILINGS"
+    if price >= high_floor:
+        return "BELOW_BOTH_CEILINGS"
+    return "BELOW_HIGH_FLOOR"
+
+
+def build_fan_read(price: float, lines: list[ProjectedLine]) -> FanRead:
+    zone = fan_zone(price, lines)
+    labels: dict[FanZone, str] = {
+        "ABOVE_BOTH_CEILINGS": "Above both fan ceilings",
+        "BETWEEN_CEILINGS": "Between fan ceilings",
+        "BELOW_BOTH_CEILINGS": "Below both fan ceilings",
+        "BELOW_HIGH_FLOOR": "Below High Fan Floor",
+        "PENDING": "Fan pending",
+    }
+    summaries: dict[FanZone, str] = {
+        "ABOVE_BOTH_CEILINGS": (
+            "Price is above both fan ceilings; High Fan Ceiling becomes the buy-support reference."
+        ),
+        "BETWEEN_CEILINGS": (
+            "Price is between the two ceilings; sell rejection at High Fan Ceiling can target High Fan Floor, while a Low Fan Ceiling reclaim can press through High Fan Ceiling."
+        ),
+        "BELOW_BOTH_CEILINGS": (
+            "Price is below both ceilings; ceiling retests can sell, while High Fan Floor becomes the first buy reference."
+        ),
+        "BELOW_HIGH_FLOOR": (
+            "Price is below High Fan Floor; Low Fan Floor becomes the main buy reference."
+        ),
+        "PENDING": "The four fan references are not resolved yet.",
+    }
+    references: dict[FanZone, tuple[Optional[LineKind], Optional[LineKind]]] = {
+        "ABOVE_BOTH_CEILINGS": ("PREV_RTH_HIGH_ASC", None),
+        "BETWEEN_CEILINGS": ("PREV_RTH_HIGH_ASC", "PREV_RTH_LOW_ASC"),
+        "BELOW_BOTH_CEILINGS": ("PREV_RTH_LOW_ASC", "PREV_RTH_HIGH_DESC"),
+        "BELOW_HIGH_FLOOR": ("PREV_RTH_LOW_DESC", "PREV_RTH_HIGH_DESC"),
+        "PENDING": (None, None),
+    }
+    primary, secondary = references[zone]
+    return FanRead(
+        zone=zone,
+        label=labels[zone],
+        summary=summaries[zone],
+        primary_reference=primary,
+        secondary_reference=secondary,
+    )
 
 
 def explain_scenario(scenario: Scenario, price: float, lines: list[ProjectedLine]) -> str:
     """Human-readable one-liner describing where price sits."""
     by = _by_kind(lines)
-    high_desc = by.get("PREV_RTH_HIGH_DESC") or by.get("SWING_HIGH_DESC")
-    high_asc = by.get("PREV_RTH_HIGH_ASC")
-    low_desc = by.get("PREV_RTH_LOW_DESC")
+    high_floor = by.get("PREV_RTH_HIGH_DESC") or by.get("SWING_HIGH_DESC")
+    high_ceiling = by.get("PREV_RTH_HIGH_ASC")
+    low_ceiling = by.get("PREV_RTH_LOW_ASC")
+    low_floor = by.get("PREV_RTH_LOW_DESC")
     if scenario == "OUTSIDE_PLAY":
-        return f"Last print {price:.2f} does not have the previous-RTH ES framework yet."
-    if scenario in ("INSIDE_ASCENDING", "INSIDE_DESCENDING"):
-        assert high_desc is not None
-        relation = _relative_phrase(price, high_desc, "PREV_RTH_HIGH_DESC")
+        return f"Last print {price:.2f} does not have the ES Pivot Fan resolved yet."
+    if scenario == "INSIDE_ASCENDING":
+        assert high_ceiling is not None
+        assert low_ceiling is not None
         return (
-            f"Last print {price:.2f} is near the major previous-RTH high descending line - "
-            f"{relation}. Wait for the hourly touch-and-close confirmation."
+            f"Last print {price:.2f} is between High Fan Ceiling {high_ceiling:.2f} "
+            f"and Low Fan Ceiling {low_ceiling:.2f}. Sell rejection at High Fan Ceiling "
+            "can rotate toward High Fan Floor; Low Fan Ceiling reclaim can press through the upper fan."
         )
-    if scenario in ("ABOVE_ASCENDING", "ABOVE_DESCENDING"):
-        target = f" toward previous RTH high ascending {high_asc:.2f}" if high_asc is not None else ""
+    if scenario == "ABOVE_ASCENDING":
+        target = f" at High Fan Ceiling {high_ceiling:.2f}" if high_ceiling is not None else ""
         return (
-            f"Last print {price:.2f} is above the major previous-RTH high descending line{target}. "
-            "If price returns to the major line and closes above it, the buy continuation is active; "
-            "if it extends first, the high ascending line is the sell or buy-exit reference."
+            f"Last print {price:.2f} is above both fan ceilings{target}. "
+            "A qualified touch-and-close above that ceiling is the buy-support read."
         )
-    target = f" toward previous RTH low descending {low_desc:.2f}" if low_desc is not None else ""
+    if scenario == "ABOVE_DESCENDING":
+        assert low_ceiling is not None
+        assert high_floor is not None
+        return (
+            f"Last print {price:.2f} is below both fan ceilings. "
+            f"Low Fan Ceiling {low_ceiling:.2f} can sell on rejection; "
+            f"High Fan Floor {high_floor:.2f} is the first buy reference."
+        )
+    target = f" at Low Fan Floor {low_floor:.2f}" if low_floor is not None else ""
     return (
-        f"Last print {price:.2f} is below the major previous-RTH high descending line{target}. "
-        "If price returns to the major line and closes below it, the sell continuation is active; "
-        "if it drops first, the low descending line is the buy or sell-exit reference."
+        f"Last print {price:.2f} is below High Fan Floor{target}. "
+        "Low Fan Floor is the main buy reference until price reclaims the high fan."
     )
 
 # ---------------------------------------------------------------------------
@@ -148,6 +232,25 @@ def _trade(
     )
 
 
+def _fan_trade(
+    side: Side,
+    entry: LineKind,
+    exit_: LineKind,
+    by: dict[LineKind, float],
+    *,
+    exit_price: Optional[float] = None,
+) -> Optional[Trade]:
+    if entry not in by or exit_ not in by:
+        return None
+    entry_price = by[entry]
+    resolved_exit = by[exit_] if exit_price is None else exit_price
+    if side == "BUY" and resolved_exit <= entry_price:
+        return None
+    if side == "SELL" and resolved_exit >= entry_price:
+        return None
+    return Trade(side, entry, entry_price, exit_, resolved_exit)
+
+
 def _ordered_swing_pair(
     by: dict[LineKind, float],
 ) -> Optional[tuple[tuple[LineKind, float], tuple[LineKind, float]]]:
@@ -165,10 +268,10 @@ def _ordered_swing_pair(
 
 def _line_label(kind: LineKind) -> str:
     labels: dict[LineKind, str] = {
-        "PREV_RTH_HIGH_ASC": "previous RTH high ascending",
-        "PREV_RTH_HIGH_DESC": "previous RTH high descending",
-        "PREV_RTH_LOW_ASC": "previous RTH low ascending",
-        "PREV_RTH_LOW_DESC": "previous RTH low descending",
+        "PREV_RTH_HIGH_ASC": "High Fan Ceiling",
+        "PREV_RTH_HIGH_DESC": "High Fan Floor",
+        "PREV_RTH_LOW_ASC": "Low Fan Ceiling",
+        "PREV_RTH_LOW_DESC": "Low Fan Floor",
         "SWING_HIGH_ASC": "swing-high ascending",
         "SWING_HIGH_DESC": "swing-high descending",
         "SWING_LOW_ASC": "swing-low ascending",
@@ -189,30 +292,43 @@ def _relative_phrase(price: float, line_value: float, kind: LineKind) -> str:
 def build_plays(scenario: Scenario, lines: list[ProjectedLine]) -> Plays:
     """Primary + alternate per the spec.
 
-    Descending mirrors ascending - same line roles, same play shape;
-    direction-specific scenario tags are decorative.
+    The legacy scenario tags now map to the ES Pivot Fan zones:
+    above both ceilings, between ceilings, below both ceilings, and
+    below High Fan Floor.
     """
     by = _by_kind(lines)
 
     if scenario == "OUTSIDE_PLAY":
         return Plays(None, None)
 
-    high_desc = "PREV_RTH_HIGH_DESC" if "PREV_RTH_HIGH_DESC" in by else "SWING_HIGH_DESC"
-    low_desc = "PREV_RTH_LOW_DESC"
+    high_ceiling = "PREV_RTH_HIGH_ASC"
+    high_floor = "PREV_RTH_HIGH_DESC" if "PREV_RTH_HIGH_DESC" in by else "SWING_HIGH_DESC"
+    low_ceiling = "PREV_RTH_LOW_ASC"
+    low_floor = "PREV_RTH_LOW_DESC"
 
-    if scenario in ("ABOVE_ASCENDING", "ABOVE_DESCENDING"):
-        primary = _trade("SELL", "PREV_RTH_HIGH_ASC", high_desc, by)
-        alternate = _trade("BUY", high_desc, "PREV_RTH_HIGH_ASC", by)
-        return Plays(primary, alternate)
-
-    if scenario in ("INSIDE_ASCENDING", "INSIDE_DESCENDING"):
-        if high_desc not in by or low_desc not in by:
+    if scenario == "ABOVE_ASCENDING":
+        if high_ceiling not in by or high_floor not in by:
             return Plays(None, None)
-        primary = Trade("BUY", low_desc, by[low_desc], high_desc, by[high_desc])
-        alternate = Trade("SELL", high_desc, by[high_desc], low_desc, by[low_desc])
+        width = abs(by[high_ceiling] - by[high_floor])
+        target = by[high_ceiling] + width
+        primary = _fan_trade("BUY", high_ceiling, high_ceiling, by, exit_price=target)
+        alternate = _fan_trade("SELL", high_ceiling, high_floor, by)
         return Plays(primary, alternate)
 
-    # BELOW_*
-    primary = _trade("BUY", low_desc, high_desc, by)
-    alternate = _trade("SELL", high_desc, low_desc, by)
+    if scenario == "INSIDE_ASCENDING":
+        if high_ceiling not in by or high_floor not in by or low_ceiling not in by:
+            return Plays(None, None)
+        primary = _fan_trade("SELL", high_ceiling, high_floor, by)
+        alternate = _fan_trade("BUY", low_ceiling, high_ceiling, by)
+        return Plays(primary, alternate)
+
+    if scenario == "ABOVE_DESCENDING":
+        if high_floor not in by or low_ceiling not in by:
+            return Plays(None, None)
+        primary = _fan_trade("SELL", low_ceiling, high_floor, by)
+        alternate = _fan_trade("BUY", high_floor, low_ceiling, by)
+        return Plays(primary, alternate)
+
+    primary = _fan_trade("BUY", low_floor, high_floor, by)
+    alternate = _fan_trade("SELL", high_floor, low_floor, by)
     return Plays(primary, alternate)

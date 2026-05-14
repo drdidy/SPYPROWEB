@@ -13,7 +13,7 @@ export const SLATE_COPY = {
   // ---- Card subtitles ----
   spySubtitle: "Bias is the directional lean from the overnight and premarket sessions.",
   spxSubtitle:
-    "Channel is the overnight envelope. It forms on the first qualifying pivot.",
+    "The Pivot Fan maps ES from the prior RTH high close and post-noon low wick.",
 
   // ---- Metric tooltips ----
   metric: {
@@ -23,7 +23,7 @@ export const SLATE_COPY = {
     },
     bias: "Directional lean from the overnight session and premarket flow. Bullish, bearish, or neutral.",
     channel:
-      "Direction of the overnight envelope. Forms on the first qualifying pivot; before that it reads not yet formed.",
+      "Current ES Pivot Fan zone. It resolves from the prior RTH high close and post-noon low wick.",
     grade:
       "Letter grade assigned after the trigger fires. A+, A, B+, B, C, D, or no-trade.",
   },
@@ -41,7 +41,7 @@ export const SLATE_COPY = {
   metricEmptyHelper: {
     conviction: "Populates at setup",
     bias: "Populates at setup",
-    channel: "Forms at first overnight pivot",
+    channel: "Resolves from prior RTH pivots",
     grade: "Assigned after the trigger fires",
   },
 
@@ -50,7 +50,7 @@ export const SLATE_COPY = {
   // log line, not a sentence.
   structureEmpty: {
     spy: "No active levels yet. SPY's primary lines plot during the 03:00–07:00 CT premarket window.",
-    spx: "No active levels yet. ES channel resolves on the first qualifying overnight pivot during 17:00–02:00 CT.",
+    spx: "No active levels yet. ES Pivot Fan resolves after the prior RTH pivots are available.",
   },
 
   // ---- PRE-CONFIG briefing ----
@@ -95,7 +95,7 @@ export const SLATE_COPY = {
     body:
       "SPY and ES stay separate until the slate asks for a decision. " +
       "The Decision Slate is your daily 'should I trade?' command center. " +
-      "Each engine — SPY (intraday premarket) and ES (overnight channel) — " +
+      "Each engine — SPY (intraday premarket) and ES (Pivot Fan) — " +
       "moves through a fixed pipeline: Pre-config → Stand down → Watch → " +
       "Wait → Armed → Go → Cooldown. The page tells you what state each " +
       "engine is in, why, what to watch for, and how the engine has been performing recently.",

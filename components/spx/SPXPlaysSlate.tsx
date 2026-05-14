@@ -14,10 +14,10 @@ import type {
 import { ArrowDown, ArrowUp } from "lucide-react";
 
 const lineLabel: Record<SPXLineKind, string> = {
-  PREV_RTH_HIGH_ASC: "Prev RTH High - Asc",
-  PREV_RTH_HIGH_DESC: "Prev RTH High - Desc",
-  PREV_RTH_LOW_ASC: "Prev RTH Low - Asc",
-  PREV_RTH_LOW_DESC: "Prev RTH Low - Desc",
+  PREV_RTH_HIGH_ASC: "High Fan Ceiling",
+  PREV_RTH_HIGH_DESC: "High Fan Floor",
+  PREV_RTH_LOW_ASC: "Low Fan Ceiling",
+  PREV_RTH_LOW_DESC: "Low Fan Floor",
   SWING_HIGH_ASC: "Swing High - Asc",
   SWING_HIGH_DESC: "Swing High - Desc",
   SWING_LOW_ASC: "Swing Low - Asc",
@@ -50,8 +50,8 @@ export function SPXPlaysSlate({
               No play
             </div>
             <p className="mt-3 text-[13px] text-ink-3 max-w-sm mx-auto leading-relaxed">
-              The channel doesn't have a clean read here. The discipline is to
-              wait for price to return to one of the lines we've drawn.
+              The Pivot Fan does not have a clean read here. The discipline is
+              to wait for price to return to a qualified fan reference.
             </p>
           </div>
         </CardBody>

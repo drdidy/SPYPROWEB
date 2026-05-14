@@ -38,6 +38,13 @@ SPXLineKind = Literal[
     "SWING_LOW_ASC",
     "SWING_LOW_DESC",
 ]
+SPXFanZone = Literal[
+    "ABOVE_BOTH_CEILINGS",
+    "BETWEEN_CEILINGS",
+    "BELOW_BOTH_CEILINGS",
+    "BELOW_HIGH_FLOOR",
+    "PENDING",
+]
 SPXRthBiasDirection = Literal["BULLISH", "BEARISH", "PENDING"]
 SPXAction = Literal["TAKE", "SELECTIVE", "STAND_DOWN"]
 SPXSide = Literal["BUY", "SELL"]
@@ -211,6 +218,16 @@ class SPXScoreBands(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class SPXFanRead(BaseModel):
+    zone: SPXFanZone
+    label: str
+    summary: str
+    primary_reference: Optional[SPXLineKind] = Field(default=None, alias="primaryReference")
+    secondary_reference: Optional[SPXLineKind] = Field(default=None, alias="secondaryReference")
+
+    model_config = {"populate_by_name": True}
+
+
 class SPXRthBias(BaseModel):
     direction: SPXRthBiasDirection
     open_price: Optional[float] = Field(default=None, alias="openPrice")
@@ -231,6 +248,7 @@ class SPXSnapshot(BaseModel):
     overnight: SPXOvernight
     sessions: SPXSessions
     channel: SPXChannel
+    fan_read: Optional[SPXFanRead] = Field(default=None, alias="fanRead")
     lines: List[SPXLine]
     price: SPXPrice
 

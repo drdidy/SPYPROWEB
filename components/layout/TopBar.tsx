@@ -382,7 +382,7 @@ function symbolChipTitle(
   const explanations: Record<string, string> = {
     "PRE-CONFIG": "Pre-config: setup window has not finished building levels yet.",
     "STAND DOWN": "Stand down: no trade is qualified under the current engine rules.",
-    TAKE: "Take: the ES channel conditions are actionable under the current rules.",
+    TAKE: "Take: the ES Pivot Fan conditions are actionable under the current rules.",
     SELECTIVE: "Selective: conditions are mixed, so size and discretion matter.",
     WAIT: "Wait: a setup exists, but confirmation has not arrived.",
     LONG: "Long: SPY engine is biased toward calls.",

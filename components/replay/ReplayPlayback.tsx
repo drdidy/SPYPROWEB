@@ -2,7 +2,7 @@
 
 // Synced SPY + SPX playback. Two SVG panels share a single playhead
 // (0..1) controlled by the parent ReplayWorkspace. Each panel:
-//   - draws its framework lines (SPY anchor bands / SPX channel rails)
+//   - draws its framework lines (SPY anchor bands / ES Pivot Fan references)
 //     extended across the trading session,
 //   - draws the intraday price path forward up to the playhead position,
 //   - pops a marker at every line "touch" event whose timestamp is
@@ -129,7 +129,7 @@ function spyAnchorProjections(anchor: AnchorGroup, slope: number): LineProjectio
 }
 
 // ---------------------------------------------------------------------------
-// SPX panel — channel rails + intraday ES (offset to SPX)
+// ES panel — Pivot Fan references + intraday ES
 // ---------------------------------------------------------------------------
 
 function SPXPlaybackPanel({
@@ -188,10 +188,10 @@ function spxLineProjections(lines: SPXLine[]): LineProjection[] {
 
 function shortEsLineName(kind: string): string {
   const labels: Record<string, string> = {
-    PREV_RTH_HIGH_ASC: "PRH-A",
-    PREV_RTH_HIGH_DESC: "PRH-D",
-    PREV_RTH_LOW_ASC: "PRL-A",
-    PREV_RTH_LOW_DESC: "PRL-D",
+    PREV_RTH_HIGH_ASC: "HF-C",
+    PREV_RTH_HIGH_DESC: "HF-F",
+    PREV_RTH_LOW_ASC: "LF-C",
+    PREV_RTH_LOW_DESC: "LF-F",
     SWING_HIGH_ASC: "SH-A",
     SWING_HIGH_DESC: "SH-D",
     SWING_LOW_ASC: "SL-A",

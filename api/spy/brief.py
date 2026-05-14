@@ -2,7 +2,7 @@
 
 The Daily Brief is the synthesis layer. It gathers:
   - SPY snapshot data and app structure lines
-  - ES channel snapshot data
+  - ES Pivot Fan snapshot data
   - options intelligence from Unusual Whales
   - market context from the existing market-data pipeline
   - optional news and economic-calendar context
@@ -67,7 +67,7 @@ decision-support app. The user reads this before the cash open to plan
 the day.
 
 You receive a compact JSON dossier from the app. It contains market
-data, SPY premarket-anchor structure, ES overnight-channel structure,
+data, SPY premarket-anchor structure, ES Pivot Fan structure,
 options flow, dark-pool, GEX, and option-chain summaries. Use only the
 facts provided. Also read the macro/news block when available; if it is
 unavailable, say "live headlines are unavailable" rather than saying there is
@@ -301,6 +301,7 @@ def _spx_facts() -> dict:
         "sessionDateCT": payload.get("sessionDateCT"),
         "price": payload.get("price"),
         "channel": payload.get("channel"),
+        "fanRead": payload.get("fanRead"),
         "scenario": payload.get("scenario"),
         "scenarioExplanation": payload.get("scenarioExplanation"),
         "primaryPlay": _trade_summary(plays.get("primary")),
@@ -495,9 +496,9 @@ def _engine_fallback_sections(dossier: dict) -> dict:
         },
         {
             "section": "ES_PLAN",
-            "body": f"ES channel state is {es_state}"
+            "body": f"ES Pivot Fan state is {es_state}"
             + (f" with scenario {es_scenario}." if es_scenario else ".")
-            + " Use the ES rails as context for whether SPY structure is supported or fighting the overnight channel.",
+            + " Use the ES fan references as context for whether SPY structure is supported or fighting the futures read.",
         },
         {
             "section": "OPTIONS_PRESSURE",

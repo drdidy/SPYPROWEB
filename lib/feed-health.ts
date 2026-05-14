@@ -66,7 +66,7 @@ export interface FeedHealthState {
 
 export const FEED_LABELS: Record<FeedId, string> = {
   "spy-rails": "SPY rails",
-  "spx-rails": "ES rails",
+  "spx-rails": "ES Pivot Fan",
   "spy-hit-rate": "SPY last-5",
   "spx-hit-rate": "ES last-5",
   "spy-last-session": "SPY last session",

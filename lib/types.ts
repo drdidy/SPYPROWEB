@@ -148,7 +148,7 @@ export interface Candle {
 
 // ---------------------------------------------------------------------------
 // SPX Prophet — second symbol surface
-// Modeled on the SPPRO engine: overnight channel + previous-day RTH refs,
+// Modeled on the SPPRO engine: ES Pivot Fan + previous-day RTH refs,
 // scenario classifier, primary + alternate plays, confluence score.
 // ---------------------------------------------------------------------------
 
@@ -162,6 +162,13 @@ export type SPXScenario =
   | "INSIDE_DESCENDING"
   | "BELOW_DESCENDING"
   | "OUTSIDE_PLAY"; // scenario 7: stand down
+
+export type SPXFanZone =
+  | "ABOVE_BOTH_CEILINGS"
+  | "BETWEEN_CEILINGS"
+  | "BELOW_BOTH_CEILINGS"
+  | "BELOW_HIGH_FLOOR"
+  | "PENDING";
 
 export type SPXLineKind =
   | "PREV_RTH_HIGH_ASC"
@@ -291,6 +298,14 @@ export interface SPXSnapshot {
     reason: string;
     noChannelReason?: SPXNoChannelReason;
   };
+
+  fanRead?: {
+    zone: SPXFanZone;
+    label: string;
+    summary: string;
+    primaryReference: SPXLineKind | null;
+    secondaryReference: SPXLineKind | null;
+  } | null;
 
   lines: SPXLine[];
 

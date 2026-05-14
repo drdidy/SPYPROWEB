@@ -78,7 +78,7 @@ export default async function Page() {
             <div className="mt-3 font-serif text-[32px] leading-none text-paper">Replay is the audit trail.</div>
             <p className="mt-4 text-[13px] text-paper/62 leading-relaxed max-w-2xl">
               Use Replay to review prior sessions bar by bar: verdict trail, line touches,
-              channel state, anchors, and the exact decision path the engine printed.
+              engine state, anchors, and the exact decision path the engine printed.
             </p>
             <a
               href="/replay"

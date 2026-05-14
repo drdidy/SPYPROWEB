@@ -217,6 +217,6 @@ function determinationText(snap: SPXSnapshot): string {
   if (snap.lines.length >= 4) {
     return snap.channel.reason;
   }
-  return "The ES framework resolves after the previous RTH high close and post-noon low wick are available.";
+  return "The ES Pivot Fan resolves after the previous RTH high close and post-noon low wick are available.";
 }
 

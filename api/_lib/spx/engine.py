@@ -40,6 +40,7 @@ from .contracts import suggest_for_plays
 from .reentry import evaluate_reentry
 from .scenario import (
     ProjectedLine,
+    build_fan_read,
     build_plays,
     classify,
     explain_scenario,
@@ -155,14 +156,14 @@ def _flip_condition_for(scenario: str, projected: list[ProjectedLine]) -> str:
     if scenario.startswith("INSIDE_"):
         if high_desc is not None:
             return (
-                f"Confirmed hourly close through the major previous-RTH high descending "
-                f"line at {high_desc:.2f} arms the next ES entry."
+                f"Confirmed hourly close through High Fan Floor at {high_desc:.2f} "
+                "arms the next ES entry."
             )
     if scenario.startswith("ABOVE_") and high_asc is not None:
-        return f"Watch previous RTH high ascending at {high_asc:.2f}; the major high-descending line remains the decision reference."
+        return f"Watch High Fan Ceiling at {high_asc:.2f}; it is the buy-support reference above both fans."
     if scenario.startswith("BELOW_") and low_desc is not None:
-        return f"Watch previous RTH low descending at {low_desc:.2f}; the major high-descending line remains the decision reference."
-    return "Previous-RTH ES framework pending."
+        return f"Watch Low Fan Floor at {low_desc:.2f}; it is the buy reference below High Fan Floor."
+    return "ES Pivot Fan pending."
 
 def _decision_trace(
     *, as_of_iso: str, scenario: str, scenario_text: str,
@@ -170,7 +171,7 @@ def _decision_trace(
 ) -> list[dict]:
     """Chronological trace of the events that produced today's verdict."""
     trace: list[dict] = []
-    trace.append({"ts": as_of_iso, "event": f"Channel: {channel_reason}", "weight": "info"})
+    trace.append({"ts": as_of_iso, "event": f"Pivot Fan: {channel_reason}", "weight": "info"})
     trace.append({"ts": as_of_iso, "event": f"Scenario {scenario.replace('_', ' ').lower()}", "weight": "key"})
     trace.append({
         "ts": as_of_iso,
@@ -239,7 +240,7 @@ def _rth_open_price(candles: list[Candle], session: date) -> Optional[float]:
 
 
 def _rth_bias_for(lines: list[Line], candles: list[Candle], session: date) -> Optional[dict]:
-    """RTH-open posture from the previous-RTH high-descending major line."""
+    """RTH-open posture from the High Fan Floor."""
     high_asc = next((l for l in lines if l.kind == "PREV_RTH_HIGH_ASC"), None)
     high_desc = next((l for l in lines if l.kind == "PREV_RTH_HIGH_DESC"), None)
     low_desc = next((l for l in lines if l.kind == "PREV_RTH_LOW_DESC"), None)
@@ -259,8 +260,7 @@ def _rth_bias_for(lines: list[Line], candles: list[Candle], session: date) -> Op
             "continuationLine": "PREV_RTH_HIGH_ASC",
             "continuationValue": round(project_line(high_asc, open_at), 2) if high_asc else None,
             "note": (
-                "RTH posture pending: compare the opening print to the major "
-                "previous-RTH high descending line."
+                "RTH posture pending: compare the opening print to High Fan Floor."
             ),
         }
 
@@ -274,9 +274,8 @@ def _rth_bias_for(lines: list[Line], candles: list[Candle], session: date) -> Op
             "continuationLine": "PREV_RTH_HIGH_ASC",
             "continuationValue": round(cont, 2) if cont is not None else None,
             "note": (
-                "RTH opened above the major previous-RTH high descending line; "
-                "watch for a push toward the high ascending line, then a return "
-                "to the major line for the buy/sell decision."
+                "RTH opened above High Fan Floor; watch for a push toward High Fan Ceiling, "
+                "then a return to the fan for the buy/sell decision."
             ),
         }
 
@@ -289,9 +288,8 @@ def _rth_bias_for(lines: list[Line], candles: list[Candle], session: date) -> Op
         "continuationLine": "PREV_RTH_LOW_DESC",
         "continuationValue": round(cont, 2) if cont is not None else None,
         "note": (
-            "RTH opened below the major previous-RTH high descending line; "
-            "watch for a push toward that line, or a drop first toward the "
-            "previous-RTH low descending buy/sell-exit reference."
+            "RTH opened below High Fan Floor; watch for a push back into the high fan, "
+            "or a drop first toward Low Fan Floor."
         ),
     }
 
@@ -325,6 +323,7 @@ def compute_snapshot(
         SPXContractSuggestion,
         SPXContracts,
         SPXDecisionTraceEntry,
+        SPXFanRead,
         SPXInvalidation,
         SPXLine,
         SPXOvernight,
@@ -348,7 +347,7 @@ def compute_snapshot(
     as_of_ct = to_ct(as_of)
     session = session_date_ct(as_of_ct)
 
-    # 1. ES Channel structure is computed in native ES coordinates.
+    # 1. ES Pivot Fan structure is computed in native ES coordinates.
     #
     # The `es_to_spx_offset` argument is retained for API compatibility and
     # quote diagnostics, but it must not be applied to the six structure lines.
@@ -360,13 +359,12 @@ def compute_snapshot(
     sydney = sydney_range(spx_candles, session)
     tokyo = tokyo_range(spx_candles, session)
 
-    # 3. Canonical ES framework. Sydney/Tokyo ranges are diagnostics only.
+    # 3. Canonical ES Pivot Fan. Sydney/Tokyo ranges are diagnostics only.
     channel = Channel(
         direction="ASCENDING",
         reason=(
-            "Previous-RTH framework active: ascending and descending lines "
-            "are projected from the prior RTH swing-high close and the "
-            "post-noon RTH low wick. The high-descending line is the major flow reference."
+            "ES Pivot Fan active: High Fan and Low Fan references are projected "
+            "from the prior RTH high close and the post-noon RTH low wick."
         ),
     )
 
@@ -393,6 +391,7 @@ def compute_snapshot(
     # 7. Scenario + plays.
     scenario = classify(channel.direction, last_price, projected)
     scenario_text = explain_scenario(scenario, last_price, projected)
+    fan_read = build_fan_read(last_price, projected)
     plays = build_plays(scenario, projected)
 
     # 8. Contracts.
@@ -488,6 +487,13 @@ def compute_snapshot(
             reason=channel.reason,
             noChannelReason=channel.no_channel_reason,
         ),
+        fanRead=SPXFanRead(
+            zone=fan_read.zone,
+            label=fan_read.label,
+            summary=fan_read.summary,
+            primaryReference=fan_read.primary_reference,
+            secondaryReference=fan_read.secondary_reference,
+        ),
         lines=[_line_model(l, projected, last_price, session) for l in lines],
         price=SPXPrice(last=last_price, change=change, changePct=change_pct),
         scenario=scenario,
@@ -561,10 +567,10 @@ def _line_model(l: Line, projected: list[ProjectedLine], price: float, session: 
     """Convert internal Line + projection into the schema's SPXLine."""
     from .schema import SPXLine
     name_map = {
-        "PREV_RTH_HIGH_ASC": "Prev RTH High - Ascending",
-        "PREV_RTH_HIGH_DESC": "Prev RTH High - Descending",
-        "PREV_RTH_LOW_ASC": "Prev RTH Low - Ascending",
-        "PREV_RTH_LOW_DESC": "Prev RTH Low - Descending",
+        "PREV_RTH_HIGH_ASC": "High Fan Ceiling",
+        "PREV_RTH_HIGH_DESC": "High Fan Floor",
+        "PREV_RTH_LOW_ASC": "Low Fan Ceiling",
+        "PREV_RTH_LOW_DESC": "Low Fan Floor",
         "SWING_HIGH_ASC": "Overnight Swing High - Ascending",
         "SWING_HIGH_DESC": "Overnight Swing High - Descending",
         "SWING_LOW_ASC": "Overnight Swing Low - Ascending",

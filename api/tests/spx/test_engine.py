@@ -20,6 +20,8 @@ def test_snapshot_basic_shape(es_candles_ascending_inside, es_offset, as_of):
     }
     assert snap.rth_bias is not None
     assert snap.rth_bias.reference_line == "PREV_RTH_HIGH_DESC"
+    assert snap.fan_read is not None
+    assert snap.fan_read.zone == "BELOW_BOTH_CEILINGS"
 
 
 def test_snapshot_inside_ascending_with_plays(es_candles_ascending_inside, es_offset, as_of):
@@ -28,7 +30,7 @@ def test_snapshot_inside_ascending_with_plays(es_candles_ascending_inside, es_of
     assert snap.plays.primary is not None
     assert snap.plays.alternate is not None
     assert snap.plays.primary.side == "SELL"
-    assert snap.plays.primary.entry_line == "PREV_RTH_HIGH_ASC"
+    assert snap.plays.primary.entry_line == "PREV_RTH_LOW_ASC"
     assert snap.plays.primary.exit_line == "PREV_RTH_HIGH_DESC"
     assert snap.plays.alternate.side == "BUY"
 
@@ -67,6 +69,7 @@ def test_snapshot_serializes_to_camelcase_json(es_candles_ascending_inside, es_o
     assert "sessionDateCT" in js
     assert "scenarioExplanation" in js
     assert "reentryWatch" in js
+    assert "fanRead" in js
     # nested camelCase
     assert "changePct" in js["price"]
     assert "currentValue" in js["lines"][0]

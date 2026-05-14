@@ -92,6 +92,7 @@ interface BriefDossier {
     state?: string;
     scenario?: string;
     scenarioExplanation?: string;
+    fanRead?: SPXSnapshot["fanRead"];
     price?: { last?: number; change?: number; changePct?: number };
     channel?: { direction?: string; reason?: string; noChannelReason?: string };
     primaryPlay?: Record<string, unknown> | null;
@@ -256,7 +257,7 @@ export default async function Page() {
             </div>
             <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <StateHeroChip label="SPY state" value={formatState(spy?.state ?? snap.currentState)} term="COOLDOWN" note={fmtPrice(spyLast)} tone={stateTone(spy?.state ?? snap.currentState)} />
-              <StateHeroChip label="ES context" value={formatState(es?.scenario ?? es?.state)} term="INSIDE DESCENDING" note={es?.channel?.direction?.replace(/_/g, " ") ?? "RTH pivot read"} tone={directionTone(es?.channel?.direction)} />
+              <StateHeroChip label="ES context" value={es?.fanRead?.label ?? formatState(es?.scenario ?? es?.state)} term="PIVOT FAN" note="Pivot Fan read" tone={directionTone(es?.channel?.direction)} />
               <StateHeroChip label="Options flow" value={spyOptions?.flow?.lean ?? "Waiting"} term="NET PREMIUM" note={fmtMoney(spyOptions?.flow?.premiumNet)} tone={leanTone(spyOptions?.flow?.lean)} />
               <StateHeroChip label="Dealer gamma" value={spyOptions?.gex?.regime ?? "Waiting"} term="GEX" note={`Flip ${nearReferencePriceLabel(spyOptions?.gex?.flipPoint, spyLast ?? snap.currentPrice)}`} tone={gammaTone(spyOptions?.gex?.regime)} />
             </div>
@@ -309,19 +310,19 @@ export default async function Page() {
             </CardBody>
           </Card>
           <Card>
-            <CardHeader eyebrow="ES" title="Framework context" meta={es?.confluence ? `Confluence ${fmtInt(es.confluence.score)} · ${formatState(es.confluence.action)}` : undefined} />
+            <CardHeader eyebrow="ES" title="Pivot Fan context" meta={es?.confluence ? `Confluence ${fmtInt(es.confluence.score)} · ${formatState(es.confluence.action)}` : undefined} />
             <CardBody className="space-y-3">
               {esLines.length > 0 ? (
                 esLines.map((line, i) => <CompactLine key={`${lineLabel(line)}-${i}`} line={line} />)
               ) : (
                 <CommandEmptyState
-                  eyebrow="ES framework"
-                  title="ES structure is waiting."
-                  body="The brief will include ES framework rows when the current snapshot returns the line set."
+                  eyebrow="ES Pivot Fan"
+                  title="ES fan read is waiting."
+                  body="The brief will include ES Pivot Fan rows when the current snapshot returns the line set."
                   rows={[
                     { label: "State", value: es?.available === false ? "Unavailable" : "Waiting" },
-                    { label: "Scenario", value: es?.scenario ?? "—" },
-                    { label: "Synthetic rails", value: "None" },
+                    { label: "Fan zone", value: es?.fanRead?.label ?? es?.scenario ?? "—" },
+                    { label: "Fan refs", value: "None" },
                   ]}
                 />
               )}
@@ -550,7 +551,7 @@ function StoryDetail({ title, body }: { title: string; body: string }) {
 function OperatorRail({ spy, es, spyOptions, spxOptions, snap, tldr }: { spy?: BriefDossier["SPY"]; es?: BriefDossier["ES"]; spyOptions?: OptionsSymbol; spxOptions?: OptionsSymbol; snap: Awaited<ReturnType<typeof loadLiveSnapshot>>["data"]; tldr: { bias: string; action: string; invalidation: string } }) {
   const rows = [
     { icon: <LineChart className="h-4 w-4" />, label: "SPY structure", value: spy?.verdict ?? snap.decision.verdict, note: spy?.rationale ?? snap.decision.finalExplanation },
-    { icon: <Crosshair className="h-4 w-4" />, label: "ES structure", value: es?.scenario?.replace(/_/g, " ") ?? "Waiting", note: es?.scenarioExplanation ?? es?.channel?.reason },
+    { icon: <Crosshair className="h-4 w-4" />, label: "ES Pivot Fan", value: es?.fanRead?.label ?? es?.scenario?.replace(/_/g, " ") ?? "Waiting", note: es?.fanRead?.summary ?? es?.scenarioExplanation ?? es?.channel?.reason },
     { icon: <Activity className="h-4 w-4" />, label: "Options pressure", value: spyOptions?.flow?.lean ?? "Waiting", note: optionsSummary(spyOptions, spxOptions) },
     { icon: <ShieldAlert className="h-4 w-4" />, label: "Invalidation", value: tldr.invalidation, note: spy?.flipCondition ?? "Current plan's invalidation reference." },
     { icon: <Clock3 className="h-4 w-4" />, label: "Next trigger", value: tldr.action, note: "Wait for the engine's line reaction before acting." },
@@ -762,7 +763,8 @@ function normalizeEsDossier(es: BriefDossier["ES"] | undefined, snap: SPXSnapsho
     available: true,
     state: snap.currentState ?? es?.state,
     scenario: snap.scenario,
-    scenarioExplanation: snap.rthBias?.note ? `${snap.scenarioExplanation} ${snap.rthBias.note}` : snap.scenarioExplanation,
+    scenarioExplanation: snap.rthBias?.note ? `${snap.fanRead?.summary ?? snap.scenarioExplanation} ${snap.rthBias.note}` : snap.fanRead?.summary ?? snap.scenarioExplanation,
+    fanRead: snap.fanRead,
     price: {
       last: snap.price.last,
       change: snap.price.change,

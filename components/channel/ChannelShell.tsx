@@ -184,7 +184,7 @@ function EsContextStrip({ snap }: { snap: AdaptedSnapshot }) {
     <Link
       href="/es"
       className="block rounded-card border border-rule bg-paper px-4 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3 shadow-card transition-colors hover:border-rule-strong hover:text-ink"
-      title="Open the ES Channel for the companion overnight-channel read."
+      title="Open the ES Channel for the companion Pivot Fan read."
     >
       ES context · open ES Channel · SPY decisions should be checked against the futures read
       <span className="ml-2 text-ink-4">SPY {displayedChannelState(snap).replace(/_/g, " ")}</span>

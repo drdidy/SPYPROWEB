@@ -6,6 +6,14 @@ entries grow newest-first.
 
 ## [Unreleased]
 
+### ES Pivot Fan framework
+
+- Reframed the ES engine around a professional Pivot Fan model: High Fan Ceiling/Floor and Low Fan Ceiling/Floor.
+- Added `fanRead` to the ES snapshot contract so Dashboard, ES Channel, Brief, and Replay can display the same zone summary.
+- Updated ES play selection for above-ceilings, between-ceilings, below-ceilings, and below-High-Fan-Floor regimes, including the HP-ceiling sell to HP-floor and LP-ceiling buy through HP-ceiling reads.
+- Replaced stale ES "channel/rails/six-line" user-facing language across the app with Pivot Fan copy and labels.
+- Expanded SPX/ES engine tests for fan-zone classification, play construction, and API serialization.
+
 ### Decision Slate — presentation upgrade (P1)
 
 Twelve P1 items, all landed.

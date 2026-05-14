@@ -216,10 +216,10 @@ function shortSpxLineLabel(kind: string): string {
   const labels: Record<string, string> = {
     SWING_HIGH_DESC: "Swing H dn",
     SWING_LOW_ASC: "Swing L up",
-    PREV_RTH_HIGH_ASC: "PRH-A",
-    PREV_RTH_HIGH_DESC: "PRH-D",
-    PREV_RTH_LOW_ASC: "PRL-A",
-    PREV_RTH_LOW_DESC: "PRL-D",
+    PREV_RTH_HIGH_ASC: "HF-C",
+    PREV_RTH_HIGH_DESC: "HF-F",
+    PREV_RTH_LOW_ASC: "LF-C",
+    PREV_RTH_LOW_DESC: "LF-F",
     SWING_HIGH_ASC: "Swing H up",
     SWING_LOW_DESC: "Swing L dn",
   };

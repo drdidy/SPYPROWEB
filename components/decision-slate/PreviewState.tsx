@@ -131,10 +131,10 @@ export function PreviewState({
         />
         <PreviewCard
           engine="SPX"
-          headline="Take the channel"
+          headline="Take the fan read"
           price="6,124.50"
           delta="+12.40"
-          subtitle="Channel is the overnight envelope. It forms on the first qualifying pivot."
+          subtitle="The Pivot Fan maps ES from the prior RTH high close and post-noon low wick."
           conviction={73}
           convictionMax={100}
           convictionLabel="73 / 100"

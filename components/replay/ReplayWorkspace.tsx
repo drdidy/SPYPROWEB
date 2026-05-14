@@ -717,7 +717,7 @@ function ReplayStatusRow({
         <StatusToken label="State" value={stateLabel} />
         <StatusToken label="Date loaded" value={date ?? "None"} />
         <StatusToken label="Bars" value={state === "loading" ? "Loading" : String(barsCount)} />
-        <BuildToken label="Channel built" built={channelBuilt} loading={state === "loading"} />
+        <BuildToken label="Fan built" built={channelBuilt} loading={state === "loading"} />
         <BuildToken label="Anchors built" built={anchorsBuilt} loading={state === "loading"} />
         {error && <span className="text-[13px] leading-snug">{error}</span>}
       </div>
@@ -934,9 +934,9 @@ function ReplaySvg({
         role="img"
         aria-labelledby="replay-chart-title replay-chart-desc"
       >
-        <title id="replay-chart-title">ES channel replay chart</title>
+        <title id="replay-chart-title">ES Pivot Fan replay chart</title>
         <desc id="replay-chart-desc">
-          ES intraday price path plotted against the projected channel and reference lines.
+          ES intraday price path plotted against the projected Pivot Fan references.
         </desc>
         <rect width={width} height={height} fill="transparent" />
         {[0.2, 0.4, 0.6, 0.8].map((fraction) => (
@@ -1883,7 +1883,7 @@ function buildVerdictEvents(
         at: item.ts,
         label: item.state.replace(/_/g, " ").toLowerCase(),
         kind: "state",
-        detail: "State transition recorded by the ES channel engine.",
+        detail: "State transition recorded by the ES Pivot Fan engine.",
       });
     }
     for (const trace of spx.decisionTrace ?? []) {
