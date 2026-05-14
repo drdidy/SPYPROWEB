@@ -804,8 +804,8 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section aria-label={title} className="space-y-4">
-      <div className="flex items-baseline gap-3">
+    <section aria-label={title} className="space-y-5 pt-2">
+      <div className="flex items-baseline gap-3 pb-1">
         <h2 className="font-serif text-h2 text-ink tracking-tight">{title}</h2>
         <span aria-hidden className="h-px flex-1 bg-rule" />
       </div>
@@ -861,6 +861,8 @@ function SpyVerdictCard({
     ? `Track ${snap.currentState === "STAND_DOWN" ? "the closest primary line" : "this trigger"} (${closestLine.name}) at ${closestLine.currentValue.toFixed(2)}.`
     : undefined;
   const change = decision.conviction != null ? snap.shellState.change : 0;
+  const completedTrade =
+    snap.currentState === "COOLDOWN" || /completed/i.test(snap.flipCondition || "");
 
   return (
     <EngineCard
@@ -888,14 +890,16 @@ function SpyVerdictCard({
       }
     >
       <p className="sr-only">{SLATE_COPY.spySubtitle}</p>
-      <p className="text-body text-ink-2 leading-relaxed">
-        {cleanActionableExplanation(
+      <p className="min-h-[68px] text-body text-ink-2 leading-relaxed">
+        {completedTrade && snap.flipCondition ? snap.flipCondition : (
+        cleanActionableExplanation(
           decision.finalExplanation ||
             snap.bias.explanation ||
             (isPreConfig
               ? "No active triggers yet — bias and conviction populate when the setup window opens."
               : "Engine is initializing."),
           currentPrice,
+        )
         )}
       </p>
       <div className="grid grid-cols-3 gap-3 pt-3 border-t border-rule">
@@ -934,7 +938,7 @@ function SpyVerdictCard({
       </div>
       {(isPreConfig ||
         snap.currentState === "STAND_DOWN" ||
-        snap.currentState === "COOLDOWN") && (
+        completedTrade) && (
         <LastSignalRecap recap={lastSignal} feedId="spy-last-session" />
       )}
       {isPreConfig ? (
@@ -942,7 +946,7 @@ function SpyVerdictCard({
       ) : (
         <>
           <FlipsLine condition={snap.flipCondition} />
-          <InvalidationLine invalidation={snap.invalidation} />
+          <InvalidationLine invalidation={snap.invalidation} completed={completedTrade} />
         </>
       )}
       <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -1081,6 +1085,7 @@ function SpxVerdictCard({
   const isPreConfig = state === "PRE_CONFIG";
   const headline = isPreConfig ? "Awaiting setup" : spxHeadline(state, action);
   const isOutside = snap.scenario === "OUTSIDE_PLAY";
+  const completedTrade = state === "COOLDOWN" || /completed/i.test(snap.flipCondition || "");
 
   const closestLine = nearestSpxLine(snap.lines);
   const alertLevel = closestLine ? closestLine.currentValue : snap.price.last;
@@ -1130,7 +1135,7 @@ function SpxVerdictCard({
       }
     >
       <p className="sr-only">{SLATE_COPY.spxSubtitle}</p>
-      <p className="text-body text-ink-2 leading-relaxed">
+      <p className="min-h-[68px] text-body text-ink-2 leading-relaxed">
         {snap.fanRead?.summary ||
           snap.scenarioExplanation ||
           snap.channel.reason ||
@@ -1179,7 +1184,7 @@ function SpxVerdictCard({
       ) : (
         <>
           <FlipsLine condition={snap.flipCondition} />
-          <InvalidationLine invalidation={snap.invalidation ?? null} />
+          <InvalidationLine invalidation={snap.invalidation ?? null} completed={completedTrade} />
         </>
       )}
       <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -1400,9 +1405,18 @@ function FlipsLine({ condition }: { condition?: string }) {
 
 function InvalidationLine({
   invalidation,
+  completed = false,
 }: {
   invalidation: { level: number; stopOffset: number } | null;
+  completed?: boolean;
 }) {
+  if (completed) {
+    return (
+      <p className="text-meta text-ink-3 font-mono">
+        Invalidation: trade completed; no live trigger remains.
+      </p>
+    );
+  }
   if (!invalidation) {
     return (
       <p className="text-meta text-ink-3 font-mono">

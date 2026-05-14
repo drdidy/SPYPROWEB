@@ -204,6 +204,18 @@ export interface ReplayBlock {
   session: ReplaySession | null;
   verdictOutcome: "WIN" | "LOSS" | "PUSH" | "N_A" | null;
   verdictPnl: number | null;
+  entry?: {
+    time?: string | null;
+    price?: number | null;
+    side?: "LONG" | "SHORT" | string | null;
+    rule?: string | null;
+    line?: string | null;
+  } | null;
+  exit?: {
+    time?: string | null;
+    price?: number | null;
+    rule?: string | null;
+  } | null;
   error?: string | null;
 }
 

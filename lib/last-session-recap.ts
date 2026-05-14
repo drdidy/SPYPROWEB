@@ -62,7 +62,13 @@ function buildSpyRecap(snap: AdaptedSnapshot | null): LastSignalSummary | null {
   const block = snap.replay;
   const verdict = snap.decision.verdict;
   const side: "LONG" | "SHORT" | null =
-    verdict === "LONG" ? "LONG" : verdict === "SHORT" ? "SHORT" : null;
+    block.entry?.side === "LONG" || block.entry?.side === "SHORT"
+      ? block.entry.side
+      : verdict === "LONG"
+        ? "LONG"
+        : verdict === "SHORT"
+          ? "SHORT"
+          : null;
 
   if (side && block.verdictOutcome && block.verdictOutcome !== "N_A") {
     return shapeRecap(side, block, snap.asOf);
