@@ -1,12 +1,16 @@
+"use client";
+
 // State-aware command module for Decision Slate. This is the page's
 // visual anchor: a compact trading-desk panel with the current action,
 // structure rails, and countdowns in one glance.
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   ArrowRight,
   BookOpen,
+  ChevronLeft,
+  ChevronRight,
   Rewind,
   Activity,
   Target,
@@ -242,16 +246,14 @@ export function RecommendedAction({
         </div>
 
         <CommandRailDiagram
-          chart={activeChart}
-          accent={chartAccent}
+          spyChart={spyChart}
+          spxChart={spxChart}
+          spyProjection={spyProjection}
+          spxProjection={spxProjection}
+          initialEngine={rec.id === "live-spx" ? "ES" : "SPY"}
+          fallbackAccent={chartAccent}
           frameless={unifiedChrome}
-          metricRail={
-            <ScorecardMetrics
-              confidence={confidence}
-              activeProjection={activeProjection}
-              compact
-            />
-          }
+          confidence={confidence}
         />
 
         <aside className="border-t border-paper/10 px-6 py-5 lg:border-l lg:border-t-0 lg:px-4 lg:py-7">
@@ -426,16 +428,41 @@ function ScorecardMetrics({
 }
 
 function CommandRailDiagram({
-  chart,
-  accent,
+  spyChart,
+  spxChart,
+  spyProjection,
+  spxProjection,
+  initialEngine,
+  fallbackAccent,
   frameless = false,
-  metricRail,
+  confidence,
 }: {
-  chart?: StructureChartData | null;
-  accent: "bull" | "gold" | "violet" | "neutral";
+  spyChart?: StructureChartData | null;
+  spxChart?: StructureChartData | null;
+  spyProjection?: ContractProjection | null;
+  spxProjection?: ContractProjection | null;
+  initialEngine: "SPY" | "ES";
+  fallbackAccent: "bull" | "gold" | "violet" | "neutral";
   frameless?: boolean;
-  metricRail?: ReactNode;
+  confidence: number;
 }) {
+  const [engine, setEngine] = useState<"SPY" | "ES">(initialEngine);
+  const [direction, setDirection] = useState<"left" | "right">("right");
+  const chart = engine === "ES" ? spxChart : spyChart;
+  const projection = engine === "ES" ? spxProjection : spyProjection;
+  const accent = engine === "ES" ? "violet" : fallbackAccent;
+  const otherEngine = engine === "SPY" ? "ES" : "SPY";
+
+  const selectEngine = (next: "SPY" | "ES") => {
+    if (next === engine) return;
+    setDirection(next === "ES" ? "right" : "left");
+    setEngine(next);
+  };
+
+  const metricRail = (
+    <ScorecardMetrics confidence={confidence} activeProjection={projection} compact />
+  );
+
   if (!chart) {
     return (
       <div className="hidden min-h-[560px] border-t border-paper/10 px-3 py-6 lg:block lg:border-t-0">
@@ -447,6 +474,11 @@ function CommandRailDiagram({
               : "rounded-[10px] border border-paper/10 bg-paper/[0.035]",
           )}
         >
+          <ChartLensSwitcher
+            engine={engine}
+            otherEngine={otherEngine}
+            onSelect={selectEngine}
+          />
           <EmptyWorkspaceChart />
           {metricRail}
         </div>
@@ -457,19 +489,134 @@ function CommandRailDiagram({
   return (
     <div className="hidden min-h-[560px] border-t border-paper/10 px-3 py-6 lg:block lg:border-t-0">
       <div className="relative flex h-full min-h-[508px] flex-col gap-4">
-        <StructurePathChart
-          data={chart}
-          variant="dark"
-          accent={accent}
-          height={388}
-          title="recommended path"
-          frameless={frameless}
+        <ChartLensSwitcher
+          engine={engine}
+          otherEngine={otherEngine}
+          onSelect={selectEngine}
         />
+        <div
+          key={engine}
+          className={cn(
+            "slate-lens-panel",
+            direction === "right"
+              ? "slate-lens-enter-right"
+              : "slate-lens-enter-left",
+          )}
+        >
+          <StructurePathChart
+            data={chart}
+            variant="dark"
+            accent={accent}
+            height={358}
+            title={`${engine} path vs structure`}
+            frameless={frameless}
+          />
+        </div>
         {metricRail}
+        <style>{lensStyles}</style>
       </div>
     </div>
   );
 }
+
+function ChartLensSwitcher({
+  engine,
+  otherEngine,
+  onSelect,
+}: {
+  engine: "SPY" | "ES";
+  otherEngine: "SPY" | "ES";
+  onSelect: (engine: "SPY" | "ES") => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-[12px] border border-paper/10 bg-paper/[0.04] px-3 py-2">
+      <div>
+        <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-paper/45">
+          Workspace lens
+        </div>
+        <div className="mt-0.5 font-mono text-[11px] uppercase tracking-[0.12em] text-gold-soft">
+          {engine} structure chart
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <div
+          role="tablist"
+          aria-label="Workspace chart engine"
+          className="grid grid-cols-2 rounded-pill border border-paper/10 bg-[#071116]/72 p-1"
+        >
+          {(["SPY", "ES"] as const).map((item) => (
+            <button
+              key={item}
+              type="button"
+              role="tab"
+              aria-selected={engine === item}
+              onClick={() => onSelect(item)}
+              className={cn(
+                "h-8 rounded-pill px-3 font-mono text-[11px] uppercase tracking-[0.10em] transition",
+                "outline-none focus-visible:ring-2 focus-visible:ring-gold/60",
+                engine === item
+                  ? "bg-paper text-ink"
+                  : "text-paper/58 hover:text-paper",
+              )}
+            >
+              {item}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => onSelect(otherEngine)}
+          aria-label={`Show ${otherEngine} chart`}
+          className={cn(
+            "group inline-flex h-9 w-9 items-center justify-center rounded-full",
+            "border border-gold/35 bg-gold-soft/10 text-gold-soft transition",
+            "hover:bg-gold-soft hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/70",
+          )}
+        >
+          {engine === "SPY" ? (
+            <ChevronRight
+              size={16}
+              className="transition-transform group-hover:translate-x-0.5"
+              aria-hidden
+            />
+          ) : (
+            <ChevronLeft
+              size={16}
+              className="transition-transform group-hover:-translate-x-0.5"
+              aria-hidden
+            />
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const lensStyles = `
+  @keyframes slateLensFromRight {
+    from { opacity: 0; transform: translateX(22px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes slateLensFromLeft {
+    from { opacity: 0; transform: translateX(-22px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  .slate-lens-panel {
+    will-change: opacity, transform;
+  }
+  .slate-lens-enter-right {
+    animation: slateLensFromRight 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .slate-lens-enter-left {
+    animation: slateLensFromLeft 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .slate-lens-enter-right,
+    .slate-lens-enter-left {
+      animation: none !important;
+    }
+  }
+`;
 
 function EmptyWorkspaceChart() {
   return (
