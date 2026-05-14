@@ -106,7 +106,7 @@ export function Sidebar({
       <nav className="relative flex-1 overflow-y-auto py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {sections.map((s) => (
           <div key={s.label} className="mt-5 first:mt-0">
-            <div className="px-5 mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-gold-soft/45">
+            <div className="px-5 mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-gold-soft/72">
               {s.label}
             </div>
             {s.items.map((it) => {
@@ -168,7 +168,7 @@ export function Sidebar({
             <div className="font-serif text-[13px] leading-none tracking-[0.04em] text-paper">
               {BUILD_LABEL}
             </div>
-            <div className="mt-1 font-mono text-[9px] text-paper/45">
+            <div className="mt-1 font-mono text-[9px] text-paper/64">
               {WORKSPACE_LABEL}
             </div>
           </div>

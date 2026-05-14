@@ -13,8 +13,8 @@
     "test:e2e": "node scripts/run-playwright-smoke.mjs",
     "test:e2e:smoke": "npx playwright test tests/dashboard/smoke.spec.ts --reporter=line --workers=1",
     "test:e2e:visual": "npx playwright test tests/visual --reporter=line --workers=1",
-    "test:e2e:all": "npx playwright test tests/dashboard tests/visual --reporter=line --workers=1",
-    "test:a11y": "node -e \"console.log('axe harness scaffolded; hard assertions enable in Task 4')\""
+    "test:e2e:all": "npx playwright test tests/dashboard tests/critical tests/replay tests/visual --reporter=line --workers=1",
+    "test:a11y": "npx playwright test tests/a11y/critical.spec.ts --reporter=line --workers=1"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.0",

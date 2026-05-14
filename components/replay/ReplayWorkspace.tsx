@@ -231,8 +231,20 @@ export function ReplayWorkspace({ initialDate }: Props) {
     });
   };
 
-  useReplayClock(spyPlaying, speed, setSpyPlayhead, setSpyPlaying);
-  useReplayClock(esPlaying, speed, setEsPlayhead, setEsPlaying);
+  useReplayClock(
+    spyPlaying,
+    speed,
+    intraday?.spy.length ?? 0,
+    setSpyPlayhead,
+    setSpyPlaying,
+  );
+  useReplayClock(
+    esPlaying,
+    speed,
+    intraday?.es.length ?? 0,
+    setEsPlayhead,
+    setEsPlaying,
+  );
 
   const barsCount = (intraday?.spy.length ?? 0) + (intraday?.es.length ?? 0);
   const hasBars = barsCount > 0;
@@ -395,7 +407,7 @@ export function ReplayWorkspace({ initialDate }: Props) {
         aria-label="Replay workstation"
         className="grid gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(340px,3fr)]"
       >
-        <DarkPanel className="min-h-[520px]">
+        <DarkPanel className="min-h-[680px]">
           <PanelHeader
             eyebrow="Replay chart"
             title={replayCopy.chart.title}
@@ -524,22 +536,25 @@ export function ReplayWorkspace({ initialDate }: Props) {
 function useReplayClock(
   playing: boolean,
   speed: PlaybackSpeed,
+  barCount: number,
   setPlayhead: Dispatch<SetStateAction<number>>,
   setPlaying: Dispatch<SetStateAction<boolean>>,
 ) {
-  const secondsPerFullSessionAt1x = 90;
   const rafRef = useRef<number | null>(null);
   useEffect(() => {
-    if (!playing) {
+    if (!playing || barCount < 2) {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (playing) setPlaying(false);
       return;
     }
+    const step = 1 / Math.max(1, barCount - 1);
+    const barsPerSecondAt1x = 5;
     let last = performance.now();
     const tick = (now: number) => {
       const dt = (now - last) / 1000;
       last = now;
       setPlayhead((current) => {
-        const next = current + dt / (secondsPerFullSessionAt1x / speed);
+        const next = current + dt * barsPerSecondAt1x * speed * step;
         if (next >= 1) {
           setPlaying(false);
           return 1;
@@ -552,7 +567,7 @@ function useReplayClock(
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [playing, setPlayhead, setPlaying, speed]);
+  }, [barCount, playing, setPlayhead, setPlaying, speed]);
 }
 
 function ReplayHeader({

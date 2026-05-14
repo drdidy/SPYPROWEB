@@ -22,9 +22,9 @@ export function buildReplayPriceLens(bars: ReplayLikeBar[]): ReplayPriceLens {
   }
 
   const center = quantile(closes, 0.5);
-  const middleRange = Math.max(0.01, quantile(closes, 0.9) - quantile(closes, 0.1));
-  const instrumentFloor = Math.abs(center) > 2000 ? 55 : 6;
-  const radius = Math.max(instrumentFloor, Math.abs(center) * 0.012, middleRange * 2.4);
+  const middleRange = Math.max(0.01, quantile(closes, 0.92) - quantile(closes, 0.08));
+  const instrumentFloor = Math.abs(center) > 2000 ? 45 : 4.5;
+  const radius = Math.max(instrumentFloor, Math.abs(center) * 0.008, middleRange * 1.8);
 
   return {
     center,

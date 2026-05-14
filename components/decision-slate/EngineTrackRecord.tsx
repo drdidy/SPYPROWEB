@@ -195,15 +195,14 @@ export function EngineTrackRecord({ record, feedId, className }: Props) {
       </div>
 
       {skipText && (
-        <div className="mt-2 font-mono text-[10.5px] text-ink-3">
-          <InfoTooltip label="Skip" content={SLATE_COPY.trackRecord.skipTooltip}>
-            <Link
-              href={skipFilterHref}
-              className="rounded-soft hover:text-ink transition-colors outline-none focus-visible:ring-2 focus-visible:ring-gold/40"
-            >
-              {skipText} excluded from hit rate
-            </Link>
-          </InfoTooltip>
+        <div className="mt-2 inline-flex items-center gap-1.5 font-mono text-[10.5px] text-ink-3">
+          <Link
+            href={skipFilterHref}
+            className="rounded-soft hover:text-ink transition-colors outline-none focus-visible:ring-2 focus-visible:ring-gold/40"
+          >
+            {skipText} excluded from hit rate
+          </Link>
+          <InfoTooltip label="Skip" content={SLATE_COPY.trackRecord.skipTooltip} />
         </div>
       )}
     </div>

@@ -510,12 +510,12 @@ function DeltaTag({
   neutral?: boolean;
 }) {
   const tone = neutral
-    ? "text-state-neutral"
+    ? "text-paper/72"
     : value > 0
-      ? "text-state-bullish"
+      ? "text-[#78C895]"
       : value < 0
-        ? "text-state-bearish"
-        : "text-state-neutral";
+        ? "text-[#E08A78]"
+        : "text-paper/72";
   const sign = value > 0 ? "+" : value < 0 ? "−" : "";
   const mag = Math.abs(value).toFixed(2);
   // v10 P1-1: render the percent move alongside the points delta

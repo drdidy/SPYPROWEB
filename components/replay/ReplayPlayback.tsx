@@ -219,14 +219,15 @@ function PanelChart({
   priceColor: string;
   emptyMsg: string;
 }) {
-  const W = 1040;
-  const H = 440;
-  const PAD_L = 62;
-  const PAD_R = 172;
-  const PAD_T = 34;
-  const PAD_B = 44;
+  const W = 1180;
+  const H = 560;
+  const PAD_L = 72;
+  const PAD_R = 226;
+  const PAD_T = 42;
+  const PAD_B = 56;
 
   const hasBars = bars.length > 0;
+  const hasStructureLines = lines.length > 0;
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const { playhead } = playback;
 
@@ -309,7 +310,7 @@ function PanelChart({
   const tooltipY = Math.min(H - PAD_B - 66, Math.max(PAD_T + 4, selectedY - 38));
 
   return (
-    <div className="rounded-[14px] border border-paper/10 bg-paper/[0.035] p-3 md:p-4">
+    <div className="rounded-[16px] border border-paper/10 bg-paper/[0.035] p-3 md:p-5">
       <div className="mb-3 flex items-baseline justify-between gap-3">
         <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-gold-soft">{title}</span>
         {lastBar && (
@@ -319,29 +320,36 @@ function PanelChart({
           </span>
         )}
       </div>
-      {!hasBars || lines.length === 0 ? (
+      {!hasBars ? (
         <div className="font-mono text-[12px] text-ink-3 italic py-12 text-center">
           {emptyMsg}
         </div>
       ) : (
-        <svg
-          viewBox={`0 0 ${W} ${H}`}
-          className="h-[360px] w-full outline-none md:h-[430px]"
-          tabIndex={0}
-          role="img"
-          aria-label={`${title} interactive replay chart`}
-          onPointerMove={(event) =>
-            setActiveIndex(nearestReplayBarIndex(event, bars, W, PAD_L, W - PAD_R, xOf))
-          }
-          onPointerLeave={() => setActiveIndex(null)}
-          onFocus={() =>
-            setActiveIndex((value) => value ?? Math.max(0, visibleBars.length - 1))
-          }
-          onKeyDown={(event) => {
-            const next = stepReplayIndex(event, activeIndex ?? selectedIndex, bars.length);
-            if (next !== activeIndex) setActiveIndex(next);
-          }}
-        >
+        <>
+          {!hasStructureLines && (
+            <div className="mb-3 rounded-[10px] border border-gold/24 bg-gold/10 px-3 py-2 font-mono text-[11px] uppercase tracking-[0.08em] text-gold-soft">
+              Price replay active; structure overlay unavailable for this date.
+            </div>
+          )}
+          <svg
+            viewBox={`0 0 ${W} ${H}`}
+            className="h-[470px] w-full outline-none md:h-[540px] xl:h-[580px]"
+            data-testid={`${engineSlug(title)}-replay-chart`}
+            tabIndex={0}
+            role="img"
+            aria-label={`${title} interactive replay chart`}
+            onPointerMove={(event) =>
+              setActiveIndex(nearestReplayBarIndex(event, bars, W, PAD_L, W - PAD_R, xOf))
+            }
+            onPointerLeave={() => setActiveIndex(null)}
+            onFocus={() =>
+              setActiveIndex((value) => value ?? Math.max(0, visibleBars.length - 1))
+            }
+            onKeyDown={(event) => {
+              const next = stepReplayIndex(event, activeIndex ?? selectedIndex, bars.length);
+              if (next !== activeIndex) setActiveIndex(next);
+            }}
+          >
           <title>{title}</title>
           <desc>
             Actual replay price path with projected structure lines and exact current values.
@@ -373,7 +381,7 @@ function PanelChart({
                 key={i}
                 x={PAD_L - 4}
                 y={PAD_T + f * (H - PAD_T - PAD_B) + 3}
-                fontSize="9"
+                fontSize="11"
                 fontFamily="var(--font-geist-mono)"
                 fill="rgba(244,228,192,0.56)"
                 textAnchor="end"
@@ -432,7 +440,7 @@ function PanelChart({
                 <text
                   x={W - PAD_R + 8}
                   y={labelY + 4}
-                  fontSize="12"
+                  fontSize="13"
                   fontFamily="var(--font-geist-mono)"
                   fill={ln.color}
                 >
@@ -626,10 +634,11 @@ function PanelChart({
               />
             </g>
           ))}
-        </svg>
+          </svg>
+        </>
       )}
 
-      <ChartTransport title={title} disabled={!hasBars || lines.length === 0} playback={playback} />
+      <ChartTransport title={title} disabled={!hasBars} playback={playback} />
 
       {/* touch event log */}
       {visibleTouches.length > 0 && (
@@ -664,6 +673,8 @@ function ChartTransport({
   disabled: boolean;
   playback: ReplayChartPlayback;
 }) {
+  const engine = engineSlug(title).toUpperCase();
+  const playLabel = `${playback.playing ? "Pause" : "Play"} ${engine}`;
   return (
     <div className="mt-3 rounded-[12px] border border-paper/10 bg-paper/[0.04] px-3 py-3">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
@@ -680,10 +691,11 @@ function ChartTransport({
             type="button"
             disabled={disabled}
             onClick={playback.onToggle}
+            data-testid={`${engine.toLowerCase()}-replay-play`}
             className="inline-flex h-9 items-center justify-center rounded-[8px] bg-paper px-4 font-mono text-[12px] uppercase tracking-[0.08em] text-ink transition hover:bg-gold-tint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:cursor-not-allowed disabled:opacity-35"
-            aria-label={`${playback.playing ? "Pause" : "Play"} ${title}`}
+            aria-label={`${playLabel} replay`}
           >
-            {playback.playing ? "Pause" : "Play"}
+            {playLabel}
           </button>
           <button
             type="button"
@@ -800,4 +812,8 @@ function shortTime(iso: string): string {
   } catch {
     return "—";
   }
+}
+
+function engineSlug(title: string): "spy" | "es" {
+  return title.toLowerCase().startsWith("spy") ? "spy" : "es";
 }

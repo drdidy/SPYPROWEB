@@ -31,6 +31,7 @@ export function OptionsIntelligence({
       spy={spy}
       healthAction={<PanelHeartbeat feedId="options-chain" />}
       projection={projection}
+      chainStatus={chain ? "loaded" : "waiting"}
     />
   );
 }

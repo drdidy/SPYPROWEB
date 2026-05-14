@@ -17,6 +17,8 @@ const result = spawnSync(
     "playwright",
     "test",
     "tests/dashboard/smoke.spec.ts",
+    "tests/critical/surfaces.spec.ts",
+    "tests/replay/transport.spec.ts",
     "--reporter=line",
     "--workers=1",
   ],

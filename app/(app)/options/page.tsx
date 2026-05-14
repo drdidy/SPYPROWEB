@@ -84,7 +84,7 @@ export default async function Page() {
               rows={[
                 { label: "Symbols", value: "SPY + SPX" },
                 { label: "Sections", value: "Flow, dark pool, GEX, chain, Greeks" },
-                { label: "Display rule", value: "No synthetic rows" },
+                { label: "Retry", value: "Refresh this page to re-query the live providers" },
               ]}
             />
           </CardBody>
@@ -269,7 +269,7 @@ function ChainPanel({ symbol, chain, spot }: { symbol: string; chain?: UwOptionC
               rows={[
                 { label: "Symbol", value: symbol },
                 { label: "Rows", value: "No synthetic contracts" },
-                { label: "Greeks", value: "Delta, gamma, theta, vega, IV" },
+                { label: "Retry", value: "Manual refresh re-checks the current expiration" },
               ]}
             />
           </div>

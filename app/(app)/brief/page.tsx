@@ -1060,16 +1060,16 @@ function glossaryForLine(line: WatchLine): BriefGlossaryKey | null {
   return null;
 }
 
-function lineLabel(line: WatchLine): string {
-  return line.line ?? line.name ?? line.kind ?? "Structure";
+function lineLabel(line: WatchLine | undefined): string {
+  return line?.line ?? line?.name ?? line?.kind ?? "Structure";
 }
 
-function lineLevel(line: WatchLine): number | undefined {
-  return line.level ?? line.currentValue;
+function lineLevel(line: WatchLine | undefined): number | undefined {
+  return line?.level ?? line?.currentValue;
 }
 
-function lineDistance(line: WatchLine): number {
-  const value = line.distance ?? line.distanceFromPrice;
+function lineDistance(line: WatchLine | undefined): number {
+  const value = line?.distance ?? line?.distanceFromPrice;
   return Number.isFinite(value ?? NaN) ? Number(value) : NaN;
 }
 

@@ -20,12 +20,14 @@ export function OptionsIntelPanel({
   spy,
   healthAction,
   projection,
+  chainStatus,
 }: {
   intel: Intel | null;
   strikes: SelectedStrikes | null;
   spy: number;
   healthAction?: ReactNode;
   projection?: ContractProjection | null;
+  chainStatus?: "loaded" | "waiting";
 }) {
   if (!intel || !strikes) {
     return (
@@ -46,14 +48,17 @@ export function OptionsIntelPanel({
               Options chain not yet loaded.
             </div>
             <p className="mt-2 text-[13px] text-ink-3 leading-relaxed max-w-xl">
-              The active option-chain feed has not returned the current expiration.
-              The panel is paused instead of fabricating dealer or flow values.
+              The current expiration has not returned a complete strike ladder yet.
+              The panel is paused instead of fabricating dealer, flow, or entry-cost values.
             </p>
           </div>
           <div className="grid gap-2 sm:grid-cols-3">
-            <EmptyChainStat label="Live chain" value="Waiting" />
+            <EmptyChainStat
+              label="Live chain"
+              value={chainStatus === "loaded" ? "Partial" : "Waiting"}
+            />
             <EmptyChainStat label="Contract model" value={projection ? "Available" : "Pending"} />
-            <EmptyChainStat label="Refresh" value="Session clock" />
+            <EmptyChainStat label="Retry cadence" value="Manual + clock" />
           </div>
           {projection && <ContractProjectionCard projection={projection} />}
           <div className="flex flex-wrap items-center gap-3 pt-2">
