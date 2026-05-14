@@ -95,6 +95,18 @@ def _quote_last(item: dict) -> float | None:
     return None
 
 
+def _quote_num(item: dict, *keys: str) -> float | None:
+    for key in keys:
+        value = item.get(key)
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError):
+            continue
+        if parsed == parsed:
+            return parsed
+    return None
+
+
 @pc.ttl_cache(ttl_seconds=600.0, maxsize=1)
 def _get_access_token() -> str | None:
     """Exchange the long-lived refresh token for a short-lived access token.
@@ -155,6 +167,82 @@ def fetch_equity_quote(symbol: str = "SPY") -> float | None:
         if item.get("symbol") == clean:
             return _quote_last(item)
     return None
+
+
+def _quote_type_for_option_symbol(symbol: str) -> str:
+    clean = symbol.upper()
+    if "SPX" in clean or clean.startswith("SPX"):
+        return "index-option"
+    return "equity-option"
+
+
+def _fetch_option_market_data(option_symbols: list[str]) -> dict[str, dict]:
+    token = _get_access_token()
+    if not token or not option_symbols:
+        return {}
+    headers = {
+        "Accept": "application/json",
+        "Authorization": f"Bearer {token}",
+    }
+    if ENV == "production":
+        headers["Accept-Version"] = TASTYTRADE_API_VERSION
+    params = []
+    for symbol in option_symbols:
+        clean = str(symbol or "").strip()
+        if clean:
+            params.append((_quote_type_for_option_symbol(clean), clean))
+    if not params:
+        return {}
+    body = _http_get(
+        f"{BASE}/market-data/by-type?{urllib.parse.urlencode(params)}",
+        headers,
+        timeout=5.0,
+    )
+    out: dict[str, dict] = {}
+    for item in _quote_items(body):
+        sym = str(item.get("symbol") or item.get("streamer-symbol") or item.get("streamerSymbol") or "").strip()
+        if sym:
+            out[sym] = item
+    return out
+
+
+def _enrich_option_quote_rows(rows_call: list[dict], rows_put: list[dict], atm: int | None) -> None:
+    rows = rows_call + rows_put
+    if not rows:
+        return
+    quote_rows = rows
+    if atm is not None:
+        quote_rows = sorted(
+            rows,
+            key=lambda row: abs(float(row.get("strike") or atm) - atm),
+        )[:80]
+    symbols = [str(row.get("optionSymbol") or "").strip() for row in quote_rows if row.get("optionSymbol")]
+    quotes = _fetch_option_market_data(symbols)
+    if not quotes:
+        return
+    for row in rows:
+        sym = str(row.get("optionSymbol") or "").strip()
+        quote = quotes.get(sym)
+        if not quote:
+            continue
+        bid = _quote_num(quote, "bid", "bid-price", "bidPrice")
+        ask = _quote_num(quote, "ask", "ask-price", "askPrice")
+        mark = _quote_num(quote, "mark", "mark-price", "markPrice", "last", "last-price", "lastPrice", "close")
+        if mark is None and bid is not None and ask is not None and bid > 0 and ask >= bid:
+            mark = (bid + ask) / 2
+        for key, value in (
+            ("bid", bid),
+            ("ask", ask),
+            ("mark", mark),
+            ("iv", _quote_num(quote, "iv", "implied-volatility", "impliedVolatility")),
+            ("delta", _quote_num(quote, "delta")),
+            ("gamma", _quote_num(quote, "gamma")),
+            ("theta", _quote_num(quote, "theta")),
+            ("vega", _quote_num(quote, "vega")),
+            ("rho", _quote_num(quote, "rho")),
+        ):
+            if value is not None:
+                row[key] = value
 
 
 def _safe_float(value: Any) -> float:
@@ -271,6 +359,8 @@ def fetch_chain_snapshot(
 
     if not rows_call and not rows_put:
         return None
+
+    _enrich_option_quote_rows(rows_call, rows_put, atm)
 
     total_call_oi = sum(r.get("oi") or 0 for r in rows_call if r.get("oi") == r.get("oi"))
     total_put_oi = sum(r.get("oi") or 0 for r in rows_put if r.get("oi") == r.get("oi"))
