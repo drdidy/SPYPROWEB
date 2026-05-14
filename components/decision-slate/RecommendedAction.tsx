@@ -189,7 +189,7 @@ export function RecommendedAction({
           </div>
         </div>
       </div>
-      <div className="relative grid gap-0 lg:grid-cols-[180px_minmax(0,1fr)_158px] xl:grid-cols-[198px_minmax(0,1fr)_168px]">
+      <div className="relative grid gap-0 lg:grid-cols-[180px_minmax(0,1fr)] xl:grid-cols-[210px_minmax(0,1fr)]">
         <div className="px-5 py-6 md:px-6 md:py-7">
           <p
             id="recommended-action-heading"
@@ -265,7 +265,7 @@ export function RecommendedAction({
           confidence={confidence}
         />
 
-        <aside className="border-t border-paper/10 px-6 py-5 lg:border-l lg:border-t-0 lg:px-4 lg:py-7">
+        <aside className="border-t border-paper/10 px-6 py-5 lg:col-span-2 lg:px-6 lg:py-5">
           <div className="flex items-center gap-2 text-gold-soft">
             <Hourglass size={15} aria-hidden />
             <span className="font-mono text-[10px] tracking-[0.18em] uppercase font-semibold">
@@ -275,10 +275,10 @@ export function RecommendedAction({
           {showContext && (
             <div
               data-testid="recommended-action-context"
-              className="mt-4 space-y-4 font-mono text-meta tabular-nums text-paper/78"
+              className="mt-4 grid gap-3 font-mono text-meta tabular-nums text-paper/78 sm:grid-cols-2 xl:grid-cols-4"
             >
               {spyNextEventISO && (
-                <div>
+                <div className="rounded-soft border border-paper/10 bg-paper/[0.035] px-3 py-2.5">
                   <div className="text-[10px] uppercase tracking-[0.16em] text-paper/45">
                     SPY {spyEventVerb}
                   </div>
@@ -288,7 +288,7 @@ export function RecommendedAction({
                 </div>
               )}
               {spxNextEventISO && (
-                <div className="border-t border-paper/10 pt-4">
+                <div className="rounded-soft border border-paper/10 bg-paper/[0.035] px-3 py-2.5">
                   <div className="text-[10px] uppercase tracking-[0.16em] text-paper/45">
                     ES {spxEventVerb}
                   </div>
@@ -297,7 +297,7 @@ export function RecommendedAction({
                   </div>
                 </div>
               )}
-              <div className="border-t border-paper/10 pt-4">
+              <div className="rounded-soft border border-paper/10 bg-paper/[0.035] px-3 py-2.5">
                 <div className="text-[10px] uppercase tracking-[0.16em] text-paper/45">
                   Data window
                 </div>
@@ -305,7 +305,7 @@ export function RecommendedAction({
                   {activeChart ? `${activeChart.label} ${activeChart.date}` : "Awaiting bars"}
                 </div>
               </div>
-              <div className="border-t border-paper/10 pt-4">
+              <div className="rounded-soft border border-paper/10 bg-paper/[0.035] px-3 py-2.5">
                 <div className="text-[10px] uppercase tracking-[0.16em] text-gold-soft">
                   Session posture
                 </div>
@@ -489,10 +489,10 @@ function CommandRailDiagram({
 
   if (!chart) {
     return (
-      <div className="hidden min-h-[640px] border-t border-paper/10 px-3 py-6 lg:block lg:border-t-0">
+      <div className="hidden min-h-[820px] border-t border-paper/10 px-3 py-6 lg:block lg:border-l lg:border-t-0">
         <div
           className={cn(
-            "relative flex h-full min-h-[588px] flex-col gap-4 overflow-hidden px-7 py-7 text-center",
+            "relative flex h-full min-h-[768px] flex-col gap-4 overflow-hidden px-7 py-7 text-center",
             frameless
               ? "rounded-none border-0 bg-paper/[0.018]"
               : "rounded-[10px] border border-paper/10 bg-paper/[0.035]",
@@ -511,8 +511,8 @@ function CommandRailDiagram({
   }
 
   return (
-    <div className="hidden min-h-[740px] border-t border-paper/10 px-3 py-6 lg:block lg:border-t-0">
-      <div className="relative flex h-full min-h-[688px] flex-col gap-4">
+    <div className="hidden min-h-[820px] border-t border-paper/10 px-3 py-6 lg:block lg:border-l lg:border-t-0">
+      <div className="relative flex h-full min-h-[768px] flex-col gap-4">
         <ChartLensSwitcher
           engine={engine}
           otherEngine={otherEngine}
@@ -531,7 +531,7 @@ function CommandRailDiagram({
             data={chart}
             variant="dark"
             accent={accent}
-            height={530}
+            height={610}
             title={`${engine} path vs structure`}
             frameless={frameless}
           />
