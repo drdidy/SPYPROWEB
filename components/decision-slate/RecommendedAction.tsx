@@ -511,8 +511,8 @@ function CommandRailDiagram({
   }
 
   return (
-    <div className="hidden min-h-[640px] border-t border-paper/10 px-3 py-6 lg:block lg:border-t-0">
-      <div className="relative flex h-full min-h-[588px] flex-col gap-4">
+    <div className="hidden min-h-[740px] border-t border-paper/10 px-3 py-6 lg:block lg:border-t-0">
+      <div className="relative flex h-full min-h-[688px] flex-col gap-4">
         <ChartLensSwitcher
           engine={engine}
           otherEngine={otherEngine}
@@ -531,7 +531,7 @@ function CommandRailDiagram({
             data={chart}
             variant="dark"
             accent={accent}
-            height={430}
+            height={530}
             title={`${engine} path vs structure`}
             frameless={frameless}
           />

@@ -44,12 +44,12 @@ export function StructurePathChart({
 }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const largeCanvas = height >= 320;
-  const W = largeCanvas ? 520 : 620;
-  const H = largeCanvas ? 340 : 210;
+  const W = largeCanvas ? 780 : 620;
+  const H = largeCanvas ? 460 : 210;
   const PAD_L = 48;
-  const PAD_R = largeCanvas ? 132 : 124;
-  const PAD_T = largeCanvas ? 26 : 22;
-  const PAD_B = largeCanvas ? 34 : 28;
+  const PAD_R = largeCanvas ? 168 : 124;
+  const PAD_T = largeCanvas ? 34 : 22;
+  const PAD_B = largeCanvas ? 42 : 28;
   const bars = (data?.bars ?? []).filter(validBar);
   const lines = (data?.lines ?? []).filter(validLine);
   const hasData = bars.length >= 2 && lines.length > 0;
@@ -219,7 +219,7 @@ export function StructurePathChart({
       <svg
         viewBox={`0 0 ${W} ${H}`}
         className="w-full"
-        style={{ height: Math.max(118, height - 38) }}
+        style={{ height: Math.max(118, height - 30) }}
         role="img"
         tabIndex={0}
         aria-label={`${data?.label} actual price path against engine rails`}

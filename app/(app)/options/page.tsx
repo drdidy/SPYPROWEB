@@ -276,9 +276,12 @@ function ChainPanel({ symbol, chain, spot }: { symbol: string; chain?: UwOptionC
         ) : (
           <div className="grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_330px]">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[880px] text-[12px] tabular-nums">
+              <table className="w-full min-w-[1120px] text-[12px] tabular-nums">
                 <thead>
                   <tr className="border-y border-rule text-ink-3 eyebrow">
+                    <th className="text-right px-3 py-2.5">Call Bid</th>
+                    <th className="text-right px-3 py-2.5">Call Ask</th>
+                    <th className="text-right px-3 py-2.5">Call Mark</th>
                     <th className="text-right px-3 py-2.5">Call Vol</th>
                     <th className="text-right px-3 py-2.5">Call OI</th>
                     <th className="text-right px-3 py-2.5">Call IV</th>
@@ -290,11 +293,17 @@ function ChainPanel({ symbol, chain, spot }: { symbol: string; chain?: UwOptionC
                     <th className="text-right px-3 py-2.5">Put IV</th>
                     <th className="text-right px-3 py-2.5">Put OI</th>
                     <th className="text-right px-3 py-2.5">Put Vol</th>
+                    <th className="text-right px-3 py-2.5">Put Mark</th>
+                    <th className="text-right px-3 py-2.5">Put Ask</th>
+                    <th className="text-right px-3 py-2.5">Put Bid</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-rule">
                   {rows.map((r) => (
                     <tr key={r.strike} className={r.atm ? "bg-gold-tint/45" : ""}>
+                      <td className="text-right px-3 py-2 font-mono font-semibold text-bull-ink">{fmtOptionPrice(r.callBid)}</td>
+                      <td className="text-right px-3 py-2 font-mono font-semibold text-bull-ink">{fmtOptionPrice(r.callAsk)}</td>
+                      <td className="text-right px-3 py-2 font-mono font-semibold text-ink">{fmtOptionPrice(r.callMark)}</td>
                       <td className="text-right px-3 py-2 font-mono text-ink-2">{fmtInt(r.callVol)}</td>
                       <td className="text-right px-3 py-2 font-mono text-bull-ink">{fmtInt(r.callOi)}</td>
                       <td className="text-right px-3 py-2 font-mono text-ink-2">{fmtPct(r.callIV)}</td>
@@ -306,6 +315,9 @@ function ChainPanel({ symbol, chain, spot }: { symbol: string; chain?: UwOptionC
                       <td className="text-right px-3 py-2 font-mono text-ink-2">{fmtPct(r.putIV)}</td>
                       <td className="text-right px-3 py-2 font-mono text-bear-ink">{fmtInt(r.putOi)}</td>
                       <td className="text-right px-3 py-2 font-mono text-ink-2">{fmtInt(r.putVol)}</td>
+                      <td className="text-right px-3 py-2 font-mono font-semibold text-ink">{fmtOptionPrice(r.putMark)}</td>
+                      <td className="text-right px-3 py-2 font-mono font-semibold text-bear-ink">{fmtOptionPrice(r.putAsk)}</td>
+                      <td className="text-right px-3 py-2 font-mono font-semibold text-bear-ink">{fmtOptionPrice(r.putBid)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -443,6 +455,9 @@ function WallMeter({
 
 interface RowData {
   strike: number;
+  callBid: number | null;
+  callAsk: number | null;
+  callMark: number | null;
   callOi: number;
   callVol: number;
   callDelta: number | null;
@@ -450,6 +465,9 @@ interface RowData {
   callIV: number | null;
   putOi: number;
   putVol: number;
+  putBid: number | null;
+  putAsk: number | null;
+  putMark: number | null;
   putDelta: number | null;
   putGamma: number | null;
   putIV: number | null;
@@ -464,6 +482,9 @@ function chainRows(chain: UwOptionChain, spot?: number): RowData[] {
     const r = byStrike.get(c.strike)!;
     r.callOi = c.oi;
     r.callVol = c.volume;
+    r.callBid = c.bid;
+    r.callAsk = c.ask;
+    r.callMark = c.mark;
     r.callDelta = c.delta;
     r.callGamma = c.gamma;
     r.callIV = c.iv;
@@ -474,6 +495,9 @@ function chainRows(chain: UwOptionChain, spot?: number): RowData[] {
     const r = byStrike.get(p.strike)!;
     r.putOi = p.oi;
     r.putVol = p.volume;
+    r.putBid = p.bid;
+    r.putAsk = p.ask;
+    r.putMark = p.mark;
     r.putDelta = p.delta;
     r.putGamma = p.gamma;
     r.putIV = p.iv;
@@ -490,6 +514,9 @@ function chainRows(chain: UwOptionChain, spot?: number): RowData[] {
 function blankRow(strike: number): RowData {
   return {
     strike,
+    callBid: null,
+    callAsk: null,
+    callMark: null,
     callOi: 0,
     callVol: 0,
     callDelta: null,
@@ -497,6 +524,9 @@ function blankRow(strike: number): RowData {
     callIV: null,
     putOi: 0,
     putVol: 0,
+    putBid: null,
+    putAsk: null,
+    putMark: null,
     putDelta: null,
     putGamma: null,
     putIV: null,
@@ -609,6 +639,11 @@ function fmtCompactNumber(n: number | null | undefined): string {
 function fmtPrice(n: number | null | undefined): string {
   if (!Number.isFinite(n ?? NaN) || n === null || n === undefined) return "-";
   return n.toFixed(Number.isInteger(n) ? 0 : 2);
+}
+
+function fmtOptionPrice(n: number | null | undefined): string {
+  if (!Number.isFinite(n ?? NaN) || n === null || n === undefined) return "-";
+  return n.toFixed(2);
 }
 
 function fmtPct(n: number | null | undefined): string {
