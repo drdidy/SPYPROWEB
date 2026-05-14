@@ -139,6 +139,7 @@ def _engine_state_from(
     return "WATCH"
 
 
+ES_ENTRY_SETUP_HOUR_CT = 8
 ES_ENTRY_WINDOW_START_HOUR_CT = 9
 ES_ENTRY_WINDOW_END_HOUR_CT = 11
 
@@ -150,7 +151,7 @@ def _touch_window_entry_from_lines(
     as_of: datetime,
     session: date,
 ) -> Optional[dict]:
-    """First completed 09/10/11 CT touch against the 08:00 fan values."""
+    """First completed 08:00 setup or 09/10/11 CT touch against 08:00 fan values."""
     if not lines or not candles:
         return None
     as_of_ct = to_ct(as_of)
@@ -173,7 +174,7 @@ def _touch_window_entry_from_lines(
         ct = to_ct(candle.t).replace(minute=0, second=0, microsecond=0)
         if ct.date() != session:
             continue
-        if not (ES_ENTRY_WINDOW_START_HOUR_CT <= ct.hour <= ES_ENTRY_WINDOW_END_HOUR_CT):
+        if not (ES_ENTRY_SETUP_HOUR_CT <= ct.hour <= ES_ENTRY_WINDOW_END_HOUR_CT):
             continue
         if ct + timedelta(hours=1) > as_of_ct:
             continue
@@ -204,14 +205,27 @@ def _touch_window_entry_from_lines(
                 })
         if candidates:
             hit = sorted(candidates, key=lambda item: item["distance"])[0]
+            if hour.hour == ES_ENTRY_SETUP_HOUR_CT:
+                entry_time = hour + timedelta(hours=1)
+                exit_time = entry_time + timedelta(hours=1)
+                exit_group = buckets.get(entry_time)
+                exit_price = float(sorted(exit_group, key=lambda c: to_ct(c.t))[-1].c) if exit_group else hit["close"]
+                rule = "EIGHT_AM_SETUP_TOUCH"
+            else:
+                entry_time = hit["hour"]
+                exit_time = hit["hour"] + timedelta(hours=1)
+                exit_price = hit["close"]
+                rule = "ENTRY_WINDOW_TOUCH"
             return {
                 "side": hit["side"],
                 "lineKind": hit["kind"],
                 "lineName": hit["name"],
                 "entryPrice": hit["value"],
-                "exitPrice": hit["close"],
-                "entryTime": hit["hour"],
-                "exitTime": hit["hour"] + timedelta(hours=1),
+                "exitPrice": exit_price,
+                "setupTime": hit["hour"],
+                "entryTime": entry_time,
+                "exitTime": exit_time,
+                "rule": rule,
             }
     return None
 
@@ -231,8 +245,13 @@ def _state_from_touch_window(as_of: datetime, touch_window: Optional[dict]) -> O
 
 def _touch_window_trace(touch_window: dict) -> str:
     side = str(touch_window["side"]).lower()
+    prefix = (
+        "8:00 setup"
+        if touch_window.get("rule") == "EIGHT_AM_SETUP_TOUCH"
+        else "Touch-window"
+    )
     return (
-        f"Touch-window {side} triggered at {touch_window['lineName']} "
+        f"{prefix} {side} triggered at {touch_window['lineName']} "
         f"({float(touch_window['entryPrice']):.2f}); hourly exit marked at "
         f"{float(touch_window['exitPrice']):.2f}."
     )

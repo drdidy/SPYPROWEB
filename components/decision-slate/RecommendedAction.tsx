@@ -63,6 +63,8 @@ interface Props {
   spxChart?: StructureChartData | null;
   spyProjection?: ContractProjection | null;
   spxProjection?: ContractProjection | null;
+  spyEntryCostStatus?: EntryCostStatus;
+  spxEntryCostStatus?: EntryCostStatus;
   compactHeader?: boolean;
   slateDateLabel?: string;
   sessionDate?: string;
@@ -83,6 +85,8 @@ export function RecommendedAction({
   spxChart,
   spyProjection,
   spxProjection,
+  spyEntryCostStatus = "waiting",
+  spxEntryCostStatus = "waiting",
   compactHeader = false,
   slateDateLabel,
   sessionDate,
@@ -109,6 +113,8 @@ export function RecommendedAction({
         : spyChart ?? spxChart;
   const activeProjection =
     rec.id === "live-spx" ? spxProjection : spyProjection ?? spxProjection;
+  const activeEntryCostStatus =
+    rec.id === "live-spx" ? spxEntryCostStatus : spyEntryCostStatus;
   const chartAccent =
     rec.id === "live-spx"
       ? "violet"
@@ -183,7 +189,7 @@ export function RecommendedAction({
           </div>
         </div>
       </div>
-      <div className="relative grid gap-0 lg:grid-cols-[210px_minmax(0,1fr)_180px] xl:grid-cols-[230px_minmax(0,1fr)_190px]">
+      <div className="relative grid gap-0 lg:grid-cols-[180px_minmax(0,1fr)_158px] xl:grid-cols-[198px_minmax(0,1fr)_168px]">
         <div className="px-5 py-6 md:px-6 md:py-7">
           <p
             id="recommended-action-heading"
@@ -191,7 +197,7 @@ export function RecommendedAction({
           >
             Recommended next step
           </p>
-          <h2 className="mt-2 font-serif text-[46px] leading-none text-paper md:text-[58px]">
+          <h2 className="mt-2 font-serif text-[40px] leading-[0.94] text-paper md:text-[48px]">
             {command.title}
           </h2>
           <p className="mt-2 font-mono text-[11px] tracking-[0.12em] uppercase text-paper/70">
@@ -225,6 +231,7 @@ export function RecommendedAction({
           <ScorecardMetrics
             confidence={confidence}
             activeProjection={activeProjection}
+            entryCostStatus={activeEntryCostStatus}
             className="mt-7 lg:hidden"
           />
           {!entryCostInScorecard && activeProjection ? (
@@ -250,6 +257,8 @@ export function RecommendedAction({
           spxChart={spxChart}
           spyProjection={spyProjection}
           spxProjection={spxProjection}
+          spyEntryCostStatus={spyEntryCostStatus}
+          spxEntryCostStatus={spxEntryCostStatus}
           initialEngine={rec.id === "live-spx" ? "ES" : "SPY"}
           fallbackAccent={chartAccent}
           frameless={unifiedChrome}
@@ -369,19 +378,24 @@ function HeroMetric({
 function ScorecardMetrics({
   confidence,
   activeProjection,
+  entryCostStatus,
   compact = false,
   className,
 }: {
   confidence: number;
   activeProjection?: ContractProjection | null;
+  entryCostStatus: EntryCostStatus;
   compact?: boolean;
   className?: string;
 }) {
   const entryTone = activeProjection
     ? "text-gold-soft"
-    : compact
+    : entryCostStatus === "active"
+      ? "text-bull-soft"
+      : compact
       ? "text-paper/76 text-[15px] leading-tight"
       : "text-paper/72 text-[19px] leading-tight";
+  const entryCopy = entryCostCopy(activeProjection, entryCostStatus);
 
   if (compact) {
     return (
@@ -398,9 +412,9 @@ function ScorecardMetrics({
         <HeroMetric
           compact
           label="Entry cost"
-          value={entryCostValue(activeProjection)}
+          value={entryCopy.value}
           tone={entryTone}
-          tooltip="Estimates the option debit at the planned entry line from the live chain and Greeks. It stays pending until the chain is usable; no placeholder debit is shown."
+          tooltip={entryCopy.tooltip}
         />
       </div>
     );
@@ -417,9 +431,9 @@ function ScorecardMetrics({
       <div className="mt-2">
         <HeroMetric
           label="Entry cost"
-          value={entryCostValue(activeProjection)}
+          value={entryCopy.value}
           tone={entryTone}
-          tooltip="Estimates the option debit at the planned entry line from the live chain and Greeks. It stays pending until the chain is usable; no placeholder debit is shown."
+          tooltip={entryCopy.tooltip}
           className="min-h-[70px]"
         />
       </div>
@@ -432,6 +446,8 @@ function CommandRailDiagram({
   spxChart,
   spyProjection,
   spxProjection,
+  spyEntryCostStatus,
+  spxEntryCostStatus,
   initialEngine,
   fallbackAccent,
   frameless = false,
@@ -441,6 +457,8 @@ function CommandRailDiagram({
   spxChart?: StructureChartData | null;
   spyProjection?: ContractProjection | null;
   spxProjection?: ContractProjection | null;
+  spyEntryCostStatus: EntryCostStatus;
+  spxEntryCostStatus: EntryCostStatus;
   initialEngine: "SPY" | "ES";
   fallbackAccent: "bull" | "gold" | "violet" | "neutral";
   frameless?: boolean;
@@ -450,6 +468,7 @@ function CommandRailDiagram({
   const [direction, setDirection] = useState<"left" | "right">("right");
   const chart = engine === "ES" ? spxChart : spyChart;
   const projection = engine === "ES" ? spxProjection : spyProjection;
+  const entryCostStatus = engine === "ES" ? spxEntryCostStatus : spyEntryCostStatus;
   const accent = engine === "ES" ? "violet" : fallbackAccent;
   const otherEngine = engine === "SPY" ? "ES" : "SPY";
 
@@ -460,15 +479,20 @@ function CommandRailDiagram({
   };
 
   const metricRail = (
-    <ScorecardMetrics confidence={confidence} activeProjection={projection} compact />
+    <ScorecardMetrics
+      confidence={confidence}
+      activeProjection={projection}
+      entryCostStatus={entryCostStatus}
+      compact
+    />
   );
 
   if (!chart) {
     return (
-      <div className="hidden min-h-[560px] border-t border-paper/10 px-3 py-6 lg:block lg:border-t-0">
+      <div className="hidden min-h-[640px] border-t border-paper/10 px-3 py-6 lg:block lg:border-t-0">
         <div
           className={cn(
-            "relative flex h-full min-h-[508px] flex-col gap-4 overflow-hidden px-7 py-7 text-center",
+            "relative flex h-full min-h-[588px] flex-col gap-4 overflow-hidden px-7 py-7 text-center",
             frameless
               ? "rounded-none border-0 bg-paper/[0.018]"
               : "rounded-[10px] border border-paper/10 bg-paper/[0.035]",
@@ -487,8 +511,8 @@ function CommandRailDiagram({
   }
 
   return (
-    <div className="hidden min-h-[560px] border-t border-paper/10 px-3 py-6 lg:block lg:border-t-0">
-      <div className="relative flex h-full min-h-[508px] flex-col gap-4">
+    <div className="hidden min-h-[640px] border-t border-paper/10 px-3 py-6 lg:block lg:border-t-0">
+      <div className="relative flex h-full min-h-[588px] flex-col gap-4">
         <ChartLensSwitcher
           engine={engine}
           otherEngine={otherEngine}
@@ -507,7 +531,7 @@ function CommandRailDiagram({
             data={chart}
             variant="dark"
             accent={accent}
-            height={358}
+            height={430}
             title={`${engine} path vs structure`}
             frameless={frameless}
           />
@@ -698,7 +722,36 @@ function EmptyWorkspaceChart() {
   );
 }
 
-function entryCostValue(projection?: ContractProjection | null): string {
-  if (!projection) return "Pending live chain";
-  return `$${projection.projectedEntry.debitPerContract}`;
+type EntryCostStatus = "active" | "waiting" | "unavailable";
+
+function entryCostCopy(
+  projection: ContractProjection | null | undefined,
+  status: EntryCostStatus,
+): { value: string; tooltip: string } {
+  if (projection) {
+    return {
+      value: `$${projection.projectedEntry.debitPerContract}`,
+      tooltip:
+        "Estimated option debit at the planned entry line from the live chain and Greeks.",
+    };
+  }
+  if (status === "active") {
+    return {
+      value: "Chain active",
+      tooltip:
+        "The option chain is live. No debit is shown because the current slate has no unresolved entry projection with a valid option quote.",
+    };
+  }
+  if (status === "unavailable") {
+    return {
+      value: "No chain",
+      tooltip:
+        "The option-chain feed is unavailable for this engine right now, so the slate will not invent a debit.",
+    };
+  }
+  return {
+    value: "Chain waiting",
+    tooltip:
+      "The entry-cost model publishes only after the live option chain returns a usable quote and Greeks for the planned entry.",
+  };
 }

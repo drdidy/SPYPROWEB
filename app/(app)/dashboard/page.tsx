@@ -91,7 +91,7 @@ export default async function Page({
     fetchLastSessionRecaps(),
     fetchTrackRecord("SPY"),
     fetchTrackRecord("SPX"),
-    loadOptionsIntelBundle(["SPX"]),
+    loadOptionsIntelBundle(["SPY", "SPX"]),
   ]);
   const spx = spxLoaded.snap;
   const spxSource = spxLoaded.source;
@@ -143,6 +143,23 @@ export default async function Page({
     snap: spx,
     chain: optionBundle.data.symbols.SPX?.chain ?? null,
   });
+  const spyEntryCostStatus = entryCostStatusFor({
+    projection: spyProjection,
+    hasChain: Boolean(
+      spy.optionsChain
+        ?? optionBundle.data.symbols.SPY?.chain
+        ?? optionBundle.data.symbols.SPY?.available,
+    ),
+    optionsError: optionBundle.source === "error",
+  });
+  const spxEntryCostStatus = entryCostStatusFor({
+    projection: spxProjection,
+    hasChain: Boolean(
+      optionBundle.data.symbols.SPX?.chain
+        ?? optionBundle.data.symbols.SPX?.available,
+    ),
+    optionsError: optionBundle.source === "error",
+  });
 
   // Per-card error state. We render the error inside the engine's
   // section instead of replacing the whole page so a partial outage
@@ -187,6 +204,8 @@ export default async function Page({
         spxChart={spxChart}
         spyProjection={spyProjection}
         spxProjection={spxProjection}
+        spyEntryCostStatus={spyEntryCostStatus}
+        spxEntryCostStatus={spxEntryCostStatus}
         compactHeader={slateHeroV2}
         slateDateLabel={formatSlateDate(now)}
         sessionDate={spyChartDate}
@@ -942,12 +961,36 @@ function SpyVerdictCard({
   );
 }
 
+function entryCostStatusFor({
+  projection,
+  hasChain,
+  optionsError,
+}: {
+  projection: unknown;
+  hasChain: boolean;
+  optionsError: boolean;
+}): "active" | "waiting" | "unavailable" {
+  if (projection || hasChain) return "active";
+  return optionsError ? "unavailable" : "waiting";
+}
+
 function SpyReadCard({ snap }: { snap: AdaptedSnapshot }) {
-  const armed = snap.lines
+  const primary = snap.lines
     .filter((l) => l.isPrimary)
     .slice()
     .sort((a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice))
     .slice(0, 4);
+  const referenceFallback = snap.lines
+    .filter((l) => l.name !== "Day Open")
+    .slice()
+    .sort((a, b) => {
+      const aLevel = a.entryValue ?? a.currentValue;
+      const bLevel = b.entryValue ?? b.currentValue;
+      return Math.abs(aLevel - snap.currentPrice) - Math.abs(bLevel - snap.currentPrice);
+    })
+    .slice(0, 4);
+  const rows = primary.length > 0 ? primary : referenceFallback;
+  const isReferenceMode = primary.length === 0 && rows.length > 0;
   return (
     <EngineCard
       engine="SPY"
@@ -955,10 +998,20 @@ function SpyReadCard({ snap }: { snap: AdaptedSnapshot }) {
       feedId="spy-rails"
       title={
         <span className="flex items-center gap-2 flex-wrap">
-          <span>{armed.length === 0 ? "No active levels" : `${armed.length} active level${armed.length === 1 ? "" : "s"}`}</span>
+          <span>
+            {rows.length === 0
+              ? "No active levels"
+              : isReferenceMode
+                ? "08:00 references"
+                : `${rows.length} active level${rows.length === 1 ? "" : "s"}`}
+          </span>
           <InfoTooltip
-            label="Primary line"
-            content="A tradable level the engine watches for rejection or break — anchored on prior-day pivots and projected forward."
+            label={isReferenceMode ? "Reference levels" : "Primary line"}
+            content={
+              isReferenceMode
+                ? "The SPY channel has 08:00 operating references loaded, but no fresh primary entry line is armed. Context rows are diagnostic until a setup re-arms."
+                : "A tradable level the engine watches for rejection or break against projected prior-day pivots."
+            }
           />
         </span>
       }
@@ -976,7 +1029,7 @@ function SpyReadCard({ snap }: { snap: AdaptedSnapshot }) {
     >
       <div className="-mx-5 -mb-5">
         <div className="min-h-[180px] flex flex-col">
-          {armed.length === 0 ? (
+          {rows.length === 0 ? (
             <div className="px-5 py-8 text-body text-ink-3">
               {SLATE_COPY.structureEmpty.spy}
             </div>
@@ -984,18 +1037,25 @@ function SpyReadCard({ snap }: { snap: AdaptedSnapshot }) {
             <>
               <ColumnHeaderRow />
               <ul className="divide-y divide-rule">
-                {armed.map((l) => (
-                  <TriggerRow
-                    key={l.name}
-                    label={spyLineLabel(l.name)}
-                    fullName={spyLineFullName(l.name)}
-                    hint={spyLineHint(l.name)}
-                    level={l.currentValue}
-                    distance={l.distanceFromPrice}
-                    proximity={SPY_DISTANCE_PROXIMITY}
-                    glyph="armed"
-                  />
-                ))}
+                {rows.map((l) => {
+                  const level = l.entryValue ?? l.currentValue;
+                  return (
+                    <TriggerRow
+                      key={`${l.name}-${level}`}
+                      label={spyLineLabel(l.name)}
+                      fullName={spyLineFullName(l.name)}
+                      hint={
+                        isReferenceMode
+                          ? "08:00 CT operating reference. Shown for context because no active SPY entry line is currently armed."
+                          : spyLineHint(l.name)
+                      }
+                      level={level}
+                      distance={level - snap.currentPrice}
+                      proximity={SPY_DISTANCE_PROXIMITY}
+                      glyph={isReferenceMode ? "stale" : "armed"}
+                    />
+                  );
+                })}
               </ul>
             </>
           )}

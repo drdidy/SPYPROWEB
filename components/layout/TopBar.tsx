@@ -57,6 +57,7 @@ const verbPalette: Record<string, string> = {
   WATCH: "text-ink-2 bg-paper-2 shadow-[inset_0_0_0_1px_rgba(20,22,26,0.12)]",
   ARMED: "text-state-armed bg-paper-2 shadow-[inset_0_0_0_1px_rgba(10,117,137,0.30)]",
   GO: "text-bull-ink bg-bull-tint shadow-[inset_0_0_0_1px_rgba(14,124,80,0.30)]",
+  COOLDOWN: "text-ink-3 bg-paper-2 shadow-[inset_0_0_0_1px_rgba(20,22,26,0.10)]",
   COOL: "text-ink-3 bg-paper-2 shadow-[inset_0_0_0_1px_rgba(20,22,26,0.10)]",
 };
 
@@ -103,7 +104,7 @@ export function TopBar({
   const spyMeta = null;
 
   const rawSpxVerb = spxSnapshot.confluence.action.replace(/_/g, " ");
-  const spxVerb = spxState === "PRE_CONFIG" ? "PRE-CONFIG" : rawSpxVerb;
+  const spxVerb = engineStateChipLabel(spxState, rawSpxVerb);
   const spxTone = verbPalette[spxVerb] ?? verbPalette["STAND DOWN"];
   const spxMeta =
     spxState === "PRE_CONFIG"

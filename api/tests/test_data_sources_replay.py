@@ -173,6 +173,33 @@ def test_spy_live_touch_window_aggregates_5m_bars_to_completed_hour():
     assert touch["side"] == "LONG"
 
 
+def test_spy_8am_setup_candle_arms_9am_entry_and_exits_9am_close():
+    bars = pd.DataFrame(
+        {
+            "Open": [101.0, 100.75],
+            "High": [101.5, 103.5],
+            "Low": [99.5, 100.25],
+            "Close": [100.5, 103.0],
+        },
+        index=[_ts(8), _ts(9)],
+    )
+
+    touch = _replay_touch_window_entry(
+        triggers=[_trigger("Upper ref", 100.0)],
+        rth_today=bars,
+        completed_at=_ts(10, 5),
+    )
+
+    assert touch is not None
+    assert touch["rule"] == "EIGHT_AM_SETUP_TOUCH"
+    assert touch["setup_time"] == _ts(8)
+    assert touch["entry_time"] == _ts(9)
+    assert touch["exit_time"] == _ts(10)
+    assert touch["entry_price"] == 100.0
+    assert touch["exit_price"] == 103.0
+    assert touch["side"] == "LONG"
+
+
 def test_spy_replay_grades_open_above_primary_structure_as_one_hour_long():
     bars = _frame(entry_open=100.0, exit_close=102.0)
 

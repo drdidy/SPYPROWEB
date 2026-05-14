@@ -27,10 +27,12 @@ from . import seed_snapshot
 from . import tastytrade
 from . import unusual_whales
 
-# Entry levels are the 08:00 CT values on the structure lines. The operator
-# then evaluates the 09:00, 10:00, and 11:00 CT candles against those fixed
+# Entry levels are the 08:00 CT values on the structure lines. The 08:00
+# candle can confirm a setup for a 09:00 entry; otherwise the operator
+# evaluates the 09:00, 10:00, and 11:00 CT candles against those fixed
 # references.
 ENTRY_REFERENCE_HOUR_CT = 8
+ENTRY_SETUP_HOUR_CT = 8
 ENTRY_WINDOW_START_HOUR_CT = 9
 ENTRY_WINDOW_END_HOUR_CT = 11
 
@@ -199,13 +201,13 @@ def _replay_touch_window_entry(
     rth_today: pd.DataFrame,
     completed_at: pd.Timestamp | None = None,
 ) -> dict | None:
-    """First 09:00/10:00/11:00 CT reference touch, exited at that hour's close.
+    """First valid 08:00 setup or 09:00/10:00/11:00 CT reference touch.
 
     Replay grading is intentionally tied to the operating window, not the
-    full-day drift. A valid replay entry is the first hourly candle starting
-    at 09:00, 10:00, or 11:00 CT that tags an engine reference and closes away from
-    it. Entry is the touched reference value; exit is the same hourly bar's
-    close.
+    full-day drift. An 08:00 CT candle that tags an engine reference and
+    closes away from it arms a 09:00 CT entry, exited at the 09:00 hourly
+    close. Otherwise the first 09:00, 10:00, or 11:00 CT candle that tags a
+    reference is entered at that reference and exited at that hour's close.
     """
     if rth_today is None or rth_today.empty or not triggers:
         return None
@@ -235,7 +237,7 @@ def _replay_touch_window_entry(
             ct_ts = ct_ts.tz_localize(pc.get_central_tz())
         else:
             ct_ts = ct_ts.tz_convert(pc.get_central_tz())
-        if not (ENTRY_WINDOW_START_HOUR_CT <= ct_ts.hour <= ENTRY_WINDOW_END_HOUR_CT):
+        if not (ENTRY_SETUP_HOUR_CT <= ct_ts.hour <= ENTRY_WINDOW_END_HOUR_CT):
             continue
         high = float(bar["High"])
         low = float(bar["Low"])
@@ -252,15 +254,27 @@ def _replay_touch_window_entry(
                     side = "SHORT"
                 else:
                     continue
+                if ct_ts.hour == ENTRY_SETUP_HOUR_CT:
+                    entry_time = ct_ts + pd.Timedelta(hours=1)
+                    exit_time = entry_time + pd.Timedelta(hours=1)
+                    exit_bar = hourly[hourly.index == entry_time]
+                    exit_price = float(exit_bar.iloc[0]["Close"]) if not exit_bar.empty else close
+                    rule = "EIGHT_AM_SETUP_TOUCH"
+                else:
+                    entry_time = ct_ts
+                    exit_time = ct_ts + pd.Timedelta(hours=1)
+                    exit_price = close
+                    rule = "ENTRY_WINDOW_TOUCH"
                 return {
-                    "entry_time": ct_ts,
-                    "exit_time": ct_ts + pd.Timedelta(hours=1),
+                    "setup_time": ct_ts,
+                    "entry_time": entry_time,
+                    "exit_time": exit_time,
                     "entry_price": level,
-                    "exit_price": close,
+                    "exit_price": exit_price,
                     "signal_type": signal_type,
                     "side": side,
                     "line": ref["line"],
-                    "rule": "ENTRY_WINDOW_TOUCH",
+                    "rule": rule,
                 }
     return None
 
@@ -270,10 +284,11 @@ def _entry_window_hourly_bars(
     *,
     completed_at: pd.Timestamp | None = None,
 ) -> pd.DataFrame:
-    """Aggregate 5m/hourly bars into the 09/10/11 CT decision candles.
+    """Aggregate 5m/hourly bars into the 08/09/10/11 CT decision candles.
 
-    The strategy evaluates the hourly candles that start at 09:00, 10:00,
-    and 11:00 CT against the fixed 08:00 reference values. Live mode only
+    The strategy uses the 08:00 CT candle as a setup check, then evaluates
+    the 09:00, 10:00, and 11:00 CT candles against the fixed 08:00 reference
+    values. Live mode only
     uses an hour once that hour has closed, so a partial 10:00 candle cannot
     fabricate a confirmation at 10:12.
     """
@@ -294,7 +309,7 @@ def _entry_window_hourly_bars(
         ct_ts = pd.Timestamp(ts)
         ct_ts = ct_ts.tz_localize(ct) if ct_ts.tzinfo is None else ct_ts.tz_convert(ct)
         hour = ct_ts.replace(minute=0, second=0, microsecond=0)
-        if not (ENTRY_WINDOW_START_HOUR_CT <= hour.hour <= ENTRY_WINDOW_END_HOUR_CT):
+        if not (ENTRY_SETUP_HOUR_CT <= hour.hour <= ENTRY_WINDOW_END_HOUR_CT):
             continue
         if completed_ts is not None and hour + pd.Timedelta(hours=1) > completed_ts:
             continue
@@ -920,7 +935,7 @@ def _spy_engine_state(decision_verb: str, conviction: int) -> str:
 
 
 def _spy_state_from_touch_window(now_ct: pd.Timestamp, touch_window: dict | None) -> str | None:
-    """Live-state override from the same 09/10/11 CT rule replay uses."""
+    """Live-state override from the same 08:00 setup / 09-11 rule replay uses."""
     if touch_window is None:
         return None
     entry_time = pd.Timestamp(touch_window["entry_time"])
@@ -942,8 +957,13 @@ def _spy_touch_window_trace(touch_window: dict) -> str:
     line = str(touch_window.get("line") or "structure line")
     entry = float(touch_window.get("entry_price"))
     exit_price = float(touch_window.get("exit_price"))
+    prefix = (
+        "8:00 setup"
+        if touch_window.get("rule") == "EIGHT_AM_SETUP_TOUCH"
+        else "Touch-window"
+    )
     return (
-        f"Touch-window {side} triggered at {line} ({entry:.2f}); "
+        f"{prefix} {side} triggered at {line} ({entry:.2f}); "
         f"hourly exit marked at {exit_price:.2f}."
     )
 
@@ -1274,8 +1294,9 @@ def _build_replay_block(
 ) -> dict:
     """OHLC + verdict-outcome card for backtest mode.
 
-    Scoring rule: first 09:00/10:00/11:00 CT reference touch, exited at the
-    close of that hour. Older confirmed-entry/open-zone fallbacks remain
+    Scoring rule: 08:00 CT can confirm a 09:00 entry; otherwise the first
+    09:00/10:00/11:00 CT reference touch is entered at the line and exited
+    at that hour's close. Older confirmed-entry/open-zone fallbacks remain
     for historical payloads that do not yet carry entry references.
     """
     block: dict = {
@@ -1357,7 +1378,9 @@ def _build_replay_block(
     block["exit"] = {
         "time": exit_time.isoformat(),
         "price": round(exit_price, 2),
-        "rule": "HOURLY_CLOSE" if entry_rule == "ENTRY_WINDOW_TOUCH" else "FORCED_1H",
+        "rule": "HOURLY_CLOSE"
+        if entry_rule in {"ENTRY_WINDOW_TOUCH", "EIGHT_AM_SETUP_TOUCH"}
+        else "FORCED_1H",
     }
     block["verdictOutcome"] = "WIN" if pnl > 0 else ("LOSS" if pnl < 0 else "PUSH")
     block["verdictPnl"] = round(pnl, 2)

@@ -91,6 +91,43 @@ def test_snapshot_live_state_uses_completed_9am_fan_touch(
     assert any("Touch-window buy triggered" in event.event for event in snap.decision_trace)
 
 
+def test_snapshot_8am_setup_candle_arms_9am_entry(
+    es_candles_ascending_inside,
+    es_offset,
+):
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from _lib.spx.candles import Candle
+
+    ct = ZoneInfo("America/Chicago")
+    session = datetime(2026, 5, 8, tzinfo=ct)
+    candles = [
+        *es_candles_ascending_inside,
+        Candle(
+            t=session.replace(hour=8),
+            o=5885.00,
+            h=5886.00,
+            l=5883.50,
+            c=5884.50,
+        ),
+        Candle(
+            t=session.replace(hour=9),
+            o=5884.75,
+            h=5891.00,
+            l=5884.25,
+            c=5890.00,
+        ),
+    ]
+
+    snap = compute_snapshot(candles, es_offset, session.replace(hour=10, minute=7))
+
+    assert snap.current_state == "COOLDOWN"
+    assert snap.flip_condition is not None
+    assert "Touch-window buy completed" in snap.flip_condition
+    assert any("8:00 setup buy triggered" in event.event for event in snap.decision_trace)
+
+
 def test_snapshot_serializes_to_camelcase_json(es_candles_ascending_inside, es_offset, as_of):
     """The schema uses camelCase aliases so the JSON matches the TS contract."""
     snap = compute_snapshot(es_candles_ascending_inside, es_offset, as_of)
