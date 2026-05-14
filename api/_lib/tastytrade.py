@@ -169,13 +169,6 @@ def fetch_equity_quote(symbol: str = "SPY") -> float | None:
     return None
 
 
-def _quote_type_for_option_symbol(symbol: str) -> str:
-    clean = symbol.upper()
-    if "SPX" in clean or clean.startswith("SPX"):
-        return "index-option"
-    return "equity-option"
-
-
 def _fetch_option_market_data(option_symbols: list[str]) -> dict[str, dict]:
     token = _get_access_token()
     if not token or not option_symbols:
@@ -190,7 +183,7 @@ def _fetch_option_market_data(option_symbols: list[str]) -> dict[str, dict]:
     for symbol in option_symbols:
         clean = str(symbol or "").strip()
         if clean:
-            params.append((_quote_type_for_option_symbol(clean), clean))
+            params.append(("options", clean))
     if not params:
         return {}
     body = _http_get(
@@ -222,7 +215,8 @@ def _enrich_option_quote_rows(rows_call: list[dict], rows_put: list[dict], atm: 
         return
     for row in rows:
         sym = str(row.get("optionSymbol") or "").strip()
-        quote = quotes.get(sym)
+        streamer_sym = str(row.get("streamerSymbol") or "").strip()
+        quote = quotes.get(sym) or quotes.get(streamer_sym)
         if not quote:
             continue
         bid = _quote_num(quote, "bid", "bid-price", "bidPrice")
@@ -291,8 +285,11 @@ def _row_from_strike(strike: dict, side: str) -> dict | None:
     ask = _safe_float(strike.get(f"{side}-ask"))
     if all(v != v for v in (bid, ask)):  # both nan
         return None
+    order_symbol = strike.get(side) or strike.get(f"{side}-symbol")
+    streamer_symbol = strike.get(f"{side}-streamer-symbol")
     return {
-        "optionSymbol": strike.get(f"{side}-streamer-symbol") or strike.get(f"{side}-symbol"),
+        "optionSymbol": order_symbol or streamer_symbol,
+        "streamerSymbol": streamer_symbol,
         "strike": _safe_float(strike.get("strike-price")),
         "side": "CALL" if side == "call" else "PUT",
         "bid": bid,
