@@ -1511,21 +1511,23 @@ function formatHM(iso: string): string {
 
 function spyHeadline(state: EngineState, verdict: string): string {
   const v = (verdict || "").toUpperCase();
+  if (state === "COOLDOWN") return "Trade completed";
+  if (state === "GO") return "Trade live";
+  if (state === "ARMED") return "Armed for entry";
   if (v === "LONG") return "Leaning long";
   if (v === "SHORT") return "Leaning short";
   if (v === "HOLD") return "Holding position";
   if (state === "STAND_DOWN" || v === "STAND DOWN") return "Standing down";
-  if (state === "ARMED") return "Armed for entry";
-  if (state === "GO") return "Trade allowed";
   return "Waiting for rejection";
 }
 
 function spxHeadline(state: EngineState, action: string): string {
-  if (action === "TAKE") return "Take the fan read";
-  if (action === "SELECTIVE") return "Trading selectively";
-  if (state === "GO") return "Trade allowed";
+  if (state === "COOLDOWN") return "Trade completed";
+  if (state === "GO") return "Trade live";
   if (state === "ARMED") return "Armed for entry";
   if (state === "STAND_DOWN" || action === "STAND_DOWN") return "Standing down";
+  if (action === "TAKE") return "Take the fan read";
+  if (action === "SELECTIVE") return "Watch the fan read";
   return "Watching the fan read";
 }
 

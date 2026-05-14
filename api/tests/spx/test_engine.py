@@ -61,6 +61,36 @@ def test_snapshot_confluence_action_present(es_candles_ascending_inside, es_offs
     assert len(snap.confluence.factors) == 3
 
 
+def test_snapshot_live_state_uses_completed_9am_fan_touch(
+    es_candles_ascending_inside,
+    es_offset,
+):
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from _lib.spx.candles import Candle
+
+    ct = ZoneInfo("America/Chicago")
+    session = datetime(2026, 5, 8, tzinfo=ct)
+    candles = [
+        *es_candles_ascending_inside,
+        Candle(
+            t=session.replace(hour=9),
+            o=5885.00,
+            h=5886.00,
+            l=5883.50,
+            c=5885.50,
+        ),
+    ]
+
+    snap = compute_snapshot(candles, es_offset, session.replace(hour=10, minute=7))
+
+    assert snap.current_state == "COOLDOWN"
+    assert snap.flip_condition is not None
+    assert "Touch-window buy completed" in snap.flip_condition
+    assert any("Touch-window buy triggered" in event.event for event in snap.decision_trace)
+
+
 def test_snapshot_serializes_to_camelcase_json(es_candles_ascending_inside, es_offset, as_of):
     """The schema uses camelCase aliases so the JSON matches the TS contract."""
     snap = compute_snapshot(es_candles_ascending_inside, es_offset, as_of)

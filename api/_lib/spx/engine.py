@@ -14,7 +14,7 @@ synchronized SPX-cash / ES print pair (see ``offset.derive_offset``).
 """
 from __future__ import annotations
 
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from typing import Optional
 
 # We don't import the schema at module top-level because the api package
@@ -137,6 +137,117 @@ def _engine_state_from(
         return "ARMED"
     # Inside-play but score below selective threshold -> still observing.
     return "WATCH"
+
+
+ES_ENTRY_WINDOW_START_HOUR_CT = 9
+ES_ENTRY_WINDOW_END_HOUR_CT = 11
+
+
+def _touch_window_entry_from_lines(
+    *,
+    lines: list[Line],
+    candles: list[Candle],
+    as_of: datetime,
+    session: date,
+) -> Optional[dict]:
+    """First completed 09/10/11 CT touch against the 08:00 fan values."""
+    if not lines or not candles:
+        return None
+    as_of_ct = to_ct(as_of)
+    entry_reference = at_ct(session, time(8, 0))
+    refs: list[dict] = []
+    for line in lines:
+        try:
+            refs.append({
+                "kind": line.kind,
+                "name": _line_display_name(line.kind),
+                "value": float(project_line(line, entry_reference)),
+            })
+        except Exception:
+            continue
+    if not refs:
+        return None
+
+    buckets: dict[datetime, list[Candle]] = {}
+    for candle in sorted(candles, key=lambda c: to_ct(c.t)):
+        ct = to_ct(candle.t).replace(minute=0, second=0, microsecond=0)
+        if ct.date() != session:
+            continue
+        if not (ES_ENTRY_WINDOW_START_HOUR_CT <= ct.hour <= ES_ENTRY_WINDOW_END_HOUR_CT):
+            continue
+        if ct + timedelta(hours=1) > as_of_ct:
+            continue
+        buckets.setdefault(ct, []).append(candle)
+
+    for hour in sorted(buckets):
+        group = sorted(buckets[hour], key=lambda c: to_ct(c.t))
+        high = max(float(c.h) for c in group)
+        low = min(float(c.l) for c in group)
+        close = float(group[-1].c)
+        open_price = float(group[0].o)
+        candidates: list[dict] = []
+        for ref in refs:
+            value = ref["value"]
+            if low <= value <= high:
+                if close > value:
+                    side = "BUY"
+                elif close < value:
+                    side = "SELL"
+                else:
+                    continue
+                candidates.append({
+                    **ref,
+                    "side": side,
+                    "distance": abs(open_price - value),
+                    "close": close,
+                    "hour": hour,
+                })
+        if candidates:
+            hit = sorted(candidates, key=lambda item: item["distance"])[0]
+            return {
+                "side": hit["side"],
+                "lineKind": hit["kind"],
+                "lineName": hit["name"],
+                "entryPrice": hit["value"],
+                "exitPrice": hit["close"],
+                "entryTime": hit["hour"],
+                "exitTime": hit["hour"] + timedelta(hours=1),
+            }
+    return None
+
+
+def _state_from_touch_window(as_of: datetime, touch_window: Optional[dict]) -> Optional[str]:
+    if touch_window is None:
+        return None
+    now = to_ct(as_of)
+    entry_time = to_ct(touch_window["entryTime"])
+    exit_time = to_ct(touch_window["exitTime"])
+    if now < entry_time:
+        return "ARMED"
+    if now < exit_time:
+        return "GO"
+    return "COOLDOWN"
+
+
+def _touch_window_trace(touch_window: dict) -> str:
+    side = str(touch_window["side"]).lower()
+    return (
+        f"Touch-window {side} triggered at {touch_window['lineName']} "
+        f"({float(touch_window['entryPrice']):.2f}); hourly exit marked at "
+        f"{float(touch_window['exitPrice']):.2f}."
+    )
+
+
+def _touch_window_flip_condition(touch_window: dict, state: str) -> str:
+    side = str(touch_window["side"]).lower()
+    line = str(touch_window["lineName"])
+    entry = float(touch_window["entryPrice"])
+    exit_time = to_ct(touch_window["exitTime"]).strftime("%H:%M CT")
+    if state == "GO":
+        return f"Touch-window {side} is active from {line} ({entry:.2f}); manage until the {exit_time} hourly exit."
+    if state == "COOLDOWN":
+        return f"Touch-window {side} completed from {line} ({entry:.2f}); stand down until the next valid setup."
+    return f"Touch-window setup armed at {line} ({entry:.2f})."
 
 
 def _flip_condition_for(scenario: str, projected: list[ProjectedLine]) -> str:
@@ -434,7 +545,18 @@ def compute_snapshot(
 
     # ---- Phase-1 hardening derivations ----
     as_of_iso = as_of_ct.isoformat()
-    flip_condition = _flip_condition_for(scenario, projected)
+    touch_window = _touch_window_entry_from_lines(
+        lines=lines,
+        candles=spx_candles,
+        as_of=as_of_ct,
+        session=session,
+    )
+    touch_state = _state_from_touch_window(as_of_ct, touch_window)
+    flip_condition = (
+        _touch_window_flip_condition(touch_window, touch_state)
+        if touch_window is not None and touch_state is not None
+        else _flip_condition_for(scenario, projected)
+    )
     decision_trace = _decision_trace(
         as_of_iso=as_of_iso,
         scenario=scenario,
@@ -444,7 +566,7 @@ def compute_snapshot(
         action=confluence.action,
     )
     invalidation = _invalidation_for(plays.primary, projected)
-    current_state = _engine_state_from(
+    current_state = touch_state or _engine_state_from(
         scenario,
         confluence.action,
         primary_trade=plays.primary,
@@ -461,6 +583,12 @@ def compute_snapshot(
         decision_trace.append({
             "ts": as_of_iso,
             "event": f"RTH bias: {rth_bias['note']}",
+            "weight": "key",
+        })
+    if touch_window is not None:
+        decision_trace.append({
+            "ts": to_ct(touch_window["entryTime"]).isoformat(),
+            "event": _touch_window_trace(touch_window),
             "weight": "key",
         })
 
@@ -567,6 +695,23 @@ def compute_snapshot(
 def _line_model(l: Line, projected: list[ProjectedLine], price: float, session: date):
     """Convert internal Line + projection into the schema's SPXLine."""
     from .schema import SPXLine
+    cur = next(p.value for p in projected if p.kind == l.kind)
+    entry_reference = at_ct(session, time(8, 0))
+    entry_value = project_line(l, entry_reference)
+    return SPXLine(
+        kind=l.kind,
+        name=_line_display_name(l.kind),
+        anchorPrice=l.anchor.price,
+        anchorTime=l.anchor.time.isoformat(),
+        slopePerHour=l.slope_per_hour,
+        currentValue=cur,
+        entryValue=entry_value,
+        entryReferenceTime=entry_reference.isoformat(),
+        distanceFromPrice=entry_value - price,
+    )
+
+
+def _line_display_name(kind: str) -> str:
     name_map = {
         "PREV_RTH_HIGH_ASC": "High Fan Ceiling",
         "PREV_RTH_HIGH_DESC": "High Fan Floor",
@@ -577,20 +722,7 @@ def _line_model(l: Line, projected: list[ProjectedLine], price: float, session: 
         "SWING_LOW_ASC": "Overnight Swing Low - Ascending",
         "SWING_LOW_DESC": "Overnight Swing Low - Descending",
     }
-    cur = next(p.value for p in projected if p.kind == l.kind)
-    entry_reference = at_ct(session, time(8, 0))
-    entry_value = project_line(l, entry_reference)
-    return SPXLine(
-        kind=l.kind,
-        name=name_map[l.kind],
-        anchorPrice=l.anchor.price,
-        anchorTime=l.anchor.time.isoformat(),
-        slopePerHour=l.slope_per_hour,
-        currentValue=cur,
-        entryValue=entry_value,
-        entryReferenceTime=entry_reference.isoformat(),
-        distanceFromPrice=entry_value - price,
-    )
+    return name_map.get(kind, kind)
 
 
 def _session_range_model(r: Optional[SessionRange]):

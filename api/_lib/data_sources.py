@@ -197,6 +197,7 @@ def _replay_touch_window_entry(
     *,
     triggers: list[dict] | None,
     rth_today: pd.DataFrame,
+    completed_at: pd.Timestamp | None = None,
 ) -> dict | None:
     """First 09:00/10:00/11:00 CT reference touch, exited at that hour's close.
 
@@ -207,6 +208,9 @@ def _replay_touch_window_entry(
     close.
     """
     if rth_today is None or rth_today.empty or not triggers:
+        return None
+    hourly = _entry_window_hourly_bars(rth_today, completed_at=completed_at)
+    if hourly.empty:
         return None
     refs = []
     for row in triggers:
@@ -225,7 +229,7 @@ def _replay_touch_window_entry(
     if not refs:
         return None
 
-    for ts, bar in rth_today.sort_index().iterrows():
+    for ts, bar in hourly.sort_index().iterrows():
         ct_ts = pd.Timestamp(ts)
         if ct_ts.tzinfo is None:
             ct_ts = ct_ts.tz_localize(pc.get_central_tz())
@@ -259,6 +263,58 @@ def _replay_touch_window_entry(
                     "rule": "ENTRY_WINDOW_TOUCH",
                 }
     return None
+
+
+def _entry_window_hourly_bars(
+    frame: pd.DataFrame,
+    *,
+    completed_at: pd.Timestamp | None = None,
+) -> pd.DataFrame:
+    """Aggregate 5m/hourly bars into the 09/10/11 CT decision candles.
+
+    The strategy evaluates the hourly candles that start at 09:00, 10:00,
+    and 11:00 CT against the fixed 08:00 reference values. Live mode only
+    uses an hour once that hour has closed, so a partial 10:00 candle cannot
+    fabricate a confirmation at 10:12.
+    """
+    if frame is None or frame.empty:
+        return pd.DataFrame()
+    ct = pc.get_central_tz()
+    completed_ts = None
+    if completed_at is not None:
+        completed_ts = pd.Timestamp(completed_at)
+        completed_ts = (
+            completed_ts.tz_localize(ct)
+            if completed_ts.tzinfo is None
+            else completed_ts.tz_convert(ct)
+        )
+
+    buckets: dict[pd.Timestamp, list[tuple[pd.Timestamp, pd.Series]]] = {}
+    for ts, row in frame.sort_index().iterrows():
+        ct_ts = pd.Timestamp(ts)
+        ct_ts = ct_ts.tz_localize(ct) if ct_ts.tzinfo is None else ct_ts.tz_convert(ct)
+        hour = ct_ts.replace(minute=0, second=0, microsecond=0)
+        if not (ENTRY_WINDOW_START_HOUR_CT <= hour.hour <= ENTRY_WINDOW_END_HOUR_CT):
+            continue
+        if completed_ts is not None and hour + pd.Timedelta(hours=1) > completed_ts:
+            continue
+        buckets.setdefault(hour, []).append((ct_ts, row))
+
+    if not buckets:
+        return pd.DataFrame()
+
+    rows = []
+    index = []
+    for hour in sorted(buckets):
+        group = [row for _, row in sorted(buckets[hour], key=lambda item: item[0])]
+        rows.append({
+            "Open": float(group[0]["Open"]),
+            "High": max(float(row["High"]) for row in group),
+            "Low": min(float(row["Low"]) for row in group),
+            "Close": float(group[-1]["Close"]),
+        })
+        index.append(hour)
+    return pd.DataFrame(rows, index=index)
 
 
 def _open_zone_replay_entry(
@@ -1244,7 +1300,8 @@ def _build_replay_block(
         "netPts": round(c - o, 2),
         "netPct": round(((c - o) / o * 100) if o else 0.0, 3),
     }
-    touch_window = _replay_touch_window_entry(triggers=triggers, rth_today=rth_today)
+    touch_frame = intraday_5m if intraday_5m is not None and not intraday_5m.empty else rth_today
+    touch_window = _replay_touch_window_entry(triggers=triggers, rth_today=touch_frame)
     if touch_window is not None:
         entry_time = pd.Timestamp(touch_window["entry_time"])
         exit_time = pd.Timestamp(touch_window["exit_time"])
@@ -1539,7 +1596,12 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
     as_of_iso = now_ct.isoformat()
     decision_verb = decision.get("verb", "WAIT")
     decision_conviction = int(decision.get("conviction", 0) or 0)
-    touch_window_live = _replay_touch_window_entry(triggers=triggers, rth_today=rth_today)
+    live_touch_frame = intraday if intraday is not None and not intraday.empty else rth_today
+    touch_window_live = _replay_touch_window_entry(
+        triggers=triggers,
+        rth_today=live_touch_frame,
+        completed_at=now_ct,
+    )
     current_state = (
         _spy_state_from_touch_window(now_ct, touch_window_live)
         or _spy_engine_state(decision_verb, decision_conviction)

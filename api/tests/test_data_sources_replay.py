@@ -5,7 +5,12 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from _lib.data_sources import _build_replay_block, _spy_state_from_touch_window, _triggers_from_lines
+from _lib.data_sources import (
+    _build_replay_block,
+    _replay_touch_window_entry,
+    _spy_state_from_touch_window,
+    _triggers_from_lines,
+)
 from _lib.prophet_core import DynamicLine
 
 CT = ZoneInfo("America/Chicago")
@@ -140,6 +145,32 @@ def test_live_spy_state_uses_touch_window_trade_lifecycle():
 
     assert _spy_state_from_touch_window(_ts(10), touch) == "GO"
     assert _spy_state_from_touch_window(_ts(11), touch) == "COOLDOWN"
+
+
+def test_spy_live_touch_window_aggregates_5m_bars_to_completed_hour():
+    idx = [_ts(9), _ts(9, 15), _ts(9, 55), _ts(10)]
+    bars = pd.DataFrame(
+        {
+            "Open": [99.0, 99.5, 101.0, 102.5],
+            "High": [99.5, 100.5, 102.0, 103.0],
+            "Low": [98.75, 99.25, 100.5, 102.0],
+            "Close": [99.25, 100.25, 102.5, 102.75],
+        },
+        index=idx,
+    )
+
+    touch = _replay_touch_window_entry(
+        triggers=[_trigger("Upper ref", 100.0)],
+        rth_today=bars,
+        completed_at=_ts(10, 5),
+    )
+
+    assert touch is not None
+    assert touch["entry_time"] == _ts(9)
+    assert touch["exit_time"] == _ts(10)
+    assert touch["entry_price"] == 100.0
+    assert touch["exit_price"] == 102.5
+    assert touch["side"] == "LONG"
 
 
 def test_spy_replay_grades_open_above_primary_structure_as_one_hour_long():
