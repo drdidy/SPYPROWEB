@@ -146,6 +146,7 @@ def test_prev_rth_anchors_reads_thursday(es_candles_ascending_inside, es_offset,
     assert res is not None
     high, low = res
     assert high.price == pytest.approx(5876.00)
+    # Low Pivot is the lowest post-noon wick, not the lowest close.
     assert low.price == pytest.approx(5867.00)
     assert low.time == datetime(2026, 5, 7, 12, 0, tzinfo=CT)
 
@@ -168,6 +169,38 @@ def test_build_lines_builds_previous_rth_framework(es_candles_ascending_inside, 
         "PREV_RTH_LOW_ASC",
         "PREV_RTH_LOW_DESC",
     }
+
+
+def test_build_lines_adds_minor_overnight_high_when_above_prev_rth():
+    prev_high = Anchor(price=5876.00, time=datetime(2026, 5, 7, 13, tzinfo=CT))
+    prev_low = Anchor(price=5867.00, time=datetime(2026, 5, 7, 12, tzinfo=CT))
+    overnight_high = Anchor(price=5881.25, time=datetime(2026, 5, 7, 23, tzinfo=CT))
+    overnight_low = Anchor(price=5850.00, time=datetime(2026, 5, 7, 17, tzinfo=CT))
+    lines = build_lines(
+        direction="ASCENDING",
+        overnight_high=overnight_high,
+        overnight_low=overnight_low,
+        prev_rth_high=prev_high,
+        prev_rth_low=prev_low,
+    )
+    swing_high = next(l for l in lines if l.kind == "SWING_HIGH_ASC")
+    assert swing_high.anchor.price == pytest.approx(5881.25)
+    assert swing_high.slope_per_hour > 0
+
+
+def test_build_lines_skips_minor_overnight_high_when_not_above_prev_rth():
+    prev_high = Anchor(price=5876.00, time=datetime(2026, 5, 7, 13, tzinfo=CT))
+    prev_low = Anchor(price=5867.00, time=datetime(2026, 5, 7, 12, tzinfo=CT))
+    overnight_high = Anchor(price=5875.50, time=datetime(2026, 5, 7, 23, tzinfo=CT))
+    overnight_low = Anchor(price=5850.00, time=datetime(2026, 5, 7, 17, tzinfo=CT))
+    lines = build_lines(
+        direction="ASCENDING",
+        overnight_high=overnight_high,
+        overnight_low=overnight_low,
+        prev_rth_high=prev_high,
+        prev_rth_low=prev_low,
+    )
+    assert "SWING_HIGH_ASC" not in {l.kind for l in lines}
 
 
 def test_build_lines_without_previous_rth_pivots_resolves_empty():

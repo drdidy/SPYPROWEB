@@ -269,7 +269,7 @@ function esLineLabel(kind: string): string {
     PREV_RTH_HIGH_DESC: "Previous RTH high descending",
     PREV_RTH_LOW_ASC: "Previous RTH low ascending",
     PREV_RTH_LOW_DESC: "Previous RTH low descending",
-    SWING_HIGH_ASC: "Swing high ascending",
+    SWING_HIGH_ASC: "Overnight higher pivot ascending",
     SWING_HIGH_DESC: "Swing high descending",
     SWING_LOW_ASC: "Swing low ascending",
     SWING_LOW_DESC: "Swing low descending",

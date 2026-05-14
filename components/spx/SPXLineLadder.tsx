@@ -26,8 +26,8 @@ const lineMeta: Record<SPXLineKind, { dot: string; label: string; group: string 
   },
   SWING_HIGH_ASC: {
     dot: "bg-gold",
-    label: "Swing High - Asc",
-    group: "Overnight swing",
+    label: "Overnight Higher Pivot",
+    group: "Minor watch",
   },
   SWING_HIGH_DESC: {
     dot: "bg-bear",

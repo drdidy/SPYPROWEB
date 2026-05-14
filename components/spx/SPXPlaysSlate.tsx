@@ -18,7 +18,7 @@ const lineLabel: Record<SPXLineKind, string> = {
   PREV_RTH_HIGH_DESC: "High Fan Floor",
   PREV_RTH_LOW_ASC: "Low Fan Ceiling",
   PREV_RTH_LOW_DESC: "Low Fan Floor",
-  SWING_HIGH_ASC: "Swing High - Asc",
+  SWING_HIGH_ASC: "Overnight Higher Pivot",
   SWING_HIGH_DESC: "Swing High - Desc",
   SWING_LOW_ASC: "Swing Low - Asc",
   SWING_LOW_DESC: "Swing Low - Desc",

@@ -3,11 +3,14 @@
 This module implements the geometry that defines the ES session:
 
   1. Previous RTH swing-high close and post-noon RTH low wick.
-  2. Line construction: four lines per active session.
+  2. Line construction: four major lines per active session.
        PREV_RTH_HIGH_ASC  anchor=prev RTH high close, slope=+1.04
        PREV_RTH_HIGH_DESC anchor=prev RTH high close, slope=-1.04
        PREV_RTH_LOW_ASC   anchor=post-noon RTH low wick, slope=+1.04
        PREV_RTH_LOW_DESC  anchor=post-noon RTH low wick, slope=-1.04
+     Optional minor watch:
+       SWING_HIGH_ASC      anchor=overnight high close when it exceeds
+                           the prior RTH high close, slope=+1.04
   4. Projection: anchor_price + slope_per_hour * hours_since_anchor.
 """
 from __future__ import annotations
@@ -218,13 +221,17 @@ def build_lines(
 
     Direction and overnight anchors are retained for call-site compatibility.
     The live ES framework uses the highest RTH close plus the lowest post-noon
-    RTH wick; each pivot projects both ascending and descending lines.
+    RTH wick; each major pivot projects both ascending and descending lines.
+    If the overnight high close exceeds the prior RTH high close, the app also
+    marks a minor ascending watch from that overnight pivot.
     """
     lines: list[Line] = []
 
     if prev_rth_high is not None:
         lines.append(Line("PREV_RTH_HIGH_ASC", prev_rth_high, +slope_per_hour))
         lines.append(Line("PREV_RTH_HIGH_DESC", prev_rth_high, -slope_per_hour))
+        if overnight_high.price > prev_rth_high.price:
+            lines.append(Line("SWING_HIGH_ASC", overnight_high, +slope_per_hour))
     if prev_rth_low is not None:
         lines.append(Line("PREV_RTH_LOW_ASC", prev_rth_low, +slope_per_hour))
         lines.append(Line("PREV_RTH_LOW_DESC", prev_rth_low, -slope_per_hour))

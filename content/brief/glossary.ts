@@ -65,11 +65,11 @@ export const briefGlossary: Record<string, BriefGlossaryTerm> = {
   },
   "SWING HIGH ASC/DESC": {
     term: "Swing high asc/desc",
-    definition: "The ascending and descending ES lines projected from the overnight swing-high close.",
+    definition: "Legacy overnight swing-high references. The current ES read only promotes a higher overnight high as a minor ascending watch.",
   },
   "SWING LOW ASC/DESC": {
     term: "Swing low asc/desc",
-    definition: "The ascending and descending ES lines projected from the overnight swing-low close.",
+    definition: "Legacy overnight swing-low references retained for old replays.",
   },
   "TOUCH-WINDOW": {
     term: "Touch-window",

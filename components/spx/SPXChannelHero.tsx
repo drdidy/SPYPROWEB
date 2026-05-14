@@ -934,7 +934,7 @@ function lineCode(kind: string): string {
     PREV_RTH_HIGH_DESC: "HF-F",
     PREV_RTH_LOW_ASC: "LF-C",
     PREV_RTH_LOW_DESC: "LF-F",
-    SWING_HIGH_ASC: "SH-A",
+    SWING_HIGH_ASC: "OH-C",
     SWING_HIGH_DESC: "SH-D",
     SWING_LOW_ASC: "SL-A",
     SWING_LOW_DESC: "SL-D",

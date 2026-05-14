@@ -739,7 +739,7 @@ function shortSpxLineLabel(kind: string): string {
     PREV_RTH_HIGH_DESC: "HF-F",
     PREV_RTH_LOW_ASC: "LF-C",
     PREV_RTH_LOW_DESC: "LF-F",
-    SWING_HIGH_ASC: "Swing H up",
+    SWING_HIGH_ASC: "OH-C",
     SWING_LOW_DESC: "Swing L dn",
   };
   return m[kind] || "Ref";
@@ -1593,7 +1593,7 @@ function spxLineLabel(kind: string): string {
     PREV_RTH_LOW_ASC: "Low Fan Ceiling",
     PREV_RTH_HIGH_ASC: "High Fan Ceiling",
     PREV_RTH_LOW_DESC: "Low Fan Floor",
-    SWING_HIGH_ASC: "Swing high ascending",
+    SWING_HIGH_ASC: "Overnight Higher Pivot",
     SWING_LOW_DESC: "Swing low descending",
   };
   return m[kind] || kind;
@@ -1607,7 +1607,7 @@ function spxLineHint(kind: string): string {
     PREV_RTH_LOW_ASC: "Low Pivot Fan ceiling projected up from yesterday's post-noon RTH low wick.",
     PREV_RTH_HIGH_ASC: "High Pivot Fan ceiling projected up from yesterday's RTH high close.",
     PREV_RTH_LOW_DESC: "Low Pivot Fan floor projected down from yesterday's post-noon RTH low wick.",
-    SWING_HIGH_ASC: "Engine-generated ascending ES reference line.",
+    SWING_HIGH_ASC: "Minor ascending watch line from an overnight high close above the prior RTH high close.",
     SWING_LOW_DESC: "Engine-generated descending ES reference line.",
   };
   return m[kind] || "Engine-generated ES reference line.";

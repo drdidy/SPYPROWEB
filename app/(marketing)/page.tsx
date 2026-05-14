@@ -220,7 +220,7 @@ function shortSpxLineLabel(kind: string): string {
     PREV_RTH_HIGH_DESC: "HF-F",
     PREV_RTH_LOW_ASC: "LF-C",
     PREV_RTH_LOW_DESC: "LF-F",
-    SWING_HIGH_ASC: "Swing H up",
+    SWING_HIGH_ASC: "OH-C",
     SWING_LOW_DESC: "Swing L dn",
   };
   return labels[kind] || "Ref";

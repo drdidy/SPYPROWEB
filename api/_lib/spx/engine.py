@@ -364,7 +364,8 @@ def compute_snapshot(
         direction="ASCENDING",
         reason=(
             "ES Pivot Fan active: High Fan and Low Fan references are projected "
-            "from the prior RTH high close and the post-noon RTH low wick."
+            "from the prior RTH high close and the post-noon RTH low wick. "
+            "A higher overnight pivot adds a minor ascending watch line."
         ),
     )
 
@@ -571,7 +572,7 @@ def _line_model(l: Line, projected: list[ProjectedLine], price: float, session: 
         "PREV_RTH_HIGH_DESC": "High Fan Floor",
         "PREV_RTH_LOW_ASC": "Low Fan Ceiling",
         "PREV_RTH_LOW_DESC": "Low Fan Floor",
-        "SWING_HIGH_ASC": "Overnight Swing High - Ascending",
+        "SWING_HIGH_ASC": "Overnight Higher Pivot - Minor Ascending",
         "SWING_HIGH_DESC": "Overnight Swing High - Descending",
         "SWING_LOW_ASC": "Overnight Swing Low - Ascending",
         "SWING_LOW_DESC": "Overnight Swing Low - Descending",

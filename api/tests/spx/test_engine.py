@@ -8,7 +8,8 @@ def test_snapshot_basic_shape(es_candles_ascending_inside, es_offset, as_of):
     snap = compute_snapshot(es_candles_ascending_inside, es_offset, as_of)
     assert snap.symbol == "SPX"
     assert snap.session_date_ct == "2026-05-08"
-    # Four-line framework is active after previous RTH pivots resolve.
+    # Four major fan lines are active; the minor overnight-higher-pivot watch
+    # appears only when overnight closes above the prior RTH high close.
     assert snap.channel.direction == "ASCENDING"
     assert len(snap.lines) == 4
     kinds = {l.kind for l in snap.lines}

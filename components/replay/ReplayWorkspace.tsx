@@ -2048,7 +2048,7 @@ function esLineLabel(kind: SPXLine["kind"]): string {
     PREV_RTH_HIGH_DESC: "Prev high desc",
     PREV_RTH_LOW_ASC: "Prev low asc",
     PREV_RTH_LOW_DESC: "Prev low",
-    SWING_HIGH_ASC: "Swing high asc",
+    SWING_HIGH_ASC: "Overnight high minor",
     SWING_HIGH_DESC: "Swing high desc",
     SWING_LOW_ASC: "Swing low asc",
     SWING_LOW_DESC: "Swing low desc",

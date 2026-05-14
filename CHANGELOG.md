@@ -8,6 +8,9 @@ entries grow newest-first.
 
 ### ES Pivot Fan framework
 
+- Confirmed the ES Low Pivot is the post-noon RTH low wick, not the low close, and locked it with explicit tests.
+- Added the optional overnight higher-pivot minor ascending watch line when overnight closes above the prior RTH high close.
+- Labeled the minor line consistently in ES Channel, Dashboard, Replay, Foresight, and demo data without letting it override the major fan read.
 - Reframed the ES engine around a professional Pivot Fan model: High Fan Ceiling/Floor and Low Fan Ceiling/Floor.
 - Added `fanRead` to the ES snapshot contract so Dashboard, ES Channel, Brief, and Replay can display the same zone summary.
 - Updated ES play selection for above-ceilings, between-ceilings, below-ceilings, and below-High-Fan-Floor regimes, including the HP-ceiling sell to HP-floor and LP-ceiling buy through HP-ceiling reads.

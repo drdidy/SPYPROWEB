@@ -272,7 +272,7 @@ def _line_label(kind: LineKind) -> str:
         "PREV_RTH_HIGH_DESC": "High Fan Floor",
         "PREV_RTH_LOW_ASC": "Low Fan Ceiling",
         "PREV_RTH_LOW_DESC": "Low Fan Floor",
-        "SWING_HIGH_ASC": "swing-high ascending",
+        "SWING_HIGH_ASC": "overnight higher-pivot ascending",
         "SWING_HIGH_DESC": "swing-high descending",
         "SWING_LOW_ASC": "swing-low ascending",
         "SWING_LOW_DESC": "swing-low descending",

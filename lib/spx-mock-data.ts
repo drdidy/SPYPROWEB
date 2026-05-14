@@ -80,6 +80,15 @@ export const spxSnapshot: SPXSnapshot = {
       distanceFromPrice: -22.48,
     },
     {
+      kind: "SWING_HIGH_ASC",
+      name: "Overnight Higher Pivot - Minor Ascending",
+      anchorPrice: 5884.00,
+      anchorTime: "2026-05-07T23:00:00-05:00",
+      slopePerHour: 1.04,
+      currentValue: 5894.40,
+      distanceFromPrice: 14.40,
+    },
+    {
       kind: "PREV_RTH_LOW_ASC",
       name: "Low Fan Ceiling",
       anchorPrice: 5849.00,
