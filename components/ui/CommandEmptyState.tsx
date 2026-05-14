@@ -19,18 +19,17 @@ export function CommandEmptyState({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-[18px] border border-[#D6BC75]/35 bg-[#071116] text-paper shadow-[0_24px_70px_-40px_rgba(7,17,22,0.95)]",
+        "relative overflow-hidden rounded-[16px] border border-[#D6BC75]/35 bg-[#071116] text-paper shadow-[0_24px_70px_-40px_rgba(7,17,22,0.95)]",
         className,
       )}
     >
-      <div className="absolute inset-0 opacity-[0.16] bg-[linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] bg-[size:36px_36px]" />
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gold to-transparent" />
-      <div className="relative grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-8 p-6 md:p-8">
+      <div className="absolute inset-x-0 top-0 h-px bg-gold/55" />
+      <div className="relative grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-7 p-5 md:p-6">
         <div className="max-w-2xl">
           <div className="font-mono text-[10px] uppercase tracking-[0.20em] text-gold-soft">
             {eyebrow}
           </div>
-          <h3 className="mt-3 font-serif text-[34px] leading-none tracking-tight text-paper">
+          <h3 className="mt-3 font-serif text-[28px] leading-tight tracking-tight text-paper md:text-[32px]">
             {title}
           </h3>
           <p className="mt-4 text-[14px] leading-relaxed text-paper/68">{body}</p>

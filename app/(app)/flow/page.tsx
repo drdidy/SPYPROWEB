@@ -29,7 +29,7 @@ export default async function Page() {
       <PageHeader
         eyebrow="Intelligence - 09"
         title="Order Flow"
-        lede="Unusual Whales options flow and dealer gamma exposure."
+        lede="Options-flow pressure, dark-pool context, and dealer gamma exposure."
         source={source}
       />
 
@@ -37,7 +37,7 @@ export default async function Page() {
         <CommandEmptyState
           eyebrow="Flow feed unavailable"
           title="No flow or GEX feed is available."
-          body="The app is not receiving Unusual Whales flow or dealer gamma in this snapshot. No substitute prints, premiums, or flip points are rendered until the upstream provides them."
+          body="The app is not receiving options-flow or dealer-gamma data in this snapshot. No substitute prints, premiums, or flip points are rendered until the upstream provides them."
           rows={[
             { label: "Flow", value: "Unavailable" },
             { label: "GEX", value: "Unavailable" },
@@ -85,7 +85,7 @@ export default async function Page() {
                 <CommandEmptyState
                   eyebrow="Print tape unavailable"
                   title="Flow has not returned yet."
-                  body="Unusual Whales returned no flow data for this snapshot. The premium bars and top prints appear only when the upstream response carries real prints."
+                  body="The options-flow provider returned no flow data for this snapshot. The premium bars and top prints appear only when the upstream response carries real prints."
                   rows={[
                     { label: "Ticker", value: "SPY" },
                     { label: "Premium", value: "Unavailable" },
@@ -144,7 +144,7 @@ export default async function Page() {
             />
             <CardBody>
               {!gex ? (
-                <div className="py-6 text-[13px] text-ink-3">GEX has not returned from Unusual Whales.</div>
+                <div className="py-6 text-[13px] text-ink-3">GEX has not returned from the options-flow provider.</div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <CommandStat

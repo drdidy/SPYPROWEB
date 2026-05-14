@@ -54,6 +54,7 @@ const sections = [
 ];
 
 const BUILD_LABEL = "Build 0.9.7";
+const WORKSPACE_LABEL = process.env.NODE_ENV === "production" ? "Production workspace" : "Local workspace";
 
 export function Sidebar({
   open = false,
@@ -154,7 +155,7 @@ export function Sidebar({
         ))}
       </nav>
 
-      <div className="pointer-events-none relative mx-5 mb-4 h-28 shrink-0 opacity-[0.22]">
+      <div className="pointer-events-none relative mx-5 mb-4 h-20 shrink-0 opacity-[0.16]">
         <CompassMark />
       </div>
 
@@ -168,7 +169,7 @@ export function Sidebar({
               {BUILD_LABEL}
             </div>
             <div className="mt-1 font-mono text-[9px] text-paper/45">
-              Production workspace
+              {WORKSPACE_LABEL}
             </div>
           </div>
         </div>

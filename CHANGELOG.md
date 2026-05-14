@@ -6,6 +6,15 @@ entries grow newest-first.
 
 ## [Unreleased]
 
+### Production UI audit and shared polish
+
+- Added a full-route production UI/UX audit covering Landing, Decision Slate, Channels, Replay, Foresight, Options, Intelligence, Brief, Learning, Journal, Signal Log, and Configuration.
+- Compacted shared in-app page headers and removed non-semantic decorative header geometry from secondary workspaces.
+- Simplified shared empty-state chrome so missing data reads as an operational state rather than a marketing panel.
+- Added a shared compliance/build footer to app routes that did not already have a route-specific footer.
+- Removed user-facing provider names from Order Flow copy and kept the tab framed around measured flow/gamma data.
+- Gated the sidebar workspace label by runtime environment so local builds do not claim to be production.
+
 ### ES Pivot Fan framework
 
 - Confirmed the ES Low Pivot is the post-noon RTH low wick, not the low close, and locked it with explicit tests.
