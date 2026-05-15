@@ -625,11 +625,11 @@ function buildSpyChannelChart(snap: AdaptedSnapshot): StructureChartData | null 
     };
   }
   if (!primary || bars.length < 2) return null;
-  const referenceTime = primary.entryReferenceTime ?? bars[0]?.t ?? primary.anchorTime;
+  const slopePerHour = -Math.abs(Number(snap.anchor?.slopePerHour ?? SLOPE_PER_HOUR));
   const lines = [
-    makeSpyChartLine("Upper ref", entryBandValue(primary.bands.upper), referenceTime, "upper"),
-    makeSpyChartLine("Main", entryBandValue(primary.bands.main), referenceTime, "anchor"),
-    makeSpyChartLine("Lower ref", entryBandValue(primary.bands.lower), referenceTime, "lower"),
+    makeSpyChartLine("Upper ref", primary.bands.upper.anchorPrice, primary.anchorTime, slopePerHour, "upper"),
+    makeSpyChartLine("Main", primary.bands.main.anchorPrice, primary.anchorTime, slopePerHour, "anchor"),
+    makeSpyChartLine("Lower ref", primary.bands.lower.anchorPrice, primary.anchorTime, slopePerHour, "lower"),
   ].filter((line): line is StructureChartLine => line !== null);
   if (lines.length === 0) return null;
   return { label: "SPY", date: new Date().toISOString().slice(0, 10), bars, lines };
@@ -639,6 +639,7 @@ function makeSpyChartLine(
   label: string,
   anchorPrice: number | null,
   anchorTime: string,
+  slopePerHour: number,
   tone: StructureChartLine["tone"],
 ): StructureChartLine | null {
   if (!Number.isFinite(anchorPrice ?? NaN)) return null;
@@ -646,7 +647,7 @@ function makeSpyChartLine(
     label,
     anchorTime,
     anchorPrice: Number(anchorPrice),
-    slopePerHour: 0,
+    slopePerHour,
     tone,
   };
 }

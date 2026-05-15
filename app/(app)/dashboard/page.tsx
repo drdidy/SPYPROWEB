@@ -658,12 +658,12 @@ function buildSpyStructureChart(
     };
   }
   if (bars.length < 2) return null;
-  const referenceTime = anchor?.entryReferenceTime ?? bars[0].t;
+  const spyAnchorSlope = -Math.abs(Number(snap.anchor?.slopePerHour ?? 0.2));
   const lines: StructureChartLine[] = anchor
     ? [
-        makeSpyBand("Upper", anchor.bands.upper.entryValue ?? anchor.bands.upper.currentValue, referenceTime, "upper"),
-        makeSpyBand("Main", anchor.bands.main.entryValue ?? anchor.bands.main.currentValue, referenceTime, "anchor"),
-        makeSpyBand("Lower", anchor.bands.lower.entryValue ?? anchor.bands.lower.currentValue, referenceTime, "lower"),
+        makeSpyBand("Upper", anchor.bands.upper.anchorPrice, anchor.anchorTime, spyAnchorSlope, "upper"),
+        makeSpyBand("Main", anchor.bands.main.anchorPrice, anchor.anchorTime, spyAnchorSlope, "anchor"),
+        makeSpyBand("Lower", anchor.bands.lower.anchorPrice, anchor.anchorTime, spyAnchorSlope, "lower"),
       ].filter(Boolean) as StructureChartLine[]
     : snap.lines
         .slice()
@@ -694,6 +694,7 @@ function makeSpyBand(
   label: string,
   anchorPrice: number | null,
   anchorTime: string,
+  slopePerHour: number,
   tone: StructureChartLine["tone"],
 ): StructureChartLine | null {
   if (!Number.isFinite(anchorPrice ?? NaN)) return null;
@@ -701,7 +702,7 @@ function makeSpyBand(
     label,
     anchorTime,
     anchorPrice: Number(anchorPrice),
-    slopePerHour: 0,
+    slopePerHour,
     tone,
   };
 }
@@ -720,9 +721,9 @@ function buildSpxStructureChart(
   const lines = snap.lines
     .map((line): StructureChartLine => ({
       label: shortSpxLineLabel(line.kind),
-      anchorTime: line.entryReferenceTime ?? line.anchorTime,
-      anchorPrice: line.entryValue ?? line.currentValue,
-      slopePerHour: 0,
+      anchorTime: line.anchorTime,
+      anchorPrice: line.anchorPrice,
+      slopePerHour: line.slopePerHour,
       tone:
         line.kind === "PREV_RTH_HIGH_DESC" || line.kind === "SWING_HIGH_DESC"
           ? "upper"
