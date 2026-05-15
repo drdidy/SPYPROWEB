@@ -51,6 +51,24 @@ def test_fetch_es_bars_filters_to_window_and_converts_to_ct(mock_download):
 
 
 @patch("yfinance.download")
+def test_fetch_es_bars_drops_invalid_ohlc_rows(mock_download):
+    df = _hourly_df([
+        ("2026-05-07 14:00", 5860, 5862, 5858, 5861, 1000),
+        ("2026-05-07 15:00", float("nan"), 5864, 5859, 5863, 1000),
+        ("2026-05-07 16:00", 5864, 5860, 5858, 5861, 1000),  # high below open
+        ("2026-05-07 17:00", 5865, 5868, 5862, 5867, 1000),
+    ])
+    mock_download.return_value = df
+
+    bars = YFinanceFetcher().fetch_es_bars(
+        datetime(2026, 5, 7, 8, 0, tzinfo=CT),
+        datetime(2026, 5, 7, 13, 0, tzinfo=CT),
+    )
+
+    assert [b.c for b in bars] == [5861.0, 5867.0]
+
+
+@patch("yfinance.download")
 def test_fetch_es_bars_empty_returns_empty_list(mock_download):
     mock_download.return_value = pd.DataFrame()
     bars = YFinanceFetcher().fetch_es_bars(

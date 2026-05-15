@@ -1,27 +1,28 @@
 "use client";
 import { Card } from "@/components/ui/Card";
 import { StatusPill } from "@/components/ui/StatusPill";
-import type { SPXSnapshot, SPXScenario, SPXAction } from "@/lib/types";
+import type { SPXSnapshot, SPXScenario, SPXAction, SPXLine } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
+import { useState, type KeyboardEvent, type PointerEvent } from "react";
 
 const scenarioLabel: Record<SPXScenario, string> = {
-  ABOVE_ASCENDING: "Above the rising channel",
-  INSIDE_ASCENDING: "Inside the rising channel",
-  BELOW_ASCENDING: "Below the rising channel",
-  ABOVE_DESCENDING: "Above the falling channel",
-  INSIDE_DESCENDING: "Inside the falling channel",
-  BELOW_DESCENDING: "Below the falling channel",
+  ABOVE_ASCENDING: "Above both fan ceilings",
+  INSIDE_ASCENDING: "Between fan ceilings",
+  BELOW_ASCENDING: "Below active structure",
+  ABOVE_DESCENDING: "Below both ceilings",
+  INSIDE_DESCENDING: "Between fan references",
+  BELOW_DESCENDING: "Below High Fan Floor",
   OUTSIDE_PLAY: "Outside the planned play",
 };
 
 const scenarioShort: Record<SPXScenario, string> = {
-  ABOVE_ASCENDING: "ABOVE · ASC",
-  INSIDE_ASCENDING: "INSIDE · ASC",
-  BELOW_ASCENDING: "BELOW · ASC",
-  ABOVE_DESCENDING: "ABOVE · DESC",
-  INSIDE_DESCENDING: "INSIDE · DESC",
-  BELOW_DESCENDING: "BELOW · DESC",
+  ABOVE_ASCENDING: "ABOVE CEILINGS",
+  INSIDE_ASCENDING: "BETWEEN CEILINGS",
+  BELOW_ASCENDING: "BELOW STRUCTURE",
+  ABOVE_DESCENDING: "BELOW CEILINGS",
+  INSIDE_DESCENDING: "FAN RANGE",
+  BELOW_DESCENDING: "BELOW HIGH FLOOR",
   OUTSIDE_PLAY: "OUTSIDE",
 };
 
@@ -37,7 +38,17 @@ const actionLabel: Record<SPXAction, string> = {
   STAND_DOWN: "STAND DOWN",
 };
 
-export function SPXChannelHero({ snap }: { snap: SPXSnapshot }) {
+function entryLineValue(line: SPXLine): number {
+  return line.entryValue ?? line.currentValue;
+}
+
+export function SPXChannelHero({
+  snap,
+  bars,
+}: {
+  snap: SPXSnapshot;
+  bars?: Array<{ t: string; h: number; l: number; c: number }> | null;
+}) {
   const directionTone =
     snap.channel.direction === "ASCENDING"
       ? "text-bull-ink"
@@ -50,31 +61,36 @@ export function SPXChannelHero({ snap }: { snap: SPXSnapshot }) {
   const heroBg = selective ? "bg-gold-tint/40" : "bg-paper";
 
   // Compose right-rail stat strip values
-  const ceiling = snap.lines.find((l) => l.kind === "CHANNEL_CEILING");
-  const floor = snap.lines.find((l) => l.kind === "CHANNEL_FLOOR");
-  const channelWidth =
-    ceiling && floor ? ceiling.currentValue - floor.currentValue : null;
-  const distToCeiling = ceiling
-    ? ceiling.currentValue - snap.price.last
-    : null;
-  const distToFloor = floor ? snap.price.last - floor.currentValue : null;
+  const majorHighDesc =
+    snap.lines.find((l) => l.kind === "PREV_RTH_HIGH_DESC") ??
+    snap.lines.find((l) => l.kind === "SWING_HIGH_DESC");
+  const lowDesc = snap.lines.find((l) => l.kind === "PREV_RTH_LOW_DESC");
+  const activePair = [majorHighDesc, lowDesc]
+    .filter((line): line is NonNullable<typeof line> => Boolean(line))
+    .sort((a, b) => entryLineValue(a) - entryLineValue(b));
+  const lowerLine = activePair[0] ?? null;
+  const upperLine = activePair[1] ?? null;
+  const activeGap =
+    lowerLine && upperLine ? entryLineValue(upperLine) - entryLineValue(lowerLine) : null;
+  const distToUpper = upperLine ? entryLineValue(upperLine) - snap.price.last : null;
+  const distToLower = lowerLine ? snap.price.last - entryLineValue(lowerLine) : null;
 
   return (
     <Card
       className={`relative overflow-hidden ${heroBg}`}
     >
-      {/* SPX violet signature — left edge */}
+      {/* SPX violet signature - left edge */}
       <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-violet/55" />
       {/* hairline top */}
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-rule to-transparent" />
 
       <div className="grid grid-cols-12 gap-0">
-        {/* LEFT — scenario + action */}
-        <div className="col-span-12 lg:col-span-7 p-7 pr-6 pl-8 relative">
+        {/* LEFT - scenario + action */}
+        <div className="col-span-12 lg:col-span-5 p-5 sm:p-7 lg:pr-6 lg:pl-8 relative">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="eyebrow text-ink-3">ES · Channel Slate</span>
-              {/* v9: slope value hidden — proprietary engine
+              <span className="eyebrow text-ink-3">ES - Pivot Fan</span>
+              {/* v9: slope value hidden - proprietary engine
                   parameter, not for surface display. */}
               <span className="text-[10px] text-ink-4 font-mono">
                 Session {snap.sessionDateCT}
@@ -140,29 +156,33 @@ export function SPXChannelHero({ snap }: { snap: SPXSnapshot }) {
             </div>
           </div>
 
-          {/* Single combined paragraph — scenario explanation followed by the
-              channel-determination context as a leader sentence. The previous
+          {/* Single combined paragraph - fan explanation followed by the
+              pivot context as a leader sentence. The previous
               version stacked two italic blocks which read as sentimental. */}
           <p className="mt-7 text-[15px] text-ink-2 leading-relaxed max-w-xl">
-            {snap.scenarioExplanation}
+            {snap.fanRead?.summary ?? snap.scenarioExplanation}
             <span className="text-ink-3 ml-1.5">{snap.channel.reason}</span>
           </p>
+          {snap.rthBias && (
+            <div className="mt-4 rounded-[12px] border border-rule bg-paper-2/65 px-3 py-3">
+              <div className="eyebrow text-ink-3">RTH posture</div>
+              <p className="mt-1 text-[13px] leading-relaxed text-ink-2">
+                {snap.rthBias.note}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* vertical rule */}
-        <div className="hidden lg:block absolute left-[58.333%] top-7 bottom-7 w-px bg-rule" />
+        <div className="hidden lg:block absolute left-[41.666%] top-7 bottom-7 w-px bg-rule" />
 
-        {/* RIGHT — diagram + stat strip (rebalanced) */}
-        <div className="col-span-12 lg:col-span-5 p-7 pl-7 bg-paper-2/40 relative">
+        {/* RIGHT - diagram + stat strip (rebalanced) */}
+        <div className="col-span-12 lg:col-span-7 p-5 sm:p-7 lg:pl-7 bg-paper-2/40 relative">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <span className="eyebrow text-ink-3">Channel</span>
+              <span className="eyebrow text-ink-3">Fan read</span>
               <div className="mt-1.5 text-title font-serif text-ink">
-                {snap.channel.direction === "NONE"
-                  ? "No channel today"
-                  : snap.channel.direction === "ASCENDING"
-                    ? "Ascending"
-                    : "Descending"}
+                {snap.fanRead?.label ?? (snap.channel.direction === "NONE" ? "Resolving" : "Mapped")}
               </div>
             </div>
             <div className="text-right">
@@ -184,30 +204,30 @@ export function SPXChannelHero({ snap }: { snap: SPXSnapshot }) {
             </div>
           </div>
 
-          {/* 3-stat band — gives the right rail visual gravity */}
+          {/* 3-stat band - gives the right rail visual gravity */}
           <div className="grid grid-cols-3 gap-2 mb-4">
             <RailStat
-              label="Width"
-              value={channelWidth !== null ? `${channelWidth.toFixed(2)}` : "—"}
+              label="Major range"
+              value={activeGap !== null ? `${activeGap.toFixed(2)}` : "-"}
               suffix="pts"
             />
             <RailStat
-              label="To Ceil"
-              value={distToCeiling !== null ? distToCeiling.toFixed(2) : "—"}
+              label="To major"
+              value={distToUpper !== null ? distToUpper.toFixed(2) : "-"}
               tone={
-                distToCeiling !== null && distToCeiling >= 0 ? "bear" : "bull"
+                distToUpper !== null && distToUpper >= 0 ? "bear" : "bull"
               }
               suffix="pts"
             />
             <RailStat
-              label="To Floor"
-              value={distToFloor !== null ? distToFloor.toFixed(2) : "—"}
-              tone={distToFloor !== null && distToFloor >= 0 ? "bull" : "bear"}
+              label="To low ref"
+              value={distToLower !== null ? distToLower.toFixed(2) : "-"}
+              tone={distToLower !== null && distToLower >= 0 ? "bull" : "bear"}
               suffix="pts"
             />
           </div>
 
-          <ChannelDiagram snap={snap} />
+          <FanDiagram snap={snap} bars={bars ?? null} />
 
           <div className="mt-3 grid grid-cols-2 gap-3 text-[11px]">
             <Anchor
@@ -260,8 +280,16 @@ function RailStat({
       : tone === "bear"
         ? "text-bear-ink"
         : "text-ink";
+  const isBlank = value === "-";
   return (
-    <div className="px-2.5 py-1.5 rounded-soft bg-paper shadow-rule">
+    <div
+      className="px-2.5 py-1.5 rounded-soft bg-paper shadow-rule"
+      title={
+        isBlank
+          ? "These populate once the overnight swing closes and previous RTH references are available."
+          : undefined
+      }
+    >
       <div className="eyebrow text-ink-3 mb-0.5">{label}</div>
       <div className="flex items-baseline gap-1">
         <span
@@ -274,6 +302,11 @@ function RailStat({
           <span className="font-mono text-[9px] text-ink-4">{suffix}</span>
         )}
       </div>
+      {isBlank && (
+        <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.08em] text-ink-4">
+          Why blank?
+        </div>
+      )}
     </div>
   );
 }
@@ -310,26 +343,57 @@ function Anchor({
 
 // ---------- Diagram ----------
 
-function ChannelDiagram({ snap }: { snap: SPXSnapshot }) {
-  const W = 400;
-  const H = 220; // grown from 180 — gives the diagram more visual gravity
-  const PAD_L = 40;
-  const PAD_R = 14;
-  const PAD_T = 14;
-  const PAD_B = 22;
+function FanDiagram({
+  snap,
+  bars,
+}: {
+  snap: SPXSnapshot;
+  bars: Array<{ t: string; h: number; l: number; c: number }> | null;
+}) {
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const W = 760;
+  const H = 460;
+  const PAD_L = 54;
+  const PAD_R = 170;
+  const PAD_T = 30;
+  const PAD_B = 44;
 
-  const t0 = new Date(snap.overnight.window.start).getTime();
+  const cleanBars = (bars ?? [])
+    .filter(
+      (bar) =>
+        !!bar.t &&
+        Number.isFinite(bar.h) &&
+        Number.isFinite(bar.l) &&
+        Number.isFinite(bar.c),
+    )
+    .sort((a, b) => Date.parse(a.t) - Date.parse(b.t));
+  if (cleanBars.length > 0 && Number.isFinite(snap.price.last)) {
+    const last = cleanBars[cleanBars.length - 1];
+    cleanBars[cleanBars.length - 1] = {
+      ...last,
+      h: Math.max(last.h, snap.price.last),
+      l: Math.min(last.l, snap.price.last),
+      c: snap.price.last,
+    };
+  }
+  const t0 = cleanBars[0]?.t
+    ? new Date(cleanBars[0].t).getTime()
+    : new Date(snap.overnight.window.start).getTime();
   const tNow = new Date(snap.asOf).getTime();
-  const tEnd = tNow + 60 * 60 * 1000;
+  const tEnd = cleanBars.at(-1)?.t
+    ? new Date(cleanBars.at(-1)!.t).getTime()
+    : tNow + 60 * 60 * 1000;
 
-  const ceiling = snap.lines.find((l) => l.kind === "CHANNEL_CEILING");
-  const floor = snap.lines.find((l) => l.kind === "CHANNEL_FLOOR");
-  const prevHighAsc = snap.lines.find((l) => l.kind === "PREV_RTH_HIGH_ASC");
+  const ceiling =
+    snap.lines.find((l) => l.kind === "PREV_RTH_HIGH_DESC") ??
+    snap.lines.find((l) => l.kind === "SWING_HIGH_DESC");
+  const floor =
+    snap.lines.find((l) => l.kind === "PREV_RTH_LOW_DESC") ??
+    snap.lines.find((l) => l.kind === "SWING_LOW_ASC");
 
   const yPoints: number[] = [snap.price.last];
-  if (ceiling) yPoints.push(ceiling.currentValue, ceiling.anchorPrice);
-  if (floor) yPoints.push(floor.currentValue, floor.anchorPrice);
-  if (prevHighAsc) yPoints.push(prevHighAsc.currentValue, prevHighAsc.anchorPrice);
+  for (const bar of cleanBars) yPoints.push(bar.h, bar.l, bar.c);
+  for (const line of snap.lines) yPoints.push(entryLineValue(line), line.currentValue, line.anchorPrice);
   let yMin = Math.min(...yPoints);
   let yMax = Math.max(...yPoints);
   const pad = (yMax - yMin) * 0.12 || 4;
@@ -340,6 +404,14 @@ function ChannelDiagram({ snap }: { snap: SPXSnapshot }) {
     PAD_L + ((t - t0) / (tEnd - t0)) * (W - PAD_L - PAD_R);
   const yOf = (p: number) =>
     PAD_T + (1 - (p - yMin) / (yMax - yMin)) * (H - PAD_T - PAD_B);
+  const pricePath = cleanBars
+    .map((bar, index) => {
+      const ms = Date.parse(bar.t);
+      return `${index === 0 ? "M" : "L"} ${xOf(ms).toFixed(1)},${yOf(bar.c).toFixed(1)}`;
+    })
+    .join(" ");
+  const selectedIndex = activeIndex ?? Math.max(0, cleanBars.length - 1);
+  const selected = cleanBars[Math.max(0, Math.min(cleanBars.length - 1, selectedIndex))] ?? null;
 
   const projectAt = (
     anchorPrice: number,
@@ -354,18 +426,6 @@ function ChannelDiagram({ snap }: { snap: SPXSnapshot }) {
   const ascending = snap.channel.direction === "ASCENDING";
   const railColor = ascending ? "#0E7C50" : "#B5301E";
   const railFill = ascending ? "rgba(14,124,80,0.09)" : "rgba(181,48,30,0.09)";
-  // Prev-day RTH refs: violet (was teal — collided with SPY's "armed" state).
-  const refColor = "#5B3FB1";
-
-  const ceilingPath =
-    ceiling && snap.channel.direction !== "NONE"
-      ? `M ${xOf(new Date(ceiling.anchorTime).getTime())},${yOf(ceiling.anchorPrice)} L ${xOf(tEnd)},${yOf(projectAt(ceiling.anchorPrice, ceiling.anchorTime, ceiling.slopePerHour, tEnd))}`
-      : "";
-  const floorPath =
-    floor && snap.channel.direction !== "NONE"
-      ? `M ${xOf(new Date(floor.anchorTime).getTime())},${yOf(floor.anchorPrice)} L ${xOf(tEnd)},${yOf(projectAt(floor.anchorPrice, floor.anchorTime, floor.slopePerHour, tEnd))}`
-      : "";
-
   let bandPath = "";
   if (ceiling && floor && snap.channel.direction !== "NONE") {
     const tCeilStart = new Date(ceiling.anchorTime).getTime();
@@ -402,18 +462,59 @@ function ChannelDiagram({ snap }: { snap: SPXSnapshot }) {
       `L ${xOf(tBandStart)},${yOf(fStart)} Z`;
   }
 
-  const prevHighPath = prevHighAsc
-    ? `M ${xOf(new Date(prevHighAsc.anchorTime).getTime())},${yOf(prevHighAsc.anchorPrice)} L ${xOf(tEnd)},${yOf(projectAt(prevHighAsc.anchorPrice, prevHighAsc.anchorTime, prevHighAsc.slopePerHour, tEnd))}`
-    : "";
-
-  const xNow = xOf(tNow);
+  const xNow = Math.max(PAD_L, Math.min(W - PAD_R, xOf(Math.min(Math.max(tNow, t0), tEnd))));
   const yPrice = yOf(snap.price.last);
+  const selectedMs = selected ? Date.parse(selected.t) : tNow;
+  const selectedX = Math.max(PAD_L, Math.min(W - PAD_R, xOf(selectedMs)));
+  const selectedPrice = selected?.c ?? snap.price.last;
+  const selectedY = yOf(selectedPrice);
+  const selectedLine = snap.lines
+    .slice()
+    .sort(
+      (a, b) =>
+        Math.abs(projectAt(a.anchorPrice, a.anchorTime, a.slopePerHour, selectedMs) - selectedPrice) -
+        Math.abs(projectAt(b.anchorPrice, b.anchorTime, b.slopePerHour, selectedMs) - selectedPrice),
+    )[0];
+  const selectedLineValue = selectedLine
+    ? projectAt(selectedLine.anchorPrice, selectedLine.anchorTime, selectedLine.slopePerHour, selectedMs)
+    : null;
+  const tooltipX = Math.min(W - PAD_R - 118, Math.max(PAD_L + 4, selectedX + 10));
+  const tooltipY = Math.min(H - PAD_B - 56, Math.max(PAD_T + 4, selectedY - 32));
 
   const rthOpen = new Date(snap.sessionDateCT + "T08:30:00-05:00").getTime();
   const xRTH = xOf(rthOpen);
+  const lineLabels = distributeEsChartLabels(
+    snap.lines.map((line) => {
+      const endValue = projectAt(line.anchorPrice, line.anchorTime, line.slopePerHour, tEnd);
+      return {
+        key: line.kind,
+        code: lineCode(line.kind),
+        value: entryLineValue(line),
+        endValue,
+        y: yOf(endValue),
+        color: lineStroke(line.kind),
+      };
+    }),
+    PAD_T + 16,
+    H - PAD_B - 16,
+  );
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full spx-diagram">
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      className="w-full spx-diagram"
+      tabIndex={0}
+      role="img"
+      aria-label="ES Pivot Fan chart with interactive price crosshair"
+      onPointerMove={(event) => {
+        setActiveIndex(nearestEsBarIndexFromPointer(event, cleanBars, W, PAD_L, W - PAD_R, xOf));
+      }}
+      onPointerLeave={() => setActiveIndex(null)}
+      onFocus={() => setActiveIndex((value) => value ?? Math.max(0, cleanBars.length - 1))}
+      onKeyDown={(event) => {
+        setActiveIndex((value) => stepEsIndex(event, value ?? Math.max(0, cleanBars.length - 1), cleanBars.length));
+      }}
+    >
       <style>{spxDiagramStyles}</style>
       {/* horizontal price gridlines */}
       {[0.25, 0.5, 0.75].map((f) => {
@@ -476,42 +577,181 @@ function ChannelDiagram({ snap }: { snap: SPXSnapshot }) {
         </>
       )}
 
-      {/* channel band fill */}
+      {/* fan fill */}
+      {snap.channel.direction === "NONE" && (
+        <g className="spx-ghost-channel">
+          <path
+            d={`M ${PAD_L},${PAD_T + 58} L ${W - PAD_R},${PAD_T + 42} L ${W - PAD_R},${H - PAD_B - 42} L ${PAD_L},${H - PAD_B - 58} Z`}
+            fill="rgba(20,22,26,0.045)"
+            stroke="#D4CBB6"
+            strokeWidth={0.8}
+            strokeDasharray="4 4"
+          />
+          <line
+            x1={PAD_L}
+            y1={H / 2}
+            x2={W - PAD_R}
+            y2={H / 2}
+            stroke="#D4CBB6"
+            strokeWidth={0.7}
+            strokeDasharray="2 5"
+          />
+          <text
+            x={PAD_L + 6}
+            y={PAD_T + 20}
+            fontSize="8.5"
+            fontFamily="var(--font-geist-mono)"
+            fill="#5A5A5A"
+            letterSpacing="0.08em"
+          >
+            PIVOT FAN AWAITS RTH PIVOTS
+          </text>
+        </g>
+      )}
       {bandPath && <path d={bandPath} fill={railFill} className="spx-band" />}
 
-      {/* prev-day RTH high asc — dashed violet reference */}
-      {prevHighPath && (
-        <path
-          d={prevHighPath}
-          stroke={refColor}
-          strokeWidth={1.1}
-          strokeDasharray="4 4"
-          fill="none"
-          opacity={0.85}
-          className="spx-ref-line"
-        />
-      )}
+      {/* ES Pivot Fan lines with exact projected values */}
+      {snap.lines.map((line, index) => {
+        const start = new Date(line.anchorTime).getTime();
+        const endValue = projectAt(line.anchorPrice, line.anchorTime, line.slopePerHour, tEnd);
+        const entryValue = entryLineValue(line);
+        const entryTime = line.entryReferenceTime ? new Date(line.entryReferenceTime).getTime() : null;
+        const color = lineStroke(line.kind);
+        const label = lineLabels.find((item) => item.key === line.kind);
+        return (
+          <g key={line.kind}>
+            <path
+              d={`M ${xOf(start)},${yOf(line.anchorPrice)} L ${xOf(tEnd)},${yOf(endValue)}`}
+              stroke={color}
+              strokeWidth={line.kind === "PREV_RTH_HIGH_DESC" || line.kind === "PREV_RTH_LOW_DESC" ? 1.7 : 1.05}
+              strokeDasharray={line.kind.startsWith("PREV_RTH") ? "5 5" : line.slopePerHour > 0 ? "2 4" : undefined}
+              fill="none"
+              opacity={line.kind.startsWith("PREV_RTH") ? 0.82 : 0.9}
+              className={index % 2 === 0 ? "spx-rail" : "spx-rail spx-rail-delayed"}
+              pathLength={1}
+            />
+            {label && (
+              <g className="spx-line-label">
+                <path
+                  d={`M ${W - PAD_R},${yOf(endValue)} L ${W - PAD_R + 10},${label.labelY}`}
+                  stroke={color}
+                  strokeWidth={0.7}
+                  strokeOpacity={0.44}
+                  fill="none"
+                />
+                <rect
+                  x={W - PAD_R + 12}
+                  y={label.labelY - 12}
+                  width="132"
+                  height="24"
+                  rx="6"
+                  fill="#FFFDF7"
+                  stroke={color}
+                  strokeOpacity="0.28"
+                />
+                <text
+                  x={W - PAD_R + 20}
+                  y={label.labelY - 2}
+                  fontSize="8"
+                  fontFamily="var(--font-geist-mono)"
+                  fontWeight="800"
+                  fill={color}
+                  letterSpacing="0.05em"
+                >
+                  {label.code}
+                </text>
+                <text
+                  x={W - PAD_R + 20}
+                  y={label.labelY + 9}
+                  fontSize="9.5"
+                  fontFamily="var(--font-geist-mono)"
+                  fontWeight="700"
+                  fill="#14161A"
+                >
+                  08 {label.value.toFixed(2)}
+                </text>
+              </g>
+            )}
+            {entryTime !== null && entryTime >= t0 && entryTime <= tEnd && (
+              <g>
+                <circle
+                  cx={xOf(entryTime)}
+                  cy={yOf(entryValue)}
+                  r={3.2}
+                  fill="#FFFDF7"
+                  stroke={color}
+                  strokeWidth={1.2}
+                />
+              </g>
+            )}
+          </g>
+        );
+      })}
 
-      {/* channel rails */}
-      {ceilingPath && (
+      {pricePath && (
         <path
-          d={ceilingPath}
-          stroke={railColor}
-          strokeWidth={1.6}
+          d={pricePath}
+          stroke="#14161A"
+          strokeWidth={2}
           fill="none"
-          className="spx-rail"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="spx-price-path"
           pathLength={1}
         />
       )}
-      {floorPath && (
-        <path
-          d={floorPath}
-          stroke={railColor}
-          strokeWidth={1.6}
-          fill="none"
-          className="spx-rail spx-rail-delayed"
-          pathLength={1}
-        />
+      {selected && (
+        <g className="spx-hover">
+          <line
+            x1={selectedX}
+            x2={selectedX}
+            y1={PAD_T}
+            y2={H - PAD_B}
+            stroke="#14161A"
+            strokeWidth={0.7}
+            strokeDasharray="3 4"
+            opacity={0.5}
+          />
+          <line
+            x1={PAD_L}
+            x2={W - PAD_R}
+            y1={selectedY}
+            y2={selectedY}
+            stroke="#14161A"
+            strokeWidth={0.55}
+            strokeDasharray="2 5"
+            opacity={0.35}
+          />
+          <circle
+            cx={selectedX}
+            cy={selectedY}
+            r={4.1}
+            fill="#14161A"
+            stroke="#FFFDF7"
+            strokeWidth={1.2}
+          />
+          <g transform={`translate(${tooltipX},${tooltipY})`}>
+            <rect
+              width="116"
+              height="52"
+              rx="7"
+              fill="#FFFDF7"
+              stroke="#D6CCB7"
+              filter="drop-shadow(0 8px 16px rgba(20,22,26,0.12))"
+            />
+            <text x="8" y="12" fontSize="7" fontFamily="var(--font-geist-mono)" fontWeight="700" fill="#5A5A5A">
+              {formatChartTime(selected.t)}
+            </text>
+            <text x="8" y="28" fontSize="12" fontFamily="var(--font-geist-mono)" fontWeight="800" fill="#14161A">
+              {selectedPrice.toFixed(2)}
+            </text>
+            {selectedLine && selectedLineValue !== null && (
+              <text x="8" y="44" fontSize="7.4" fontFamily="var(--font-geist-mono)" fill={lineStroke(selectedLine.kind)}>
+                {lineCode(selectedLine.kind)} {selectedLineValue.toFixed(2)}
+              </text>
+            )}
+          </g>
+        </g>
       )}
 
       {/* anchor dots */}
@@ -571,76 +811,145 @@ function ChannelDiagram({ snap }: { snap: SPXSnapshot }) {
       <g className="spx-price-marker">
         <circle cx={xNow} cy={yPrice} r={4.5} fill="#14161A" />
         <circle cx={xNow} cy={yPrice} r={8} fill="#14161A" opacity={0.12} className="spx-price-halo" />
+        <rect
+          x={Math.min(W - PAD_R - 96, xNow + 8)}
+          y={Math.max(PAD_T + 2, yPrice - 14)}
+          width="88"
+          height="22"
+          rx="6"
+          fill="#FFFDF7"
+          stroke="#D6CCB7"
+        />
+        <text
+          x={Math.min(W - PAD_R - 52, xNow + 52)}
+          y={Math.max(PAD_T + 17, yPrice + 1)}
+          fontSize="9.5"
+          fontFamily="var(--font-geist-mono)"
+          fill="#14161A"
+          textAnchor="middle"
+        >
+          LAST {snap.price.last.toFixed(2)}
+        </text>
       </g>
 
-      {/* labels at right edge */}
-      {ceiling && snap.channel.direction !== "NONE" && (
-        <text
-          x={W - PAD_R - 2}
-          y={
-            yOf(
-              projectAt(
-                ceiling.anchorPrice,
-                ceiling.anchorTime,
-                ceiling.slopePerHour,
-                tEnd,
-              ),
-            ) - 3
-          }
-          fontSize="8"
-          fontFamily="var(--font-geist-mono)"
-          fill={railColor}
-          textAnchor="end"
-          fontWeight={600}
-        >
-          CEIL {ceiling.currentValue.toFixed(2)}
-        </text>
-      )}
-      {floor && snap.channel.direction !== "NONE" && (
-        <text
-          x={W - PAD_R - 2}
-          y={
-            yOf(
-              projectAt(
-                floor.anchorPrice,
-                floor.anchorTime,
-                floor.slopePerHour,
-                tEnd,
-              ),
-            ) + 9
-          }
-          fontSize="8"
-          fontFamily="var(--font-geist-mono)"
-          fill={railColor}
-          textAnchor="end"
-          fontWeight={600}
-        >
-          FLOOR {floor.currentValue.toFixed(2)}
-        </text>
-      )}
-      {prevHighAsc && (
-        <text
-          x={W - PAD_R - 2}
-          y={
-            yOf(
-              projectAt(
-                prevHighAsc.anchorPrice,
-                prevHighAsc.anchorTime,
-                prevHighAsc.slopePerHour,
-                tEnd,
-              ),
-            ) - 3
-          }
-          fontSize="7.5"
-          fontFamily="var(--font-geist-mono)"
-          fill={refColor}
-          textAnchor="end"
-        >
-          PREV-H ASC
-        </text>
-      )}
     </svg>
   );
+}
+
+function nearestEsBarIndexFromPointer(
+  event: PointerEvent<SVGSVGElement>,
+  bars: Array<{ t: string; h: number; l: number; c: number }>,
+  width: number,
+  minX: number,
+  maxX: number,
+  xOf: (ms: number) => number,
+): number {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const viewX = ((event.clientX - rect.left) / Math.max(1, rect.width)) * width;
+  const clamped = Math.max(minX, Math.min(maxX, viewX));
+  let bestIndex = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  bars.forEach((bar, index) => {
+    const distance = Math.abs(xOf(Date.parse(bar.t)) - clamped);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = index;
+    }
+  });
+  return bestIndex;
+}
+
+function stepEsIndex(
+  event: KeyboardEvent<SVGSVGElement>,
+  current: number,
+  length: number,
+): number {
+  if (event.key !== "ArrowLeft" && event.key !== "ArrowRight" && event.key !== "Home" && event.key !== "End") {
+    return current;
+  }
+  event.preventDefault();
+  if (event.key === "Home") return 0;
+  if (event.key === "End") return Math.max(0, length - 1);
+  const delta = event.key === "ArrowLeft" ? -1 : 1;
+  return Math.max(0, Math.min(length - 1, current + delta));
+}
+
+function formatChartTime(iso: string): string {
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return "--:-- CT";
+  return `${new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(ms))} CT`;
+}
+
+type EsChartLabel = {
+  key: string;
+  code: string;
+  value: number;
+  endValue: number;
+  y: number;
+  color: string;
+  labelY: number;
+};
+
+function distributeEsChartLabels(
+  labels: Array<Omit<EsChartLabel, "labelY">>,
+  minY: number,
+  maxY: number,
+): EsChartLabel[] {
+  const minGap = 30;
+  const sorted = labels
+    .filter(
+      (label) =>
+        Number.isFinite(label.value) &&
+        Number.isFinite(label.endValue) &&
+        Number.isFinite(label.y),
+    )
+    .sort((a, b) => a.y - b.y);
+  const placed = sorted.map((label, index) => {
+    const previous = index === 0 ? minY : sorted[index - 1].y + minGap;
+    return {
+      ...label,
+      labelY: Math.max(minY, Math.min(maxY, Math.max(label.y, previous))),
+    };
+  });
+  for (let index = placed.length - 2; index >= 0; index -= 1) {
+    placed[index].labelY = Math.min(
+      placed[index].labelY,
+      placed[index + 1].labelY - minGap,
+    );
+  }
+  return placed.map((label) => ({
+    ...label,
+    labelY: Math.max(minY, Math.min(maxY, label.labelY)),
+  }));
+}
+
+function lineCode(kind: string): string {
+  const labels: Record<string, string> = {
+    PREV_RTH_HIGH_ASC: "HF-C",
+    PREV_RTH_HIGH_DESC: "HF-F",
+    PREV_RTH_LOW_ASC: "LF-C",
+    PREV_RTH_LOW_DESC: "LF-F",
+    SWING_HIGH_ASC: "OH-C",
+    SWING_HIGH_DESC: "SH-D",
+    SWING_LOW_ASC: "SL-A",
+    SWING_LOW_DESC: "SL-D",
+  };
+  return labels[kind] ?? "ES-L";
+}
+
+function lineStroke(kind: string): string {
+  if (kind === "PREV_RTH_HIGH_DESC") return "#B5301E";
+  if (kind === "PREV_RTH_LOW_ASC") return "#0E7C50";
+  if (kind === "SWING_HIGH_DESC") return "#B5301E";
+  if (kind === "SWING_LOW_ASC") return "#0E7C50";
+  if (kind.startsWith("PREV_RTH")) return "#5B3FB1";
+  if (kind.includes("HIGH")) return "#B8860B";
+  return "#8A6117";
 }
 
 const spxDiagramStyles = `
@@ -671,6 +980,10 @@ const spxDiagramStyles = `
     50%  { opacity: 0.04; transform: scale(1.7); }
     100% { opacity: 0.12; transform: scale(1); }
   }
+  @keyframes spx-path-draw {
+    from { stroke-dashoffset: 1; }
+    to { stroke-dashoffset: 0; }
+  }
   .spx-diagram .spx-rail {
     stroke-dasharray: 1;
     animation: spx-rail-draw 950ms cubic-bezier(0.22, 1, 0.36, 1) 200ms both;
@@ -700,6 +1013,11 @@ const spxDiagramStyles = `
   .spx-diagram .spx-price-line {
     animation: spx-breathe 3200ms ease-in-out infinite;
   }
+  .spx-diagram .spx-price-path {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: spx-path-draw 1300ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
   .spx-diagram .spx-price-marker {
     opacity: 0;
     animation: spx-fade-in 360ms ease-out 1300ms forwards;
@@ -721,9 +1039,12 @@ const spxDiagramStyles = `
       transform: none !important;
     }
     .spx-diagram .spx-anchor-pulse,
+    .spx-diagram .spx-price-path,
     .spx-diagram .spx-price-line,
     .spx-diagram .spx-price-halo {
       animation: none !important;
+      stroke-dashoffset: 0 !important;
     }
   }
 `;
+

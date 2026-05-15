@@ -16,7 +16,7 @@ const steps = [
     href: "/es",
     icon: ChartNoAxesCombined,
     body: "Rails project forward from structure. The chart is not decoration; it is the decision surface.",
-    cta: "See ES channel",
+    cta: "See ES read",
   },
   {
     n: "03",

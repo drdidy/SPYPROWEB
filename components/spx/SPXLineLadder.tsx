@@ -4,33 +4,67 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import type { SPXLine, SPXLineKind } from "@/lib/types";
 
 const lineMeta: Record<SPXLineKind, { dot: string; label: string; group: string }> = {
-  CHANNEL_CEILING: { dot: "bg-bear", label: "Channel Ceiling", group: "Active channel" },
-  CHANNEL_FLOOR: { dot: "bg-bull", label: "Channel Floor", group: "Active channel" },
   PREV_RTH_HIGH_ASC: {
-    dot: "bg-violet",
-    label: "Prev RTH High · Asc",
-    group: "Reference",
+    dot: "bg-ink-4",
+    label: "High Fan Ceiling",
+    group: "High Pivot Fan",
+  },
+  PREV_RTH_HIGH_DESC: {
+    dot: "bg-bear",
+    label: "High Fan Floor",
+    group: "High Pivot Fan",
+  },
+  PREV_RTH_LOW_ASC: {
+    dot: "bg-bull",
+    label: "Low Fan Ceiling",
+    group: "Low Pivot Fan",
   },
   PREV_RTH_LOW_DESC: {
-    dot: "bg-violet",
-    label: "Prev RTH Low · Desc",
-    group: "Reference",
+    dot: "bg-ink-4",
+    label: "Low Fan Floor",
+    group: "Low Pivot Fan",
+  },
+  SWING_HIGH_ASC: {
+    dot: "bg-gold",
+    label: "Overnight Higher Pivot",
+    group: "Minor watch",
+  },
+  SWING_HIGH_DESC: {
+    dot: "bg-bear",
+    label: "Swing High - Desc",
+    group: "Overnight swing",
+  },
+  SWING_LOW_ASC: {
+    dot: "bg-bull",
+    label: "Swing Low - Asc",
+    group: "Overnight swing",
+  },
+  SWING_LOW_DESC: {
+    dot: "bg-gold",
+    label: "Swing Low - Desc",
+    group: "Overnight swing",
   },
 };
 
-function lineState(distance: number): "armed" | "watching" | "stale" {
+function lineState(kind: SPXLineKind, distance: number): "armed" | "watching" | "stale" | "reference" | "bias" {
+  if (kind === "PREV_RTH_HIGH_DESC") return "bias";
+  if (lineMeta[kind].group.endsWith("Pivot Fan")) return "reference";
   const a = Math.abs(distance);
   if (a <= 3) return "armed";
   if (a <= 15) return "watching";
   return "stale";
 }
 
+function entryLineValue(line: SPXLine): number {
+  return line.entryValue ?? line.currentValue;
+}
+
 export function SPXLineLadder({ lines, price }: { lines: SPXLine[]; price: number }) {
   return (
     <Card>
       <CardHeader
-        eyebrow="Line Ladder"
-        title="Levels in play"
+        eyebrow="Pivot Fan"
+        title="08:00 CT operating levels"
         meta={`Last ${price.toFixed(2)} · sorted by proximity`}
       />
       <CardBody className="px-0 pb-0">
@@ -45,11 +79,21 @@ export function SPXLineLadder({ lines, price }: { lines: SPXLine[]; price: numbe
           {[...lines]
             .sort(
               (a, b) =>
-                Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice),
+                Math.abs(entryLineValue(a) - price) - Math.abs(entryLineValue(b) - price),
             )
             .map((l, idx) => {
-              const state = lineState(l.distanceFromPrice);
+              const entryValue = entryLineValue(l);
+              const distanceFromEntry = entryValue - price;
+              const state = lineState(l.kind, distanceFromEntry);
               const m = lineMeta[l.kind];
+              const pct =
+                price !== 0 && Number.isFinite(price)
+                  ? (Math.abs(distanceFromEntry) / Math.abs(price)) * 100
+                  : null;
+              const pillVariant =
+                state === "reference" ? "stale" : state === "bias" ? "waiting" : state;
+              const stateLabel =
+                state === "reference" ? "REFERENCE" : state === "bias" ? "BIAS" : state;
               return (
                 <li
                   key={l.kind}
@@ -67,20 +111,25 @@ export function SPXLineLadder({ lines, price }: { lines: SPXLine[]; price: numbe
                     className="col-span-2 text-right font-mono text-sm tabular-nums text-ink"
                     data-num
                   >
-                    {l.currentValue.toFixed(2)}
+                    {entryValue.toFixed(2)}
                   </div>
                   <div
                     className={`col-span-2 text-right font-mono text-sm tabular-nums ${
-                      l.distanceFromPrice >= 0 ? "text-bull-ink" : "text-bear-ink"
+                      distanceFromEntry >= 0 ? "text-bull-ink" : "text-bear-ink"
                     }`}
                     data-num
                   >
-                    {l.distanceFromPrice >= 0 ? "+" : ""}
-                    {l.distanceFromPrice.toFixed(2)}
+                    {distanceFromEntry >= 0 ? "+" : ""}
+                    {distanceFromEntry.toFixed(2)}
+                    {pct !== null && (
+                      <span className="ml-1 text-[10px] text-ink-4">
+                        {pct.toFixed(2)}%
+                      </span>
+                    )}
                   </div>
                   <div className="col-span-1 flex justify-end">
-                    <StatusPill variant={state} pulse={state === "armed"}>
-                      {state}
+                    <StatusPill variant={pillVariant} pulse={state === "armed"}>
+                      {stateLabel}
                     </StatusPill>
                   </div>
                 </li>

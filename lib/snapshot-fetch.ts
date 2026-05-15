@@ -32,7 +32,7 @@ export interface LoadedLiveSnapshot {
   error?: string;
 }
 
-function emptyAdapted(): AdaptedSnapshot {
+export function emptyAdapted(): AdaptedSnapshot {
   return {
     source: "error",
     asOf: new Date().toISOString(),

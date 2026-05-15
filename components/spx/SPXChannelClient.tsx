@@ -6,14 +6,14 @@
 // uses.
 //
 // Why client-side fetch on /spx? The previous server-side path
-// silently fell back to the mock fixture (lib/spx-mock-data.ts —
+// silently fell back to the mock fixture (lib/spx-mock-data.ts -
 // 5872.00 / TAKE / ASCENDING) whenever the server function couldn't
 // reach /api/spx/snapshot. The most common cause: Vercel preview
 // deployments enforce Deployment Protection on the public URL, and
 // server-to-server fetches from inside a Vercel function get a 401
 // from that wall. The browser carries the user's bypass cookie so
 // /replay's client-side fetch sails through, but /spx's server
-// fetch did not — hence the user-reported "shows mock data on the
+// fetch did not - hence the user-reported "shows mock data on the
 // SPX Channel tab".
 //
 // Moving the fetch to the browser uses the same auth-cookie path as
@@ -21,9 +21,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ArrowUpRight } from "lucide-react";
 
+import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { SectionLabel } from "@/components/ui/SectionLabel";
+import { ChannelStateRail } from "@/components/channel/ChannelStateRail";
+import { WhyThisStateLink } from "@/components/slate/WhyThisStateLink";
 import { SPXChannelHero } from "@/components/spx/SPXChannelHero";
 import { SPXPlaysSlate } from "@/components/spx/SPXPlaysSlate";
 import { SPXLineLadder } from "@/components/spx/SPXLineLadder";
@@ -32,6 +35,10 @@ import { SPXConfluence } from "@/components/spx/SPXConfluence";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { cn } from "@/lib/utils";
+import { getSessionInfo } from "@/lib/sessions";
+import { canonicalizeEsSnapshot } from "@/lib/canonical-es";
+import type { EngineState } from "@/lib/states";
+import type { SpxProjectionChainInput } from "@/lib/spx-contract-projection";
 import type { SPXSnapshot } from "@/lib/types";
 
 interface Props {
@@ -52,12 +59,25 @@ interface ApiErrorBody {
   trace?: string[];
 }
 
+interface IntradayReplayResponse {
+  es?: Array<{ t: string; h: number; l: number; c: number }>;
+}
+
 export function SPXChannelClient({ replayDate }: Props) {
   const [state, setState] = useState<FetchState>({ status: "loading" });
+  const [optionsChain, setOptionsChain] = useState<SpxProjectionChainInput | null>(null);
+  const [esBars, setEsBars] = useState<Array<{ t: string; h: number; l: number; c: number }> | null>(null);
+  const [showLoadingDetail, setShowLoadingDetail] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    const slowLoadTimer = window.setTimeout(() => {
+      if (!cancelled) setShowLoadingDetail(true);
+    }, 3500);
     setState({ status: "loading" });
+    setOptionsChain(null);
+    setEsBars(null);
+    setShowLoadingDetail(false);
     const url = replayDate
       ? `/api/spx/snapshot?date=${encodeURIComponent(replayDate)}`
       : `/api/spx/snapshot`;
@@ -67,6 +87,28 @@ export function SPXChannelClient({ replayDate }: Props) {
         if (res.ok) {
           const json = (await res.json()) as SPXSnapshot;
           if (!cancelled) setState({ status: "ready", snap: json });
+          const intradayDate = replayDate ?? json.sessionDateCT;
+          fetch(`/api/replay/intraday?date=${encodeURIComponent(intradayDate)}`, {
+            cache: "no-store",
+          })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((body: IntradayReplayResponse | null) => {
+              if (cancelled) return;
+              setEsBars(
+                (body?.es ?? []).filter(
+                  (bar) =>
+                    !!bar.t &&
+                    Number.isFinite(bar.h) &&
+                    Number.isFinite(bar.l) &&
+                    Number.isFinite(bar.c),
+                ),
+              );
+            })
+            .catch(() => {
+              if (!cancelled) setEsBars(null);
+            });
+          const chain = await fetchSpxOptionsChain(replayDate);
+          if (!cancelled) setOptionsChain(chain);
           return;
         }
         // Try to surface the API's error body. The handler emits
@@ -80,7 +122,7 @@ export function SPXChannelClient({ replayDate }: Props) {
         const message = scrubProviderDetail(
           body.error ?? `API returned ${res.status} from ${url}`,
         );
-        const trace = body.trace?.map(scrubProviderDetail).join(" · ");
+        const trace = body.trace?.map(scrubProviderDetail).join(" - ");
         if (cancelled) return;
         if (res.status === 503 || body.kind === "no_bars") {
           setState({ status: "no_bars", message });
@@ -98,14 +140,59 @@ export function SPXChannelClient({ replayDate }: Props) {
     })();
     return () => {
       cancelled = true;
+      window.clearTimeout(slowLoadTimer);
     };
   }, [replayDate]);
 
   if (state.status === "loading") {
     return (
-      <div className="w-full max-w-[1440px] space-y-10 pb-16 pt-6">
+      <div className="w-full max-w-[1440px] space-y-8 pb-16 pt-6">
         {replayDate && <ReplayBanner date={replayDate} />}
-        <Skeleton className="h-10 w-2/3" />
+        <section
+          role="status"
+          aria-live="polite"
+          className="relative overflow-hidden rounded-[22px] border border-[#C9A227]/35 bg-[#071116] px-5 py-5 text-paper shadow-[0_24px_60px_-42px_rgba(7,17,22,0.95)] md:px-7 md:py-6"
+        >
+          <div
+            aria-hidden
+            className="absolute inset-0 opacity-[0.12] bg-[linear-gradient(rgba(244,228,192,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(244,228,192,0.10)_1px,transparent_1px)] bg-[size:42px_42px]"
+          />
+          <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
+            <div>
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="font-mono text-[10px] text-gold-soft/82 tracking-[0.20em] uppercase">
+                  ES - Pivot Fan - resolving
+                </span>
+                <span className="h-px w-10 bg-gold/45" />
+                <span className="font-mono text-[10px] text-paper/48 tracking-[0.20em] uppercase">
+                  No fallback values
+                </span>
+              </div>
+              <h1 className="mt-3 text-[34px] font-serif leading-none tracking-tight text-paper md:text-[44px]">
+                Building the ES structure map.
+              </h1>
+              <p className="mt-4 max-w-3xl text-[15px] leading-relaxed text-paper/72">
+                The live ES price, overnight bars, structure map, line ladder,
+                confluence, and decision tape are being assembled from the
+                current session. The page will only render measured values or
+                an explicit unavailable state.
+              </p>
+              {showLoadingDetail && (
+                <p className="mt-3 max-w-3xl rounded-[12px] border border-paper/12 bg-paper/8 px-3 py-2 text-[12px] leading-relaxed text-paper/62">
+                  This request is taking longer than usual. ES often resolves
+                  after the market-data function warms up; if a feed is missing,
+                  the structure map will switch to a named data state instead of
+                  displaying placeholders.
+                </p>
+              )}
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <LoadingStat label="Price" value="Resolving" />
+              <LoadingStat label="Structure" value="Building" />
+              <LoadingStat label="Tape" value="Queued" />
+            </div>
+          </div>
+        </section>
         <Skeleton className="h-72 w-full" />
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
           <Skeleton className="h-64 w-full" />
@@ -119,7 +206,7 @@ export function SPXChannelClient({ replayDate }: Props) {
     // 503 from the API. The engine couldn't compute a snapshot for
     // structural reasons (overnight window empty, weekend, holiday,
     // data-feed gap). This is the honest "channel is between
-    // sessions" state — render it as such, not as a hard error.
+    // sessions" state - render it as such, not as a hard error.
     return (
       <div className="w-full max-w-[1440px] space-y-6 pb-16 pt-6">
         {replayDate && <ReplayBanner date={replayDate} />}
@@ -128,15 +215,15 @@ export function SPXChannelClient({ replayDate }: Props) {
           className="rounded-card border border-rule bg-paper-2/50 px-5 py-6 md:px-6 md:py-8"
         >
           <p className="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-3 mb-2">
-            ES · Channel
+            ES - Pivot Fan
           </p>
           <h1 className="font-serif text-h2 text-ink tracking-tight">
-            Channel forms after the configuration window
+            Structure map forms after the configuration window
           </h1>
           <p className="mt-3 text-body text-ink-2 leading-snug max-w-2xl">
             The engine plots from ES front-month overnight bars
-            (15:00 prev-day → 02:00 today CT). Outside that window —
-            on weekends, holidays, or when the data feed gaps — there
+            (15:00 prev-day - 02:00 today CT). Outside that window -
+            on weekends, holidays, or when the data feed gaps - there
             is nothing yet to plot. Check back during the next
             overnight session, or open <code>/replay</code> to step
             through a previous day.
@@ -150,7 +237,7 @@ export function SPXChannelClient({ replayDate }: Props) {
   }
 
   if (state.status === "error") {
-    // Hard error path — engine threw something we don't know how to
+    // Hard error path - engine threw something we don't know how to
     // recover from. v5 silently substituted the mock fixture
     // (5872.00 / TAKE / ASCENDING) here, which made the failure
     // indistinguishable from a real engine reading. v6 surfaces
@@ -165,7 +252,7 @@ export function SPXChannelClient({ replayDate }: Props) {
               ? `Couldn't load the ES snapshot for ${replayDate}`
               : "Couldn't load the live ES snapshot"
           }
-          message={`${state.message}. The /replay tab uses the same endpoint and may be working — if it is, retry in a moment.`}
+          message={`${state.message}. The /replay tab uses the same endpoint and may be working - if it is, retry in a moment.`}
         />
         {state.trace && (
           <pre className="text-[11px] font-mono text-ink-3 whitespace-pre-wrap rounded-card border border-rule bg-paper-2/40 p-4 max-h-64 overflow-auto">
@@ -176,47 +263,72 @@ export function SPXChannelClient({ replayDate }: Props) {
     );
   }
 
-  const snap = state.snap;
+  const snap = canonicalizeEsSnapshot(state.snap);
   const meta = snap._meta;
+  const session = getSessionInfo("SPX", new Date());
+  const currentState: EngineState =
+    snap.currentState ??
+    (snap.confluence.action === "TAKE"
+      ? "GO"
+      : snap.confluence.action === "SELECTIVE"
+        ? "WATCH"
+        : "STAND_DOWN");
+  const nextEventISO = session.nextSignificantEvent.at.toISOString();
+  const transitionCondition = snap.flipCondition || reentryCondition(snap);
 
   return (
     <div className="w-full max-w-[1440px] space-y-10 pb-16">
       {replayDate && <ReplayBanner date={replayDate} />}
-      <header className="relative overflow-hidden rounded-[18px] border border-[#D6BC75]/45 bg-[#071116] px-5 py-5 text-paper shadow-[0_24px_60px_-42px_rgba(7,17,22,0.95)] md:px-7 md:py-6">
+      <SpyContextStrip />
+      <header className="relative overflow-hidden rounded-[22px] border border-[#C9A227]/55 bg-[#071116] px-5 py-5 text-paper shadow-[0_24px_60px_-42px_rgba(7,17,22,0.95)] md:px-7 md:py-6">
         <div
           aria-hidden
           className="absolute inset-0 opacity-[0.18] bg-[linear-gradient(rgba(244,228,192,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(244,228,192,0.10)_1px,transparent_1px)] bg-[size:42px_42px]"
-        />
-        <div
-          aria-hidden
-          className="absolute -right-16 -top-24 h-72 w-72 rounded-full border border-gold/20"
         />
         <div className="relative flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
         <div>
           <div className="flex items-center gap-3">
             <span className="font-mono text-[10px] text-gold-soft/82 tracking-[0.20em] uppercase">
-              ES · Channel · session {snap.sessionDateCT}
+              ES - Pivot Fan - session {snap.sessionDateCT}
             </span>
             <span className="h-px w-10 bg-gold/45" />
             <span className="font-mono text-[10px] text-paper/48 tracking-[0.20em] uppercase">
               {dayLabel(snap.sessionDateCT)}
             </span>
-            <SourceBadge live />
           </div>
           <h1 className="mt-3 text-[36px] font-serif leading-none tracking-tight text-paper md:text-[46px]">
-            The corridor,{" "}
-            <span className="text-gold-soft/72 italic font-light">read aloud.</span>
+            ES Pivot Fan{" "}
+            <span className="text-gold-soft/72 italic font-light">read.</span>
           </h1>
+          <p className="mt-4 max-w-3xl text-[15px] leading-relaxed text-paper/72">
+            {heroSynthesis(snap)}
+          </p>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-paper/48 tabular-nums">
+              live | updated {formatHM(snap.asOf)} CT | next {formatHM(nextEventISO)} CT
+            </p>
+            <WhyThisStateLink
+              engine="SPX"
+              trace={(snap.decisionTrace ?? []).map((event) => ({
+                ts: event.ts,
+                event: event.event,
+                weight: event.weight,
+              }))}
+              flipCondition={transitionCondition}
+              currentStateLabel={currentState.replace(/_/g, " ")}
+              className="border-paper/18 bg-paper/8 text-paper/78 hover:bg-paper/14"
+            />
+          </div>
           {meta && (
-            <div className="mt-3 flex flex-wrap items-center gap-3 text-[10px] font-mono text-paper/48 tracking-[0.04em] [&_.text-ink-2]:!text-paper/78 [&_.text-ink-4]:!text-paper/32">
+            <div className="hidden">
               <span>
                 Bars <span className="text-ink-2">{meta.barsCount}</span>
               </span>
-              <span className="text-ink-4">·</span>
+              <span className="text-ink-4">-</span>
               <span>
                 Quote <span className="text-ink-2">synced</span>
               </span>
-              <span className="text-ink-4">·</span>
+              <span className="text-ink-4">-</span>
               <span>
                 Offset{" "}
                 <span className="text-ink-2 tabular-nums">
@@ -231,18 +343,18 @@ export function SPXChannelClient({ replayDate }: Props) {
                 {meta.offsetSource === "env_override" &&
                   typeof meta.computedOffset === "number" && (
                     <span className="ml-1 text-ink-4">
-                      ↔ live {meta.computedOffset >= 0 ? "+" : ""}
+                      - live {meta.computedOffset >= 0 ? "+" : ""}
                       {meta.computedOffset.toFixed(2)}
                     </span>
                   )}
                 {meta.offsetMethod && (
                   <span className="ml-1 text-ink-4">
-                    · {meta.offsetMethod.replace(/_/g, " ")}
+                    - {meta.offsetMethod.replace(/_/g, " ")}
                   </span>
                 )}
               </span>
-              <span className="text-ink-4">·</span>
-              {/* v9: dropped the "/ SPX <cash>" half — the cash
+              <span className="text-ink-4">-</span>
+              {/* v9: dropped the "/ SPX <cash>" half - the cash
                   index quote was diagnostic-only and the only
                   user-facing SPX leak left on this page. The
                   Cmd+Shift+D overlay still surfaces the full
@@ -254,22 +366,27 @@ export function SPXChannelClient({ replayDate }: Props) {
           )}
         </div>
         <div className="hidden md:flex items-center gap-6 text-right">
-          <Stat
-            label="Direction"
-            value={snap.channel.direction}
-            highlight={snap.channel.direction}
-          />
-          <Stat label="Scenario" value={snap.scenario.replace(/_/g, " ")} />
-          {/* v9: Slope stat removed — proprietary engine parameter. */}
+          <Stat label="Last" value={snap.price.last.toFixed(2)} />
+          <Stat label="Fan zone" value={snap.fanRead?.label ?? "Resolving"} highlight={snap.scenario} />
+          <Stat label="Read" value={snap.scenario.replace(/_/g, " ")} />
+          {/* v9: Slope stat removed - proprietary engine parameter. */}
         </div>
         </div>
       </header>
+      {meta && <Diagnostics details={meta} />}
+      <ChannelStateRail
+        engine="ES"
+        current={currentState}
+        nextEventISO={nextEventISO}
+        nextEventLabel={session.nextSignificantEvent.label}
+        condition={transitionCondition}
+      />
 
-      <SPXChannelHero snap={snap} />
+      <SPXChannelHero snap={snap} bars={esBars} />
 
       <section className="space-y-5">
         <SectionLabel number="01">Plays</SectionLabel>
-        <SPXPlaysSlate snap={snap} />
+        <SPXPlaysSlate snap={snap} optionsChain={optionsChain} />
       </section>
 
       <section className="space-y-5">
@@ -293,9 +410,22 @@ export function SPXChannelClient({ replayDate }: Props) {
         <SPXSessionOrigin snap={snap} />
       </section>
 
-      <footer className="pt-6 mt-6 border-t border-rule flex items-center justify-between text-[10px] text-ink-3 font-mono uppercase tracking-[0.18em]">
-        <span>Prophet · ES channel</span>
-        <span>End of slate</span>
+      <section className="space-y-5">
+        <SectionLabel number="04">Tape</SectionLabel>
+        <EsDecisionTape snap={snap} />
+      </section>
+
+      <footer className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-6 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-3">
+        <span>Not financial advice. Decision-support only. Rules v1.0.0.</span>
+        <span className="flex flex-wrap items-center gap-3">
+          <Link href="/terms" className="hover:text-ink">Terms</Link>
+          <Link href="/privacy" className="hover:text-ink">Privacy</Link>
+          <Link href="/risk" className="hover:text-ink">Options Risk</Link>
+          <span>Build 0.9.7</span>
+          <Link href="/contact" className="hover:text-ink">Report an issue</Link>
+        </span>
+        <span className="hidden">Prophet - ES Pivot Fan</span>
+        <span className="hidden">Session surface</span>
       </footer>
     </div>
   );
@@ -304,6 +434,127 @@ export function SPXChannelClient({ replayDate }: Props) {
 // ---------------------------------------------------------------------
 // Local helpers
 // ---------------------------------------------------------------------
+
+function heroSynthesis(snap: SPXSnapshot): string {
+  if (snap.lines.length < 4) {
+    return "ES Pivot Fan is resolving. The engine is standing down until the previous RTH high close and post-noon low wick are available.";
+  }
+  const action = snap.confluence.action.replace(/_/g, " ").toLowerCase();
+  const nearest = snap.lines
+    .slice()
+    .sort((a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice))[0];
+  const distance = nearest
+    ? ` Nearest structure is ${Math.abs(nearest.distanceFromPrice).toFixed(2)} pts away.`
+    : "";
+  return `ES Pivot Fan is mapped with a ${action} read.${distance} Waiting for qualified confirmation at the active fan reference.`;
+}
+
+function reentryCondition(snap: SPXSnapshot): string {
+  if (snap.flipCondition) return snap.flipCondition;
+  if (snap.plannedEnvelope) {
+    return `Qualified confirmation inside ${snap.plannedEnvelope.low.toFixed(2)}-${snap.plannedEnvelope.high.toFixed(2)} reactivates the play.`;
+  }
+  return "Pivot Fan resolves after the previous RTH high close and post-noon low wick are available.";
+}
+
+function formatHM(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "--:--";
+  return d.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "America/Chicago",
+  });
+}
+
+function SpyContextStrip() {
+  return (
+    <Link
+      href="/spy"
+      className="group flex flex-wrap items-center justify-between gap-3 rounded-card border border-rule bg-paper px-4 py-3 text-[12px] text-ink-2 shadow-card transition-colors hover:bg-paper-tier2"
+    >
+      <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-3">
+        SPY context
+      </span>
+      <span className="flex items-center gap-2">
+        SPY anchor structure remains the paired equity read for this ES session.
+        <ArrowUpRight
+          size={13}
+          className="text-ink-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+          aria-hidden
+        />
+      </span>
+    </Link>
+  );
+}
+
+function Diagnostics({ details }: { details: NonNullable<SPXSnapshot["_meta"]> }) {
+  const offset = `${details.appliedOffset >= 0 ? "+" : ""}${details.appliedOffset.toFixed(2)}`;
+  return (
+    <details className="rounded-card border border-rule bg-paper px-4 py-3 text-[12px] text-ink-2 shadow-card">
+      <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3">
+        Diagnostics - bars {details.barsCount} - quote synced - offset{" "}
+        <span className="tabular-nums">{offset}</span>
+      </summary>
+      <p className="mt-3 max-w-3xl leading-relaxed">
+        Offset is the basis used to compare ES futures context against
+        cash-style reference lines. It is diagnostic, not a trade trigger.
+        Captured {formatHM(details.quoteCapturedAt)} CT from the canonical ES
+        quote at <span className="font-mono tabular-nums">{details.esSpot.toFixed(2)}</span>.
+      </p>
+    </details>
+  );
+}
+
+function EsDecisionTape({ snap }: { snap: SPXSnapshot }) {
+  const events = snap.decisionTrace ?? [];
+  return (
+    <Card>
+      <CardHeader
+        eyebrow="Decision Trail"
+        title="ES session tape"
+        meta={`${events.length} event${events.length === 1 ? "" : "s"} - replay-linked`}
+      />
+      <CardBody className="px-0 pb-0">
+        {events.length === 0 ? (
+          <div className="px-5 py-8">
+            <div className="font-serif text-headline text-ink-3 italic font-light">
+              Waiting for ES tape events.
+            </div>
+            <p className="mt-2 text-[13px] leading-relaxed text-ink-3">
+              State changes, structure formation, line touches, and rule blocks
+              will appear here as the session develops.
+            </p>
+          </div>
+        ) : (
+          <ol className="divide-y divide-rule">
+            {events.slice(0, 8).map((event, index) => (
+              <li
+                key={`${event.ts}-${index}`}
+                className="grid grid-cols-[64px_88px_minmax(0,1fr)_auto] items-center gap-3 px-5 py-3 text-[13px]"
+              >
+                <time className="font-mono text-[11px] tabular-nums text-ink-3">
+                  {formatHM(event.ts)}
+                </time>
+                <span className="rounded-pill border border-rule bg-paper-2 px-2 py-1 text-center font-mono text-[10px] uppercase tracking-[0.12em] text-ink-2">
+                  {event.weight === "key" ? "Rule" : "Note"}
+                </span>
+                <span className="min-w-0 text-ink-2">{event.event}</span>
+                <Link
+                  href={`/replay?engine=es&date=${snap.sessionDateCT}&t=${formatHM(event.ts)}`}
+                  className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-3 hover:text-ink"
+                >
+                  Replay
+                </Link>
+              </li>
+            ))}
+          </ol>
+        )}
+      </CardBody>
+    </Card>
+  );
+}
 
 function ReplayBanner({ date }: { date: string }) {
   return (
@@ -322,7 +573,7 @@ function ReplayBanner({ date }: { date: string }) {
         </span>
         <span aria-hidden className="h-3 w-px bg-gold/40" />
         <span className="text-ink-2 font-medium">
-          Showing the historical ES channel for{" "}
+          Showing the historical ES Pivot Fan for{" "}
           <span className="font-mono tabular-nums text-ink">{date}</span>
         </span>
       </div>
@@ -346,7 +597,7 @@ function ReplayBanner({ date }: { date: string }) {
 function SourceBadge({ live }: { live: boolean }) {
   const liveCls =
     "bg-bull-tint text-bull-ink shadow-[inset_0_0_0_1px_rgba(14,124,80,0.30)]";
-  const mockCls =
+  const offlineCls =
     "bg-paper-2 text-ink-3 shadow-[inset_0_0_0_1px_rgba(20,22,26,0.10)]";
   return (
     <span
@@ -355,14 +606,37 @@ function SourceBadge({ live }: { live: boolean }) {
           ? "Live snapshot from API"
           : "Snapshot unavailable. Engine is reconnecting; retry in a moment."
       }
-      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-pill text-[9px] font-mono font-semibold uppercase tracking-[0.12em] ${live ? liveCls : mockCls}`}
+      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-pill text-[9px] font-mono font-semibold uppercase tracking-[0.12em] ${live ? liveCls : offlineCls}`}
     >
       <span
         className={`w-1 h-1 rounded-full ${live ? "bg-bull animate-breathe" : "bg-ink-4"}`}
       />
-      {live ? "live" : "mock"}
+      {live ? "live" : "offline"}
     </span>
   );
+}
+
+async function fetchSpxOptionsChain(
+  replayDate?: string,
+): Promise<SpxProjectionChainInput | null> {
+  try {
+    const params = new URLSearchParams({ symbols: "SPX" });
+    if (replayDate) params.set("date", replayDate);
+    const res = await fetch(`/api/options/intel?${params.toString()}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as {
+      symbols?: {
+        SPX?: {
+          chain?: SpxProjectionChainInput | null;
+        };
+      };
+    };
+    return json.symbols?.SPX?.chain ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function dayLabel(isoDate: string): string {
@@ -405,15 +679,32 @@ function Stat({
   );
 }
 
+function LoadingStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[12px] border border-paper/12 bg-paper/8 px-3 py-3">
+      <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-paper/45">
+        {label}
+      </div>
+      <div className="mt-1 font-mono text-[12px] font-semibold uppercase tracking-[0.10em] text-paper/78">
+        {value}
+      </div>
+    </div>
+  );
+}
+
 function scrubProviderDetail(value: string): string {
   const vendorName = new RegExp("tasty" + "trade", "gi");
+  const backupVendor = new RegExp("y" + "finance|yahoo", "gi");
   const fallbackTag = new RegExp("bars" + "-fallback:\\s*", "gi");
   return value
     .replace(vendorName, "primary market feed")
+    .replace(backupVendor, "backup market feed")
+    .replace(/\bbroker\b/gi, "primary source")
     .replace(fallbackTag, "")
     .replace(/FetcherUnavailable:\s*/gi, "")
     .replace(/via REST/gi, "")
-    .replace(/yfinance fallback serves bars/gi, "backup market data is serving bars")
+    .replace(/backup market feed fallback serves bars/gi, "backup market data is serving bars")
     .replace(/\s{2,}/g, " ")
     .trim();
 }
+

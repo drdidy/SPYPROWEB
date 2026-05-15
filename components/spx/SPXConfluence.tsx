@@ -1,5 +1,6 @@
 "use client";
-import { Card, CardHeader, CardBody } from "@/components/ui/Card";
+
+import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { StatusPill } from "@/components/ui/StatusPill";
 import type { SPXAction, SPXConfluenceFactor } from "@/lib/types";
 
@@ -18,21 +19,16 @@ export function SPXConfluence({
   score: number;
   action: SPXAction;
 }) {
-  const placeholderCount = factors.filter((f) =>
-    f.key.startsWith("factor"),
-  ).length;
-  const provisional = placeholderCount > 0;
+  const liveFactors = factors.filter(
+    (factor) => !factor.key.startsWith("factor") && factor.weight > 0,
+  );
 
   return (
     <Card>
       <CardHeader
         eyebrow="Confluence"
-        title="Five-factor read"
-        meta={
-          provisional
-            ? `Provisional · ${placeholderCount} factor${placeholderCount === 1 ? "" : "s"} pending spec`
-            : "Each factor 0–1, weighted; sum × 100 = score"
-        }
+        title="Confluence read"
+        meta={`${liveFactors.length} live factor${liveFactors.length === 1 ? "" : "s"} in score`}
         action={
           <StatusPill variant={actionToVariant[action]} pulse>
             {action.replace(/_/g, " ")}
@@ -47,66 +43,59 @@ export function SPXConfluence({
             <span className="text-ink-4 text-sm">/100</span>
           </span>
         </div>
-        <ul className="divide-y divide-rule spx-confluence-list">
-          {factors.map((f, idx) => {
-            const placeholder = f.key.startsWith("factor");
-            return (
+        {liveFactors.length === 0 ? (
+          <div className="px-5 py-8">
+            <div className="font-serif text-headline text-ink-3 italic font-light">
+              Confluence not scored yet.
+            </div>
+            <p className="mt-2 text-[13px] leading-relaxed text-ink-3">
+              The fan read needs usable session, London, or RTH reaction data
+              before this panel can add evidence.
+            </p>
+          </div>
+        ) : (
+          <ul className="divide-y divide-rule spx-confluence-list">
+            {liveFactors.map((factor, idx) => (
               <li
-                key={f.key}
+                key={factor.key}
                 className="px-5 py-3.5 spx-confluence-row"
                 style={{ animationDelay: `${idx * 90}ms` }}
               >
                 <div className="flex items-baseline justify-between mb-1.5">
-                  <div className="flex items-baseline gap-2">
-                    <span
-                      className={`font-serif text-[14px] ${placeholder ? "text-ink-3 italic" : "text-ink"}`}
-                    >
-                      {f.label}
-                    </span>
-                    {placeholder && (
-                      <span className="text-[9px] font-mono text-ink-4 uppercase tracking-[0.10em] px-1.5 py-0.5 rounded bg-paper-2">
-                        placeholder
-                      </span>
-                    )}
-                  </div>
+                  <span className="font-serif text-[14px] text-ink">
+                    {factor.label}
+                  </span>
                   <span
-                    className={`font-mono text-[12px] tabular-nums ${placeholder ? "text-ink-4" : "text-ink-2"}`}
+                    className="font-mono text-[12px] tabular-nums text-ink-2"
                     data-num
                   >
-                    {placeholder ? "—" : (f.value * 100).toFixed(0)}
+                    {(factor.value * 100).toFixed(0)}
                     <span className="text-ink-4">
                       {" "}
-                      · w {f.weight.toFixed(2)}
+                      /100 · w {factor.weight.toFixed(2)}
                     </span>
                   </span>
                 </div>
-                {placeholder ? (
-                  // Dashed outline at zero — does not visually contribute.
-                  <div className="h-1 rounded-full border border-dashed border-rule-strong" />
-                ) : (
-                  <div className="h-1 bg-paper-2 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-ink rounded-full spx-confluence-bar"
-                      style={
-                        {
-                          "--bar-width": `${f.value * 100}%`,
-                          animationDelay: `${idx * 90 + 200}ms`,
-                        } as React.CSSProperties
-                      }
-                    />
-                  </div>
-                )}
-                {f.note && (
+                <div className="h-1 bg-paper-2 rounded-full overflow-hidden">
                   <div
-                    className={`mt-2 text-[12px] leading-relaxed ${placeholder ? "text-ink-4" : "text-ink-3"}`}
-                  >
-                    {f.note}
+                    className="h-full bg-ink rounded-full spx-confluence-bar"
+                    style={
+                      {
+                        "--bar-width": `${factor.value * 100}%`,
+                        animationDelay: `${idx * 90 + 200}ms`,
+                      } as React.CSSProperties
+                    }
+                  />
+                </div>
+                {factor.note && (
+                  <div className="mt-2 text-[12px] leading-relaxed text-ink-3">
+                    {factor.note}
                   </div>
                 )}
               </li>
-            );
-          })}
-        </ul>
+            ))}
+          </ul>
+        )}
       </CardBody>
       <style jsx>{`
         @keyframes spx-conf-row-in {

@@ -27,12 +27,12 @@ const engineColumns = [
   },
   {
     title: "ES",
-    kicker: "Overnight channel engine",
+    kicker: "Pivot Fan engine",
     href: "/es",
-    copy: "Sydney and Tokyo build the overnight channel. Scenario, play, invalidation, and re-entry all come from that structure.",
+    copy: "The prior RTH high close and post-noon low wick build the Pivot Fan. Scenario, play, invalidation, and re-entry all come from those references.",
     bullets: [
-      "Channel from overnight structure",
-      "Scenarios: above, inside, below, outside",
+      "High Fan and Low Fan references",
+      "Scenarios: above, between, below",
       "Plays define exit and invalidation",
       "Re-entry requires a real retest",
     ],

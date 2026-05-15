@@ -8,16 +8,16 @@ from _lib.spx.scenario import Trade
 def _buy(entry: float) -> Trade:
     return Trade(
         side="BUY",
-        entry_line="CHANNEL_FLOOR", entry_price=entry,
-        exit_line="CHANNEL_CEILING", exit_price=entry + 18.32,
+        entry_line="SWING_LOW_ASC", entry_price=entry,
+        exit_line="SWING_HIGH_DESC", exit_price=entry + 18.32,
     )
 
 
 def _sell(entry: float) -> Trade:
     return Trade(
         side="SELL",
-        entry_line="CHANNEL_CEILING", entry_price=entry,
-        exit_line="CHANNEL_FLOOR", exit_price=entry - 18.32,
+        entry_line="SWING_HIGH_DESC", entry_price=entry,
+        exit_line="SWING_LOW_ASC", exit_price=entry - 18.32,
     )
 
 

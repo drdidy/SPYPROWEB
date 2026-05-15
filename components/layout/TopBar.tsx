@@ -11,7 +11,6 @@ import { FreshnessPill } from "@/components/decision-slate/FreshnessPill";
 import {
   getSessionInfo,
   priceStalenessLabel,
-  renderSessionSegment,
 } from "@/lib/sessions";
 import { formatNumber, isLoadedNumber } from "@/lib/format-number";
 import { deriveProvenance } from "@/lib/spx-provenance";
@@ -55,17 +54,32 @@ const verbPalette: Record<string, string> = {
   // pill, ladder, and card headlines all carry the same tone.
   "PRE-CONFIG":
     "text-state-armed bg-paper-2 shadow-[inset_0_0_0_1px_rgba(10,117,137,0.30)]",
+  WATCH: "text-ink-2 bg-paper-2 shadow-[inset_0_0_0_1px_rgba(20,22,26,0.12)]",
+  ARMED: "text-state-armed bg-paper-2 shadow-[inset_0_0_0_1px_rgba(10,117,137,0.30)]",
+  GO: "text-bull-ink bg-bull-tint shadow-[inset_0_0_0_1px_rgba(14,124,80,0.30)]",
+  COOLDOWN: "text-ink-3 bg-paper-2 shadow-[inset_0_0_0_1px_rgba(20,22,26,0.10)]",
+  COOL: "text-ink-3 bg-paper-2 shadow-[inset_0_0_0_1px_rgba(20,22,26,0.10)]",
 };
 
 const SPX_SCENARIO_TAG: Record<string, string> = {
-  ABOVE_ASCENDING: "ABOVE · ASC",
-  INSIDE_ASCENDING: "INSIDE · ASC",
-  BELOW_ASCENDING: "BELOW · ASC",
-  ABOVE_DESCENDING: "ABOVE · DESC",
-  INSIDE_DESCENDING: "INSIDE · DESC",
-  BELOW_DESCENDING: "BELOW · DESC",
+  ABOVE_ASCENDING: "ABOVE ASCENDING",
+  INSIDE_ASCENDING: "INSIDE ASCENDING",
+  BELOW_ASCENDING: "BELOW ASCENDING",
+  ABOVE_DESCENDING: "ABOVE DESCENDING",
+  INSIDE_DESCENDING: "INSIDE DESCENDING",
+  BELOW_DESCENDING: "BELOW DESCENDING",
   OUTSIDE_PLAY: "OUTSIDE",
 };
+
+function engineStateChipLabel(state: EngineState, fallback: string): string {
+  if (state === "PRE_CONFIG") return "PRE-CONFIG";
+  if (state === "STAND_DOWN") return "STAND DOWN";
+  if (state === "COOLDOWN") return "COOLDOWN";
+  if (state === "WATCH" || state === "WAIT" || state === "ARMED" || state === "GO") {
+    return state;
+  }
+  return fallback;
+}
 
 export function TopBar({
   onOpenPalette,
@@ -78,20 +92,19 @@ export function TopBar({
   const spxSnapshot = useLiveSPX();
   const decision = spy.decision;
   const t = spy.shell;
-  const sessionLine = useSessionLine();
+  const nextRefreshLine = useRefreshCountdown(t.feedHealth.lastTickTs);
   const staleness = useStalenessLabel();
   const stalenessAt = useStalenessTimestamp();
 
   const spyState = spy.currentState;
   const spxState = (spxSnapshot.currentState as EngineState | undefined) ?? "STAND_DOWN";
 
-  const spyVerb = spyState === "PRE_CONFIG" ? "PRE-CONFIG" : decision.verdict;
+  const spyVerb = engineStateChipLabel(spyState, decision.verdict);
   const spyTone = verbPalette[spyVerb] ?? verbPalette["STAND DOWN"];
-  const spyMeta =
-    spyState === "PRE_CONFIG" ? null : `conviction ${decision.conviction}/5`;
+  const spyMeta = null;
 
   const rawSpxVerb = spxSnapshot.confluence.action.replace(/_/g, " ");
-  const spxVerb = spxState === "PRE_CONFIG" ? "PRE-CONFIG" : rawSpxVerb;
+  const spxVerb = engineStateChipLabel(spxState, rawSpxVerb);
   const spxTone = verbPalette[spxVerb] ?? verbPalette["STAND DOWN"];
   const spxMeta =
     spxState === "PRE_CONFIG"
@@ -128,7 +141,7 @@ export function TopBar({
       className={cn(
         "h-[46px] sticky top-0 z-30 bg-[#071116] text-paper backdrop-blur-md",
         "border-b border-[#C9A227]/35 shadow-[0_12px_32px_-30px_rgba(7,17,22,0.95)]",
-        "flex items-center gap-3 md:gap-4 px-3 md:px-5 overflow-hidden min-w-0",
+        "flex items-center gap-3 md:gap-4 px-3 md:px-5 overflow-x-auto overflow-y-hidden min-w-0",
       )}
       data-testid="topbar"
     >
@@ -185,8 +198,8 @@ export function TopBar({
           number the engine actually trades on — the trader-aligned
           read. The SyntheticChip + AsOfMicrotext are gone with
           the synthesis. */}
-      <div className="hidden md:flex flex-1 items-center justify-center gap-3 lg:gap-4 min-w-0 overflow-hidden">
-        <Quote label="SPY" wrapClass="hidden lg:flex">
+      <div className="hidden xl:flex flex-none min-w-[360px] items-center justify-center gap-4 overflow-visible">
+        <Quote href="/spy" label="SPY" wrapClass="hidden lg:flex">
           <ValueWithTooltip
             staleness={staleness}
             stalenessAt={stalenessAt}
@@ -198,7 +211,7 @@ export function TopBar({
             }
           />
         </Quote>
-        <Quote label="ES" wrapClass="hidden lg:flex" accent="violet">
+        <Quote href="/es" label="ES" wrapClass="hidden lg:flex" accent="violet">
           <ValueWithTooltip
             staleness={staleness}
             stalenessAt={stalenessAt}
@@ -213,7 +226,7 @@ export function TopBar({
             }
           />
         </Quote>
-        <Quote label="VIX">
+        <Quote href="/context" label="VIX">
           {/* v10 P1-1: VIX delta uses neutral tone — a rising VIX
               isn't bullish/bearish-relative, so green/red would
               mislead. No pct (the shell shape doesn't carry it
@@ -237,11 +250,9 @@ export function TopBar({
         data-cluster="session"
         className="hidden lg:flex items-center gap-3 shrink-0 whitespace-nowrap"
       >
-        {sessionLine && (
-          <span className="font-mono text-[10px] text-ink-3 tabular-nums uppercase tracking-[0.06em]">
-            {sessionLine}
-          </span>
-        )}
+        <span className="font-mono text-[10px] text-paper/66 tabular-nums uppercase tracking-[0.06em]">
+          Next refresh in {nextRefreshLine}
+        </span>
         <FreshnessPill
           freshnessISO={t.feedHealth.lastTickTs}
           source={t.feedHealth.source}
@@ -328,9 +339,12 @@ function SymbolChip({
   accent?: "violet";
 }) {
   const symbolTone = accent === "violet" ? "text-violet-soft" : "text-paper";
+  const title = symbolChipTitle(symbol, verb, meta);
   return (
     <Link
       href={href}
+      title={title}
+      aria-label={title}
       className={cn(
         "inline-flex items-center gap-1.5 h-7 px-1.5 rounded-soft whitespace-nowrap shrink-0",
         "text-paper/70 hover:text-paper transition-colors",
@@ -348,24 +362,45 @@ function SymbolChip({
       <span className="text-paper/25 text-[10px]" aria-hidden>
         ·
       </span>
-      <span className="text-[11px] tracking-[0.02em] lowercase">
-        {verb.toLowerCase()}
+      <span className="text-[11px] tracking-[0.02em] uppercase">
+        {verb}
       </span>
       {meta && (
-        <span className="text-[10px] font-mono text-paper/45 lowercase tracking-[0.02em]">
-          · {meta.toLowerCase()}
+        <span className="text-[10px] font-mono text-paper/45 uppercase tracking-[0.02em]">
+          · {meta}
         </span>
       )}
     </Link>
   );
 }
 
+function symbolChipTitle(
+  symbol: string,
+  verb: string,
+  meta: string | null,
+): string {
+  const normalized = verb.toUpperCase();
+  const explanations: Record<string, string> = {
+    "PRE-CONFIG": "Pre-config: setup window has not finished building levels yet.",
+    "STAND DOWN": "Stand down: no trade is qualified under the current engine rules.",
+    TAKE: "Take: the ES Pivot Fan conditions are actionable under the current rules.",
+    SELECTIVE: "Selective: conditions are mixed, so size and discretion matter.",
+    WAIT: "Wait: a setup exists, but confirmation has not arrived.",
+    LONG: "Long: SPY engine is biased toward calls.",
+    SHORT: "Short: SPY engine is biased toward puts.",
+  };
+  const base = explanations[normalized] ?? `${verb}: current ${symbol} state.`;
+  return meta ? `${symbol} ${base} ${meta}.` : `${symbol} ${base}`;
+}
+
 function Quote({
+  href,
   label,
   children,
   wrapClass,
   accent,
 }: {
+  href: string;
   label: string;
   children: React.ReactNode;
   wrapClass?: string;
@@ -375,9 +410,10 @@ function Quote({
 }) {
   const labelTone = accent === "violet" ? "text-violet-soft" : "text-paper/55";
   return (
-    <div
+    <Link
+      href={href}
       className={cn(
-        "flex items-baseline gap-2 whitespace-nowrap shrink-0",
+        "flex items-baseline gap-2 whitespace-nowrap shrink-0 rounded-soft px-1 py-0.5 hover:bg-paper/10",
         wrapClass,
       )}
     >
@@ -385,7 +421,7 @@ function Quote({
       <span className="text-[13px] font-mono font-semibold text-paper tabular-nums">
         {children}
       </span>
-    </div>
+    </Link>
   );
 }
 
@@ -475,12 +511,12 @@ function DeltaTag({
   neutral?: boolean;
 }) {
   const tone = neutral
-    ? "text-state-neutral"
+    ? "text-paper/72"
     : value > 0
-      ? "text-state-bullish"
+      ? "text-[#78C895]"
       : value < 0
-        ? "text-state-bearish"
-        : "text-state-neutral";
+        ? "text-[#E08A78]"
+        : "text-paper/72";
   const sign = value > 0 ? "+" : value < 0 ? "−" : "";
   const mag = Math.abs(value).toFixed(2);
   // v10 P1-1: render the percent move alongside the points delta
@@ -502,19 +538,21 @@ function DeltaTag({
   );
 }
 
-function useSessionLine(): string | null {
-  const [line, setLine] = useState<string | null>(null);
+function useRefreshCountdown(lastTickISO?: string | null): string {
+  const [line, setLine] = useState("—");
   useEffect(() => {
     const tick = () => {
-      const now = new Date();
-      const spy = getSessionInfo("SPY", now);
-      const spx = getSessionInfo("SPX", now);
-      setLine(renderSessionSegment(spy, spx, now));
+      const last = lastTickISO ? new Date(lastTickISO).getTime() : Date.now();
+      const next = last + 10 * 60_000;
+      const ms = Math.max(0, next - Date.now());
+      const mins = Math.ceil(ms / 60_000);
+      if (mins < 60) setLine(`${mins}m`);
+      else setLine(`${Math.floor(mins / 60)}h ${mins % 60}m`);
     };
     tick();
     const id = window.setInterval(tick, 30_000);
     return () => window.clearInterval(id);
-  }, []);
+  }, [lastTickISO]);
   return line;
 }
 
@@ -560,3 +598,4 @@ function useStalenessTimestamp(): string | null {
   }, []);
   return ts;
 }
+

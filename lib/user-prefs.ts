@@ -1,8 +1,7 @@
 // User preferences accessor. The backend doesn't persist user prefs
-// yet (the /settings page renders a "coming soon" notice), so until
-// the auth + persistence layer lands the slate falls back to
-// America/Chicago — the default the rest of the app already uses for
-// session math and stale-close labels.
+// yet, so until the auth + persistence layer lands the slate falls
+// back to the browser timezone when available. Session math remains Chicago-
+// anchored; display preferences are user-local.
 //
 // TODO(backend): once /api/me returns userPrefs.timezone, replace
 // the hardcoded default with the server value. Field shape we want:
@@ -20,6 +19,10 @@ export const DEFAULT_TIMEZONE = "America/Chicago";
  * downstream consumers won't have to change.
  */
 export function resolveUserTimezone(): string {
+  if (typeof Intl !== "undefined") {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (tz) return tz;
+  }
   return DEFAULT_TIMEZONE;
 }
 

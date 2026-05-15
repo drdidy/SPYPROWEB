@@ -3,6 +3,11 @@ export type FlagName =
   | "panel_states"
   | "visual_v2"
   | "mock_dashboard"
+  | "slate_hero_v2"
+  | "slate_verdict_chrome"
+  | "slate_entry_cost_tile"
+  | "slate_state_rail"
+  | "slate_feed_health"
   | "slate_a11y"
   | "verdict_actions"
   | "personalization"
@@ -10,6 +15,7 @@ export type FlagName =
   | "telemetry_receipts"
   | "notifications"
   | "armed_go"
+  | "slate_compliance"
   | "compliance_footer";
 
 type RuntimeName = "development" | "preview" | "staging" | "production" | "test";
@@ -42,6 +48,11 @@ const FLAG_DEFINITIONS: Record<FlagName, FlagDefinition> = {
     test: false,
   }),
   mock_dashboard: flag("MOCK_DASHBOARD", false),
+  slate_hero_v2: flag("SLATE_HERO_V2", true),
+  slate_verdict_chrome: flag("SLATE_VERDICT_CHROME", true),
+  slate_entry_cost_tile: flag("SLATE_ENTRY_COST_TILE", true),
+  slate_state_rail: flag("SLATE_STATE_RAIL", true),
+  slate_feed_health: flag("SLATE_FEED_HEALTH", true),
   slate_a11y: flag("SLATE_A11Y", false),
   verdict_actions: flag("VERDICT_ACTIONS", false),
   personalization: flag("PERSONALIZATION", false),
@@ -49,6 +60,7 @@ const FLAG_DEFINITIONS: Record<FlagName, FlagDefinition> = {
   telemetry_receipts: flag("TELEMETRY_RECEIPTS", false),
   notifications: flag("NOTIFICATIONS", false),
   armed_go: flag("ARMED_GO", false),
+  slate_compliance: flag("SLATE_COMPLIANCE", true),
   compliance_footer: flag("COMPLIANCE_FOOTER", false),
 };
 
@@ -60,6 +72,11 @@ const PUBLIC_ENV: Partial<Record<string, string | undefined>> = {
   NEXT_PUBLIC_FF_PANEL_STATES: process.env.NEXT_PUBLIC_FF_PANEL_STATES,
   NEXT_PUBLIC_FF_VISUAL_V2: process.env.NEXT_PUBLIC_FF_VISUAL_V2,
   NEXT_PUBLIC_FF_MOCK_DASHBOARD: process.env.NEXT_PUBLIC_FF_MOCK_DASHBOARD,
+  NEXT_PUBLIC_FF_SLATE_HERO_V2: process.env.NEXT_PUBLIC_FF_SLATE_HERO_V2,
+  NEXT_PUBLIC_FF_SLATE_VERDICT_CHROME: process.env.NEXT_PUBLIC_FF_SLATE_VERDICT_CHROME,
+  NEXT_PUBLIC_FF_SLATE_ENTRY_COST_TILE: process.env.NEXT_PUBLIC_FF_SLATE_ENTRY_COST_TILE,
+  NEXT_PUBLIC_FF_SLATE_STATE_RAIL: process.env.NEXT_PUBLIC_FF_SLATE_STATE_RAIL,
+  NEXT_PUBLIC_FF_SLATE_FEED_HEALTH: process.env.NEXT_PUBLIC_FF_SLATE_FEED_HEALTH,
   NEXT_PUBLIC_FF_SLATE_A11Y: process.env.NEXT_PUBLIC_FF_SLATE_A11Y,
   NEXT_PUBLIC_FF_VERDICT_ACTIONS: process.env.NEXT_PUBLIC_FF_VERDICT_ACTIONS,
   NEXT_PUBLIC_FF_PERSONALIZATION: process.env.NEXT_PUBLIC_FF_PERSONALIZATION,
@@ -67,6 +84,7 @@ const PUBLIC_ENV: Partial<Record<string, string | undefined>> = {
   NEXT_PUBLIC_FF_TELEMETRY_RECEIPTS: process.env.NEXT_PUBLIC_FF_TELEMETRY_RECEIPTS,
   NEXT_PUBLIC_FF_NOTIFICATIONS: process.env.NEXT_PUBLIC_FF_NOTIFICATIONS,
   NEXT_PUBLIC_FF_ARMED_GO: process.env.NEXT_PUBLIC_FF_ARMED_GO,
+  NEXT_PUBLIC_FF_SLATE_COMPLIANCE: process.env.NEXT_PUBLIC_FF_SLATE_COMPLIANCE,
   NEXT_PUBLIC_FF_COMPLIANCE_FOOTER: process.env.NEXT_PUBLIC_FF_COMPLIANCE_FOOTER,
 };
 

@@ -2,11 +2,9 @@
 // (when env vars are wired) verifies a Turnstile token, hits the
 // email provider's double-opt-in endpoint, and rate-limits the IP.
 //
-// Today this is a SCAFFOLD: every external integration is gated on an
-// env var. With no secrets configured the route returns 200 and only
-// logs the lead, so the UI flow can be tested end-to-end without
-// committing to a vendor. Each integration carries a TODO that
-// describes the missing piece.
+// External integrations are gated on env vars so local and preview
+// deploys can still exercise the form. When no email provider is
+// configured, logs are redacted and never include raw email or IP.
 
 import { NextResponse, type NextRequest } from "next/server";
 
@@ -26,6 +24,9 @@ interface Payload {
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const IP_LIMIT = { max: 5, windowMs: 60 * 60 * 1000 };
+const EMAIL_LIMIT = { max: 3, windowMs: 24 * 60 * 60 * 1000 };
+const rateBuckets = new Map<string, { count: number; resetAt: number }>();
 
 export async function POST(req: NextRequest) {
   let body: Payload;
@@ -58,10 +59,6 @@ export async function POST(req: NextRequest) {
   }
 
   // ---- Rate limit ----
-  // TODO(rate-limit): wire @upstash/ratelimit or a Vercel KV-backed
-  // limiter. Suggested policy: 5 requests per IP per hour, 10 per
-  // email per day. With no KV configured the limiter is a no-op so
-  // the form still works in local + preview deploys.
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
   const rateLimitOk = await checkRateLimit(ip, email);
   if (!rateLimitOk) {
@@ -134,9 +131,13 @@ function pick(v: unknown): string | null {
 // Stubs — replace each with real provider call when secrets are wired.
 // ----------------------------------------------------------------------
 
-async function checkRateLimit(_ip: string, _email: string): Promise<boolean> {
-  // TODO(rate-limit): replace with Upstash / KV implementation.
-  return true;
+async function checkRateLimit(ip: string, email: string): Promise<boolean> {
+  const now = Date.now();
+  pruneRateBuckets(now);
+  return (
+    consumeRateBucket(`ip:${hashForLog(ip)}`, IP_LIMIT, now) &&
+    consumeRateBucket(`email:${hashForLog(email)}`, EMAIL_LIMIT, now)
+  );
 }
 
 async function verifyCaptcha(token: string | null): Promise<boolean> {
@@ -170,7 +171,7 @@ async function sendDoubleOptIn(lead: {
   if (!apiKey) {
     // No provider wired — log and accept so closed-beta dev + preview
     // can exercise the full UI flow.
-    console.log("[waitlist] lead (no provider configured)", lead);
+    logWaitlistLead("no_provider", lead);
     return true;
   }
   // TODO(email-provider): implement the provider's add-with-double-opt-in
@@ -190,6 +191,58 @@ async function sendDoubleOptIn(lead: {
   //   });
   //   if (!res.ok) return false;
   //   // Trigger confirmation email via Loops transactional API…
-  console.log("[waitlist] lead (provider stub)", lead);
+  logWaitlistLead("provider_not_implemented", lead);
   return true;
+}
+
+function logWaitlistLead(
+  mode: "no_provider" | "provider_not_implemented",
+  lead: {
+    email: string;
+    utm: Record<string, string | null>;
+    referrer: string | null;
+    receivedAt: string;
+    ip: string;
+  },
+) {
+  const domain = lead.email.split("@")[1] ?? "unknown";
+  console.log("[waitlist] lead accepted", {
+    mode,
+    emailDomain: domain.slice(0, 80),
+    hasReferrer: !!lead.referrer,
+    utm: lead.utm,
+    receivedAt: lead.receivedAt,
+    ipHash: hashForLog(lead.ip),
+  });
+}
+
+function hashForLog(value: string): string {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+function consumeRateBucket(
+  key: string,
+  limit: { max: number; windowMs: number },
+  now: number,
+): boolean {
+  const current = rateBuckets.get(key);
+  if (!current || current.resetAt <= now) {
+    rateBuckets.set(key, { count: 1, resetAt: now + limit.windowMs });
+    return true;
+  }
+  if (current.count >= limit.max) return false;
+  current.count += 1;
+  return true;
+}
+
+function pruneRateBuckets(now: number) {
+  if (rateBuckets.size < 500) return;
+  for (const [key, bucket] of rateBuckets) {
+    if (bucket.resetAt <= now) rateBuckets.delete(key);
+  }
 }

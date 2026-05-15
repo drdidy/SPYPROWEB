@@ -187,6 +187,31 @@ export function getSessionInfo(engine: Engine, now: Date): SessionInfo {
   };
 }
 
+/** RTH close for an explicit Chicago trading-date ISO, or null on closed days. */
+export function getTradingDayCloseForDate(dateISO: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateISO);
+  if (!match) return null;
+
+  const day: DayKey = {
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3]),
+    iso: dateISO,
+    weekday: new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12, 0)).getUTCDay(),
+  };
+
+  if (!isTradingDay(day)) return null;
+
+  const earlyClose = EARLY_CLOSE_2026.has(day.iso);
+  return chicagoDateAt(
+    day.year,
+    day.month,
+    day.day,
+    earlyClose ? EARLY_CLOSE_H : RTH_CLOSE_H,
+    RTH_CLOSE_M,
+  );
+}
+
 function nextEvent(
   phase: SessionPhase,
   engine: Engine,
@@ -195,6 +220,7 @@ function nextEvent(
   rthOpen: Date,
   rthClose: Date,
 ): { label: string; at: Date } {
+  const engineLabel = engine === "SPX" ? "ES" : engine;
   switch (phase) {
     case "CONFIG_WINDOW":
       return { label: "Config window closes", at: configEnd };
@@ -205,12 +231,12 @@ function nextEvent(
     case "PRE_CONFIG":
     case "CLOSED_WEEKEND":
     case "CLOSED_HOLIDAY":
-      return { label: `${engine} setup opens`, at: configStart };
+      return { label: `${engineLabel} setup opens`, at: configStart };
     case "POST_RTH":
       // The trading-day picker has already rolled forward to the next
       // session, so configStart here is the *next* engine cycle's
       // window opening. No recursion needed.
-      return { label: `${engine} setup opens`, at: configStart };
+      return { label: `${engineLabel} setup opens`, at: configStart };
   }
 }
 

@@ -21,7 +21,7 @@ const DOT_TONE: Record<SessionOutcome["outcome"], string> = {
   WIN: "bg-bull ring-1 ring-bull-ink/20",
   LOSS: "bg-bear ring-1 ring-bear-ink/20",
   PUSH: "bg-state-neutral ring-1 ring-ink/15",
-  SKIP: "bg-[#C9A227]/60 ring-1 ring-[#8E6F19]/40",
+  SKIP: "bg-gold/60 ring-1 ring-gold-ink/40",
 };
 
 const OUTCOME_LABEL: Record<SessionOutcome["outcome"], string> = {
@@ -36,12 +36,6 @@ export function EngineTrackRecord({ record, feedId, className }: Props) {
     record.hitRate == null ? null : Math.round(record.hitRate * 100);
   const labelTone = record.engine === "SPX" ? "text-violet" : "text-ink-2";
   const display = displayEngine(record.engine);
-  const summary =
-    pct == null
-      ? SLATE_COPY.trackRecord.noGraded
-      : `${pct}% hit (${record.wins}W ${record.losses}L${
-          record.pushes ? ` ${record.pushes}P` : ""
-        })`;
   const skipText = record.skips
     ? SLATE_COPY.trackRecord.skipLabel(record.skips)
     : null;
@@ -49,7 +43,11 @@ export function EngineTrackRecord({ record, feedId, className }: Props) {
   const skipFilterHref = record.sessions[0]
     ? `/replay?date=${record.sessions[0].date}&filter=skip`
     : "/replay?filter=skip";
-  const ringPct = pct ?? 0;
+  const totalSegments = Math.max(
+    1,
+    record.wins + record.losses + record.pushes + record.skips,
+  );
+  const graded = record.wins + record.losses + record.pushes;
 
   return (
     <div
@@ -87,43 +85,48 @@ export function EngineTrackRecord({ record, feedId, className }: Props) {
             }
           >
             <span className="cursor-help font-mono text-meta tabular-nums text-ink-2">
-              {summary}
+              Methodology
             </span>
           </InfoTooltip>
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-[76px_1fr] items-center gap-4">
-        <div
-          className="relative h-[76px] w-[76px] rounded-full"
-          style={{
-            background:
-              pct == null
-                ? "conic-gradient(#D4CBB6 0deg, #EFEADC 0deg)"
-                : `conic-gradient(#0E7C50 ${ringPct * 3.6}deg, #B5301E ${ringPct * 3.6}deg ${Math.min(
-                    360,
-                    (ringPct + record.losses * 10) * 3.6,
-                  )}deg, #E8E2D2 0deg)`,
-          }}
-          aria-hidden
-        >
-          <div className="absolute inset-[7px] rounded-full bg-paper" />
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="font-serif text-[24px] leading-none text-ink">
-              {pct == null ? "-" : pct}
-            </span>
-            <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-3">
-              hit
-            </span>
+      <div className="mt-4">
+        <div className="rounded-[8px] border border-rule-soft bg-paper-tier3 p-3">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-4">
+                Verified hit rate
+              </div>
+              <div className="mt-1 font-serif text-[34px] leading-none text-ink">
+                {pct == null ? "Pending" : `${pct}%`}
+              </div>
+              {record.sessions.length > 0 && (
+                <div className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.12em] text-ink-3">
+                  {graded}/{record.sessions.length} graded
+                </div>
+              )}
+            </div>
+            <div className="text-right font-mono text-[10px] uppercase tracking-[0.12em] text-ink-3">
+              {record.wins}W · {record.losses}L · {record.skips}S
+            </div>
           </div>
-        </div>
-
-        <div className="min-w-0">
-          <div className="grid grid-cols-3 divide-x divide-rule rounded-[6px] border border-rule-soft bg-paper-tier3">
+          <div
+            className="mt-3 flex h-2 overflow-hidden rounded-full bg-paper shadow-rule"
+            aria-hidden
+          >
+            <Segment count={record.wins} total={totalSegments} className="bg-bull" />
+            <Segment count={record.losses} total={totalSegments} className="bg-bear" />
+            <Segment count={record.pushes} total={totalSegments} className="bg-state-neutral" />
+            <Segment count={record.skips} total={totalSegments} className="bg-gold/70" />
+          </div>
+          <div className="mt-3 grid grid-cols-3 divide-x divide-rule">
             <Metric label="Wins" value={record.wins} tone="text-bull-ink" />
             <Metric label="Losses" value={record.losses} tone="text-bear-ink" />
             <Metric label="Skips" value={record.skips} tone="text-gold-ink" />
           </div>
+        </div>
+        <div className="min-w-0">
           <div className="mt-3">
             {record.sessions.length === 0 ? (
               <ol
@@ -166,7 +169,7 @@ export function EngineTrackRecord({ record, feedId, className }: Props) {
             >
               <Swatch className="bg-bull ring-1 ring-bull-ink/20" /> win
               <Swatch className="bg-bear ring-1 ring-bear-ink/20 ml-2" /> loss
-              <Swatch className="bg-[#C9A227]/60 ring-1 ring-[#8E6F19]/40 ml-2" /> skip
+              <Swatch className="bg-gold/60 ring-1 ring-gold-ink/40 ml-2" /> skip
             </p>
           </div>
         </div>
@@ -192,15 +195,14 @@ export function EngineTrackRecord({ record, feedId, className }: Props) {
       </div>
 
       {skipText && (
-        <div className="mt-2 font-mono text-[10.5px] text-ink-3">
-          <InfoTooltip label="Skip" content={SLATE_COPY.trackRecord.skipTooltip}>
-            <Link
-              href={skipFilterHref}
-              className="rounded-soft hover:text-ink transition-colors outline-none focus-visible:ring-2 focus-visible:ring-gold/40"
-            >
-              {skipText} excluded from hit rate
-            </Link>
-          </InfoTooltip>
+        <div className="mt-2 inline-flex items-center gap-1.5 font-mono text-[10.5px] text-ink-3">
+          <Link
+            href={skipFilterHref}
+            className="rounded-soft hover:text-ink transition-colors outline-none focus-visible:ring-2 focus-visible:ring-gold/40"
+          >
+            {skipText} excluded from hit rate
+          </Link>
+          <InfoTooltip label="Skip" content={SLATE_COPY.trackRecord.skipTooltip} />
         </div>
       )}
     </div>
@@ -225,6 +227,24 @@ function Metric({
         {label}
       </div>
     </div>
+  );
+}
+
+function Segment({
+  count,
+  total,
+  className,
+}: {
+  count: number;
+  total: number;
+  className?: string;
+}) {
+  if (count <= 0) return null;
+  return (
+    <span
+      className={cn("h-full min-w-[3px]", className)}
+      style={{ width: `${(count / total) * 100}%` }}
+    />
   );
 }
 

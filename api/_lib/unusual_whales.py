@@ -314,6 +314,15 @@ def _has_contract_greeks(chain: dict | None) -> bool:
     return False
 
 
+def _has_contract_quotes(chain: dict | None) -> bool:
+    if not chain:
+        return False
+    for row in (chain.get("calls") or []) + (chain.get("puts") or []):
+        if row.get("bid") is not None or row.get("ask") is not None or row.get("mark") is not None:
+            return True
+    return False
+
+
 def _merge_chain_greeks(base: dict, greek_chain: dict) -> dict:
     if base.get("expiration") != greek_chain.get("expiration"):
         return base
@@ -331,6 +340,26 @@ def _merge_chain_greeks(base: dict, greek_chain: dict) -> dict:
                     val = match.get(field)
                     if val is not None:
                         row[field] = val
+    return base
+
+
+def _merge_greek_rows(base: dict | None, greeks: list[dict]) -> dict | None:
+    if not base or not greeks:
+        return base
+    greek_by_key = {
+        (row.get("side"), row.get("strike")): row
+        for row in greeks
+        if row.get("side") in {"CALL", "PUT"} and row.get("strike") is not None
+    }
+    for side_key, rows_key in (("CALL", "calls"), ("PUT", "puts")):
+        for row in base.get(rows_key) or []:
+            match = greek_by_key.get((side_key, row.get("strike")))
+            if not match:
+                continue
+            for field in ("optionSymbol", "iv", "delta", "gamma", "theta", "vega", "rho"):
+                val = match.get(field)
+                if val is not None and (row.get(field) is None or field in ("delta", "gamma", "theta", "vega", "rho")):
+                    row[field] = val
     return base
 
 
@@ -660,9 +689,9 @@ def fetch_option_chain(
             "pcr": round(put_vol / call_vol, 2) if call_vol > 0 else None,
         },
     }
-    if not _has_contract_greeks(out):
+    if not _has_contract_quotes(out) or not _has_contract_greeks(out):
         broker = _chain_from_broker(ticker, session_date, require_expiration=expiration)
-        if broker and _has_contract_greeks(broker):
+        if broker and (_has_contract_quotes(broker) or _has_contract_greeks(broker)):
             out = _merge_chain_greeks(out, broker)
     return out
 
@@ -765,6 +794,7 @@ def fetch_symbol_options_intel(ticker: str, effective_date: str | None = None) -
     alerts = fetch_flow_alerts(symbol, session_date)
     darkpool = fetch_darkpool_summary(symbol, session_date)
     greeks = fetch_greeks(symbol, session_date) if chain else []
+    chain = _merge_greek_rows(chain, greeks)
     return {
         "ticker": symbol,
         "sessionDate": session_date,

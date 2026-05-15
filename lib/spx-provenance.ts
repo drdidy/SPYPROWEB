@@ -55,7 +55,7 @@ export interface SpxProvenance {
   /** ISO of the basis-capture moment. */
   capturedAtISO: string;
   /** Where the offset came from. */
-  offsetSource: "computed" | "env_override" | "historical_replay";
+  offsetSource: "native_es" | "computed" | "env_override" | "historical_replay";
   /** Sub-algorithm that produced the offset (yfinance backend). */
   offsetMethod:
     | "close_anchored"
@@ -91,8 +91,8 @@ export function deriveProvenance(
     trust,
     esSpot: meta.esSpot,
     spxSpot: meta.spxSpot,
-    basis: meta.appliedOffset,
-    computedSpx: meta.esSpot + meta.appliedOffset,
+    basis: meta.computedOffset ?? meta.requestedOffset ?? meta.appliedOffset,
+    computedSpx: meta.esSpot + (meta.computedOffset ?? meta.requestedOffset ?? meta.appliedOffset),
     basisAgeMs: Number.isFinite(basisAgeMs) ? basisAgeMs : Infinity,
     capturedAtISO: meta.quoteCapturedAt,
     offsetSource: meta.offsetSource ?? "computed",

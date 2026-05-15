@@ -12,12 +12,14 @@ import { LastSignalRecap } from "@/components/decision-slate/LastSignalRecap";
 import { EngineTrackRecord } from "@/components/decision-slate/EngineTrackRecord";
 import { PreConfigBriefing } from "@/components/decision-slate/PreConfigBriefing";
 import {
+  SlateStateRail,
   StatePipeline,
   type StructureLevels,
 } from "@/components/decision-slate/StatePipeline";
 import { EngineCard } from "@/components/decision-slate/EngineCard";
 import { RecommendedAction } from "@/components/decision-slate/RecommendedAction";
 import { PreviewState } from "@/components/decision-slate/PreviewState";
+import { SlateCompliance } from "@/components/decision-slate/SlateCompliance";
 import {
   DegradedModeBanner,
   FeedHealthProvider,
@@ -30,10 +32,14 @@ import { SLATE_COPY } from "@/content/copy";
 import { loadLiveSnapshot } from "@/lib/snapshot-fetch";
 import { loadSnapshot as loadSpxSnapshot } from "@/lib/spx-fetch";
 import { loadIntradayReplay } from "@/lib/intraday-replay-fetch";
+import { loadOptionsIntelBundle } from "@/lib/options-intel-fetch";
 import { fetchLastSessionRecaps } from "@/lib/last-session-recap";
 import { fetchTrackRecord } from "@/lib/track-record";
 import { getSessionInfo } from "@/lib/sessions";
+import { buildSpyContractProjection } from "@/lib/spy-contract-projection";
+import { buildSpxContractProjection } from "@/lib/spx-contract-projection";
 import { relabelDashboardString } from "@/lib/engine-labels";
+import { isEnabled } from "@/lib/feature-flags";
 import {
   FEED_DEFAULTS,
   buildFeedSeed,
@@ -56,9 +62,19 @@ import {
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function Page() {
+export default async function Page({
+  searchParams,
+}: {
+  searchParams?: Record<string, string | string[] | undefined>;
+}) {
   const now = new Date();
-  const chartDate = chartSessionDateISO(now);
+  const spyChartDate = chartSessionDateISO("SPY", now);
+  const flagContext = { query: searchParams ?? null };
+  const slateHeroV2 = isEnabled("slate_hero_v2", flagContext);
+  const slateVerdictChrome = isEnabled("slate_verdict_chrome", flagContext);
+  const slateEntryCostTile = isEnabled("slate_entry_cost_tile", flagContext);
+  const slateStateRail = isEnabled("slate_state_rail", flagContext);
+  const slateCompliance = isEnabled("slate_compliance", flagContext);
   // Both engines are independent fetches. Run them in parallel — the
   // slate is meant to be read in one glance, so a slow side shouldn't
   // hold up the other.
@@ -68,21 +84,24 @@ export default async function Page() {
     recaps,
     spyTrack,
     spxTrack,
-    chartSpyLoaded,
-    chartSpxLoaded,
-    intraday,
+    optionBundle,
   ] = await Promise.all([
     loadLiveSnapshot(),
     loadSpxSnapshot(),
     fetchLastSessionRecaps(),
     fetchTrackRecord("SPY"),
     fetchTrackRecord("SPX"),
-    loadLiveSnapshot(chartDate),
-    loadSpxSnapshot(chartDate),
-    loadIntradayReplay(chartDate),
+    loadOptionsIntelBundle(["SPY", "SPX"]),
   ]);
   const spx = spxLoaded.snap;
   const spxSource = spxLoaded.source;
+  const spxChartDate = spx.sessionDateCT || spyChartDate;
+  const [spyIntraday, spxIntraday] = await Promise.all([
+    loadIntradayReplay(spyChartDate),
+    spxChartDate === spyChartDate
+      ? Promise.resolve(null)
+      : loadIntradayReplay(spxChartDate),
+  ]);
 
   // Source badges intentionally not rendered here — feed health lives
   // in the TopBar and any error/seed mode degrades the FreshnessPill.
@@ -106,17 +125,41 @@ export default async function Page() {
     spyTrackFetchedAt: serverNowISO,
     spxTrackFetchedAt: serverNowISO,
     recapsFetchedAt: serverNowISO,
+    optionsFetchedAt: optionBundle.fetchedAt,
+    optionsError: optionBundle.source === "error" ? optionBundle.error ?? "options unavailable" : null,
   });
   const spyChart = buildSpyStructureChart(
-    chartSpyLoaded.data,
-    intraday?.spy ?? null,
-    chartDate,
+    spy,
+    spyIntraday?.spy ?? null,
+    spyChartDate,
   );
   const spxChart = buildSpxStructureChart(
-    chartSpxLoaded.snap,
-    intraday?.es ?? null,
-    chartDate,
+    spx,
+    (spxIntraday ?? spyIntraday)?.es ?? null,
+    spxChartDate,
   );
+  const spyProjection = buildSpyContractProjection(spy);
+  const spxProjection = buildSpxContractProjection({
+    snap: spx,
+    chain: optionBundle.data.symbols.SPX?.chain ?? null,
+  });
+  const spyEntryCostStatus = entryCostStatusFor({
+    projection: spyProjection,
+    hasChain: Boolean(
+      spy.optionsChain
+        ?? optionBundle.data.symbols.SPY?.chain
+        ?? optionBundle.data.symbols.SPY?.available,
+    ),
+    optionsError: optionBundle.source === "error",
+  });
+  const spxEntryCostStatus = entryCostStatusFor({
+    projection: spxProjection,
+    hasChain: Boolean(
+      optionBundle.data.symbols.SPX?.chain
+        ?? optionBundle.data.symbols.SPX?.available,
+    ),
+    optionsError: optionBundle.source === "error",
+  });
 
   // Per-card error state. We render the error inside the engine's
   // section instead of replacing the whole page so a partial outage
@@ -135,13 +178,13 @@ export default async function Page() {
     //   briefing → preview          24 (mt-6 on preview)
     <FeedHealthProvider serverNowISO={serverNowISO} feeds={feedHealth}>
     <div className="w-full max-w-[1440px] pb-12 pt-6 anim-rise">
-      <PageHeader />
+      {!slateHeroV2 && <PageHeader />}
       <DegradedModeBanner className="mt-3" />
 
       {/* v4 #3 + v10 P1-12: Recommended Action page hero. 24px
           rhythm between the header and the hero. */}
       <RecommendedAction
-        className="mt-6"
+        className={slateHeroV2 ? "mt-0" : "mt-4"}
         spyState={spyState}
         spxState={spxState}
         spyNextEventISO={spySession.nextSignificantEvent.at.toISOString()}
@@ -159,7 +202,28 @@ export default async function Page() {
           .toLowerCase()}
         spyChart={spyChart}
         spxChart={spxChart}
+        spyProjection={spyProjection}
+        spxProjection={spxProjection}
+        spyEntryCostStatus={spyEntryCostStatus}
+        spxEntryCostStatus={spxEntryCostStatus}
+        compactHeader={slateHeroV2}
+        slateDateLabel={formatSlateDate(now)}
+        sessionDate={spyChartDate}
+        unifiedChrome={slateVerdictChrome}
+        entryCostInScorecard={slateEntryCostTile}
+        feedId="market-clock"
       />
+
+      {slateStateRail && (
+        <div className="mt-4">
+          <SlateStateRail
+            spyState={spyState}
+            spxState={spxState}
+            spyHistory={spy.stateHistory}
+            spxHistory={spx.stateHistory ?? []}
+          />
+        </div>
+      )}
 
       {/* v4 #6 + v5 #8 + v10 P1-12: engines row. 24px rhythm
           between hero and engine row. Outer padding matches
@@ -178,6 +242,7 @@ export default async function Page() {
             explanation={spyExplanation(spyState, spy)}
             structureLevels={spyStructureLevels(spy)}
             structureChart={spyChart}
+            showProgression={!slateStateRail}
           />
           <StatePipeline
             engine="SPX"
@@ -192,6 +257,7 @@ export default async function Page() {
             explanation={spxExplanation(spxState, spx)}
             structureLevels={spxStructureLevels(spx)}
             structureChart={spxChart}
+            showProgression={!slateStateRail}
           />
         </div>
       </section>
@@ -260,10 +326,12 @@ export default async function Page() {
             </div>
           </Section>
 
-          <TimelineRow
-            spyHistory={spy.stateHistory}
-            spxHistory={spx.stateHistory ?? []}
-          />
+          {!slateStateRail && (
+            <TimelineRow
+              spyHistory={spy.stateHistory}
+              spxHistory={spx.stateHistory ?? []}
+            />
+          )}
 
           <Section title="Active levels">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
@@ -272,6 +340,13 @@ export default async function Page() {
             </div>
           </Section>
         </>
+      )}
+      {slateCompliance && (
+        <SlateCompliance
+          environment={process.env.NEXT_PUBLIC_VERCEL_ENV ?? process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "development"}
+          ruleVersion="v1.0.0"
+          requireAcknowledgement={false}
+        />
       )}
     </div>
     </FeedHealthProvider>
@@ -289,6 +364,8 @@ function buildDashboardFeedHealth({
   spyTrackFetchedAt,
   spxTrackFetchedAt,
   recapsFetchedAt,
+  optionsFetchedAt,
+  optionsError,
 }: {
   serverNowISO: string;
   spy: AdaptedSnapshot;
@@ -300,6 +377,8 @@ function buildDashboardFeedHealth({
   spyTrackFetchedAt: string;
   spxTrackFetchedAt: string;
   recapsFetchedAt: string;
+  optionsFetchedAt: string;
+  optionsError: string | null;
 }): FeedHealthSeed[] {
   const spyRailsThreshold =
     spySession.phase === "RTH_OPEN"
@@ -356,6 +435,13 @@ function buildDashboardFeedHealth({
       ).toISOString(),
       staleAfterMs: FEED_DEFAULTS.marketClockMs,
     }),
+    buildFeedSeed("options-chain", {
+      lastUpdatedAt: optionsFetchedAt,
+      staleAfterMs: FEED_DEFAULTS.channelPanelMs,
+      critical: true,
+      failedAt: optionsError ? serverNowISO : null,
+      initialStatus: optionsError ? "failed" : undefined,
+    }),
   ];
 }
 
@@ -382,32 +468,23 @@ function PageHeader() {
     year: "numeric",
   }).format(new Date());
   return (
-    <header className="relative overflow-hidden rounded-[18px] border border-[#D6BC75]/45 bg-[#071116] px-5 py-5 text-paper shadow-[0_24px_60px_-42px_rgba(7,17,22,0.95)] md:px-7 md:py-6">
-      <div
-        aria-hidden
-        className="absolute inset-0 opacity-[0.18] bg-[linear-gradient(rgba(244,228,192,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(244,228,192,0.10)_1px,transparent_1px)] bg-[size:42px_42px]"
-      />
-      <div
-        aria-hidden
-        className="absolute -right-16 -top-24 h-72 w-72 rounded-full border border-gold/20"
-      />
-      <div className="relative flex items-start justify-between gap-4">
+    <header className="flex items-end justify-between gap-4 px-1">
       <div className="min-w-0">
-        <div className="mb-3 flex flex-wrap items-center gap-3">
-          <span className="font-mono text-[10px] uppercase tracking-[0.20em] text-gold-soft/82">
+        <div className="mb-2 flex flex-wrap items-center gap-3">
+          <span className="font-mono text-[10px] uppercase tracking-[0.20em] text-gold-ink">
             Command workspace
           </span>
-          <span aria-hidden className="h-px w-10 bg-gold/45" />
-          <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-paper/48">
+          <span aria-hidden className="h-px w-10 bg-rule-strong" />
+          <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-3">
             {dateLabel}
           </span>
         </div>
-        <h1 className="font-serif text-[36px] leading-none text-paper tracking-tight md:text-[46px]">
+        <h1 className="font-serif text-[28px] leading-none text-ink tracking-tight md:text-[34px]">
           Decision Slate
         </h1>
         {/* v10 P1-5: subtle session-date stamp directly under the
             H1. ~14px sans, muted ink. */}
-        <p className="mt-3 max-w-2xl text-[14px] leading-relaxed text-paper/68">
+        <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-ink-3">
           {/* "Friday, May 9, 2026" → "Friday · May 9, 2026"
               (one replace = first comma only). */}
           SPY and ES stay separate until the slate asks for a decision.
@@ -425,15 +502,14 @@ function PageHeader() {
           aria-label="About this page"
           className={cn(
             "inline-flex items-center justify-center w-8 h-8 rounded-full shrink-0",
-            "bg-paper/[0.06] text-paper/66 hover:text-paper hover:bg-paper/10",
-            "border border-paper/15 transition-colors cursor-help",
+            "bg-paper text-ink-3 hover:text-ink hover:bg-paper-2",
+            "border border-rule transition-colors cursor-help shadow-card",
             "text-[12px] font-bold tabular-nums",
           )}
         >
           ?
         </span>
       </InfoTooltip>
-      </div>
     </header>
   );
 }
@@ -451,13 +527,13 @@ function spyExplanation(state: EngineState, snap: AdaptedSnapshot): string {
     return "Setup is plotted, but conditions aren't favoring a trade right now.";
   }
   if (state === "WATCH") {
-    return "Price is approaching a primary trigger. Watching for a rejection candle.";
+    return "Price is approaching active structure. Keep the channel open.";
   }
   if (state === "WAIT") {
-    return "Rejection candle printed. Waiting for confirmation on the next bar.";
+    return "Structure is active. Waiting for qualified confirmation.";
   }
   if (state === "ARMED") {
-    return "Confirmation in. The entry trigger is armed.";
+    return "Qualified confirmation is in. The setup is armed.";
   }
   if (state === "GO") {
     return "Trigger fired. The setup is live for the rest of the session.";
@@ -470,34 +546,34 @@ function spyExplanation(state: EngineState, snap: AdaptedSnapshot): string {
 
 function spxExplanation(state: EngineState, snap: SPXSnapshot): string {
   if (state === "PRE_CONFIG") {
-    return "Channel forms during the 17:00–02:00 CT overnight window. No envelope yet.";
+    return "Pivot Fan resolves once the prior RTH high close and post-noon low wick are available.";
   }
   if (state === "STAND_DOWN") {
-    return "Channel is plotted, but price isn't sitting where a setup can qualify.";
+    return "Pivot Fan is plotted, but price is not sitting where a setup can qualify.";
   }
   if (state === "WATCH") {
-    return "Price is approaching the channel rail. Watching for a rejection.";
+    return "Price is approaching a fan reference. Keep the ES read open.";
   }
   if (state === "WAIT") {
-    return "Rejection candle printed. Waiting for confirmation.";
+    return "Structure is active. Waiting for qualified confirmation.";
   }
   if (state === "ARMED") {
-    return "Confirmation in. The entry trigger is armed at the channel rail.";
+    return "Qualified confirmation is in. The setup is armed.";
   }
   if (state === "GO") {
-    return "Trigger fired. The channel trade is live.";
+    return "Trigger fired. The fan trade is live.";
   }
   if (state === "COOLDOWN") {
     return "Trade has resolved. No new signals until the next overnight window.";
   }
-  return snap.scenarioExplanation || snap.channel.reason || "";
+  return snap.fanRead?.summary || snap.scenarioExplanation || snap.channel.reason || "";
 }
 
 function spyStructureLevels(snap: AdaptedSnapshot): StructureLevels {
   const primaryAnchor = snap.anchor?.primary;
-  const upper = primaryAnchor?.bands.upper.currentValue;
-  const anchor = primaryAnchor?.bands.main.currentValue;
-  const lower = primaryAnchor?.bands.lower.currentValue;
+  const upper = primaryAnchor?.bands.upper.entryValue ?? primaryAnchor?.bands.upper.currentValue;
+  const anchor = primaryAnchor?.bands.main.entryValue ?? primaryAnchor?.bands.main.currentValue;
+  const lower = primaryAnchor?.bands.lower.entryValue ?? primaryAnchor?.bands.lower.currentValue;
   if (
     typeof upper === "number" ||
     typeof anchor === "number" ||
@@ -543,10 +619,14 @@ function spyStructureLevels(snap: AdaptedSnapshot): StructureLevels {
 }
 
 function spxStructureLevels(snap: SPXSnapshot): StructureLevels {
-  const ceiling = snap.lines.find((line) => line.kind === "CHANNEL_CEILING");
-  const floor = snap.lines.find((line) => line.kind === "CHANNEL_FLOOR");
-  const upper = ceiling?.currentValue ?? snap.overnight.high.price ?? null;
-  const lower = floor?.currentValue ?? snap.overnight.low.price ?? null;
+  const ceiling =
+    snap.lines.find((line) => line.kind === "PREV_RTH_HIGH_DESC") ??
+    snap.lines.find((line) => line.kind === "SWING_HIGH_DESC");
+  const floor =
+    snap.lines.find((line) => line.kind === "PREV_RTH_LOW_DESC") ??
+    snap.lines.find((line) => line.kind === "SWING_LOW_ASC");
+  const upper = ceiling?.entryValue ?? ceiling?.currentValue ?? snap.overnight.high.price ?? null;
+  const lower = floor?.entryValue ?? floor?.currentValue ?? snap.overnight.low.price ?? null;
   const anchor =
     typeof upper === "number" && typeof lower === "number"
       ? (upper + lower) / 2
@@ -565,19 +645,49 @@ function buildSpyStructureChart(
   date: string,
 ): StructureChartData | null {
   const anchor = snap.anchor?.primary;
-  if (!anchor) return null;
-  const slope = Number(snap.anchor?.slopePerHour);
-  if (!Number.isFinite(slope)) return null;
   const bars = normalizeChartBars(
-    intradayBars && intradayBars.length > 1 ? intradayBars : snap.candles,
+    snap.candles && snap.candles.length > 1 ? snap.candles : intradayBars,
   );
-  const lines: StructureChartLine[] = [
-    makeSpyBand("Upper", anchor.bands.upper.anchorPrice, anchor.anchorTime, slope, "upper"),
-    makeSpyBand("Anchor", anchor.bands.main.anchorPrice, anchor.anchorTime, slope, "anchor"),
-    makeSpyBand("Lower", anchor.bands.lower.anchorPrice, anchor.anchorTime, slope, "lower"),
-  ].filter(Boolean) as StructureChartLine[];
+  if (bars.length > 0 && Number.isFinite(snap.currentPrice) && snap.currentPrice > 0) {
+    const last = bars[bars.length - 1];
+    bars[bars.length - 1] = {
+      ...last,
+      h: Math.max(last.h, snap.currentPrice),
+      l: Math.min(last.l, snap.currentPrice),
+      c: snap.currentPrice,
+    };
+  }
+  if (bars.length < 2) return null;
+  const spyAnchorSlope = -Math.abs(Number(snap.anchor?.slopePerHour ?? 0.2));
+  const lines: StructureChartLine[] = anchor
+    ? [
+        makeSpyBand("Upper", anchor.bands.upper.anchorPrice, anchor.anchorTime, spyAnchorSlope, "upper"),
+        makeSpyBand("Main", anchor.bands.main.anchorPrice, anchor.anchorTime, spyAnchorSlope, "anchor"),
+        makeSpyBand("Lower", anchor.bands.lower.anchorPrice, anchor.anchorTime, spyAnchorSlope, "lower"),
+      ].filter(Boolean) as StructureChartLine[]
+    : snap.lines
+        .slice()
+        .sort((a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice))
+        .slice(0, 4)
+        .map((line, index): StructureChartLine => ({
+          label: spyShortChartLabel(line.name, index),
+          anchorTime: bars[0].t,
+          anchorPrice: line.currentValue,
+          slopePerHour: 0,
+          tone: index === 0 ? "anchor" : line.currentValue >= snap.currentPrice ? "upper" : "lower",
+        }));
   if (bars.length < 2 || lines.length === 0) return null;
   return { label: "SPY", date, bars, lines };
+}
+
+function spyShortChartLabel(name: string, index: number): string {
+  if (/PDH/i.test(name)) return "PDH";
+  if (/PDL/i.test(name)) return "PDL";
+  if (/UA/i.test(name)) return "UA";
+  if (/UD/i.test(name)) return "UD";
+  if (/LA/i.test(name)) return "LA";
+  if (/LD/i.test(name)) return "LD";
+  return `L${index + 1}`;
 }
 
 function makeSpyBand(
@@ -602,12 +712,11 @@ function buildSpxStructureChart(
   intradayBars: StructureChartBar[] | null,
   date: string,
 ): StructureChartData | null {
-  const offset = snap._meta?.appliedOffset ?? 0;
   const bars = normalizeChartBars(intradayBars ?? []).map((bar) => ({
     t: bar.t,
-    h: bar.h + offset,
-    l: bar.l + offset,
-    c: bar.c + offset,
+    h: bar.h,
+    l: bar.l,
+    c: bar.c,
   }));
   const lines = snap.lines
     .map((line): StructureChartLine => ({
@@ -616,9 +725,9 @@ function buildSpxStructureChart(
       anchorPrice: line.anchorPrice,
       slopePerHour: line.slopePerHour,
       tone:
-        line.kind === "CHANNEL_CEILING"
+        line.kind === "PREV_RTH_HIGH_DESC" || line.kind === "SWING_HIGH_DESC"
           ? "upper"
-          : line.kind === "CHANNEL_FLOOR"
+          : line.kind === "PREV_RTH_LOW_DESC" || line.kind === "SWING_LOW_ASC"
             ? "lower"
             : "reference",
     }))
@@ -644,20 +753,20 @@ function normalizeChartBars(
 
 function shortSpxLineLabel(kind: string): string {
   const m: Record<string, string> = {
-    CHANNEL_CEILING: "Ceil",
-    CHANNEL_FLOOR: "Floor",
-    PREV_RTH_HIGH_ASC: "Prev H",
-    PREV_RTH_LOW_DESC: "Prev L",
+    SWING_HIGH_DESC: "Swing H dn",
+    SWING_LOW_ASC: "Swing L up",
+    PREV_RTH_HIGH_ASC: "HF-C",
+    PREV_RTH_HIGH_DESC: "HF-F",
+    PREV_RTH_LOW_ASC: "LF-C",
+    PREV_RTH_LOW_DESC: "LF-F",
+    SWING_HIGH_ASC: "OH-C",
+    SWING_LOW_DESC: "Swing L dn",
   };
   return m[kind] || "Ref";
 }
 
-function chartSessionDateISO(now: Date): string {
-  const session = getSessionInfo("SPY", now);
-  if (session.phase === "RTH_OPEN" || session.phase === "POST_RTH") {
-    return chicagoDateISO(session.rthClose);
-  }
-  return previousTradingDateISO("SPY", now);
+function chartSessionDateISO(engine: "SPY" | "SPX", now: Date): string {
+  return latestTradingDateISO(engine, now);
 }
 
 function chicagoDateISO(d: Date): string {
@@ -669,16 +778,23 @@ function chicagoDateISO(d: Date): string {
   }).format(d);
 }
 
-function previousTradingDateISO(engine: "SPY" | "SPX", now: Date): string {
+function latestTradingDateISO(engine: "SPY" | "SPX", now: Date): string {
   const todayISO = chicagoDateISO(now);
-  for (let offset = 1; offset <= 14; offset++) {
+  for (let offset = 0; offset <= 14; offset++) {
     const probe = new Date(now.getTime() - offset * 86_400_000);
-    if (chicagoDateISO(probe) === todayISO) continue;
-    const session = getSessionInfo(engine, probe);
+    const probeISO = chicagoDateISO(probe);
+    const session = getSessionInfo(engine, middayProbeForChicagoDate(probeISO));
     const tradingDateISO = chicagoDateISO(session.rthClose);
-    if (tradingDateISO < todayISO) return tradingDateISO;
+    if (tradingDateISO <= todayISO) return tradingDateISO;
   }
   return todayISO;
+}
+
+function middayProbeForChicagoDate(dateISO: string): Date {
+  // Noon CT is safely inside the same Chicago calendar day and before
+  // the RTH close. The UTC hour keeps this deterministic for the US
+  // market calendar dates this app supports.
+  return new Date(`${dateISO}T17:00:00.000Z`);
 }
 
 function Section({
@@ -689,8 +805,8 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section aria-label={title} className="space-y-4">
-      <div className="flex items-baseline gap-3">
+    <section aria-label={title} className="space-y-5 pt-2">
+      <div className="flex items-baseline gap-3 pb-1">
         <h2 className="font-serif text-h2 text-ink tracking-tight">{title}</h2>
         <span aria-hidden className="h-px flex-1 bg-rule" />
       </div>
@@ -746,11 +862,14 @@ function SpyVerdictCard({
     ? `Track ${snap.currentState === "STAND_DOWN" ? "the closest primary line" : "this trigger"} (${closestLine.name}) at ${closestLine.currentValue.toFixed(2)}.`
     : undefined;
   const change = decision.conviction != null ? snap.shellState.change : 0;
+  const completedTrade =
+    snap.currentState === "COOLDOWN" || /completed/i.test(snap.flipCondition || "");
 
   return (
     <EngineCard
       engine="SPY"
       section="today's read"
+      feedId="spy-rails"
       title={
         <span className="flex items-baseline gap-3 flex-wrap">
           <span className="font-serif text-display tracking-tight">
@@ -771,13 +890,18 @@ function SpyVerdictCard({
         />
       }
     >
-      <p className="text-meta text-ink-3 -mt-2">{SLATE_COPY.spySubtitle}</p>
-      <p className="text-body text-ink-2 leading-relaxed">
-        {decision.finalExplanation ||
-          snap.bias.explanation ||
-          (isPreConfig
-            ? "No active triggers yet — bias and conviction populate when the setup window opens."
-            : "Engine is initializing.")}
+      <p className="sr-only">{SLATE_COPY.spySubtitle}</p>
+      <p className="min-h-[68px] text-body text-ink-2 leading-relaxed">
+        {completedTrade && snap.flipCondition ? snap.flipCondition : (
+        cleanActionableExplanation(
+          decision.finalExplanation ||
+            snap.bias.explanation ||
+            (isPreConfig
+              ? "No active triggers yet — bias and conviction populate when the setup window opens."
+              : "Engine is initializing."),
+          currentPrice,
+        )
+        )}
       </p>
       <div className="grid grid-cols-3 gap-3 pt-3 border-t border-rule">
         <MetricSlot
@@ -786,13 +910,13 @@ function SpyVerdictCard({
           example={SLATE_COPY.metricExample.conviction}
           helperWhenEmpty={SLATE_COPY.metricEmptyHelper.conviction}
         >
-          {!isPreConfig && (
+          {!isPreConfig && typeof decision.conviction === "number" ? (
             <ConvictionTrack
               value={decision.conviction}
               max={5}
               label={`${decision.conviction}/5`}
             />
-          )}
+          ) : null}
         </MetricSlot>
         <MetricSlot
           label="Bias"
@@ -800,7 +924,7 @@ function SpyVerdictCard({
           example={SLATE_COPY.metricExample.bias}
           helperWhenEmpty={SLATE_COPY.metricEmptyHelper.bias}
         >
-          {!isPreConfig && <BiasValue bias={snap.bias.bias} />}
+          {!isPreConfig && snap.bias.bias ? <BiasValue bias={snap.bias.bias} /> : null}
         </MetricSlot>
         <MetricSlot
           label="Grade"
@@ -808,14 +932,14 @@ function SpyVerdictCard({
           example={SLATE_COPY.metricExample.grade}
           helperWhenEmpty={SLATE_COPY.metricEmptyHelper.grade}
         >
-          {!isPreConfig && (
+          {!isPreConfig && signal && quality ? (
             <GradeValue grade={signal && quality ? quality.grade : null} />
-          )}
+          ) : null}
         </MetricSlot>
       </div>
       {(isPreConfig ||
         snap.currentState === "STAND_DOWN" ||
-        snap.currentState === "COOLDOWN") && (
+        completedTrade) && (
         <LastSignalRecap recap={lastSignal} feedId="spy-last-session" />
       )}
       {isPreConfig ? (
@@ -823,7 +947,7 @@ function SpyVerdictCard({
       ) : (
         <>
           <FlipsLine condition={snap.flipCondition} />
-          <InvalidationLine invalidation={snap.invalidation} />
+          <InvalidationLine invalidation={snap.invalidation} completed={completedTrade} />
         </>
       )}
       <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -836,28 +960,63 @@ function SpyVerdictCard({
         )}
       </div>
       {!isPreConfig && (
-        <WhyChips trace={snap.decisionTrace} className="pt-2" />
+        <DiagnosticsDisclosure trace={snap.decisionTrace} />
       )}
     </EngineCard>
   );
 }
 
+function entryCostStatusFor({
+  projection,
+  hasChain,
+  optionsError,
+}: {
+  projection: unknown;
+  hasChain: boolean;
+  optionsError: boolean;
+}): "active" | "waiting" | "unavailable" {
+  if (projection || hasChain) return "active";
+  return optionsError ? "unavailable" : "waiting";
+}
+
 function SpyReadCard({ snap }: { snap: AdaptedSnapshot }) {
-  const armed = snap.lines
+  const primary = snap.lines
     .filter((l) => l.isPrimary)
     .slice()
     .sort((a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice))
     .slice(0, 4);
+  const referenceFallback = snap.lines
+    .filter((l) => l.name !== "Day Open")
+    .slice()
+    .sort((a, b) => {
+      const aLevel = a.entryValue ?? a.currentValue;
+      const bLevel = b.entryValue ?? b.currentValue;
+      return Math.abs(aLevel - snap.currentPrice) - Math.abs(bLevel - snap.currentPrice);
+    })
+    .slice(0, 4);
+  const rows = primary.length > 0 ? primary : referenceFallback;
+  const isReferenceMode = primary.length === 0 && rows.length > 0;
   return (
     <EngineCard
       engine="SPY"
       section="active levels"
+      feedId="spy-rails"
       title={
         <span className="flex items-center gap-2 flex-wrap">
-          <span>{armed.length === 0 ? "No active levels" : `${armed.length} active level${armed.length === 1 ? "" : "s"}`}</span>
+          <span>
+            {rows.length === 0
+              ? "No active levels"
+              : isReferenceMode
+                ? "08:00 references"
+                : `${rows.length} active level${rows.length === 1 ? "" : "s"}`}
+          </span>
           <InfoTooltip
-            label="Primary line"
-            content="A tradable level the engine watches for rejection or break — anchored on prior-day pivots and projected forward."
+            label={isReferenceMode ? "Reference levels" : "Primary line"}
+            content={
+              isReferenceMode
+                ? "The SPY channel has 08:00 operating references loaded, but no fresh primary entry line is armed. Context rows are diagnostic until a setup re-arms."
+                : "A tradable level the engine watches for rejection or break against projected prior-day pivots."
+            }
           />
         </span>
       }
@@ -875,7 +1034,7 @@ function SpyReadCard({ snap }: { snap: AdaptedSnapshot }) {
     >
       <div className="-mx-5 -mb-5">
         <div className="min-h-[180px] flex flex-col">
-          {armed.length === 0 ? (
+          {rows.length === 0 ? (
             <div className="px-5 py-8 text-body text-ink-3">
               {SLATE_COPY.structureEmpty.spy}
             </div>
@@ -883,18 +1042,25 @@ function SpyReadCard({ snap }: { snap: AdaptedSnapshot }) {
             <>
               <ColumnHeaderRow />
               <ul className="divide-y divide-rule">
-                {armed.map((l) => (
-                  <TriggerRow
-                    key={l.name}
-                    label={spyLineLabel(l.name)}
-                    fullName={spyLineFullName(l.name)}
-                    hint={spyLineHint(l.name)}
-                    level={l.currentValue}
-                    distance={l.distanceFromPrice}
-                    proximity={SPY_DISTANCE_PROXIMITY}
-                    glyph="armed"
-                  />
-                ))}
+                {rows.map((l) => {
+                  const level = l.entryValue ?? l.currentValue;
+                  return (
+                    <TriggerRow
+                      key={`${l.name}-${level}`}
+                      label={spyLineLabel(l.name)}
+                      fullName={spyLineFullName(l.name)}
+                      hint={
+                        isReferenceMode
+                          ? "08:00 CT operating reference. Shown for context because no active SPY entry line is currently armed."
+                          : spyLineHint(l.name)
+                      }
+                      level={level}
+                      distance={level - snap.currentPrice}
+                      proximity={SPY_DISTANCE_PROXIMITY}
+                      glyph={isReferenceMode ? "stale" : "armed"}
+                    />
+                  );
+                })}
               </ul>
             </>
           )}
@@ -920,6 +1086,7 @@ function SpxVerdictCard({
   const isPreConfig = state === "PRE_CONFIG";
   const headline = isPreConfig ? "Awaiting setup" : spxHeadline(state, action);
   const isOutside = snap.scenario === "OUTSIDE_PLAY";
+  const completedTrade = state === "COOLDOWN" || /completed/i.test(snap.flipCondition || "");
 
   const closestLine = nearestSpxLine(snap.lines);
   const alertLevel = closestLine ? closestLine.currentValue : snap.price.last;
@@ -931,6 +1098,7 @@ function SpxVerdictCard({
     <EngineCard
       engine="SPX"
       section="today's read"
+      feedId="spx-rails"
       title={
         <span className="flex items-baseline gap-3 flex-wrap">
           <span className="font-serif text-display tracking-tight">
@@ -967,13 +1135,14 @@ function SpxVerdictCard({
         />
       }
     >
-      <p className="text-meta text-ink-3 -mt-2">{SLATE_COPY.spxSubtitle}</p>
-      <p className="text-body text-ink-2 leading-relaxed">
-        {snap.scenarioExplanation ||
+      <p className="sr-only">{SLATE_COPY.spxSubtitle}</p>
+      <p className="min-h-[68px] text-body text-ink-2 leading-relaxed">
+        {snap.fanRead?.summary ||
+          snap.scenarioExplanation ||
           snap.channel.reason ||
           (isPreConfig
-            ? "Channel and confluence populate when the overnight window opens."
-            : "Channel is initializing.")}
+            ? "Pivot Fan and confluence populate when ES pivots are available."
+            : "Pivot Fan is initializing.")}
       </p>
       <div className="grid grid-cols-3 gap-3 pt-3 border-t border-rule">
         <MetricSlot
@@ -992,12 +1161,12 @@ function SpxVerdictCard({
           )}
         </MetricSlot>
         <MetricSlot
-          label="Channel"
+          label="Fan zone"
           hint={SLATE_COPY.metric.channel}
           example={SLATE_COPY.metricExample.channel}
           helperWhenEmpty={SLATE_COPY.metricEmptyHelper.channel}
         >
-          {!isPreConfig && <ChannelValue direction={snap.channel.direction} />}
+          {!isPreConfig && <FanZoneValue snap={snap} />}
         </MetricSlot>
         <MetricSlot
           label="Grade"
@@ -1016,7 +1185,7 @@ function SpxVerdictCard({
       ) : (
         <>
           <FlipsLine condition={snap.flipCondition} />
-          <InvalidationLine invalidation={snap.invalidation ?? null} />
+          <InvalidationLine invalidation={snap.invalidation ?? null} completed={completedTrade} />
         </>
       )}
       <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -1025,28 +1194,31 @@ function SpxVerdictCard({
         )}
       </div>
       {!isPreConfig && (
-        <WhyChips trace={snap.decisionTrace ?? []} className="pt-2" />
+        <DiagnosticsDisclosure trace={snap.decisionTrace ?? []} />
       )}
     </EngineCard>
   );
 }
 
 function SpxReadCard({ snap }: { snap: SPXSnapshot }) {
-  const sorted = [...snap.lines].sort(
-    (a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice),
-  );
+  const sorted = snap.lines
+    .filter((line) => true)
+    .sort(
+      (a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice),
+    );
   const top = sorted.slice(0, 4);
   const empty = top.length === 0;
   return (
     <EngineCard
       engine="SPX"
       section="active levels"
+      feedId="spx-rails"
       title={
         <span className="flex items-center gap-2 flex-wrap">
           <span>{empty ? "No active levels" : `${top.length} active level${top.length === 1 ? "" : "s"}`}</span>
           <InfoTooltip
-            label="Channel rail"
-            content="A primary rail of the overnight channel projected into RTH — used for rejection / break confirmation."
+            label="ES structure line"
+            content="One of the six ES structure lines projected into RTH and watched for hourly-close rejection."
           />
         </span>
       }
@@ -1101,15 +1273,15 @@ function SpxReadCard({ snap }: { snap: SPXSnapshot }) {
 
 // ---- shared bits ----
 
-function ChannelValue({ direction }: { direction: string }) {
-  if (direction === "NONE" || !direction) {
+function FanZoneValue({ snap }: { snap: SPXSnapshot }) {
+  if (!snap.fanRead || snap.fanRead.zone === "PENDING") {
     return (
       <InfoTooltip
-        label="Channel"
-        content="The channel forms after the first qualifying overnight pivot."
+        label="Pivot Fan"
+        content="The ES Pivot Fan resolves from the prior RTH high close and post-noon low wick."
       >
         <span className="text-meta text-state-neutral italic cursor-help">
-          not yet formed
+          resolving
         </span>
       </InfoTooltip>
     );
@@ -1119,7 +1291,7 @@ function ChannelValue({ direction }: { direction: string }) {
       className="font-mono text-meta font-semibold text-ink tabular-nums"
       data-num
     >
-      {direction.toLowerCase()}
+      {snap.fanRead.label.toLowerCase()}
     </span>
   );
 }
@@ -1234,9 +1406,18 @@ function FlipsLine({ condition }: { condition?: string }) {
 
 function InvalidationLine({
   invalidation,
+  completed = false,
 }: {
   invalidation: { level: number; stopOffset: number } | null;
+  completed?: boolean;
 }) {
+  if (completed) {
+    return (
+      <p className="text-meta text-ink-3 font-mono">
+        Invalidation: trade completed; no live trigger remains.
+      </p>
+    );
+  }
   if (!invalidation) {
     return (
       <p className="text-meta text-ink-3 font-mono">
@@ -1252,11 +1433,41 @@ function InvalidationLine({
   );
 }
 
+function DiagnosticsDisclosure({ trace }: { trace: import("@/components/slate/DecisionTraceDrawer").TraceEvent[] }) {
+  if (!trace || trace.length === 0) return null;
+  const cleanedTrace = trace
+    .map((event) => ({
+      ...event,
+      event: cleanActionableExplanation(event.event, extractSpotFromTrace(trace)),
+    }))
+    .filter((event) => event.event.trim().length > 0)
+    .slice(0, 3);
+  if (cleanedTrace.length === 0) return null;
+
+  return (
+    <details className="group rounded-soft border border-rule bg-paper-2/35 px-3 py-2">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3 outline-none transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-gold/40">
+        <span>Diagnostics</span>
+        <span className="text-ink-4 group-open:hidden">{cleanedTrace.length} checks</span>
+        <span className="hidden text-ink-4 group-open:inline">Hide</span>
+      </summary>
+      <WhyChips trace={cleanedTrace} className="mt-2" />
+    </details>
+  );
+}
+
+function extractSpotFromTrace(trace: import("@/components/slate/DecisionTraceDrawer").TraceEvent[]): number {
+  const joined = trace.map((event) => event.event).join(" ");
+  const match = joined.match(/\b(?:SPY|ES|SPX)\s+([0-9]{3,5}(?:\.[0-9]+)?)/i);
+  const value = match ? Number(match[1]) : NaN;
+  return Number.isFinite(value) ? value : 0;
+}
+
 // ---- structure list bits ----
 
 function ColumnHeaderRow() {
   return (
-    <div className="grid grid-cols-[1fr_auto_auto] items-center gap-4 border-t border-rule px-5 py-2 bg-paper-2/30">
+    <div className="hidden grid-cols-[1fr_auto_auto] items-center gap-4 border-t border-rule bg-paper-2/30 px-5 py-2 sm:grid">
       <span className="font-mono text-[10px] tracking-[0.16em] uppercase text-ink-3">
         Level
       </span>
@@ -1292,21 +1503,27 @@ function TriggerRow({
   const isZero = Math.abs(distance) < 0.005;
   const sign = isZero ? "" : distance > 0 ? "+" : "−";
   return (
-    <li className="grid grid-cols-[1fr_auto_auto] items-center gap-4 px-5 py-3 text-body">
+    <li className="grid grid-cols-2 gap-x-3 gap-y-1 px-5 py-3 text-body sm:grid-cols-[1fr_auto_auto] sm:items-center sm:gap-4">
       <span
-        className="flex items-center gap-2.5 min-w-0"
+        className="col-span-2 flex min-w-0 items-center gap-2.5 sm:col-span-1"
         title={`${fullName} — ${hint}`}
       >
         <StatusGlyph kind={glyph} label={`${fullName} ${glyph}`} />
-        <span className="font-mono text-ink truncate">{label}</span>
+        <span className="font-mono text-ink">{label}</span>
       </span>
-      <span className="font-mono tabular-nums text-ink text-right">
+      <span className="font-mono tabular-nums text-ink sm:text-right">
+        <span className="mr-2 text-[10px] uppercase tracking-[0.12em] text-ink-4 sm:hidden">
+          Price
+        </span>
         {level.toFixed(2)}
       </span>
       <span
-        className={`font-mono tabular-nums text-right min-w-[64px] ${tone}`}
+        className={`min-w-[64px] text-right font-mono tabular-nums ${tone}`}
         data-num
       >
+        <span className="mr-2 text-[10px] uppercase tracking-[0.12em] text-ink-4 sm:hidden">
+          Distance
+        </span>
         {sign}
         {Math.abs(distance).toFixed(2)}
       </span>
@@ -1369,22 +1586,53 @@ function formatHM(iso: string): string {
 
 function spyHeadline(state: EngineState, verdict: string): string {
   const v = (verdict || "").toUpperCase();
+  if (state === "COOLDOWN") return "Trade completed";
+  if (state === "GO") return "Trade live";
+  if (state === "ARMED") return "Armed for entry";
   if (v === "LONG") return "Leaning long";
   if (v === "SHORT") return "Leaning short";
   if (v === "HOLD") return "Holding position";
   if (state === "STAND_DOWN" || v === "STAND DOWN") return "Standing down";
-  if (state === "ARMED") return "Armed for entry";
-  if (state === "GO") return "Trade allowed";
   return "Waiting for rejection";
 }
 
 function spxHeadline(state: EngineState, action: string): string {
-  if (action === "TAKE") return "Take the channel";
-  if (action === "SELECTIVE") return "Trading selectively";
-  if (state === "GO") return "Trade allowed";
+  if (state === "COOLDOWN") return "Trade completed";
+  if (state === "GO") return "Trade live";
   if (state === "ARMED") return "Armed for entry";
   if (state === "STAND_DOWN" || action === "STAND_DOWN") return "Standing down";
-  return "Watching the channel";
+  if (action === "TAKE") return "Take the fan read";
+  if (action === "SELECTIVE") return "Watch the fan read";
+  return "Watching the fan read";
+}
+
+function formatSlateDate(d: Date): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(d);
+}
+
+function cleanActionableExplanation(text: string, spot: number): string {
+  if (!Number.isFinite(spot) || spot <= 0) return text;
+
+  const gammaFlip = /(?:\s*)dealer gamma (?:positive|negative|flat) with flip near ([0-9]+(?:\.[0-9]+)?)(?:\.|,)?/i;
+  const match = text.match(gammaFlip);
+  if (!match) return text;
+
+  const flip = Number(match[1]);
+  if (!Number.isFinite(flip)) return text;
+
+  const distance = Math.abs(flip - spot) / spot;
+  if (distance <= 0.12) return text;
+
+  const cleaned = text.replace(gammaFlip, "").replace(/\s{2,}/g, " ").trim();
+  return cleaned.length > 0
+    ? cleaned
+    : "Engine has a structural read, but options context is withheld until the live chain is inside a realistic spot range.";
 }
 
 // SPY line-name labels + hover hints.
@@ -1416,20 +1664,30 @@ function spyLineHint(name: string): string {
 
 function spxLineLabel(kind: string): string {
   const m: Record<string, string> = {
-    CHANNEL_CEILING: "Channel ceiling",
-    CHANNEL_FLOOR: "Channel floor",
-    PREV_RTH_HIGH_ASC: "Prev RTH high · ascending",
-    PREV_RTH_LOW_DESC: "Prev RTH low · descending",
+    SWING_HIGH_DESC: "Swing high descending",
+    SWING_LOW_ASC: "Swing low ascending",
+    PREV_RTH_HIGH_DESC: "High Fan Floor",
+    PREV_RTH_LOW_ASC: "Low Fan Ceiling",
+    PREV_RTH_HIGH_ASC: "High Fan Ceiling",
+    PREV_RTH_LOW_DESC: "Low Fan Floor",
+    SWING_HIGH_ASC: "Overnight Higher Pivot",
+    SWING_LOW_DESC: "Swing low descending",
   };
   return m[kind] || kind;
 }
 
 function spxLineHint(kind: string): string {
   const m: Record<string, string> = {
-    CHANNEL_CEILING: "Top rail of the overnight channel, projected forward.",
-    CHANNEL_FLOOR: "Bottom rail of the overnight channel, projected forward.",
-    PREV_RTH_HIGH_ASC: "Yesterday's RTH high, projected upward.",
-    PREV_RTH_LOW_DESC: "Yesterday's RTH low, projected downward.",
+    SWING_HIGH_DESC: "Engine-generated descending ES reference line.",
+    SWING_LOW_ASC: "Engine-generated ascending ES reference line.",
+    PREV_RTH_HIGH_DESC: "High Pivot Fan floor projected down from yesterday's RTH high close.",
+    PREV_RTH_LOW_ASC: "Low Pivot Fan ceiling projected up from yesterday's post-noon RTH low wick.",
+    PREV_RTH_HIGH_ASC: "High Pivot Fan ceiling projected up from yesterday's RTH high close.",
+    PREV_RTH_LOW_DESC: "Low Pivot Fan floor projected down from yesterday's post-noon RTH low wick.",
+    SWING_HIGH_ASC: "Minor ascending watch line from an overnight high close above the prior RTH high close.",
+    SWING_LOW_DESC: "Engine-generated descending ES reference line.",
   };
-  return m[kind] || "Engine-generated SPX reference line.";
+  return m[kind] || "Engine-generated ES reference line.";
 }
+
+

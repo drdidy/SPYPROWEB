@@ -1,18 +1,16 @@
 import type { SPXSnapshot } from "./types";
 
 // ---------------------------------------------------------------------------
-// SPX mock snapshot — demo scenario: INSIDE_ASCENDING.
-// Numbers are mathematically self-consistent against slope = +1.04/hr so the
-// surface looks honest (channel floor / ceiling project correctly from the
-// overnight anchors to the as-of timestamp).
+// SPX mock snapshot - demo scenario: INSIDE_DESCENDING.
+// Numbers are mathematically self-consistent against the ES previous-RTH
+// ES Pivot Fan framework
+// so surfaces render the same line vocabulary in dev and production.
 //
 // Session date (CT): 2026-05-08
 // As-of:             2026-05-08 09:35 CT (5 min into RTH)
 //
-// Channel direction is ASCENDING because Tokyo (21:00–02:00 CT) printed
-// HH + HL versus Sydney (17:00–20:00 CT). Floor anchors at the overnight low,
-// ceiling anchors at the overnight high; both rise at +1.04/hr (ascending
-// uses overnight highest-close / lowest-close per the anchor rule).
+// Previous RTH high close and post-noon low wick are selected as pivots.
+// Ascending and descending lines are projected from both points.
 // ---------------------------------------------------------------------------
 
 export const spxSnapshot: SPXSnapshot = {
@@ -31,14 +29,14 @@ export const spxSnapshot: SPXSnapshot = {
 
   sessions: {
     sydney: {
-      // 17:00–21:00 CT
+      // 17:00-21:00 CT, retained as overnight diagnostics.
       high: 5862.10,
       low: 5849.00,
       highTime: "2026-05-07T20:48:00-05:00",
       lowTime: "2026-05-07T17:38:00-05:00",
     },
     tokyo: {
-      // 21:00–02:00 CT — HH + HL vs Sydney → ascending
+      // 21:00-02:00 CT, retained as overnight diagnostics.
       high: 5872.40,
       low: 5853.20,
       highTime: "2026-05-07T23:14:00-05:00",
@@ -49,96 +47,110 @@ export const spxSnapshot: SPXSnapshot = {
   channel: {
     direction: "ASCENDING",
     reason:
-      "Tokyo printed a higher high (5872.40 vs 5862.10) and higher low (5853.20 vs 5849.00) than Sydney. Range is rising — ascending channel.",
+      "ES Pivot Fan active with High Fan and Low Fan references.",
   },
 
-  // Slope = +1.04/hr applied to four lines.
-  // Floor:    5848.20 + 15.95h *  1.04 ≈ 5864.79
-  // Ceiling:  5872.40 + 10.35h *  1.04 ≈ 5883.16
-  // PrevH:    5878.50 + 20.17h *  1.04 ≈ 5899.48 (asc from prev RTH high)
-  // PrevL:    5849.00 + 23.88h * -1.04 ≈ 5824.16 (desc from prev RTH low)
+  fanRead: {
+    zone: "BETWEEN_CEILINGS",
+    label: "Between fan ceilings",
+    summary:
+      "Price is between High Fan Ceiling and Low Fan Ceiling; sell rejection at the high fan can rotate toward High Fan Floor, while a low-fan reclaim can press through High Fan Ceiling.",
+    primaryReference: "PREV_RTH_HIGH_ASC",
+    secondaryReference: "PREV_RTH_LOW_ASC",
+  },
+
+  // Four projected lines from previous RTH high-close / post-noon-low pivots.
   lines: [
     {
-      kind: "CHANNEL_FLOOR",
-      name: "Channel Floor",
-      anchorPrice: 5848.20,
-      anchorTime: "2026-05-07T17:38:00-05:00",
-      slopePerHour: 1.04,
-      currentValue: 5864.79,
-      distanceFromPrice: -7.21, // price (5872.00) is above floor
-    },
-    {
-      kind: "CHANNEL_CEILING",
-      name: "Channel Ceiling",
-      anchorPrice: 5872.40,
-      anchorTime: "2026-05-07T23:14:00-05:00",
-      slopePerHour: 1.04,
-      currentValue: 5883.16,
-      distanceFromPrice: 11.16, // price is below ceiling
-    },
-    {
       kind: "PREV_RTH_HIGH_ASC",
-      name: "Prev RTH High · Ascending",
+      name: "High Fan Ceiling",
       anchorPrice: 5878.50,
       anchorTime: "2026-05-07T13:25:00-05:00",
       slopePerHour: 1.04,
       currentValue: 5899.48,
-      distanceFromPrice: 27.48,
+      distanceFromPrice: 19.48,
+    },
+    {
+      kind: "PREV_RTH_HIGH_DESC",
+      name: "High Fan Floor",
+      anchorPrice: 5878.50,
+      anchorTime: "2026-05-07T13:25:00-05:00",
+      slopePerHour: -1.04,
+      currentValue: 5857.52,
+      distanceFromPrice: -22.48,
+    },
+    {
+      kind: "SWING_HIGH_ASC",
+      name: "Overnight Higher Pivot - Minor Ascending",
+      anchorPrice: 5884.00,
+      anchorTime: "2026-05-07T23:00:00-05:00",
+      slopePerHour: 1.04,
+      currentValue: 5894.40,
+      distanceFromPrice: 14.40,
+    },
+    {
+      kind: "PREV_RTH_LOW_ASC",
+      name: "Low Fan Ceiling",
+      anchorPrice: 5849.00,
+      anchorTime: "2026-05-07T09:42:00-05:00",
+      slopePerHour: 1.04,
+      currentValue: 5873.84,
+      distanceFromPrice: -6.16,
     },
     {
       kind: "PREV_RTH_LOW_DESC",
-      name: "Prev RTH Low · Descending",
+      name: "Low Fan Floor",
       anchorPrice: 5849.00,
       anchorTime: "2026-05-07T09:42:00-05:00",
       slopePerHour: -1.04,
       currentValue: 5824.16,
-      distanceFromPrice: -47.84,
+      distanceFromPrice: -55.84,
     },
   ],
 
   price: {
-    last: 5872.00,
-    change: 6.40,
-    changePct: 0.11,
+    last: 5880.00,
+    change: 14.40,
+    changePct: 0.25,
   },
 
-  // 5872.00 is between 5864.79 (floor) and 5883.16 (ceiling) → INSIDE_ASCENDING
+  // 5880.00 is between the two fan ceilings.
   scenario: "INSIDE_ASCENDING",
   scenarioExplanation:
-    "Last print 5872.00 sits inside the ascending channel — 7.21 pts above floor, 11.16 pts below ceiling. Mid-channel: both rails are reachable on the session.",
+    "Last print 5880.00 sits between the fan ceilings. Wait for qualified confirmation near active structure.",
 
   plays: {
     primary: {
-      side: "BUY",
-      entryLine: "CHANNEL_FLOOR",
-      entryPrice: 5864.79,
-      exitLine: "CHANNEL_CEILING",
-      exitPrice: 5883.16,
+      side: "SELL",
+      entryLine: "PREV_RTH_HIGH_ASC",
+      entryPrice: 5899.48,
+      exitLine: "PREV_RTH_HIGH_DESC",
+      exitPrice: 5857.52,
     },
     alternate: {
-      side: "SELL",
-      entryLine: "CHANNEL_CEILING",
-      entryPrice: 5883.16,
-      exitLine: "CHANNEL_FLOOR",
-      exitPrice: 5864.79,
+      side: "BUY",
+      entryLine: "PREV_RTH_LOW_ASC",
+      entryPrice: 5873.84,
+      exitLine: "PREV_RTH_HIGH_ASC",
+      exitPrice: 5899.48,
     },
   },
 
   contracts: {
     // SPX strikes are 5pt; round to standard board.
     forPrimary: {
-      type: "CALL",
-      strike: 5890,
+      type: "PUT",
+      strike: 5900,
       expiration: "2026-05-08",
       dteLabel: "0DTE",
-      distanceFromSpot: 5890 - 5864.79, // 25.21 OTM from entry
+      distanceFromSpot: 5900 - 5899.48,
     },
     forAlternate: {
-      type: "PUT",
-      strike: 5860,
+      type: "CALL",
+      strike: 5875,
       expiration: "2026-05-08",
       dteLabel: "0DTE",
-      distanceFromSpot: 5860 - 5883.16, // -23.16 OTM from entry
+      distanceFromSpot: 5875 - 5873.84,
     },
   },
 
@@ -146,7 +158,7 @@ export const spxSnapshot: SPXSnapshot = {
     active: false,
     side: null,
     detail:
-      "Inside channel — re-entry watch dormant. Watch reactivates if price closes above ceiling or below floor.",
+      "Inside the ES Pivot Fan - re-entry watch dormant. Watch reactivates when active structure qualifies.",
   },
 
   confluence: {
@@ -155,44 +167,29 @@ export const spxSnapshot: SPXSnapshot = {
         key: "asian",
         label: "Asian session",
         value: 0.78,
-        weight: 0.20,
-        contribution: 0.156,
-        note: "Tokyo HH+HL clean; Sydney bracketed inside Tokyo range.",
+        weight: 0.30,
+        contribution: 0.234,
+        note: "Overnight structure resolved before the RTH planning window.",
       },
       {
         key: "london",
         label: "London session",
         value: 0.66,
-        weight: 0.20,
-        contribution: 0.132,
-        note: "London open held overnight low — floor confirmed once.",
+        weight: 0.30,
+        contribution: 0.198,
+        note: "London open held the lower swing reference once.",
       },
       {
         key: "reaction",
         label: "RTH reaction",
         value: 0.72,
-        weight: 0.25,
-        contribution: 0.180,
-        note: "Open print rejected near ceiling proxy; first 30-min builds inside range.",
-      },
-      {
-        key: "factor4_tbd",
-        label: "Factor 4 (TBD)",
-        value: 0.60,
-        weight: 0.15,
-        contribution: 0.090,
-        note: "Placeholder until you specify the fourth confluence factor.",
-      },
-      {
-        key: "factor5_tbd",
-        label: "Factor 5 (TBD)",
-        value: 0.84,
-        weight: 0.20,
-        contribution: 0.168,
-        note: "Placeholder until you specify the fifth confluence factor.",
+        weight: 0.40,
+        contribution: 0.288,
+        note: "Open print is still inside the active swing pair.",
       },
     ],
-    score: 73, // 0.726 * 100, rounded
+    score: 72,
     action: "TAKE",
   },
 };
+

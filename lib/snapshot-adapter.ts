@@ -11,6 +11,7 @@
 // behind raw.candles + raw.quote + raw.context. Unusual Whales
 // integration plugs in here when its endpoint lands.
 import { getSessionInfo, formatConfigWindow } from "./sessions";
+import { nearReferencePriceLabel } from "./market-data-quality";
 import type {
   BiasState,
   Candle,
@@ -59,6 +60,11 @@ export interface RawSnapshot {
     line: string;
     kind?: string;
     level: number;
+    entryLevel?: number | null;
+    entryReferenceTime?: string | null;
+    touchWindowStart?: string | null;
+    touchWindowEnd?: string | null;
+    currentLevel?: number | null;
     dist: number;
     bps: number;
     bias: number;
@@ -146,11 +152,14 @@ interface PivotInfo {
 export interface AnchorBand {
   anchorPrice: number | null;
   currentValue: number | null;
+  entryValue?: number | null;
 }
 export interface AnchorGroup {
   role: string;
   anchorTime: string;
   anchorLow: number;
+  entryReferenceTime?: string;
+  touchWindowEnd?: string;
   bands: { upper: AnchorBand; main: AnchorBand; lower: AnchorBand };
 }
 export interface AnchorPayload {
@@ -195,14 +204,26 @@ export interface ReplayBlock {
   session: ReplaySession | null;
   verdictOutcome: "WIN" | "LOSS" | "PUSH" | "N_A" | null;
   verdictPnl: number | null;
+  entry?: {
+    time?: string | null;
+    price?: number | null;
+    side?: "LONG" | "SHORT" | string | null;
+    rule?: string | null;
+    line?: string | null;
+  } | null;
+  exit?: {
+    time?: string | null;
+    price?: number | null;
+    rule?: string | null;
+  } | null;
   error?: string | null;
 }
 
 export interface OptionsRaw {
   expiration: string;
   atm: number;
-  calls: Array<{ strike: number; bid: number; ask: number; iv: number; delta: number; gamma: number; oi: number; volume: number }>;
-  puts: Array<{ strike: number; bid: number; ask: number; iv: number; delta: number; gamma: number; oi: number; volume: number }>;
+  calls: Array<{ strike: number; bid: number | null; ask: number | null; iv: number | null; delta: number | null; gamma: number | null; oi: number; volume: number }>;
+  puts: Array<{ strike: number; bid: number | null; ask: number | null; iv: number | null; delta: number | null; gamma: number | null; oi: number; volume: number }>;
   totals: {
     callOi: number;
     putOi: number;
@@ -352,13 +373,18 @@ function mapTriggerToLine(t: RawSnapshot["triggers"][number]): DynamicLine {
   return {
     name: t.line,
     kind,
-    anchorPrice: t.level,
+    anchorPrice: t.entryLevel ?? t.level,
     anchorTime: "",
     slopePerHour: 0,
     direction: ascending ? "ASCENDING" : "DESCENDING",
     zoneType: t.status === "ARMED" ? "PRIMARY_TRIGGER" : "SECONDARY_TARGET",
     isPrimary: t.status === "ARMED",
-    currentValue: t.level,
+    currentValue: t.entryLevel ?? t.level,
+    entryValue: t.entryLevel ?? t.level,
+    entryReferenceTime: t.entryReferenceTime ?? undefined,
+    touchWindowStart: t.touchWindowStart ?? undefined,
+    touchWindowEnd: t.touchWindowEnd ?? undefined,
+    liveValue: t.currentLevel ?? null,
     distanceFromPrice: t.dist,
   };
 }
@@ -653,8 +679,10 @@ function mapOptions(raw: RawSnapshot): { intel: OptionsIntel | null; strikes: Se
     );
   }
   if (raw.gex) {
+    const flipLabel = nearReferencePriceLabel(raw.gex.flipPoint, last);
+    const flipSuffix = /^\d/.test(flipLabel) ? ` (flip ${flipLabel})` : "";
     uwBits.push(
-      `Gamma ${raw.gex.regime.toLowerCase()}${raw.gex.flipPoint ? ` (flip ${raw.gex.flipPoint.toFixed(2)})` : ""}`,
+      `Gamma ${raw.gex.regime.toLowerCase()}${flipSuffix}`,
     );
   }
   const alignmentNote = uwBits.length

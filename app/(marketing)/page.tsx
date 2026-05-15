@@ -181,9 +181,9 @@ function buildSpxHeroChart(
       anchorPrice: line.anchorPrice,
       slopePerHour: line.slopePerHour,
       tone:
-        line.kind === "CHANNEL_CEILING"
+        line.kind === "PREV_RTH_HIGH_DESC" || line.kind === "SWING_HIGH_DESC"
           ? "upper"
-          : line.kind === "CHANNEL_FLOOR"
+          : line.kind === "PREV_RTH_LOW_DESC" || line.kind === "SWING_LOW_ASC"
             ? "lower"
             : "reference",
     }))
@@ -214,10 +214,14 @@ function normalizeChartBars(
 
 function shortSpxLineLabel(kind: string): string {
   const labels: Record<string, string> = {
-    CHANNEL_CEILING: "Ceil",
-    CHANNEL_FLOOR: "Floor",
-    PREV_RTH_HIGH_ASC: "Prev H",
-    PREV_RTH_LOW_DESC: "Prev L",
+    SWING_HIGH_DESC: "Swing H dn",
+    SWING_LOW_ASC: "Swing L up",
+    PREV_RTH_HIGH_ASC: "HF-C",
+    PREV_RTH_HIGH_DESC: "HF-F",
+    PREV_RTH_LOW_ASC: "LF-C",
+    PREV_RTH_LOW_DESC: "LF-F",
+    SWING_HIGH_ASC: "OH-C",
+    SWING_LOW_DESC: "Swing L dn",
   };
   return labels[kind] || "Ref";
 }

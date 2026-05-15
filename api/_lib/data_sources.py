@@ -27,6 +27,15 @@ from . import seed_snapshot
 from . import tastytrade
 from . import unusual_whales
 
+# Entry levels are the 08:00 CT values on the structure lines. The 08:00
+# candle can confirm a setup for a 09:00 entry; otherwise the operator
+# evaluates the 09:00, 10:00, and 11:00 CT candles against those fixed
+# references.
+ENTRY_REFERENCE_HOUR_CT = 8
+ENTRY_SETUP_HOUR_CT = 8
+ENTRY_WINDOW_START_HOUR_CT = 9
+ENTRY_WINDOW_END_HOUR_CT = 11
+
 
 @pc.ttl_cache(ttl_seconds=60.0, maxsize=8)
 def fetch_spy_hourly(period: str = "60d") -> pd.DataFrame:
@@ -186,6 +195,143 @@ def _forced_one_hour_exit(
     return exit_time, float(row["Close"])
 
 
+def _replay_touch_window_entry(
+    *,
+    triggers: list[dict] | None,
+    rth_today: pd.DataFrame,
+    completed_at: pd.Timestamp | None = None,
+) -> dict | None:
+    """First valid 08:00 setup or 09:00/10:00/11:00 CT reference touch.
+
+    Replay grading is intentionally tied to the operating window, not the
+    full-day drift. An 08:00 CT candle that tags an engine reference and
+    closes away from it arms a 09:00 CT entry, exited at the 09:00 hourly
+    close. Otherwise the first 09:00, 10:00, or 11:00 CT candle that tags a
+    reference is entered at that reference and exited at that hour's close.
+    """
+    if rth_today is None or rth_today.empty or not triggers:
+        return None
+    hourly = _entry_window_hourly_bars(rth_today, completed_at=completed_at)
+    if hourly.empty:
+        return None
+    refs = []
+    for row in triggers:
+        if row.get("kind") == "DAY_OPEN":
+            continue
+        level = row.get("entryLevel", row.get("level"))
+        if level is None:
+            continue
+        try:
+            refs.append({
+                "line": str(row.get("line") or row.get("kind") or "Reference"),
+                "level": float(level),
+            })
+        except Exception:
+            continue
+    if not refs:
+        return None
+
+    for ts, bar in hourly.sort_index().iterrows():
+        ct_ts = pd.Timestamp(ts)
+        if ct_ts.tzinfo is None:
+            ct_ts = ct_ts.tz_localize(pc.get_central_tz())
+        else:
+            ct_ts = ct_ts.tz_convert(pc.get_central_tz())
+        if not (ENTRY_SETUP_HOUR_CT <= ct_ts.hour <= ENTRY_WINDOW_END_HOUR_CT):
+            continue
+        high = float(bar["High"])
+        low = float(bar["Low"])
+        close = float(bar["Close"])
+        candidates = sorted(refs, key=lambda ref: abs(close - ref["level"]))
+        for ref in candidates:
+            level = ref["level"]
+            if low <= level <= high:
+                if close > level:
+                    signal_type = "CALL"
+                    side = "LONG"
+                elif close < level:
+                    signal_type = "PUT"
+                    side = "SHORT"
+                else:
+                    continue
+                if ct_ts.hour == ENTRY_SETUP_HOUR_CT:
+                    entry_time = ct_ts + pd.Timedelta(hours=1)
+                    exit_time = entry_time + pd.Timedelta(hours=1)
+                    exit_bar = hourly[hourly.index == entry_time]
+                    exit_price = float(exit_bar.iloc[0]["Close"]) if not exit_bar.empty else close
+                    rule = "EIGHT_AM_SETUP_TOUCH"
+                else:
+                    entry_time = ct_ts
+                    exit_time = ct_ts + pd.Timedelta(hours=1)
+                    exit_price = close
+                    rule = "ENTRY_WINDOW_TOUCH"
+                return {
+                    "setup_time": ct_ts,
+                    "entry_time": entry_time,
+                    "exit_time": exit_time,
+                    "entry_price": level,
+                    "exit_price": exit_price,
+                    "signal_type": signal_type,
+                    "side": side,
+                    "line": ref["line"],
+                    "rule": rule,
+                }
+    return None
+
+
+def _entry_window_hourly_bars(
+    frame: pd.DataFrame,
+    *,
+    completed_at: pd.Timestamp | None = None,
+) -> pd.DataFrame:
+    """Aggregate 5m/hourly bars into the 08/09/10/11 CT decision candles.
+
+    The strategy uses the 08:00 CT candle as a setup check, then evaluates
+    the 09:00, 10:00, and 11:00 CT candles against the fixed 08:00 reference
+    values. Live mode only
+    uses an hour once that hour has closed, so a partial 10:00 candle cannot
+    fabricate a confirmation at 10:12.
+    """
+    if frame is None or frame.empty:
+        return pd.DataFrame()
+    ct = pc.get_central_tz()
+    completed_ts = None
+    if completed_at is not None:
+        completed_ts = pd.Timestamp(completed_at)
+        completed_ts = (
+            completed_ts.tz_localize(ct)
+            if completed_ts.tzinfo is None
+            else completed_ts.tz_convert(ct)
+        )
+
+    buckets: dict[pd.Timestamp, list[tuple[pd.Timestamp, pd.Series]]] = {}
+    for ts, row in frame.sort_index().iterrows():
+        ct_ts = pd.Timestamp(ts)
+        ct_ts = ct_ts.tz_localize(ct) if ct_ts.tzinfo is None else ct_ts.tz_convert(ct)
+        hour = ct_ts.replace(minute=0, second=0, microsecond=0)
+        if not (ENTRY_SETUP_HOUR_CT <= hour.hour <= ENTRY_WINDOW_END_HOUR_CT):
+            continue
+        if completed_ts is not None and hour + pd.Timedelta(hours=1) > completed_ts:
+            continue
+        buckets.setdefault(hour, []).append((ct_ts, row))
+
+    if not buckets:
+        return pd.DataFrame()
+
+    rows = []
+    index = []
+    for hour in sorted(buckets):
+        group = [row for _, row in sorted(buckets[hour], key=lambda item: item[0])]
+        rows.append({
+            "Open": float(group[0]["Open"]),
+            "High": max(float(row["High"]) for row in group),
+            "Low": min(float(row["Low"]) for row in group),
+            "Close": float(group[-1]["Close"]),
+        })
+        index.append(hour)
+    return pd.DataFrame(rows, index=index)
+
+
 def _open_zone_replay_entry(
     *,
     primary_lines: list[pc.DynamicLine],
@@ -256,6 +402,8 @@ def _triggers_from_lines(
     current_price: float,
     rth_today: pd.DataFrame,
     rth_yesterday: pd.DataFrame,
+    entry_reference_dt: datetime,
+    slope: float,
 ) -> list[dict]:
     rows: list[dict] = []
     name_to_label = {
@@ -288,6 +436,14 @@ def _triggers_from_lines(
 
     armed_set = {l.name for l in pc.active_entry_lines(primary_lines, current_price, current_dt)}
 
+    def _touch_window(dt: datetime) -> tuple[str, str]:
+        ref = pd.Timestamp(dt)
+        start = ref.replace(hour=ENTRY_WINDOW_START_HOUR_CT, minute=0, second=0, microsecond=0)
+        end = ref.replace(hour=ENTRY_WINDOW_END_HOUR_CT, minute=0, second=0, microsecond=0)
+        return start.isoformat(), end.isoformat()
+
+    entry_window_start, entry_window_end = _touch_window(entry_reference_dt)
+
     def _bias_contribution(dist: float, price: float, decay_pct: float = 1.2) -> int:
         if not price:
             return 0
@@ -297,23 +453,29 @@ def _triggers_from_lines(
         return int(round(sign * mag))
 
     for line in primary_lines:
-        v = line.tradable_value_at(current_dt)
-        if pd.isna(v):
+        current_v = line.tradable_value_at(current_dt)
+        entry_v = line.tradable_value_at(entry_reference_dt)
+        if pd.isna(entry_v):
             continue
-        dist = current_price - v
+        dist = current_price - entry_v
         bps = round((dist / current_price) * 10000) if current_price else 0
         if line.name in armed_set:
             status = "ARMED"
         elif abs(dist) < 0.20:
             status = "WATCHING"
-        elif (line.direction == "descending" and current_price < v) or (line.direction == "ascending" and current_price > v):
+        elif (line.direction == "descending" and current_price < entry_v) or (line.direction == "ascending" and current_price > entry_v):
             status = "BREACHED"
         else:
             status = "WATCHING"
         rows.append({
             "line": _label_for(line.name),
             "kind": _kind_for(line),
-            "level": round(float(v), 2),
+            "level": round(float(entry_v), 2),
+            "entryLevel": round(float(entry_v), 2),
+            "entryReferenceTime": pd.Timestamp(entry_reference_dt).isoformat(),
+            "touchWindowStart": entry_window_start,
+            "touchWindowEnd": entry_window_end,
+            "currentLevel": round(float(current_v), 2) if current_v is not None and not pd.isna(current_v) else None,
             "dist": round(float(dist), 2),
             "bps": bps,
             "bias": _bias_contribution(dist, current_price),
@@ -321,15 +483,46 @@ def _triggers_from_lines(
         })
 
     if rth_yesterday is not None and not rth_yesterday.empty:
-        pdh = float(rth_yesterday["High"].max())
-        pdl = float(rth_yesterday["Low"].min())
-        for label, level in (("PDH", pdh), ("PDL", pdl)):
+        pdh_idx = rth_yesterday["High"].idxmax()
+        pdl_idx = rth_yesterday["Low"].idxmin()
+        pdh_line = pc.DynamicLine(
+            "PDH",
+            float(rth_yesterday.loc[pdh_idx]["High"]),
+            pd.Timestamp(pdh_idx),
+            slope,
+            "descending",
+            "CALL_ZONE",
+            "PREVIOUS_RTH",
+            True,
+            "Previous RTH high projected to the entry reference",
+        )
+        pdl_line = pc.DynamicLine(
+            "PDL",
+            float(rth_yesterday.loc[pdl_idx]["Low"]),
+            pd.Timestamp(pdl_idx),
+            slope,
+            "ascending",
+            "PUT_ZONE",
+            "PREVIOUS_RTH",
+            True,
+            "Previous RTH low projected to the entry reference",
+        )
+        for label, line in (("PDH", pdh_line), ("PDL", pdl_line)):
+            level = line.tradable_value_at(entry_reference_dt)
+            current_level = line.tradable_value_at(current_dt)
+            if pd.isna(level):
+                continue
             dist = current_price - level
             bps = round((dist / current_price) * 10000) if current_price else 0
             rows.append({
                 "line": label,
                 "kind": "PDH" if label == "PDH" else "PDL",
                 "level": round(level, 2),
+                "entryLevel": round(level, 2),
+                "entryReferenceTime": pd.Timestamp(entry_reference_dt).isoformat(),
+                "touchWindowStart": entry_window_start,
+                "touchWindowEnd": entry_window_end,
+                "currentLevel": round(float(current_level), 2) if current_level is not None and not pd.isna(current_level) else None,
                 "dist": round(dist, 2),
                 "bps": bps,
                 "bias": _bias_contribution(dist, current_price, decay_pct=1.6),
@@ -454,6 +647,7 @@ def _anchor_display_label(name: str) -> str:
 def _anchor_payload_for_ui(
     primary_lines: list[pc.DynamicLine],
     current_dt: datetime,
+    entry_reference_dt: datetime,
     slope: float,
 ) -> dict | None:
     """Structured payload for the SPY Channel hero diagram.
@@ -485,18 +679,25 @@ def _anchor_payload_for_ui(
             "role": main.name.split("_")[1] if main.name.startswith("ANC_") else "PRIMARY",
             "anchorTime": anchor_ts,
             "anchorLow": round(float(main.anchor_price), 2),
+            "entryReferenceTime": pd.Timestamp(entry_reference_dt).isoformat(),
+            "touchWindowEnd": pd.Timestamp(entry_reference_dt).replace(
+                hour=ENTRY_WINDOW_END_HOUR_CT, minute=0, second=0, microsecond=0
+            ).isoformat(),
             "bands": {
                 "upper": {
                     "anchorPrice": round(float(upper.anchor_price), 2) if upper else None,
                     "currentValue": _line_current_or_none(upper, current_dt),
+                    "entryValue": _line_current_or_none(upper, entry_reference_dt),
                 },
                 "main": {
                     "anchorPrice": round(float(main.anchor_price), 2),
                     "currentValue": _line_current_or_none(main, current_dt),
+                    "entryValue": _line_current_or_none(main, entry_reference_dt),
                 },
                 "lower": {
                     "anchorPrice": round(float(lower.anchor_price), 2) if lower else None,
                     "currentValue": _line_current_or_none(lower, current_dt),
+                    "entryValue": _line_current_or_none(lower, entry_reference_dt),
                 },
             },
         }
@@ -731,6 +932,52 @@ def _spy_engine_state(decision_verb: str, conviction: int) -> str:
         # ARMED (conviction near firing). Conviction is 1..5.
         return "ARMED" if conviction >= 3 else "WAIT"
     return "WATCH"
+
+
+def _spy_state_from_touch_window(now_ct: pd.Timestamp, touch_window: dict | None) -> str | None:
+    """Live-state override from the same 08:00 setup / 09-11 rule replay uses."""
+    if touch_window is None:
+        return None
+    entry_time = pd.Timestamp(touch_window["entry_time"])
+    exit_time = pd.Timestamp(touch_window["exit_time"])
+    ct = pc.get_central_tz()
+    now = pd.Timestamp(now_ct)
+    now = now.tz_localize(ct) if now.tzinfo is None else now.tz_convert(ct)
+    entry_time = entry_time.tz_localize(ct) if entry_time.tzinfo is None else entry_time.tz_convert(ct)
+    exit_time = exit_time.tz_localize(ct) if exit_time.tzinfo is None else exit_time.tz_convert(ct)
+    if now < entry_time:
+        return "ARMED"
+    if now < exit_time:
+        return "GO"
+    return "COOLDOWN"
+
+
+def _spy_touch_window_trace(touch_window: dict) -> str:
+    side = str(touch_window.get("side") or "trade").lower()
+    line = str(touch_window.get("line") or "structure line")
+    entry = float(touch_window.get("entry_price"))
+    exit_price = float(touch_window.get("exit_price"))
+    prefix = (
+        "8:00 setup"
+        if touch_window.get("rule") == "EIGHT_AM_SETUP_TOUCH"
+        else "Touch-window"
+    )
+    return (
+        f"{prefix} {side} triggered at {line} ({entry:.2f}); "
+        f"hourly exit marked at {exit_price:.2f}."
+    )
+
+
+def _spy_touch_window_flip_condition(touch_window: dict, state: str) -> str:
+    side = str(touch_window.get("side") or "trade").lower()
+    line = str(touch_window.get("line") or "structure line")
+    entry = float(touch_window.get("entry_price"))
+    exit_time = pd.Timestamp(touch_window["exit_time"]).strftime("%H:%M CT")
+    if state == "GO":
+        return f"Touch-window {side} is active from {line} ({entry:.2f}); manage until the {exit_time} hourly exit."
+    if state == "COOLDOWN":
+        return f"Touch-window {side} completed from {line} ({entry:.2f}); stand down until the next valid setup."
+    return f"Touch-window setup armed at {line} ({entry:.2f})."
 
 
 def _spy_flip_condition(
@@ -1043,12 +1290,14 @@ def _build_replay_block(
     primary_lines: list[pc.DynamicLine] | None = None,
     signals: list[pc.TradeSignal] | None = None,
     intraday_5m: pd.DataFrame | None = None,
+    triggers: list[dict] | None = None,
 ) -> dict:
     """OHLC + verdict-outcome card for backtest mode.
 
-    Scoring rule: first confirmed engine entry, force-close after one hour.
-    If no rejection entry confirmed, grade the replay-only RTH open-zone
-    continuation when the open is already outside the primary structure.
+    Scoring rule: 08:00 CT can confirm a 09:00 entry; otherwise the first
+    09:00/10:00/11:00 CT reference touch is entered at the line and exited
+    at that hour's close. Older confirmed-entry/open-zone fallbacks remain
+    for historical payloads that do not yet carry entry references.
     """
     block: dict = {
         "isReplay": is_replay,
@@ -1072,49 +1321,66 @@ def _build_replay_block(
         "netPts": round(c - o, 2),
         "netPct": round(((c - o) / o * 100) if o else 0.0, 3),
     }
-    confirmed = [
-        s for s in (signals or [])
-        if s.status == "CONFIRMED" and s.entry_time is not None and not pd.isna(s.entry_price)
-    ]
-    if not confirmed:
-        open_zone = _open_zone_replay_entry(
-            primary_lines=primary_lines or [],
+    touch_frame = intraday_5m if intraday_5m is not None and not intraday_5m.empty else rth_today
+    touch_window = _replay_touch_window_entry(triggers=triggers, rth_today=touch_frame)
+    if touch_window is not None:
+        entry_time = pd.Timestamp(touch_window["entry_time"])
+        exit_time = pd.Timestamp(touch_window["exit_time"])
+        entry_price = float(touch_window["entry_price"])
+        exit_price = float(touch_window["exit_price"])
+        signal_type = str(touch_window["signal_type"])
+        side = str(touch_window["side"])
+        entry_rule = str(touch_window["rule"])
+        entry_line = str(touch_window["line"])
+    else:
+        confirmed = [
+            s for s in (signals or [])
+            if s.status == "CONFIRMED" and s.entry_time is not None and not pd.isna(s.entry_price)
+        ]
+        if not confirmed:
+            open_zone = _open_zone_replay_entry(
+                primary_lines=primary_lines or [],
+                rth_today=rth_today,
+                intraday_5m=intraday_5m,
+            )
+            if open_zone is None:
+                block["verdictOutcome"] = "N_A"
+                block["verdictPnl"] = None
+                return block
+            entry_time = pd.Timestamp(open_zone["entry_time"])
+            entry_price = float(open_zone["entry_price"])
+            signal_type = str(open_zone["signal_type"])
+            side = str(open_zone["side"])
+            entry_rule = "OPEN_ZONE_CONTINUATION"
+            entry_line = "OPEN_ZONE"
+        else:
+            sig = min(confirmed, key=lambda s: pd.Timestamp(s.entry_time))
+            entry_time = pd.Timestamp(sig.entry_time)
+            entry_price = float(sig.entry_price)
+            signal_type = sig.signal_type
+            side = "LONG" if sig.signal_type == "CALL" else "SHORT"
+            entry_rule = "CONFIRMED_REJECTION"
+            entry_line = pc.compact_line_name(sig.line_name)
+
+        exit_time, exit_price = _forced_one_hour_exit(
+            entry_time=entry_time,
             rth_today=rth_today,
             intraday_5m=intraday_5m,
         )
-        if open_zone is None:
-            block["verdictOutcome"] = "N_A"
-            block["verdictPnl"] = None
-            return block
-        entry_time = pd.Timestamp(open_zone["entry_time"])
-        entry_price = float(open_zone["entry_price"])
-        signal_type = str(open_zone["signal_type"])
-        side = str(open_zone["side"])
-        entry_rule = "OPEN_ZONE_CONTINUATION"
-    else:
-        sig = min(confirmed, key=lambda s: pd.Timestamp(s.entry_time))
-        entry_time = pd.Timestamp(sig.entry_time)
-        entry_price = float(sig.entry_price)
-        signal_type = sig.signal_type
-        side = "LONG" if sig.signal_type == "CALL" else "SHORT"
-        entry_rule = "CONFIRMED_REJECTION"
-
-    exit_time, exit_price = _forced_one_hour_exit(
-        entry_time=entry_time,
-        rth_today=rth_today,
-        intraday_5m=intraday_5m,
-    )
     pnl = (exit_price - entry_price) if signal_type == "CALL" else (entry_price - exit_price)
     block["entry"] = {
         "time": entry_time.isoformat(),
         "price": round(entry_price, 2),
         "side": side,
         "rule": entry_rule,
+        "line": entry_line,
     }
     block["exit"] = {
         "time": exit_time.isoformat(),
         "price": round(exit_price, 2),
-        "rule": "FORCED_1H",
+        "rule": "HOURLY_CLOSE"
+        if entry_rule in {"ENTRY_WINDOW_TOUCH", "EIGHT_AM_SETUP_TOUCH"}
+        else "FORCED_1H",
     }
     block["verdictOutcome"] = "WIN" if pnl > 0 else ("LOSS" if pnl < 0 else "PUSH")
     block["verdictPnl"] = round(pnl, 2)
@@ -1197,10 +1463,19 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
         primary_source = "pivot_fallback"
 
     projection_time = _structure_projection_time(now_ct).to_pydatetime()
+    entry_reference_time = pd.Timestamp(signal_day, tz=ct).replace(
+        hour=ENTRY_REFERENCE_HOUR_CT, minute=0, second=0, microsecond=0
+    ).to_pydatetime()
 
     current_price = _latest_price_for_session(df, signal_day)
     if current_price is None:
         current_price = float(df["Close"].dropna().iloc[-1])
+    price_feed_source = "backup"
+    if not is_replay:
+        primary_quote = tastytrade.fetch_equity_quote("SPY")
+        if primary_quote is not None and primary_quote == primary_quote and primary_quote > 0:
+            current_price = float(primary_quote)
+            price_feed_source = "primary"
 
     bias_state = pc.determine_preopen_bias(primary_lines, current_price, now_ct.to_pydatetime())
 
@@ -1215,6 +1490,8 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
         day_open = float(latest_session.iloc[0]["Open"]) if not latest_session.empty else current_price
         day_high = float(latest_session["High"].max()) if not latest_session.empty else current_price
         day_low = float(latest_session["Low"].min()) if not latest_session.empty else current_price
+    day_high = max(day_high, current_price)
+    day_low = min(day_low, current_price)
     prev_close = float(rth_yesterday.iloc[-1]["Close"]) if not rth_yesterday.empty else float("nan")
     chg = current_price - prev_close if not pd.isna(prev_close) else 0.0
     chg_pct = (chg / prev_close * 100) if prev_close else 0.0
@@ -1239,7 +1516,15 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
     if not spark:
         spark = seed_snapshot.SPARK
 
-    triggers = _triggers_from_lines(primary_lines, projection_time, current_price, rth_today, rth_yesterday)
+    triggers = _triggers_from_lines(
+        primary_lines,
+        projection_time,
+        current_price,
+        rth_today,
+        rth_yesterday,
+        entry_reference_time,
+        slope,
+    )
 
     # Trigger detection considers the 8am CT bar plus all RTH bars (8:30-15:00)
     # so an 8am wick on the descending anchor line can fire the entry trigger.
@@ -1257,7 +1542,7 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
     # before the decision so flow + dealer gamma can append confluence
     # to the rationale when the lean is decisive.
     flow_summary = unusual_whales.fetch_flow_summary("SPY")
-    gex_summary = unusual_whales.fetch_gex_summary("SPY")
+    gex_summary = unusual_whales.fetch_gex_summary("SPY", center=current_price)
 
     decision = _build_decision(
         bias_state, bias_score, primary_lines, raw_signals,
@@ -1287,17 +1572,14 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
     # Anchor band values are projected to a "display reference" time.
     # On live, that's the engine's rolling projection (now floored to
     # the hour). On replay we lock it to 09:00 CT — the moment the
-    # first RTH hour closes and the framework becomes the trader's
-    # entry reference. Otherwise the replay shows lines after 9 hours
-    # of decay, which is correct math but useless for backtesting the
-    # entry decision.
-    if is_replay:
-        anchor_display_time = pd.Timestamp(signal_day, tz=ct).replace(
-            hour=9, minute=0
-        ).to_pydatetime()
-    else:
-        anchor_display_time = projection_time
-    anchor_payload_for_ui = _anchor_payload_for_ui(primary_lines, anchor_display_time, slope)
+    # first institutional reference is set. The 09:00/10:00/11:00 CT
+    # candles are evaluated against these fixed 08:00 values.
+    anchor_payload_for_ui = _anchor_payload_for_ui(
+        primary_lines,
+        projection_time,
+        entry_reference_time,
+        slope,
+    )
 
     options = tastytrade.fetch_options_snapshot(current_price)
 
@@ -1322,6 +1604,7 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
         primary_lines=primary_lines,
         signals=raw_signals,
         intraday_5m=intraday,
+        triggers=triggers,
     ) if is_replay else None
 
     # Premarket-bar diagnostic — only ship on replay so live payloads
@@ -1336,14 +1619,32 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
     as_of_iso = now_ct.isoformat()
     decision_verb = decision.get("verb", "WAIT")
     decision_conviction = int(decision.get("conviction", 0) or 0)
-    current_state = _spy_engine_state(decision_verb, decision_conviction)
+    live_touch_frame = intraday if intraday is not None and not intraday.empty else rth_today
+    touch_window_live = _replay_touch_window_entry(
+        triggers=triggers,
+        rth_today=live_touch_frame,
+        completed_at=now_ct,
+    )
+    current_state = (
+        _spy_state_from_touch_window(now_ct, touch_window_live)
+        or _spy_engine_state(decision_verb, decision_conviction)
+    )
     # Recompute closest line + active signal at this scope (the values
     # inside _build_decision aren't returned — recomputing keeps this
     # additive without refactoring the decision builder).
-    closest_for_flip = pc.get_closest_primary_line(primary_lines, projection_time, current_price)
+    closest_for_flip = None
+    closest_entry_distance = float("inf")
+    for line in primary_lines:
+        v = line.tradable_value_at(entry_reference_time)
+        if v is None or pd.isna(v):
+            continue
+        dist = abs(float(current_price) - float(v))
+        if dist < closest_entry_distance:
+            closest_entry_distance = dist
+            closest_for_flip = line
     if closest_for_flip is not None:
         closest_label_for_flip = pc.compact_line_name(closest_for_flip.name)
-        cv = closest_for_flip.tradable_value_at(projection_time)
+        cv = closest_for_flip.tradable_value_at(entry_reference_time)
         closest_value_for_flip = round(float(cv), 2) if cv is not None and not pd.isna(cv) else None
     else:
         closest_label_for_flip, closest_value_for_flip = None, None
@@ -1359,10 +1660,14 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
                 active_signal_for_trace = s
                 break
 
-    flip_condition = _spy_flip_condition(
-        decision_verb=decision_verb,
-        closest_line_label=closest_label_for_flip,
-        closest_line_value=closest_value_for_flip,
+    flip_condition = (
+        _spy_touch_window_flip_condition(touch_window_live, current_state)
+        if touch_window_live is not None
+        else _spy_flip_condition(
+            decision_verb=decision_verb,
+            closest_line_label=closest_label_for_flip,
+            closest_line_value=closest_value_for_flip,
+        )
     )
     state_history_payload = [{"ts": as_of_iso, "state": current_state}]
     decision_trace_payload = _spy_decision_trace(
@@ -1372,10 +1677,16 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
         rationale=decision.get("rationale", "") or "",
         active_signal=active_signal_for_trace,
     )
+    if touch_window_live is not None:
+        decision_trace_payload.append({
+            "ts": pd.Timestamp(touch_window_live["entry_time"]).isoformat(),
+            "event": _spy_touch_window_trace(touch_window_live),
+            "weight": "key",
+        })
     invalidation_payload = _spy_invalidation(active_signal_for_trace)
     feed_health_payload = {
         "lastTickTs": as_of_iso,
-        "source": "yfinance",
+        "source": price_feed_source,
     }
 
     return {

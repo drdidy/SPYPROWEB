@@ -1,8 +1,8 @@
-"""Five-factor confluence: factor stubs + weighted sum + action gate.
+"""ES confluence: implemented factors + weighted sum + action gate.
 
 Three factors are implemented as reasonable proxies (asian, london,
-reaction). Two slots remain for the user to specify (factor4_tbd,
-factor5_tbd). Until specified they carry weight 0 and contribute
+reaction). Unimplemented factor ideas are intentionally not emitted.
+Production surfaces should show only actionable, real inputs.
 nothing — the score is honest about its provisional state.
 
 Contract:
@@ -36,7 +36,7 @@ from .time_utils import at_ct, rth_window
 from datetime import time
 
 Action = Literal["TAKE", "SELECTIVE", "STAND_DOWN"]
-FactorKey = Literal["asian", "london", "reaction", "factor4_tbd", "factor5_tbd"]
+FactorKey = Literal["asian", "london", "reaction"]
 
 
 @dataclass(frozen=True)
@@ -62,40 +62,31 @@ class Confluence:
 
 
 def _factor_asian(channel: Channel, sydney: Optional[SessionRange], tokyo: Optional[SessionRange]) -> FactorResult:
-    """How decisively Tokyo dominates / fails to dominate Sydney.
+    """Whether the overnight swing framework has usable range data.
 
-    For a clean ASCENDING or DESCENDING read the factor leans high; for
-    NONE (expansion/contraction) it leans low.
+    This no longer determines direction. Direction comes from the previous-RTH pivot
+    framework; the Asian factor only answers whether the overnight build has
+    enough measured range to be useful.
     """
-    if sydney is None or tokyo is None:
+    ranges = [r for r in (sydney, tokyo) if r is not None]
+    if not ranges:
         return FactorResult(
             key="asian",
             label="Asian session",
             value=0.0,
             weight=FACTOR_WEIGHTS["asian"],
             contribution=0.0,
-            note="Sydney / Tokyo data missing.",
+            note="Overnight session data missing.",
         )
 
-    if channel.direction == "NONE":
-        value = 0.20
-        note = "Tokyo did not decisively dominate Sydney."
-    else:
-        # Margin = how far Tokyo's high/low extended past Sydney's, normalized
-        # by Sydney's range. Bigger margin -> cleaner Asian read.
-        if channel.direction == "ASCENDING":
-            margin_h = max(0.0, tokyo.high - sydney.high)
-            margin_l = max(0.0, tokyo.low - sydney.low)
-        else:
-            margin_h = max(0.0, sydney.high - tokyo.high)
-            margin_l = max(0.0, sydney.low - tokyo.low)
-        sydney_range = max(sydney.high - sydney.low, 1e-6)
-        normalized = min(1.0, (margin_h + margin_l) / sydney_range)
-        value = 0.60 + 0.35 * normalized  # clean reads land in [0.60, 0.95]
-        note = (
-            f"Tokyo extended {margin_h + margin_l:.2f} pts beyond Sydney "
-            f"({normalized * 100:.0f}% of Sydney's range)."
-        )
+    high = max(r.high for r in ranges)
+    low = min(r.low for r in ranges)
+    span = max(0.0, high - low)
+    value = 0.65 if len(ranges) == 2 else 0.35
+    note = (
+        f"Overnight swing framework resolved with {span:.2f} pts of measured "
+        f"range across {len(ranges)} session block{'s' if len(ranges) != 1 else ''}."
+    )
     weight = FACTOR_WEIGHTS["asian"]
     return FactorResult(
         key="asian", label="Asian session", value=value,
@@ -104,19 +95,19 @@ def _factor_asian(channel: Channel, sydney: Optional[SessionRange], tokyo: Optio
 
 
 def _factor_london(
-    candles: list[Candle], session_date: date, ceiling: Optional[Line], floor: Optional[Line]
+    candles: list[Candle], session_date: date, upper: Optional[Line], lower: Optional[Line]
 ) -> FactorResult:
-    """Did London (02:00-08:00 CT) hold the channel?
+    """Did London (02:00-08:00 CT) hold the active swing pair?
 
-    'Hold' = London bars stayed inside the channel projection. Each bar
+    'Hold' = London bars stayed inside the active line pair. Each bar
     counts; clean holds score high, frequent breaches score low.
     """
     weight = FACTOR_WEIGHTS["london"]
-    if ceiling is None or floor is None:
+    if upper is None or lower is None:
         return FactorResult(
             key="london", label="London session", value=0.0,
             weight=weight, contribution=0.0,
-            note="No active channel; London check skipped.",
+            note="No active swing pair; London check skipped.",
         )
 
     # London window: 02:00 -> 08:00 CT on session_date.
@@ -132,9 +123,9 @@ def _factor_london(
 
     held = 0
     for bar in bars:
-        c_val = project_line(ceiling, bar.t)
-        f_val = project_line(floor, bar.t)
-        # Bar held the channel if both wicks stay within rails.
+        c_val = project_line(upper, bar.t)
+        f_val = project_line(lower, bar.t)
+        # Bar held the framework if both wicks stay within the active pair.
         if bar.l >= f_val and bar.h <= c_val:
             held += 1
     fraction = held / len(bars)
@@ -142,14 +133,14 @@ def _factor_london(
     return FactorResult(
         key="london", label="London session", value=value,
         weight=weight, contribution=value * weight,
-        note=f"{held}/{len(bars)} London bars held the channel.",
+        note=f"{held}/{len(bars)} London bars held the active swing pair.",
     )
 
 
 def _factor_reaction(
-    candles: list[Candle], session_date: date, scenario: Scenario, ceiling: Optional[Line], floor: Optional[Line]
+    candles: list[Candle], session_date: date, scenario: Scenario, upper: Optional[Line], lower: Optional[Line]
 ) -> FactorResult:
-    """First RTH bar's reaction to the active rails.
+    """First RTH bar's reaction to the active swing pair.
 
     Looks at the 08:30 bar (first RTH hour). If it touched a rail and
     rejected (wicked back), that's a confirming reaction. If it sliced
@@ -165,15 +156,15 @@ def _factor_reaction(
         )
 
     first = bars[0]
-    if scenario == "OUTSIDE_PLAY" or ceiling is None or floor is None:
+    if scenario == "OUTSIDE_PLAY" or upper is None or lower is None:
         return FactorResult(
             key="reaction", label="RTH reaction", value=0.0,
             weight=weight, contribution=0.0,
             note="No play in scope; reaction not graded.",
         )
 
-    c_val = project_line(ceiling, first.t)
-    f_val = project_line(floor, first.t)
+    c_val = project_line(upper, first.t)
+    f_val = project_line(lower, first.t)
 
     # Did the first bar interact cleanly with one of the rails?
     touched_ceiling = first.l <= c_val <= first.h
@@ -186,27 +177,19 @@ def _factor_reaction(
         rejection = first.h - body_top
         wick_fraction = min(1.0, rejection / max(first.h - first.l, 1e-6))
         value = 0.40 + 0.55 * wick_fraction
-        note = f"First RTH bar tested ceiling; rejection wick {wick_fraction * 100:.0f}% of bar range."
+        note = f"First RTH bar tested the upper swing line; rejection wick {wick_fraction * 100:.0f}% of bar range."
     elif touched_floor:
         rejection = body_bottom - first.l
         wick_fraction = min(1.0, rejection / max(first.h - first.l, 1e-6))
         value = 0.40 + 0.55 * wick_fraction
-        note = f"First RTH bar tested floor; rejection wick {wick_fraction * 100:.0f}% of bar range."
+        note = f"First RTH bar tested the lower swing line; rejection wick {wick_fraction * 100:.0f}% of bar range."
     else:
-        # Bar built inside the channel without touching a rail — neutral.
+        # Bar built inside the framework without touching either active line.
         value = 0.55
-        note = "First RTH bar built inside the channel without testing a rail."
+        note = "First RTH bar built inside the previous-RTH pivot framework without testing an active line."
     return FactorResult(
         key="reaction", label="RTH reaction", value=value,
         weight=weight, contribution=value * weight, note=note,
-    )
-
-
-def _factor_placeholder(key: FactorKey, label: str) -> FactorResult:
-    """TBD factor stub — weight 0 so it does not contribute to the score."""
-    return FactorResult(
-        key=key, label=label, value=0.0, weight=FACTOR_WEIGHTS[key],
-        contribution=0.0, note="Placeholder — factor specification pending.",
     )
 
 
@@ -230,8 +213,6 @@ def evaluate(
         _factor_asian(channel, sydney, tokyo),
         _factor_london(candles, session_date, ceiling, floor),
         _factor_reaction(candles, session_date, scenario, ceiling, floor),
-        _factor_placeholder("factor4_tbd", "Factor 4 (TBD)"),
-        _factor_placeholder("factor5_tbd", "Factor 5 (TBD)"),
     ]
     raw_score = sum(f.contribution for f in factors)  # 0..1
     score = round(raw_score * 100, 1)

@@ -1,31 +1,81 @@
 "use client";
+import { PanelHeartbeat } from "@/components/channel/ChannelLiveBadge";
 import { Card } from "@/components/ui/Card";
 import { StatusPill } from "@/components/ui/StatusPill";
-import type { AdaptedSnapshot, AnchorGroup } from "@/lib/snapshot-adapter";
+import { WhyThisStateLink } from "@/components/slate/WhyThisStateLink";
+import {
+  StructurePathChart,
+  type StructureChartData,
+  type StructureChartLine,
+} from "@/components/decision-slate/StructurePathChart";
+import { PHASE_DEFINITIONS } from "@/content/phase-definitions";
+import type { AdaptedSnapshot, AnchorBand, AnchorGroup } from "@/lib/snapshot-adapter";
+import type { EngineState } from "@/lib/states";
+import type { DynamicLine } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowDownRight } from "lucide-react";
 
-const verdictTone: Record<string, "confirmed" | "watching" | "breached" | "stale"> = {
-  LONG: "confirmed",
-  SHORT: "breached",
+const stateTone: Record<EngineState, "armed" | "confirmed" | "watching" | "stale"> = {
+  PRE_CONFIG: "stale",
+  STAND_DOWN: "stale",
+  WATCH: "watching",
   WAIT: "watching",
-  "STAND DOWN": "stale",
+  ARMED: "armed",
+  GO: "confirmed",
+  COOLDOWN: "stale",
 };
 
-const headlineByVerdict: Record<string, string> = {
-  LONG: "Lean long",
-  SHORT: "Lean short",
-  HOLD: "Holding",
+const headlineByState: Record<EngineState, string> = {
+  PRE_CONFIG: "Awaiting setup window",
+  STAND_DOWN: "Standing down today",
+  WATCH: "Watching structure",
   WAIT: "Waiting on confirmation",
-  "STAND DOWN": "Standing down today",
+  ARMED: "Setup armed",
+  GO: "Trade active",
+  COOLDOWN: "Touch-window complete",
 };
 
-const SLOPE_PER_HOUR = 0.2;        // engine constant (descending only)
-const BAND_OFFSET = 3.4;           // SPY pts above/below the anchor low
+const SLOPE_PER_HOUR = 0.2;        // display fallback only; engine projects live values upstream
+
+function entryBandValue(band: AnchorBand): number | null {
+  return band.entryValue ?? band.currentValue ?? null;
+}
+
+function entryLineValue(line: DynamicLine): number {
+  return line.entryValue ?? line.currentValue;
+}
+
+function buildSpyEntryFramework(
+  snap: AdaptedSnapshot,
+  primary: AnchorGroup | null,
+  includePriorRange: boolean,
+): Array<{ label: string; value: number | null; emphasized?: boolean }> {
+  const findLine = (kind: string) =>
+    snap.lines.find((line) => line.kind === kind || line.name.toUpperCase() === kind);
+  const pdh = findLine("PDH");
+  const pdl = findLine("PDL");
+  const rows: Array<{ label: string; value: number | null; emphasized?: boolean }> = [];
+  if (includePriorRange) {
+    rows.push(
+      { label: "PDH ref", value: pdh ? entryLineValue(pdh) : null },
+      { label: "PDL ref", value: pdl ? entryLineValue(pdl) : null },
+    );
+  }
+  if (primary) {
+    rows.push(
+      { label: "Main +", value: entryBandValue(primary.bands.upper) },
+      { label: "Main", value: entryBandValue(primary.bands.main), emphasized: true },
+      { label: "Main -", value: entryBandValue(primary.bands.lower) },
+    );
+  }
+  return rows;
+}
 
 export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
-  const verdict = snap.decision.verdict;
   const bias = snap.bias.bias;
+  const displayedState = snap.currentState;
+  const displayedStateLabel =
+    PHASE_DEFINITIONS[displayedState]?.label ?? displayedState.replace(/_/g, " ");
 
   const directionTone =
     bias === "BULLISH"
@@ -34,19 +84,24 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
         ? "text-bear-ink"
         : "text-ink-3";
 
-  const heroBg = verdict === "WAIT" ? "bg-gold-tint/40" : "bg-paper";
+  const heroBg =
+    displayedState === "WAIT" || displayedState === "ARMED"
+      ? "bg-gold-tint/40"
+      : "bg-paper";
 
   const anchor = snap.anchor;
   const primary = anchor?.primary ?? null;
+  const priorRangeValid = isPriorRangeValid(snap.lines);
+  const entryFramework = buildSpyEntryFramework(snap, primary, priorRangeValid);
 
   // Distance to nearest line (the "first read" the trader looks for).
   // Uses live currentValue per band — already projected to "now" by the
   // engine — and picks the closest of upper / main / lower.
   const distances = primary
     ? [
-        { label: "Upper", value: primary.bands.upper.currentValue },
-        { label: "Main", value: primary.bands.main.currentValue },
-        { label: "Lower", value: primary.bands.lower.currentValue },
+        { label: "Upper ref", value: entryBandValue(primary.bands.upper) },
+        { label: "Main ref", value: entryBandValue(primary.bands.main) },
+        { label: "Lower ref", value: entryBandValue(primary.bands.lower) },
       ].filter((b) => b.value !== null)
     : [];
   const nearest = distances.reduce<{ label: string; dist: number; value: number } | null>(
@@ -59,6 +114,18 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
     },
     null,
   );
+  const nearestStructural = snap.lines
+    .slice()
+    .filter((line) => isActionableSpyReference(line, priorRangeValid))
+    .sort((a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice))[0];
+  const nearestRead = nearestStructural
+    ? {
+        label: nearestStructural.name,
+        value: entryLineValue(nearestStructural),
+        dist: entryLineValue(nearestStructural) - snap.currentPrice,
+      }
+    : nearest;
+  const executionRead = buildExecutionRead(snap, nearestRead, displayedState, displayedStateLabel);
 
   const todayLabel = new Date().toISOString().slice(0, 10);
 
@@ -69,7 +136,7 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
 
       <div className="grid grid-cols-12 gap-0">
         {/* LEFT — verdict + read */}
-        <div className="col-span-12 lg:col-span-7 p-7 pr-6 pl-8 relative">
+        <div className="col-span-12 lg:col-span-5 p-5 sm:p-7 lg:pr-6 lg:pl-8 relative">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <span className="eyebrow text-ink-3">SPY · Anchor Slate</span>
@@ -81,26 +148,44 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
                 Session {todayLabel}
               </span>
             </div>
-            <StatusPill variant={verdictTone[verdict] ?? "stale"} pulse>
-              {verdict}
-            </StatusPill>
+            <div className="flex items-center gap-2">
+              <PanelHeartbeat feedId="anchor-levels" />
+              <StatusPill variant={stateTone[displayedState] ?? "stale"} pulse>
+                {displayedStateLabel}
+              </StatusPill>
+              <WhyThisStateLink
+                engine="SPY"
+                trace={snap.decisionTrace.map((event) => ({
+                  ts: event.ts,
+                  event: event.event,
+                  weight: event.weight,
+                }))}
+                flipCondition={snap.flipCondition}
+                currentStateLabel={displayedStateLabel}
+                className="hidden h-7 items-center gap-1.5 whitespace-nowrap rounded-pill border border-rule bg-paper px-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-2 transition-colors hover:border-rule-strong hover:bg-paper-2 sm:inline-flex"
+              />
+            </div>
           </div>
 
           <div className="mt-6 flex items-end gap-4">
             <ArrowDownRight className={`${directionTone} -mb-2`} size={36} strokeWidth={1.25} />
             <AnimatePresence mode="wait">
               <motion.h1
-                key={verdict}
+                key={displayedState}
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -12 }}
                 transition={{ duration: 0.32, ease: [0.2, 0.8, 0.2, 1] }}
                 className={`text-display font-serif tracking-tight ${directionTone} leading-[1.02]`}
               >
-                {headlineByVerdict[verdict] ?? verdict}
+                {headlineByState[displayedState] ?? displayedStateLabel}
               </motion.h1>
             </AnimatePresence>
           </div>
+
+          <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-ink-2">
+            {synthesisLine(snap, nearestRead, displayedState)}
+          </p>
 
           <div className="mt-3 inline-flex items-center gap-2 px-2 py-0.5 rounded-pill bg-paper-2 shadow-rule">
             <span className="font-mono text-[10px] tracking-[0.14em] text-ink-2 font-semibold">
@@ -111,59 +196,67 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
           {/* First read: distance to nearest line */}
           <div className="mt-7 max-w-md">
             <div className="flex items-baseline justify-between mb-1.5">
-              <span className="eyebrow text-ink-3">Nearest line</span>
-              {nearest ? (
+              <span className="eyebrow text-ink-3">Nearest 08:00 reference</span>
+              {nearestRead ? (
                 <span className="font-mono text-sm text-ink tabular-nums">
-                  <span className="font-semibold">{nearest.label}</span>
-                  <span className="text-ink-4 ml-1.5">{nearest.value.toFixed(2)}</span>
+                  <span className="font-semibold">{nearestRead.label}</span>
+                  <span className="text-ink-4 ml-1.5">{nearestRead.value.toFixed(2)}</span>
                   <span
-                    className={`ml-1.5 ${nearest.dist >= 0 ? "text-bear-ink" : "text-bull-ink"}`}
+                    className={`ml-1.5 ${nearestRead.dist >= 0 ? "text-bear-ink" : "text-bull-ink"}`}
                   >
-                    ({nearest.dist >= 0 ? "+" : ""}
-                    {nearest.dist.toFixed(2)} pts)
+                    ({nearestRead.dist >= 0 ? "+" : ""}
+                    {nearestRead.dist.toFixed(2)} pts)
                   </span>
                 </span>
               ) : (
                 <span className="font-mono text-sm text-ink-3 italic">
-                  no anchor today
+                  awaiting structure
                 </span>
               )}
             </div>
-            {nearest && (
+            {nearestRead ? (
               <div className="relative h-1 bg-paper-2 rounded-full overflow-hidden">
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{
-                    width: `${Math.max(2, Math.min(100, 100 - Math.abs(nearest.dist) * 20))}%`,
+                    width: `${Math.max(2, Math.min(100, 100 - Math.abs(nearestRead.dist) * 20))}%`,
                   }}
                   transition={{ duration: 0.8, ease: [0.2, 0.8, 0.2, 1] }}
                   className="absolute inset-y-0 left-0 bg-ink rounded-full"
                 />
               </div>
+            ) : (
+              <span className="block mt-2 text-ink-3 text-[13.5px]">
+                No qualifying anchor is active. The channel is using the
+                closest 08:00 structural reference until a qualified line arms.
+              </span>
             )}
           </div>
 
           <p className="mt-7 text-[15px] text-ink-2 leading-relaxed max-w-xl">
-            {snap.decision.finalExplanation || snap.bias.explanation || "Engine is initializing today's read."}
-            {primary && (
-              <span className="block mt-2 text-ink-3 text-[13.5px]">
-                {primary.role === "ANCHOR_2" ? "Anchor 2" : "Primary anchor"} ·
-                low <span className="font-mono">{primary.anchorLow.toFixed(2)}</span> ·
-                set <span className="font-mono">{anchorTimeLabel(primary)}</span> CT.
+            {primary ? (
+              <span className="block text-ink-3 text-[13.5px]">
+                Source candle <span className="font-mono">{anchorTimeLabel(primary)}</span> CT.{" "}
                 {/* v9: slope value hidden — proprietary engine
                     parameter. The bands themselves still render
                     using the const above. */}
-                Bands offset above and below the anchor; both decay
-                through the session.
+                The operating bands are projected into the active window; values
+                stay visible without exposing the proprietary construction.
+              </span>
+            ) : (
+              <span className="block mt-2 text-ink-3 text-[13.5px]">
+                A qualified structural confirmation will update this read.
               </span>
             )}
           </p>
+
+          <ExecutionRead items={executionRead} className="hidden lg:block" />
         </div>
 
-        <div className="hidden lg:block absolute left-[58.333%] top-7 bottom-7 w-px bg-rule" />
+        <div className="hidden lg:block absolute left-[41.666%] top-7 bottom-7 w-px bg-rule" />
 
         {/* RIGHT — diagram + stat strip */}
-        <div className="col-span-12 lg:col-span-5 p-7 pl-7 bg-paper-2/40 relative">
+        <div className="col-span-12 lg:col-span-7 p-5 sm:p-7 lg:pl-7 bg-paper-2/40 relative">
           <div className="flex items-start justify-between mb-4">
             <div>
               <span className="eyebrow text-ink-3">Anchor</span>
@@ -179,41 +272,256 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            <BandStat
-              label="Upper"
-              value={primary?.bands.upper.currentValue ?? null}
-              price={snap.currentPrice}
-            />
-            <BandStat
-              label="Main"
-              value={primary?.bands.main.currentValue ?? null}
-              price={snap.currentPrice}
-              emphasized
-            />
-            <BandStat
-              label="Lower"
-              value={primary?.bands.lower.currentValue ?? null}
-              price={snap.currentPrice}
-            />
-          </div>
+          <StructurePathChart
+            data={buildSpyChannelChart(snap)}
+            variant="paper"
+            accent={bias === "BULLISH" ? "bull" : bias === "BEARISH" ? "bear" : "gold"}
+            height={460}
+            title="SPY price vs 08:00 references"
+            className="mb-4"
+          />
 
-          <AnchorDiagram snap={snap} />
+          {primary ? (
+            <>
+              <div className="grid grid-cols-2 gap-2 mb-4 sm:grid-cols-3 xl:grid-cols-5">
+                {entryFramework.map((item) => (
+                  <BandStat
+                    key={item.label}
+                    label={item.label}
+                    value={item.value}
+                    price={snap.currentPrice}
+                    emphasized={item.emphasized}
+                  />
+                ))}
+              </div>
+              {!priorRangeValid && (
+                <div className="mb-4 rounded-soft border border-gold/30 bg-gold-tint px-3 py-2 font-mono text-[10px] uppercase tracking-[0.10em] text-gold-ink">
+                  Prior-day range failed validation; PDH/PDL are hidden until the feed resolves.
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="mb-4 rounded-soft bg-paper px-3 py-3 shadow-rule">
+              <div className="eyebrow text-ink-3 mb-1">Anchor lines today</div>
+              <p className="text-[12px] leading-snug text-ink-3">
+                No anchor today. Nearest structural line is{" "}
+                {nearestStructural
+                  ? `${nearestStructural.name} ${entryLineValue(nearestStructural).toFixed(2)} (${nearestStructural.distanceFromPrice >= 0 ? "+" : ""}${nearestStructural.distanceFromPrice.toFixed(2)} pts from LAST).`
+                  : "not available yet."}
+              </p>
+            </div>
+          )}
 
-          <div className="mt-3 grid grid-cols-2 gap-3 text-[11px]">
-            <AnchorCell
-              label="Primary"
-              group={primary}
-            />
-            <AnchorCell
-              label="Anchor 2"
-              group={anchor?.anchor2 ?? null}
-            />
-          </div>
+          {primary && (
+            <div className="mt-3 grid grid-cols-2 gap-3 text-[11px]">
+              <AnchorCell
+                label="Primary"
+                group={primary}
+              />
+              <AnchorCell
+                label="Anchor 2"
+                group={anchor?.anchor2 ?? null}
+              />
+            </div>
+          )}
+          <ExecutionRead items={executionRead} className="lg:hidden" />
         </div>
       </div>
     </Card>
   );
+}
+
+function synthesisLine(
+  snap: AdaptedSnapshot,
+  nearestRead: { label: string; dist: number; value: number } | null,
+  displayedState: string,
+): string {
+  const bias = snap.bias.bias.toLowerCase();
+  const state = displayedState.replace(/_/g, " ").toLowerCase();
+  const engineCondition = cleanSpyExplanation(snap.flipCondition, snap.currentPrice);
+  if (
+    engineCondition &&
+    (displayedState === "ARMED" || displayedState === "GO" || displayedState === "COOLDOWN")
+  ) {
+    return `${capitalize(bias)} lean, engine ${state}. ${engineCondition}`;
+  }
+  if (nearestRead) {
+    const relation = nearestRead.dist >= 0 ? "above LAST" : "below LAST";
+    const action =
+      displayedState === "WAIT" || displayedState === "WATCH"
+        ? "waiting for qualified confirmation"
+        : displayedState === "STAND_DOWN"
+          ? "standing down until structure reactivates"
+          : displayedState === "PRE_CONFIG"
+            ? "awaiting the setup window"
+            : "tracking the active state";
+    return `${capitalize(bias)} lean, engine ${state}; ${nearestRead.label} (${nearestRead.value.toFixed(2)}) sits ${Math.abs(nearestRead.dist).toFixed(2)} pts ${relation}, ${action}.`;
+  }
+  return `${capitalize(bias)} lean, engine ${state} until SPY structure becomes actionable.`;
+}
+
+type ExecutionReadItem = {
+  label: string;
+  value: string;
+  detail: string;
+  tone?: "neutral" | "watch" | "go" | "blocked";
+};
+
+function buildExecutionRead(
+  snap: AdaptedSnapshot,
+  nearestRead: { label: string; dist: number; value: number } | null,
+  state: EngineState,
+  stateLabel: string,
+): ExecutionReadItem[] {
+  const condition = cleanSpyExplanation(snap.flipCondition, snap.currentPrice);
+  const keyTrace =
+    snap.decisionTrace.find((event) => event.weight === "key") ??
+    snap.decisionTrace[0] ??
+    null;
+  const riskDetail = snap.invalidation
+    ? `Invalidation ${snap.invalidation.level.toFixed(2)}; stop offset ${snap.invalidation.stopOffset.toFixed(2)}.`
+    : snap.guardrails.chase.detail || "No active invalidation returned by the engine.";
+
+  return [
+    {
+      label: "Posture",
+      value: stateLabel,
+      detail: executionPostureCopy(state, condition),
+      tone: state === "GO" ? "go" : state === "ARMED" || state === "WAIT" ? "watch" : "neutral",
+    },
+    {
+      label: "Active reference",
+      value: nearestRead ? `${nearestRead.label} ${nearestRead.value.toFixed(2)}` : "Awaiting line",
+      detail: nearestRead
+        ? `${formatSigned(nearestRead.dist)} pts from LAST ${snap.currentPrice.toFixed(2)}.`
+        : "The engine has not returned a qualified 08:00 reference yet.",
+      tone: nearestRead && Math.abs(nearestRead.dist) <= 0.5 ? "watch" : "neutral",
+    },
+    {
+      label: "Risk check",
+      value: snap.guardrails.chase.status.replace(/_/g, " "),
+      detail: riskDetail,
+      tone:
+        snap.guardrails.chase.status === "BROKEN" ||
+        snap.guardrails.chase.status === "MISSED_ENTRY"
+          ? "blocked"
+          : "neutral",
+    },
+    {
+      label: "Engine evidence",
+      value: keyTrace ? shortClock(keyTrace.ts) : "No trace",
+      detail: keyTrace?.event ?? "No decision-trace event has been published yet.",
+      tone: "neutral",
+    },
+  ];
+}
+
+function executionPostureCopy(state: EngineState, condition: string): string {
+  if (condition && (state === "ARMED" || state === "GO" || state === "COOLDOWN")) {
+    return condition;
+  }
+  if (state === "PRE_CONFIG") return "Setup window has not produced actionable lines yet.";
+  if (state === "STAND_DOWN") return condition || "The engine is standing down until structure reactivates.";
+  if (state === "WATCH") return condition || "Price is near structure, but confirmation is not qualified.";
+  if (state === "WAIT") return condition || "Confirmation is pending before the engine can advance.";
+  if (state === "ARMED") return condition || "Setup is armed; wait for the next engine transition.";
+  if (state === "GO") return condition || "Trade is live; manage from the engine state.";
+  return condition || "Trade has resolved; stand down until the next valid setup.";
+}
+
+function ExecutionRead({
+  items,
+  className = "",
+}: {
+  items: ExecutionReadItem[];
+  className?: string;
+}) {
+  return (
+    <div className={`mt-6 rounded-[14px] border border-rule bg-paper/80 p-4 shadow-rule ${className}`}>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <div className="eyebrow text-ink-3">Execution read</div>
+          <div className="mt-1 font-serif text-[22px] leading-none text-ink">
+            What matters now
+          </div>
+        </div>
+        <span className="rounded-pill border border-rule bg-paper-2 px-2 py-1 font-mono text-[9px] uppercase tracking-[0.12em] text-ink-3">
+          Engine trace
+        </span>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {items.map((item) => (
+          <div
+            key={item.label}
+            className={`rounded-soft border px-3 py-2.5 ${executionToneClass(item.tone)}`}
+          >
+            <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-3">
+              {item.label}
+            </div>
+            <div className="mt-1 font-mono text-[13px] font-semibold tabular-nums text-ink" data-num>
+              {item.value}
+            </div>
+            <p className="mt-1 text-[12px] leading-snug text-ink-3">
+              {item.detail}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function executionToneClass(tone: ExecutionReadItem["tone"]): string {
+  if (tone === "go") return "border-bull/25 bg-bull-tint/50";
+  if (tone === "watch") return "border-gold/30 bg-gold-tint/45";
+  if (tone === "blocked") return "border-bear/25 bg-bear-tint/45";
+  return "border-rule bg-paper";
+}
+
+function formatSigned(value: number): string {
+  if (!Number.isFinite(value)) return "--";
+  return `${value >= 0 ? "+" : ""}${value.toFixed(2)}`;
+}
+
+function shortClock(iso: string): string {
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return "--:--";
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(ms));
+}
+
+function cleanSpyExplanation(text: string, spot: number): string {
+  if (!text || !Number.isFinite(spot) || spot <= 0) return text;
+  const gammaFlip = /(?:\s*)dealer gamma (?:positive|negative|flat) with flip near ([0-9]+(?:\.[0-9]+)?)(?:\.|,)?/i;
+  const match = text.match(gammaFlip);
+  if (!match) return text;
+  const flip = Number(match[1]);
+  if (!Number.isFinite(flip)) return text;
+  if (Math.abs(flip - spot) / spot <= 0.12) return text;
+  const cleaned = text.replace(gammaFlip, "").replace(/\s{2,}/g, " ").trim();
+  return cleaned || "Options context is withheld until the live chain is inside a realistic SPY range.";
+}
+
+function capitalize(value: string): string {
+  return value.slice(0, 1).toUpperCase() + value.slice(1);
+}
+
+function isPriorRangeValid(lines: DynamicLine[]): boolean {
+  const pdh = lines.find((line) => line.kind === "PDH");
+  const pdl = lines.find((line) => line.kind === "PDL");
+  if (!pdh || !pdl) return true;
+  return entryLineValue(pdh) >= entryLineValue(pdl);
+}
+
+function isActionableSpyReference(line: DynamicLine, priorRangeValid: boolean): boolean {
+  if (line.kind === "DAY_OPEN") return false;
+  if (/backup/i.test(line.name)) return false;
+  if (!priorRangeValid && (line.kind === "PDH" || line.kind === "PDL")) return false;
+  return line.isPrimary || /^Anchor\s/i.test(line.name) || line.kind === "PDH" || line.kind === "PDL";
 }
 
 function anchorTimeLabel(g: AnchorGroup): string {
@@ -295,6 +603,55 @@ function AnchorCell({
   );
 }
 
+function buildSpyChannelChart(snap: AdaptedSnapshot): StructureChartData | null {
+  const primary = snap.anchor?.primary ?? null;
+  const bars = (snap.candles ?? [])
+    .filter(
+      (bar) =>
+        !!bar.t &&
+        Number.isFinite(bar.h) &&
+        Number.isFinite(bar.l) &&
+        Number.isFinite(bar.c),
+    )
+    .map((bar) => ({ t: bar.t, h: bar.h, l: bar.l, c: bar.c }))
+    .sort((a, b) => Date.parse(a.t) - Date.parse(b.t));
+  if (bars.length > 0 && Number.isFinite(snap.currentPrice)) {
+    const last = bars[bars.length - 1];
+    bars[bars.length - 1] = {
+      ...last,
+      h: Math.max(last.h, snap.currentPrice),
+      l: Math.min(last.l, snap.currentPrice),
+      c: snap.currentPrice,
+    };
+  }
+  if (!primary || bars.length < 2) return null;
+  const slopePerHour = -Math.abs(Number(snap.anchor?.slopePerHour ?? SLOPE_PER_HOUR));
+  const lines = [
+    makeSpyChartLine("Upper ref", primary.bands.upper.anchorPrice, primary.anchorTime, slopePerHour, "upper"),
+    makeSpyChartLine("Main", primary.bands.main.anchorPrice, primary.anchorTime, slopePerHour, "anchor"),
+    makeSpyChartLine("Lower ref", primary.bands.lower.anchorPrice, primary.anchorTime, slopePerHour, "lower"),
+  ].filter((line): line is StructureChartLine => line !== null);
+  if (lines.length === 0) return null;
+  return { label: "SPY", date: new Date().toISOString().slice(0, 10), bars, lines };
+}
+
+function makeSpyChartLine(
+  label: string,
+  anchorPrice: number | null,
+  anchorTime: string,
+  slopePerHour: number,
+  tone: StructureChartLine["tone"],
+): StructureChartLine | null {
+  if (!Number.isFinite(anchorPrice ?? NaN)) return null;
+  return {
+    label,
+    anchorTime,
+    anchorPrice: Number(anchorPrice),
+    slopePerHour,
+    tone,
+  };
+}
+
 // ---------- Diagram ----------
 
 function AnchorDiagram({ snap }: { snap: AdaptedSnapshot }) {
@@ -321,6 +678,9 @@ function AnchorDiagram({ snap }: { snap: AdaptedSnapshot }) {
 
   // Y range: include current price plus every band's anchor & current value.
   const yPoints: number[] = [snap.currentPrice];
+  for (const line of snap.lines.slice(0, 4)) {
+    yPoints.push(line.currentValue);
+  }
   for (const g of groups) {
     yPoints.push(g.anchorLow);
     yPoints.push(g.anchorLow + 3.4);
@@ -344,6 +704,9 @@ function AnchorDiagram({ snap }: { snap: AdaptedSnapshot }) {
 
   const xNow = xOf(now);
   const yPrice = yOf(snap.currentPrice);
+  const nearestLine = snap.lines
+    .slice()
+    .sort((a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice))[0];
 
   const renderGroup = (g: AnchorGroup, idx: number, isPrimary: boolean) => {
     const ts0 = new Date(g.anchorTime).getTime();
@@ -457,6 +820,31 @@ function AnchorDiagram({ snap }: { snap: AdaptedSnapshot }) {
       {primary && renderGroup(primary, 0, true)}
       {anchor2 && renderGroup(anchor2, 1, false)}
 
+      {!primary && nearestLine && (
+        <g>
+          <line
+            x1={PAD_L}
+            y1={yOf(nearestLine.currentValue)}
+            x2={W - PAD_R}
+            y2={yOf(nearestLine.currentValue)}
+            stroke="#B8821F"
+            strokeWidth={1.4}
+            strokeDasharray="4 3"
+            opacity={0.8}
+          />
+          <text
+            x={W - PAD_R - 4}
+            y={yOf(nearestLine.currentValue) - 6}
+            fontSize="9"
+            fontFamily="var(--font-geist-mono)"
+            fill="#8A6117"
+            textAnchor="end"
+          >
+            {nearestLine.name} {nearestLine.currentValue.toFixed(2)}
+          </text>
+        </g>
+      )}
+
       {/* current price horizontal */}
       <line
         x1={PAD_L}
@@ -474,7 +862,7 @@ function AnchorDiagram({ snap }: { snap: AdaptedSnapshot }) {
         <circle cx={xNow} cy={yPrice} r={8} fill="#14161A" opacity={0.12} className="spy-price-halo" />
       </g>
 
-      {!primary && (
+      {!primary && !nearestLine && (
         <text
           x={W / 2}
           y={H / 2}
@@ -483,7 +871,7 @@ function AnchorDiagram({ snap }: { snap: AdaptedSnapshot }) {
           fill="#9CA3AF"
           textAnchor="middle"
         >
-          No qualifying premarket anchor today
+          Awaiting qualified structure
         </text>
       )}
     </svg>
@@ -555,3 +943,5 @@ const spyDiagramStyles = `
     }
   }
 `;
+
+

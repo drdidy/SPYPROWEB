@@ -17,6 +17,7 @@ data, not the source.
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from math import isfinite
 from zoneinfo import ZoneInfo
 
 from ..spx.candles import Candle
@@ -78,18 +79,16 @@ class YFinanceFetcher:
             if ct_ts < start_ct or ct_ts >= end_ct:
                 continue
             try:
-                candles.append(
-                    Candle(
-                        t=ct_ts,
-                        o=float(row["Open"]),
-                        h=float(row["High"]),
-                        l=float(row["Low"]),
-                        c=float(row["Close"]),
-                        v=float(row.get("Volume", 0) or 0),
-                    )
-                )
+                o = float(row["Open"])
+                h = float(row["High"])
+                l = float(row["Low"])
+                c = float(row["Close"])
+                v = float(row.get("Volume", 0) or 0)
             except (KeyError, TypeError, ValueError):
                 continue
+            if not _valid_ohlc(o, h, l, c):
+                continue
+            candles.append(Candle(t=ct_ts, o=o, h=h, l=l, c=c, v=v if isfinite(v) else 0.0))
         return candles
 
     # ---- Sync quote ---------------------------------------------------------
@@ -251,6 +250,21 @@ def _to_ct(dt: datetime) -> datetime:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=CT)
     return dt.astimezone(CT)
+
+
+def _valid_ohlc(o: float, h: float, l: float, c: float) -> bool:
+    return (
+        isfinite(o)
+        and isfinite(h)
+        and isfinite(l)
+        and isfinite(c)
+        and o > 0
+        and h > 0
+        and l > 0
+        and c > 0
+        and h >= max(o, c, l)
+        and l <= min(o, c, h)
+    )
 
 
 def _ts_to_ct(ts) -> datetime:

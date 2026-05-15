@@ -1,7 +1,12 @@
 "use client";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { ContractProjectionCard } from "@/components/options/ContractProjection";
 import { StatusPill } from "@/components/ui/StatusPill";
+import type { ContractProjection } from "@/lib/contract-projection";
 import type { OptionsIntel as Intel, SelectedStrikes } from "@/lib/types";
+import { RefreshCw } from "lucide-react";
+import type { ReactNode } from "react";
 
 const alignmentVariant = {
   ALIGNED: "confirmed",
@@ -13,10 +18,16 @@ export function OptionsIntelPanel({
   intel,
   strikes,
   spy,
+  healthAction,
+  projection,
+  chainStatus,
 }: {
   intel: Intel | null;
   strikes: SelectedStrikes | null;
   spy: number;
+  healthAction?: ReactNode;
+  projection?: ContractProjection | null;
+  chainStatus?: "loaded" | "waiting";
 }) {
   if (!intel || !strikes) {
     return (
@@ -24,17 +35,46 @@ export function OptionsIntelPanel({
         <CardHeader
           eyebrow="Options Intelligence"
           title="Dealer & flow"
-          action={<StatusPill variant="stale">PENDING</StatusPill>}
+          action={
+            <>
+              {healthAction}
+              <StatusPill variant="stale">CHAIN WAITING</StatusPill>
+            </>
+          }
         />
-        <CardBody className="space-y-3 py-10">
-          <div className="font-serif text-headline text-ink-3 italic font-light">
-            Options chain not yet loaded.
+        <CardBody className="space-y-4 py-8">
+          <div>
+            <div className="font-serif text-headline text-ink-3 italic font-light">
+              Options chain not yet loaded.
+            </div>
+            <p className="mt-2 text-[13px] text-ink-3 leading-relaxed max-w-xl">
+              The current expiration has not returned a complete strike ladder yet.
+              The panel is paused instead of fabricating dealer, flow, or entry-cost values.
+            </p>
           </div>
-          <p className="text-[13px] text-ink-3 leading-relaxed max-w-md">
-            The broker feed returned no chain for the active expiration (likely
-            outside market hours, or the connection is still warming up).
-            This panel populates once the chain arrives.
-          </p>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <EmptyChainStat
+              label="Live chain"
+              value={chainStatus === "loaded" ? "Partial" : "Waiting"}
+            />
+            <EmptyChainStat label="Contract model" value={projection ? "Available" : "Pending"} />
+            <EmptyChainStat label="Retry cadence" value="Manual + clock" />
+          </div>
+          {projection && <ContractProjectionCard projection={projection} />}
+          <div className="flex flex-wrap items-center gap-3 pt-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => window.location.reload()}
+            >
+              <RefreshCw size={13} strokeWidth={1.75} />
+              Retry chain
+            </Button>
+            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-3">
+              Next automatic refresh follows the session clock
+            </span>
+          </div>
         </CardBody>
       </Card>
     );
@@ -59,9 +99,12 @@ export function OptionsIntelPanel({
         eyebrow="Options Intelligence"
         title="Dealer & flow"
         action={
-          <StatusPill variant={alignmentVariant[intel.alignment]}>
-            {intel.alignment}
-          </StatusPill>
+          <>
+            {healthAction}
+            <StatusPill variant={alignmentVariant[intel.alignment]}>
+              {intel.alignment}
+            </StatusPill>
+          </>
         }
       />
       <CardBody className="space-y-5">
@@ -140,6 +183,8 @@ export function OptionsIntelPanel({
           </div>
         </div>
 
+        <ContractProjectionCard projection={projection ?? null} />
+
         <p className="text-[12px] text-ink-2 leading-snug">{intel.alignmentNote}</p>
 
         <div className="hr-rule" />
@@ -151,6 +196,17 @@ export function OptionsIntelPanel({
         </div>
       </CardBody>
     </Card>
+  );
+}
+
+function EmptyChainStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-soft border border-rule bg-paper-2 px-3 py-2">
+      <div className="eyebrow text-ink-3">{label}</div>
+      <div className="mt-1 font-mono text-[13px] font-semibold uppercase tracking-[0.08em] text-ink">
+        {value}
+      </div>
+    </div>
   );
 }
 

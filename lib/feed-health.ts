@@ -8,7 +8,17 @@ export type FeedId =
   | "spy-last-session"
   | "spx-last-session"
   | "daily-brief-preview"
-  | "market-clock";
+  | "market-clock"
+  | "price-tick"
+  | "anchor-levels"
+  | "trigger-lines"
+  | "pre-open-bias"
+  | "options-chain"
+  | "signal-tape"
+  | "risk-guardrails"
+  | "session-clock"
+  | "projection-engine"
+  | "calibration-store";
 
 export const FEED_IDS = [
   "spy-rails",
@@ -19,6 +29,16 @@ export const FEED_IDS = [
   "spx-last-session",
   "daily-brief-preview",
   "market-clock",
+  "price-tick",
+  "anchor-levels",
+  "trigger-lines",
+  "pre-open-bias",
+  "options-chain",
+  "signal-tape",
+  "risk-guardrails",
+  "session-clock",
+  "projection-engine",
+  "calibration-store",
 ] as const satisfies readonly FeedId[];
 
 export interface FeedHealthSeed {
@@ -41,17 +61,28 @@ export interface FeedHealthState {
   nextExpectedAt: string | null;
   critical: boolean;
   failedForMs: number;
+  ageMs: number;
 }
 
 export const FEED_LABELS: Record<FeedId, string> = {
   "spy-rails": "SPY rails",
-  "spx-rails": "ES rails",
+  "spx-rails": "ES Pivot Fan",
   "spy-hit-rate": "SPY last-5",
   "spx-hit-rate": "ES last-5",
   "spy-last-session": "SPY last session",
   "spx-last-session": "ES last session",
   "daily-brief-preview": "Daily brief preview",
   "market-clock": "Market clock",
+  "price-tick": "Last price",
+  "anchor-levels": "Anchor levels",
+  "trigger-lines": "Trigger map",
+  "pre-open-bias": "Pre-open bias",
+  "options-chain": "Options intelligence",
+  "signal-tape": "Signal tape",
+  "risk-guardrails": "Risk guardrails",
+  "session-clock": "Session clock",
+  "projection-engine": "Projection engine",
+  "calibration-store": "Calibration store",
 };
 
 export const FEED_DEFAULTS = {
@@ -61,6 +92,11 @@ export const FEED_DEFAULTS = {
   lastSessionMs: 5 * 60_000,
   briefPreviewMs: 24 * 60 * 60_000,
   marketClockMs: 60_000,
+  // /api/snapshot intentionally permits a 15s public cache window, so channel
+  // price freshness needs enough room to avoid labeling healthy cached data stale.
+  priceTickMs: 20_000,
+  channelStructureMs: 60_000,
+  channelPanelMs: 5 * 60_000,
   failedBannerDelayMs: 60_000,
 };
 

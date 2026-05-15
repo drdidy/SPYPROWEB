@@ -1,5 +1,10 @@
 "use client";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
+import { ContractProjectionCard } from "@/components/options/ContractProjection";
+import {
+  buildSpxContractProjection,
+  type SpxProjectionChainInput,
+} from "@/lib/spx-contract-projection";
 import type {
   SPXContractSuggestion,
   SPXLineKind,
@@ -9,13 +14,22 @@ import type {
 import { ArrowDown, ArrowUp } from "lucide-react";
 
 const lineLabel: Record<SPXLineKind, string> = {
-  CHANNEL_CEILING: "Channel Ceiling",
-  CHANNEL_FLOOR: "Channel Floor",
-  PREV_RTH_HIGH_ASC: "Prev RTH High · Asc",
-  PREV_RTH_LOW_DESC: "Prev RTH Low · Desc",
+  PREV_RTH_HIGH_ASC: "High Fan Ceiling",
+  PREV_RTH_HIGH_DESC: "High Fan Floor",
+  PREV_RTH_LOW_ASC: "Low Fan Ceiling",
+  PREV_RTH_LOW_DESC: "Low Fan Floor",
+  SWING_HIGH_ASC: "Overnight Higher Pivot",
+  SWING_HIGH_DESC: "Swing High - Desc",
+  SWING_LOW_ASC: "Swing Low - Asc",
+  SWING_LOW_DESC: "Swing Low - Desc",
 };
-
-export function SPXPlaysSlate({ snap }: { snap: SPXSnapshot }) {
+export function SPXPlaysSlate({
+  snap,
+  optionsChain,
+}: {
+  snap: SPXSnapshot;
+  optionsChain?: SpxProjectionChainInput | null;
+}) {
   const standDown = snap.scenario === "OUTSIDE_PLAY" || !snap.plays.primary;
 
   return (
@@ -36,8 +50,8 @@ export function SPXPlaysSlate({ snap }: { snap: SPXSnapshot }) {
               No play
             </div>
             <p className="mt-3 text-[13px] text-ink-3 max-w-sm mx-auto leading-relaxed">
-              The channel doesn't have a clean read here. The discipline is to
-              wait for price to return to one of the lines we've drawn.
+              The Pivot Fan does not have a clean read here. The discipline is
+              to wait for price to return to a qualified fan reference.
             </p>
           </div>
         </CardBody>
@@ -46,13 +60,17 @@ export function SPXPlaysSlate({ snap }: { snap: SPXSnapshot }) {
           <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-rule">
             <PlayPanel
               kind="primary"
+              snap={snap}
               trade={snap.plays.primary!}
               contract={snap.contracts.forPrimary}
+              optionsChain={optionsChain}
             />
             <PlayPanel
               kind="alternate"
+              snap={snap}
               trade={snap.plays.alternate!}
               contract={snap.contracts.forAlternate}
+              optionsChain={optionsChain}
             />
           </div>
         </CardBody>
@@ -63,12 +81,16 @@ export function SPXPlaysSlate({ snap }: { snap: SPXSnapshot }) {
 
 function PlayPanel({
   kind,
+  snap,
   trade,
   contract,
+  optionsChain,
 }: {
   kind: "primary" | "alternate";
+  snap: SPXSnapshot;
   trade: SPXTrade;
   contract: SPXContractSuggestion | null;
+  optionsChain?: SpxProjectionChainInput | null;
 }) {
   const isBuy = trade.side === "BUY";
   const Icon = isBuy ? ArrowUp : ArrowDown;
@@ -76,6 +98,12 @@ function PlayPanel({
   const sideBg = isBuy ? "bg-bull-tint" : "bg-bear-tint";
   const move = trade.exitPrice - trade.entryPrice;
   const moveAbs = Math.abs(move);
+  const projection = buildSpxContractProjection({
+    snap,
+    chain: optionsChain,
+    trade,
+    contract,
+  });
 
   return (
     <div className="p-6">
@@ -152,6 +180,7 @@ function PlayPanel({
           </div>
         </div>
       )}
+      <ContractProjectionCard projection={projection} className="mt-3" />
     </div>
   );
 }

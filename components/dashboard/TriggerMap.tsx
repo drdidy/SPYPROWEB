@@ -2,12 +2,27 @@
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 import { StatusPill } from "@/components/ui/StatusPill";
 import type { DynamicLine } from "@/lib/types";
+import type { ReactNode } from "react";
 
-function lineState(distance: number): "armed" | "watching" | "stale" {
+type LineReadState = "armed" | "watching" | "reference";
+
+function lineState(distance: number): LineReadState {
   const a = Math.abs(distance);
   if (a <= 0.5) return "armed";
   if (a <= 2.5) return "watching";
-  return "stale";
+  return "reference";
+}
+
+function displayValue(line: DynamicLine): number {
+  return line.entryValue ?? line.currentValue;
+}
+
+function distanceToLast(line: DynamicLine, currentPrice?: number): number {
+  const reference = displayValue(line);
+  if (typeof currentPrice === "number" && Number.isFinite(currentPrice)) {
+    return reference - currentPrice;
+  }
+  return line.distanceFromPrice;
 }
 
 const lineStyle: Record<string, { dot: string; label: string }> = {
@@ -19,74 +34,227 @@ const lineStyle: Record<string, { dot: string; label: string }> = {
   S_DESC: { dot: "bg-bear/60", label: "Secondary Descending" },
   ANC_ASC: { dot: "bg-bull", label: "Anchor Ascending" },
   ANC_DESC: { dot: "bg-bear", label: "Anchor Descending" },
-  PDH: { dot: "bg-violet", label: "Prev Day High" },
-  PDL: { dot: "bg-violet", label: "Prev Day Low" },
-  DAY_OPEN: { dot: "bg-gold", label: "Day Open" },
+  PDH: { dot: "bg-violet", label: "Previous RTH high" },
+  PDL: { dot: "bg-violet", label: "Previous RTH low" },
+  DAY_OPEN: { dot: "bg-gold", label: "Day open diagnostic" },
 };
 
-export function TriggerMap({ lines }: { lines: DynamicLine[] }) {
+function pillVariant(state: LineReadState) {
+  return state === "reference" ? "stale" : state;
+}
+
+function LevelCard({
+  line,
+  meta,
+  distance,
+  context = false,
+}: {
+  line: DynamicLine;
+  meta: { dot: string; label: string };
+  distance: number;
+  context?: boolean;
+}) {
+  const state = lineState(distance);
+  return (
+    <div className="rounded-soft border border-rule bg-paper-2 px-4 py-3 shadow-rule">
+      <div className="mb-2 flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className={`h-2 w-2 shrink-0 rounded-full ${meta.dot}`} />
+          <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-ink">
+            {line.name}
+          </span>
+        </div>
+        <StatusPill variant={pillVariant(state)} pulse={state === "armed"}>
+          {context ? "context" : state}
+        </StatusPill>
+      </div>
+      <div className="font-mono text-[22px] font-semibold tabular-nums text-ink" data-num>
+        {displayValue(line).toFixed(2)}
+      </div>
+      <div className="mt-1 flex items-center justify-between gap-3 text-[12px] text-ink-3">
+        <span>{meta.label}</span>
+        <span
+          className={`font-mono tabular-nums ${
+            distance >= 0 ? "text-bear-ink" : "text-bull-ink"
+          }`}
+        >
+          {distance >= 0 ? "+" : ""}
+          {distance.toFixed(2)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+export function TriggerMap({
+  lines,
+  healthAction,
+  currentPrice,
+}: {
+  lines: DynamicLine[];
+  healthAction?: ReactNode;
+  currentPrice?: number;
+}) {
+  const sorted = lines
+    .slice()
+    .sort((a, b) => Math.abs(distanceToLast(a, currentPrice)) - Math.abs(distanceToLast(b, currentPrice)));
+  const priorRangeValid = isPriorRangeValid(sorted);
+  const validatedSorted = priorRangeValid
+    ? sorted
+    : sorted.filter((line) => line.kind !== "PDH" && line.kind !== "PDL");
+  const actionable = validatedSorted.filter(isActionableReference);
+  const context = validatedSorted.filter((line) => !isActionableReference(line));
+
+  if (lines.length === 0) {
+    return (
+      <Card>
+        <CardHeader
+          eyebrow="Trigger Map"
+          title="08:00 references"
+          meta="Waiting for qualified structure"
+          action={healthAction}
+        />
+        <CardBody>
+          <div className="rounded-soft border border-rule bg-paper-2 px-4 py-5">
+            <div className="font-serif text-headline text-ink-2 italic font-light">
+              No qualified levels yet.
+            </div>
+            <p className="mt-2 max-w-lg text-[13px] leading-relaxed text-ink-3">
+              SPY levels arm after the premarket anchor window resolves and the
+              engine has an 08:00 reference to evaluate. Until then, this panel
+              is intentionally quiet.
+            </p>
+          </div>
+        </CardBody>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader
         eyebrow="Trigger Map"
-        title="Levels in play"
-        meta="sorted by proximity"
+        title="08:00 references"
+        meta="actionable first; context below"
+        action={healthAction}
       />
       <CardBody className="px-0 pb-0">
-        <div className="grid grid-cols-12 px-5 pb-2 eyebrow text-ink-3">
+        <div className="px-5 pb-4">
+          <p className="max-w-2xl text-[12px] leading-relaxed text-ink-3">
+            These are the 08:00 CT operating values. Backup and day-open rows are
+            retained as diagnostics, but they are not equal to the active entry
+            framework.
+          </p>
+          {!priorRangeValid && (
+            <div className="mt-3 rounded-soft border border-gold/30 bg-gold-tint px-3 py-2 font-mono text-[10px] uppercase tracking-[0.10em] text-gold-ink">
+              Prior-day range failed validation; PDH/PDL are hidden until the feed resolves.
+            </div>
+          )}
+        </div>
+
+        <div className="grid gap-3 px-5 pb-5 sm:hidden">
+          {actionable.map((line) => {
+            const distance = distanceToLast(line, currentPrice);
+            const meta = lineStyle[line.kind] ?? { dot: "bg-ink-3", label: line.kind };
+            return (
+              <LevelCard key={line.name} line={line} meta={meta} distance={distance} />
+            );
+          })}
+        </div>
+
+        <div className="hidden grid-cols-12 px-5 pb-2 eyebrow text-ink-3 sm:grid">
           <div className="col-span-3">Line</div>
           <div className="col-span-3">Type</div>
-          <div className="col-span-2 text-right">Value</div>
-          <div className="col-span-2 text-right">Δ Price</div>
+          <div className="col-span-2 text-right">08:00 value</div>
+          <div className="col-span-2 text-right">Delta to last</div>
           <div className="col-span-2 text-right">Status</div>
         </div>
-        <ul className="divide-y divide-rule border-t border-rule">
-          {lines
-            .slice()
-            .sort((a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice))
-            .map((l) => {
-              const state = lineState(l.distanceFromPrice);
-              const meta = lineStyle[l.kind] ?? { dot: "bg-ink-3", label: l.kind };
-              return (
-                <li
-                  key={l.name}
-                  className="grid grid-cols-12 items-center px-5 py-3 hover:bg-paper-2/50 transition-colors group"
+        <ul className="hidden divide-y divide-rule border-t border-rule sm:block">
+          {actionable.map((line) => {
+            const distance = distanceToLast(line, currentPrice);
+            const state = lineState(distance);
+            const meta = lineStyle[line.kind] ?? { dot: "bg-ink-3", label: line.kind };
+            return (
+              <li
+                key={line.name}
+                className="grid grid-cols-12 items-center px-5 py-3 transition-colors hover:bg-paper-2/50"
+              >
+                <div className="col-span-3 flex items-center gap-2.5">
+                  <span className={`h-4 w-1.5 rounded-sm ${meta.dot}`} />
+                  <span className="font-mono text-sm font-semibold text-ink">{line.name}</span>
+                  {line.isPrimary && (
+                    <span className="text-[9px] font-mono text-gold-ink uppercase tracking-[0.10em]">
+                      primary
+                    </span>
+                  )}
+                </div>
+                <div className="col-span-3 text-xs text-ink-2">{meta.label}</div>
+                <div className="col-span-2 text-right font-mono text-sm tabular-nums text-ink" data-num>
+                  {displayValue(line).toFixed(2)}
+                </div>
+                <div
+                  className={`col-span-2 text-right font-mono text-sm tabular-nums ${
+                    distance >= 0 ? "text-bear-ink" : "text-bull-ink"
+                  }`}
+                  data-num
                 >
-                  <div className="col-span-3 flex items-center gap-2.5">
-                    <span className={`w-1.5 h-4 rounded-sm ${meta.dot}`} />
-                    <span className="font-mono text-sm font-semibold text-ink">{l.name}</span>
-                    {l.isPrimary && (
-                      <span className="text-[9px] font-mono text-gold-ink uppercase tracking-[0.10em]">
-                        primary
-                      </span>
-                    )}
-                  </div>
-                  <div className="col-span-3 text-xs text-ink-2">{meta.label}</div>
-                  <div
-                    className="col-span-2 text-right font-mono text-sm tabular-nums text-ink"
-                    data-num
-                  >
-                    {l.currentValue.toFixed(2)}
-                  </div>
-                  <div
-                    className={`col-span-2 text-right font-mono text-sm tabular-nums ${
-                      l.distanceFromPrice >= 0 ? "text-bull-ink" : "text-bear-ink"
-                    }`}
-                    data-num
-                  >
-                    {l.distanceFromPrice >= 0 ? "+" : ""}
-                    {l.distanceFromPrice.toFixed(2)}
-                  </div>
-                  <div className="col-span-2 flex justify-end">
-                    <StatusPill variant={state} pulse={state === "armed"}>
-                      {state}
-                    </StatusPill>
-                  </div>
-                </li>
-              );
-            })}
+                  {distance >= 0 ? "+" : ""}
+                  {distance.toFixed(2)}
+                </div>
+                <div className="col-span-2 flex justify-end">
+                  <StatusPill variant={pillVariant(state)} pulse={state === "armed"}>
+                    {state}
+                  </StatusPill>
+                </div>
+              </li>
+            );
+          })}
         </ul>
+
+        {context.length > 0 && (
+          <div className="border-t border-rule bg-paper-2/45 px-5 py-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <div className="eyebrow text-ink-3">Context / backup references</div>
+                <p className="mt-1 text-[11px] text-ink-3">
+                  Diagnostic references only. They should not be read as fresh entry
+                  instructions.
+                </p>
+              </div>
+              <StatusPill variant="stale">{context.length} refs</StatusPill>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              {context.map((line) => {
+                const distance = distanceToLast(line, currentPrice);
+                const meta = lineStyle[line.kind] ?? { dot: "bg-ink-3", label: line.kind };
+                return (
+                  <LevelCard
+                    key={line.name}
+                    line={line}
+                    meta={meta}
+                    distance={distance}
+                    context
+                  />
+                );
+              })}
+            </div>
+          </div>
+        )}
       </CardBody>
     </Card>
   );
+}
+
+function isActionableReference(line: DynamicLine): boolean {
+  if (line.kind === "PDH" || line.kind === "PDL") return true;
+  if (line.kind === "DAY_OPEN") return false;
+  if (/backup/i.test(line.name)) return false;
+  return line.isPrimary || /^Anchor\s/i.test(line.name);
+}
+
+function isPriorRangeValid(lines: DynamicLine[]): boolean {
+  const pdh = lines.find((line) => line.kind === "PDH");
+  const pdl = lines.find((line) => line.kind === "PDL");
+  if (!pdh || !pdl) return true;
+  return displayValue(pdh) >= displayValue(pdl);
 }

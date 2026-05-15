@@ -1,7 +1,9 @@
 export const SPY_CHANNEL_COPY = {
   hero: {
     eyebrow: "SPY · Channel · Session today",
-    title: "The trading day, read aloud.",
+    title: "SPY operating map.",
+    titleLead: "SPY operating",
+    titleEmphasis: "map.",
     subtitle:
       "Anchor lines, trigger proximity, tape, and guardrails stay in one operating surface.",
   },
@@ -39,6 +41,6 @@ export const SPY_CHANNEL_COPY = {
   },
   footer: {
     left: "Prophet · SPY channel",
-    right: "End of slate",
+    right: "Session surface",
   },
 } as const;

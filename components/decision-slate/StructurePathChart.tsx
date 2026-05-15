@@ -1,4 +1,7 @@
+"use client";
+
 import { cn } from "@/lib/utils";
+import { useState, type KeyboardEvent, type PointerEvent } from "react";
 
 export interface StructureChartBar {
   t: string;
@@ -29,6 +32,7 @@ export function StructurePathChart({
   className,
   height = 170,
   title = "Actual path vs rails",
+  frameless = false,
 }: {
   data?: StructureChartData | null;
   variant?: "paper" | "dark";
@@ -36,13 +40,16 @@ export function StructurePathChart({
   className?: string;
   height?: number;
   title?: string;
+  frameless?: boolean;
 }) {
-  const W = 620;
-  const H = 230;
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const largeCanvas = height >= 320;
+  const W = largeCanvas ? 780 : 620;
+  const H = largeCanvas ? 460 : 210;
   const PAD_L = 48;
-  const PAD_R = 86;
-  const PAD_T = 22;
-  const PAD_B = 28;
+  const PAD_R = largeCanvas ? 168 : 124;
+  const PAD_T = largeCanvas ? 34 : 22;
+  const PAD_B = largeCanvas ? 42 : 28;
   const bars = (data?.bars ?? []).filter(validBar);
   const lines = (data?.lines ?? []).filter(validLine);
   const hasData = bars.length >= 2 && lines.length > 0;
@@ -54,9 +61,11 @@ export function StructurePathChart({
       <div
         className={cn(
           "relative overflow-hidden rounded-[8px] border px-3 text-center font-mono text-[11px]",
-          variant === "dark"
-            ? "border-paper/10 bg-paper/[0.035] text-paper/45"
-            : "border-rule-soft bg-paper text-ink-3",
+          frameless
+            ? "border-transparent bg-transparent text-paper/45"
+            : variant === "dark"
+              ? "border-paper/10 bg-paper/[0.035] text-paper/45"
+              : "border-rule-soft bg-paper text-ink-3",
           className,
         )}
         style={{ minHeight: height }}
@@ -72,21 +81,11 @@ export function StructurePathChart({
           <div>
             <div
               className={cn(
-                "mx-auto mb-3 grid h-9 w-9 place-items-center rounded-[9px] border",
-                variant === "dark"
-                  ? "border-gold/30 bg-gold-soft/10 text-gold-soft"
-                  : "border-gold/25 bg-gold-tint text-gold-ink",
-              )}
-            >
-              <span className="h-2 w-2 rounded-full bg-current animate-breathe" />
-            </div>
-            <div
-              className={cn(
                 "text-[9px] uppercase tracking-[0.18em]",
                 variant === "dark" ? "text-gold-soft/70" : "text-gold-ink",
               )}
             >
-              Data link standby
+              Chart unavailable
             </div>
             <div
               className={cn(
@@ -94,8 +93,9 @@ export function StructurePathChart({
                 variant === "dark" ? "text-paper/48" : "text-ink-3",
               )}
             >
-              Actual path and rails render only after replay bars and structure
-              lines are available.
+              Actual path and rails render only after both replay bars and
+              measured structure lines are available. No illustrative chart is
+              drawn in their place.
             </div>
             {data?.date && (
               <div
@@ -119,7 +119,7 @@ export function StructurePathChart({
     line.anchorPrice + line.slopePerHour * ((ms - new Date(line.anchorTime).getTime()) / 36e5);
 
   const yValues: number[] = [];
-  for (const bar of bars) yValues.push(bar.h, bar.l, bar.c);
+  for (const bar of bars) yValues.push(bar.c);
   for (const line of lines) yValues.push(lineValue(line, t0), lineValue(line, t1));
   let yMin = Math.min(...yValues);
   let yMax = Math.max(...yValues);
@@ -137,6 +137,21 @@ export function StructurePathChart({
     .map((bar, i) => `${i === 0 ? "M" : "L"} ${xOf(new Date(bar.t).getTime()).toFixed(1)},${yOf(bar.c).toFixed(1)}`)
     .join(" ");
   const last = bars[bars.length - 1];
+  const selectedIndex = activeIndex ?? bars.length - 1;
+  const selected = bars[Math.max(0, Math.min(bars.length - 1, selectedIndex))] ?? last;
+  const selectedMs = new Date(selected.t).getTime();
+  const selectedX = xOf(selectedMs);
+  const selectedY = yOf(selected.c);
+  const selectedLine = lines
+    .slice()
+    .sort(
+      (a, b) =>
+        Math.abs(lineValue(a, selectedMs) - selected.c) -
+        Math.abs(lineValue(b, selectedMs) - selected.c),
+    )[0];
+  const selectedLineValue = selectedLine ? lineValue(selectedLine, selectedMs) : null;
+  const tooltipX = Math.min(W - PAD_R - 116, Math.max(PAD_L + 4, selectedX + 12));
+  const tooltipY = Math.min(H - PAD_B - 54, Math.max(PAD_T + 4, selectedY - 30));
   const touches = bars.flatMap((bar) => {
     const ms = new Date(bar.t).getTime();
     return lines
@@ -153,9 +168,11 @@ export function StructurePathChart({
     <div
       className={cn(
         "relative overflow-hidden rounded-[6px] border",
-        variant === "dark"
-          ? "border-paper/10 bg-paper/[0.035]"
-          : "border-rule-soft bg-paper shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]",
+        frameless
+          ? "border-transparent bg-transparent"
+          : variant === "dark"
+            ? "border-paper/10 bg-paper/[0.035]"
+            : "border-rule-soft bg-paper shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]",
         className,
       )}
       style={{ minHeight: height }}
@@ -163,7 +180,11 @@ export function StructurePathChart({
       <div
         className={cn(
           "relative z-10 flex items-start justify-between gap-3 border-b px-3 py-2",
-          variant === "dark" ? "border-paper/10 bg-[#071218]/88" : "border-rule-soft bg-paper/80",
+          frameless
+            ? "border-transparent bg-transparent"
+            : variant === "dark"
+              ? "border-paper/10 bg-[#071218]/88"
+              : "border-rule-soft bg-paper/80",
         )}
       >
         <div>
@@ -192,16 +213,30 @@ export function StructurePathChart({
               : "border-rule-soft bg-paper-2 text-ink-3",
           )}
         >
-          Rails
+          Refs
         </div>
       </div>
       <svg
         viewBox={`0 0 ${W} ${H}`}
         className="w-full"
-        style={{ height: Math.max(118, height - 38) }}
+        style={{ height: Math.max(118, height - 30) }}
         role="img"
+        tabIndex={0}
         aria-label={`${data?.label} actual price path against engine rails`}
+        onPointerMove={(event) => {
+          setActiveIndex(nearestBarIndexFromPointer(event, bars, W, PAD_L, W - PAD_R, xOf));
+        }}
+        onPointerLeave={() => setActiveIndex(null)}
+        onFocus={() => setActiveIndex((value) => value ?? bars.length - 1)}
+        onKeyDown={(event) => {
+          setActiveIndex((value) => stepIndex(event, value ?? bars.length - 1, bars.length));
+        }}
       >
+        <title>{title}</title>
+        <desc>
+          {data?.label} price path with current price {last.c.toFixed(2)}
+          plotted against the active reference lines.
+        </desc>
         <style>{chartStyles}</style>
         <rect x="0" y="0" width={W} height={H} fill="transparent" />
         {[0.25, 0.5, 0.75].map((f) => {
@@ -216,6 +251,7 @@ export function StructurePathChart({
           const yStart = yOf(lineValue(line, t0));
           const yEnd = yOf(lineValue(line, t1));
           const stroke = lineColor(line.tone, variant);
+          const projectedNow = lineValue(line, new Date(last.t).getTime());
           return (
             <g key={line.label}>
               <line
@@ -231,11 +267,12 @@ export function StructurePathChart({
               <text
                 x={W - PAD_R + 8}
                 y={yEnd + 3}
-                fontSize="9"
+                fontSize={largeCanvas ? "14" : "12"}
                 fontFamily="var(--font-geist-mono)"
+                fontWeight="700"
                 fill={stroke}
               >
-                {line.label}
+                {line.label} {projectedNow.toFixed(2)}
               </text>
             </g>
           );
@@ -273,7 +310,69 @@ export function StructurePathChart({
             className="structure-touch"
           />
         ))}
+        <g className="structure-hover">
+          <line
+            x1={selectedX}
+            x2={selectedX}
+            y1={PAD_T}
+            y2={H - PAD_B}
+            stroke={palette.marker}
+            strokeWidth="0.9"
+            strokeDasharray="3 4"
+            opacity="0.85"
+          />
+          <line
+            x1={PAD_L}
+            x2={W - PAD_R}
+            y1={selectedY}
+            y2={selectedY}
+            stroke={accentStroke}
+            strokeWidth="0.7"
+            strokeDasharray="2 5"
+            opacity="0.42"
+          />
+          <circle
+            cx={selectedX}
+            cy={selectedY}
+            r={largeCanvas ? 4.6 : 3.8}
+            fill={accentStroke}
+            stroke={variant === "dark" ? "#071116" : "#FFFDF7"}
+            strokeWidth="1.3"
+          />
+          <g transform={`translate(${tooltipX},${tooltipY})`}>
+            <rect
+              width="112"
+              height="50"
+              rx="7"
+              fill={variant === "dark" ? "#071116" : "#FFFDF7"}
+              stroke={accentStroke}
+              strokeOpacity="0.35"
+              filter="drop-shadow(0 8px 16px rgba(20,22,26,0.12))"
+            />
+            <text x="8" y="12" fontSize="7" fontFamily="var(--font-geist-mono)" fontWeight="700" fill={palette.axis}>
+              {shortTime(selected.t)}
+            </text>
+            <text x="8" y="27" fontSize="12" fontFamily="var(--font-geist-mono)" fontWeight="800" fill={accentStroke}>
+              {selected.c.toFixed(2)}
+            </text>
+            {selectedLine && selectedLineValue !== null && (
+              <text x="8" y="42" fontSize="7.5" fontFamily="var(--font-geist-mono)" fill={lineColor(selectedLine.tone, variant)}>
+                {selectedLine.label} {selectedLineValue.toFixed(2)}
+              </text>
+            )}
+          </g>
+        </g>
         <g>
+          <line
+            x1={PAD_L}
+            x2={W - PAD_R}
+            y1={yOf(last.c)}
+            y2={yOf(last.c)}
+            stroke={accentStroke}
+            strokeWidth="0.8"
+            strokeDasharray="2 5"
+            opacity="0.42"
+          />
           <line
             x1={xOf(new Date(last.t).getTime())}
             x2={xOf(new Date(last.t).getTime())}
@@ -296,15 +395,47 @@ export function StructurePathChart({
             r="3.8"
             fill={accentStroke}
           />
+          {largeCanvas && (
+            <g transform={`translate(${Math.min(W - PAD_R - 108, xOf(new Date(last.t).getTime()) + 10)},${Math.max(PAD_T + 8, Math.min(H - PAD_B - 28, yOf(last.c) - 14))})`}>
+              <rect
+                width="104"
+                height="26"
+                rx="6"
+                fill={variant === "dark" ? "#071116" : "#FFFDF7"}
+                stroke={accentStroke}
+                strokeOpacity="0.35"
+              />
+              <text
+                x="8"
+                y="10"
+                fontSize="7"
+                fontFamily="var(--font-geist-mono)"
+                fontWeight="700"
+                fill={palette.axis}
+              >
+                CURRENT PRICE
+              </text>
+              <text
+                x="8"
+                y="21"
+                fontSize="11"
+                fontFamily="var(--font-geist-mono)"
+                fontWeight="800"
+                fill={accentStroke}
+              >
+                {last.c.toFixed(2)}
+              </text>
+            </g>
+          )}
         </g>
-        <text x={PAD_L} y={H - 8} fontSize="9" fontFamily="var(--font-geist-mono)" fill={palette.axis}>
+        <text x={PAD_L} y={H - 8} fontSize={largeCanvas ? "12" : "10"} fontFamily="var(--font-geist-mono)" fill={palette.axis}>
           {shortTime(bars[0].t)}
         </text>
-        <text x={W - PAD_R} y={H - 8} fontSize="9" fontFamily="var(--font-geist-mono)" fill={palette.axis} textAnchor="end">
+        <text x={W - PAD_R} y={H - 8} fontSize={largeCanvas ? "12" : "10"} fontFamily="var(--font-geist-mono)" fill={palette.axis} textAnchor="end">
           {shortTime(last.t)}
         </text>
-        <text x={W - 12} y={18} fontSize="10" fontFamily="var(--font-geist-mono)" fill={palette.axis} textAnchor="end">
-          {last.c.toFixed(data?.label === "ES" ? 0 : 2)}
+        <text x={W - 12} y={18} fontSize={largeCanvas ? "13" : "11"} fontFamily="var(--font-geist-mono)" fontWeight="700" fill={palette.axis} textAnchor="end">
+          LAST {last.c.toFixed(2)}
         </text>
       </svg>
     </div>
@@ -359,6 +490,44 @@ function shortTime(iso: string): string {
   } catch {
     return "--:--";
   }
+}
+
+function nearestBarIndexFromPointer(
+  event: PointerEvent<SVGSVGElement>,
+  bars: StructureChartBar[],
+  width: number,
+  minX: number,
+  maxX: number,
+  xOf: (ms: number) => number,
+): number {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const viewX = ((event.clientX - rect.left) / Math.max(1, rect.width)) * width;
+  const clamped = Math.max(minX, Math.min(maxX, viewX));
+  let bestIndex = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  bars.forEach((bar, index) => {
+    const distance = Math.abs(xOf(Date.parse(bar.t)) - clamped);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = index;
+    }
+  });
+  return bestIndex;
+}
+
+function stepIndex(
+  event: KeyboardEvent<SVGSVGElement>,
+  current: number,
+  length: number,
+): number {
+  if (event.key !== "ArrowLeft" && event.key !== "ArrowRight" && event.key !== "Home" && event.key !== "End") {
+    return current;
+  }
+  event.preventDefault();
+  if (event.key === "Home") return 0;
+  if (event.key === "End") return Math.max(0, length - 1);
+  const delta = event.key === "ArrowLeft" ? -1 : 1;
+  return Math.max(0, Math.min(length - 1, current + delta));
 }
 
 const chartStyles = `

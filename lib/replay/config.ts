@@ -1,0 +1,55 @@
+import type { BarSize } from "@/lib/contracts/replay";
+
+export const REPLAY_RULE_VERSION = "v1.0.0";
+export const DEFAULT_BAR_SIZE: BarSize = "5m";
+export const RECENT_REPLAY_STORAGE_KEY = "spyprophet.replay.recentDates.v2";
+export const PLAYBACK_SPEEDS = [0.5, 1, 2, 4, 8] as const;
+export type PlaybackSpeed = (typeof PLAYBACK_SPEEDS)[number];
+export const SEEK_GRANULARITY_BARS = 1;
+
+export const REPLAY_PRESET_EVENTS = {
+  fomc: [
+    "2025-01-29",
+    "2025-03-19",
+    "2025-05-07",
+    "2025-06-18",
+    "2025-07-30",
+    "2025-09-17",
+    "2025-10-29",
+    "2025-12-10",
+    "2026-01-28",
+    "2026-03-18",
+    "2026-04-29",
+    "2026-06-17",
+    "2026-07-29",
+    "2026-09-16",
+    "2026-11-04",
+    "2026-12-16",
+  ],
+  cpi: [
+    "2025-01-15",
+    "2025-02-12",
+    "2025-03-12",
+    "2025-04-10",
+    "2025-05-13",
+    "2025-06-11",
+    "2025-07-15",
+    "2025-08-12",
+    "2025-09-11",
+    "2025-10-15",
+    "2025-11-13",
+    "2025-12-10",
+    "2026-01-13",
+    "2026-02-12",
+    "2026-03-11",
+    "2026-04-10",
+    "2026-05-12",
+    "2026-06-10",
+    "2026-07-14",
+    "2026-08-12",
+    "2026-09-11",
+    "2026-10-13",
+    "2026-11-12",
+    "2026-12-10",
+  ],
+} as const;

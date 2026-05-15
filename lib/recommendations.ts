@@ -67,6 +67,7 @@ export function forState(
   state: EngineState,
   engine: Engine,
 ): Recommendation {
+  const label = engine === "SPX" ? "ES" : engine;
   switch (state) {
     case "GO":
     case "ARMED":
@@ -76,11 +77,11 @@ export function forState(
         id: "options-cockpit",
         href: "/options",
         label: "Open Options Cockpit",
-        reason: `${engine} ${state === "GO" ? "live" : "armed"}`,
+        reason: `${label} ${state === "GO" ? "live" : "armed"}`,
         description:
           state === "GO"
-            ? `${engine} trigger fired — size the trade and place orders.`
-            : `${engine} is armed at the entry trigger. Stage the order in the cockpit.`,
+            ? `${label} trigger fired — size the trade and place orders.`
+            : `${label} is armed at the entry trigger. Stage the order in the cockpit.`,
       };
 
     case "WAIT":
@@ -96,18 +97,18 @@ export function forState(
             reason: `SPY ${state.toLowerCase()}`,
             description:
               state === "WAIT"
-                ? "SPY rejection candle printed. Watch for confirmation on the next bar."
-                : "SPY is approaching a primary trigger — watching for a rejection.",
+                ? "SPY structure is active. Watch for the next qualified confirmation."
+                : "SPY is approaching active structure. Keep the channel open.",
           }
         : {
             id: "live-spx",
-            href: "/spx",
-            label: "Open SPX Channel",
-            reason: `SPX ${state.toLowerCase()}`,
+            href: "/es",
+            label: "Open ES Channel",
+            reason: `ES ${state.toLowerCase()}`,
             description:
               state === "WAIT"
-                ? "SPX rejection candle printed. Watch for confirmation on the next bar."
-                : "SPX is approaching the channel rail — watching for a rejection.",
+                ? "ES structure is active. Watch for the next qualified confirmation."
+                : "ES is approaching active structure. Keep the channel open.",
           };
 
     case "COOLDOWN":
@@ -116,8 +117,8 @@ export function forState(
         id: "log-replay",
         href: "/replay",
         label: "Log this session in Replay",
-        reason: `${engine} cooldown`,
-        description: `${engine}'s trade has resolved. Replay the session and grade execution.`,
+        reason: `${label} cooldown`,
+        description: `${label}'s trade has resolved. Replay the session and grade execution.`,
       };
 
     case "STAND_DOWN":
@@ -131,9 +132,10 @@ export function forState(
         reason:
           state === "PRE_CONFIG"
             ? "both engines pre-config"
-            : `${engine} standing down`,
+            : `${label} standing down`,
         description:
           "Today's brief lays out structural levels and what to watch at the open.",
       };
   }
 }
+

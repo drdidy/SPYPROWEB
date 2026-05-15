@@ -44,20 +44,14 @@ def test_overnight_anchors_ascending_uses_highest_and_lowest_close(
     assert low.time == datetime(2026, 5, 7, 17, 0, tzinfo=CT)
 
 
-def test_overnight_anchors_descending_uses_raw_wicks(
+def test_overnight_anchors_descending_still_uses_closes(
     es_candles_ascending_inside, es_offset, session_date
 ):
-    """For a DESCENDING channel: anchors are the raw highest WICK and
-    lowest WICK (h, l). The synthetic data is ascending-shaped but we
-    can still ask for the descending-rule anchors and verify they're the
-    raw extremes.
-    """
+    """Direction no longer changes ES overnight anchor extraction."""
     spx = _spx(es_candles_ascending_inside, es_offset)
     high, low = overnight_anchors(spx, session_date, direction="DESCENDING")
-    # Raw highest wick in window is 5872.40 (the 23:00 bar's h).
-    assert high.price == pytest.approx(5872.40)
-    # Raw lowest wick in window is 5848.20 (the 17:00 bar's l).
-    assert low.price == pytest.approx(5848.20)
+    assert high.price == pytest.approx(5870.00)
+    assert low.price == pytest.approx(5850.00)
 
 
 def test_overnight_anchors_window_excludes_after_midnight(
@@ -151,11 +145,13 @@ def test_prev_rth_anchors_reads_thursday(es_candles_ascending_inside, es_offset,
     res = prev_rth_anchors(spx, session_date)
     assert res is not None
     high, low = res
-    assert high.price == pytest.approx(5878.50)
-    assert low.price == pytest.approx(5849.00)
+    assert high.price == pytest.approx(5876.00)
+    # Low Pivot is the lowest post-noon wick, not the lowest close.
+    assert low.price == pytest.approx(5867.00)
+    assert low.time == datetime(2026, 5, 7, 12, 0, tzinfo=CT)
 
 
-def test_build_lines_ascending_has_four_lines(es_candles_ascending_inside, es_offset, session_date):
+def test_build_lines_builds_previous_rth_framework(es_candles_ascending_inside, es_offset, session_date):
     spx = _spx(es_candles_ascending_inside, es_offset)
     high, low = overnight_anchors(spx, session_date)
     prev = prev_rth_anchors(spx, session_date)
@@ -167,10 +163,47 @@ def test_build_lines_ascending_has_four_lines(es_candles_ascending_inside, es_of
         prev_rth_low=prev[1],
     )
     kinds = {l.kind for l in lines}
-    assert kinds == {"CHANNEL_FLOOR", "CHANNEL_CEILING", "PREV_RTH_HIGH_ASC", "PREV_RTH_LOW_DESC"}
+    assert kinds == {
+        "PREV_RTH_HIGH_ASC",
+        "PREV_RTH_HIGH_DESC",
+        "PREV_RTH_LOW_ASC",
+        "PREV_RTH_LOW_DESC",
+    }
 
 
-def test_build_lines_none_direction_omits_channel_rails():
+def test_build_lines_adds_minor_overnight_high_when_above_prev_rth():
+    prev_high = Anchor(price=5876.00, time=datetime(2026, 5, 7, 13, tzinfo=CT))
+    prev_low = Anchor(price=5867.00, time=datetime(2026, 5, 7, 12, tzinfo=CT))
+    overnight_high = Anchor(price=5881.25, time=datetime(2026, 5, 7, 23, tzinfo=CT))
+    overnight_low = Anchor(price=5850.00, time=datetime(2026, 5, 7, 17, tzinfo=CT))
+    lines = build_lines(
+        direction="ASCENDING",
+        overnight_high=overnight_high,
+        overnight_low=overnight_low,
+        prev_rth_high=prev_high,
+        prev_rth_low=prev_low,
+    )
+    swing_high = next(l for l in lines if l.kind == "SWING_HIGH_ASC")
+    assert swing_high.anchor.price == pytest.approx(5881.25)
+    assert swing_high.slope_per_hour > 0
+
+
+def test_build_lines_skips_minor_overnight_high_when_not_above_prev_rth():
+    prev_high = Anchor(price=5876.00, time=datetime(2026, 5, 7, 13, tzinfo=CT))
+    prev_low = Anchor(price=5867.00, time=datetime(2026, 5, 7, 12, tzinfo=CT))
+    overnight_high = Anchor(price=5875.50, time=datetime(2026, 5, 7, 23, tzinfo=CT))
+    overnight_low = Anchor(price=5850.00, time=datetime(2026, 5, 7, 17, tzinfo=CT))
+    lines = build_lines(
+        direction="ASCENDING",
+        overnight_high=overnight_high,
+        overnight_low=overnight_low,
+        prev_rth_high=prev_high,
+        prev_rth_low=prev_low,
+    )
+    assert "SWING_HIGH_ASC" not in {l.kind for l in lines}
+
+
+def test_build_lines_without_previous_rth_pivots_resolves_empty():
     high = Anchor(price=5872.40, time=datetime(2026, 5, 7, 23, tzinfo=CT))
     low = Anchor(price=5848.20, time=datetime(2026, 5, 7, 17, tzinfo=CT))
     lines = build_lines(direction="NONE", overnight_high=high, overnight_low=low,
@@ -181,7 +214,7 @@ def test_build_lines_none_direction_omits_channel_rails():
 def test_project_line_arithmetic():
     from _lib.spx.channel import Line
     anchor_t = datetime(2026, 5, 7, 17, tzinfo=CT)
-    line = Line("CHANNEL_FLOOR", Anchor(5848.20, anchor_t), 1.04)
+    line = Line("PREV_RTH_LOW_ASC", Anchor(5848.20, anchor_t), 1.04)
     # 16 hours later: 5848.20 + 16 * 1.04 = 5864.84
     later = datetime(2026, 5, 8, 9, tzinfo=CT)
     assert project_line(line, later) == pytest.approx(5864.84)

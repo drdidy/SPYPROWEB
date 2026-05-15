@@ -26,6 +26,7 @@ import { headers } from "next/headers";
 import type { SPXSnapshot } from "./types";
 import { spxSnapshot as mockSnapshot } from "./spx-mock-data";
 import { applySpxSessionGate } from "./snapshot-adapter";
+import { canonicalizeEsSnapshot } from "./canonical-es";
 
 export type SnapshotSource = "live" | "mock";
 
@@ -90,8 +91,10 @@ export async function loadSnapshot(
   // present.
   const isReplay =
     !!replayDate && /^\d{4}-\d{2}-\d{2}$/.test(replayDate);
-  const maybeGate = (s: SPXSnapshot) =>
-    isReplay ? s : applySpxSessionGate(s);
+  const maybeGate = (s: SPXSnapshot) => {
+    const canonical = canonicalizeEsSnapshot(s);
+    return isReplay ? canonical : applySpxSessionGate(canonical);
+  };
 
   if (!base) {
     return {

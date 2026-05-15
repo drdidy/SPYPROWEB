@@ -13,7 +13,7 @@ export const FAQS = [
   },
   {
     q: "Which symbols are covered?",
-    a: "SPY and SPX, side by side. Each gets its own surface tuned to how it actually trades. We'll add other liquid index instruments when our read on them is as good.",
+    a: "SPY and ES, side by side. Each gets its own surface tuned to how it actually trades. We'll add other liquid index instruments when our read on them is as good.",
   },
   {
     q: "How does Prophet decide?",
@@ -24,8 +24,8 @@ export const FAQS = [
     a: "The workspace shows your local time. Underneath, the read is anchored to the market's home zone. You don't have to think about it.",
   },
   {
-    q: "What's in the closed beta?",
-    a: "Today's decision, the ES channel, the levels in play, the structure read, the day's foresight, the options cockpit, the signal log, and a daily brief.",
+    q: "What's included today?",
+    a: "Today's decision, the ES Pivot Fan, the levels in play, the structure read, the day's foresight, the options cockpit, the signal log, and a daily brief.",
   },
   {
     q: "Is it advice?",

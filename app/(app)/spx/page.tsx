@@ -7,19 +7,49 @@ import { permanentRedirect } from "next/navigation";
 // working.
 //
 // `permanentRedirect` (308) preserves the request method and is
-// SEO-correct for a route rename. The `?date=` query string is
-// carried through to the new URL.
+// SEO-correct for a route rename. Query parameters are carried
+// through so older replay/channel deep links do not lose their
+// timestamp, session, event, or overlay context.
 
 export const dynamic = "force-dynamic";
 
 interface PageProps {
-  searchParams?: { date?: string };
+  searchParams?: Record<string, string | string[] | undefined>;
 }
 
 export default function Page({ searchParams }: PageProps) {
-  const qs =
-    searchParams?.date && /^\d{4}-\d{2}-\d{2}$/.test(searchParams.date)
-      ? `?date=${searchParams.date}`
-      : "";
+  const qs = buildQueryString(searchParams);
   permanentRedirect(`/es${qs}`);
+}
+
+function buildQueryString(
+  searchParams?: Record<string, string | string[] | undefined>,
+): string {
+  if (!searchParams) return "";
+
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(searchParams)) {
+    if (!isSafeQueryKey(key)) continue;
+    if (Array.isArray(value)) {
+      for (const item of value) appendSafeValue(params, key, item);
+    } else {
+      appendSafeValue(params, key, value);
+    }
+  }
+
+  const serialized = params.toString();
+  return serialized ? `?${serialized}` : "";
+}
+
+function appendSafeValue(
+  params: URLSearchParams,
+  key: string,
+  value: string | undefined,
+) {
+  if (typeof value !== "string" || value.length === 0 || value.length > 160) return;
+  params.append(key, value);
+}
+
+function isSafeQueryKey(key: string): boolean {
+  return /^[a-zA-Z0-9_-]{1,48}$/.test(key);
 }

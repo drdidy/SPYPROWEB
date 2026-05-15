@@ -163,7 +163,7 @@ export const latestSignal: TradeSignal = {
   targetLineName: "UD-1",
   rr: 2.4,
   explanation:
-    "Hourly close 0.04 above UA-1 with wick rejection ratio 0.62. Awaiting next-candle confirmation before arming.",
+    "Qualified structure check is active. Awaiting confirmation before arming.",
 };
 
 // ---- Signal quality ----
@@ -283,7 +283,7 @@ export type NavItem = { label: string; href: string; group: string };
 export const navIndex: NavItem[] = [
   { label: "Decision Slate", href: "/dashboard", group: "Workspace" },
   { label: "SPY Channel", href: "/spy", group: "Workspace" },
-  { label: "SPX Channel", href: "/spx", group: "Workspace" },
+  { label: "ES Channel", href: "/es", group: "Workspace" },
   { label: "Foresight", href: "/foresight", group: "Workspace" },
   { label: "Options Cockpit", href: "/options", group: "Execution" },
   { label: "Market Context", href: "/context", group: "Intelligence" },
@@ -293,3 +293,4 @@ export const navIndex: NavItem[] = [
   { label: "Signal Log", href: "/log", group: "Journal" },
   { label: "Configuration", href: "/settings", group: "Journal" },
 ];
+

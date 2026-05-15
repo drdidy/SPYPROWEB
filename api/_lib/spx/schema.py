@@ -5,7 +5,7 @@ Pydantic mirror of the TypeScript ``SPXSnapshot`` contract in
 return this shape; the Next.js shell consumes it directly.
 
 The contract is symbol-agnostic about *where the engine lives* — once the
-SPX core (overnight channel determination, six-line projection, scenario
+SPX core (previous-RTH pivot projection, scenario
 classifier, confluence) is integrated under ``api/``, an adapter populates
 ``SPXSnapshot`` and the surface starts rendering live.
 """
@@ -29,11 +29,23 @@ SPXScenario = Literal[
     "OUTSIDE_PLAY",
 ]
 SPXLineKind = Literal[
-    "CHANNEL_CEILING",
-    "CHANNEL_FLOOR",
     "PREV_RTH_HIGH_ASC",
+    "PREV_RTH_HIGH_DESC",
+    "PREV_RTH_LOW_ASC",
     "PREV_RTH_LOW_DESC",
+    "SWING_HIGH_ASC",
+    "SWING_HIGH_DESC",
+    "SWING_LOW_ASC",
+    "SWING_LOW_DESC",
 ]
+SPXFanZone = Literal[
+    "ABOVE_BOTH_CEILINGS",
+    "BETWEEN_CEILINGS",
+    "BELOW_BOTH_CEILINGS",
+    "BELOW_HIGH_FLOOR",
+    "PENDING",
+]
+SPXRthBiasDirection = Literal["BULLISH", "BEARISH", "PENDING"]
 SPXAction = Literal["TAKE", "SELECTIVE", "STAND_DOWN"]
 SPXSide = Literal["BUY", "SELL"]
 SPXContractType = Literal["CALL", "PUT"]
@@ -46,8 +58,6 @@ SPXConfluenceKey = Literal[
     "asian",
     "london",
     "reaction",
-    "factor4_tbd",
-    "factor5_tbd",
 ]
 
 
@@ -72,6 +82,8 @@ class SPXLine(BaseModel):
     anchor_time: str = Field(..., alias="anchorTime")
     slope_per_hour: float = Field(..., alias="slopePerHour")
     current_value: float = Field(..., alias="currentValue")
+    entry_value: float | None = Field(default=None, alias="entryValue")
+    entry_reference_time: str | None = Field(default=None, alias="entryReferenceTime")
     distance_from_price: float = Field(..., alias="distanceFromPrice")
 
     model_config = {"populate_by_name": True}
@@ -206,6 +218,28 @@ class SPXScoreBands(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class SPXFanRead(BaseModel):
+    zone: SPXFanZone
+    label: str
+    summary: str
+    primary_reference: Optional[SPXLineKind] = Field(default=None, alias="primaryReference")
+    secondary_reference: Optional[SPXLineKind] = Field(default=None, alias="secondaryReference")
+
+    model_config = {"populate_by_name": True}
+
+
+class SPXRthBias(BaseModel):
+    direction: SPXRthBiasDirection
+    open_price: Optional[float] = Field(default=None, alias="openPrice")
+    reference_line: Optional[SPXLineKind] = Field(default=None, alias="referenceLine")
+    reference_value: Optional[float] = Field(default=None, alias="referenceValue")
+    continuation_line: Optional[SPXLineKind] = Field(default=None, alias="continuationLine")
+    continuation_value: Optional[float] = Field(default=None, alias="continuationValue")
+    note: str
+
+    model_config = {"populate_by_name": True}
+
+
 class SPXSnapshot(BaseModel):
     symbol: Literal["SPX"] = "SPX"
     as_of: str = Field(..., alias="asOf")
@@ -214,6 +248,7 @@ class SPXSnapshot(BaseModel):
     overnight: SPXOvernight
     sessions: SPXSessions
     channel: SPXChannel
+    fan_read: Optional[SPXFanRead] = Field(default=None, alias="fanRead")
     lines: List[SPXLine]
     price: SPXPrice
 
@@ -241,5 +276,6 @@ class SPXSnapshot(BaseModel):
         default=None, alias="plannedEnvelope",
     )
     score_bands: Optional[SPXScoreBands] = Field(default=None, alias="scoreBands")
+    rth_bias: Optional[SPXRthBias] = Field(default=None, alias="rthBias")
 
     model_config = {"populate_by_name": True}

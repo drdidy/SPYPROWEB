@@ -1,15 +1,20 @@
+"use client";
+
 // State-aware command module for Decision Slate. This is the page's
 // visual anchor: a compact trading-desk panel with the current action,
 // structure rails, and countdowns in one glance.
 
 import Link from "next/link";
+import { useState, type ReactNode } from "react";
 import {
   ArrowRight,
   BookOpen,
+  ChevronLeft,
+  ChevronRight,
   Rewind,
   Activity,
   Target,
-  CalendarClock,
+  Hourglass,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -18,11 +23,18 @@ import {
   type Recommendation,
 } from "@/lib/recommendations";
 import { Countdown } from "@/components/decision-slate/Countdown";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import type { EngineState } from "@/lib/states";
 import {
   StructurePathChart,
   type StructureChartData,
 } from "./StructurePathChart";
+import { ContractProjectionCard } from "@/components/options/ContractProjection";
+import type { ContractProjection } from "@/lib/contract-projection";
+import { SLATE_COPY } from "@/content/copy";
+import { FeedHeartbeat } from "./FeedHealthProvider";
+import type { FeedId } from "@/lib/feed-health";
+import { VerdictActions } from "./VerdictActions";
 
 const ICONS: Record<Recommendation["id"], LucideIcon> = {
   "live-spy": Activity,
@@ -49,6 +61,16 @@ interface Props {
   spxEventVerb?: string;
   spyChart?: StructureChartData | null;
   spxChart?: StructureChartData | null;
+  spyProjection?: ContractProjection | null;
+  spxProjection?: ContractProjection | null;
+  spyEntryCostStatus?: EntryCostStatus;
+  spxEntryCostStatus?: EntryCostStatus;
+  compactHeader?: boolean;
+  slateDateLabel?: string;
+  sessionDate?: string;
+  unifiedChrome?: boolean;
+  entryCostInScorecard?: boolean;
+  feedId?: FeedId;
   className?: string;
 }
 
@@ -61,6 +83,16 @@ export function RecommendedAction({
   spxEventVerb = "opens",
   spyChart,
   spxChart,
+  spyProjection,
+  spxProjection,
+  spyEntryCostStatus = "waiting",
+  spxEntryCostStatus = "waiting",
+  compactHeader = false,
+  slateDateLabel,
+  sessionDate,
+  unifiedChrome = false,
+  entryCostInScorecard = false,
+  feedId,
   className,
 }: Props) {
   const rec = recommendationFor(spyState, spxState);
@@ -73,7 +105,16 @@ export function RecommendedAction({
       : spyState === "ARMED" || spxState === "ARMED"
         ? 82
       : 72;
-  const activeChart = rec.id === "live-spx" ? spxChart : spyChart ?? spxChart;
+  const activeChart =
+    rec.id === "live-spx"
+      ? spxChart
+      : rec.id === "live-spy"
+        ? spyChart
+        : spyChart ?? spxChart;
+  const activeProjection =
+    rec.id === "live-spx" ? spxProjection : spyProjection ?? spxProjection;
+  const activeEntryCostStatus =
+    rec.id === "live-spx" ? spxEntryCostStatus : spyEntryCostStatus;
   const chartAccent =
     rec.id === "live-spx"
       ? "violet"
@@ -88,8 +129,8 @@ export function RecommendedAction({
       aria-labelledby="recommended-action-heading"
       data-testid="recommended-action"
       className={cn(
-        "relative overflow-hidden rounded-card border border-[#C9A227]/70 bg-[#071116] text-paper",
-        "shadow-[0_18px_45px_-28px_rgba(20,22,26,0.75),inset_0_1px_0_rgba(255,255,255,0.08)]",
+        "relative overflow-hidden rounded-[22px] border border-[#C9A227]/75 bg-[#071116] text-paper",
+        "shadow-[0_26px_70px_-34px_rgba(7,17,22,0.95),inset_0_1px_0_rgba(255,255,255,0.08)]",
         className,
       )}
     >
@@ -102,15 +143,61 @@ export function RecommendedAction({
           backgroundSize: "48px 48px",
         }}
       />
-      <div className="relative grid lg:grid-cols-[1.05fr_1.2fr_220px]">
-        <div className="px-6 py-6 md:px-7 md:py-7">
+      <div className="relative border-b border-paper/10 px-5 py-3 md:px-7">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-gold-soft">
+              Command workspace
+            </span>
+            <span aria-hidden className="h-px w-10 bg-gold/45" />
+            <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-paper/48">
+              Decision Slate
+            </span>
+            {compactHeader && slateDateLabel && (
+              <>
+                <span aria-hidden className="h-px w-6 bg-paper/18" />
+                <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-paper/46">
+                  {slateDateLabel}
+                </span>
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            {compactHeader && (
+              <InfoTooltip
+                label={SLATE_COPY.helpAboutSlate.title}
+                content={SLATE_COPY.helpAboutSlate.body}
+                placement="bottom"
+              >
+                <span
+                  aria-label="About the Decision Slate"
+                  className={cn(
+                    "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
+                    "border border-paper/12 bg-paper/[0.045] text-[11px] font-bold text-paper/70",
+                    "transition-colors hover:bg-paper/[0.08] hover:text-paper",
+                    "outline-none focus-visible:ring-2 focus-visible:ring-gold/60",
+                  )}
+                >
+                  ?
+                </span>
+              </InfoTooltip>
+            )}
+            <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-paper/46">
+              Discipline before conviction
+            </div>
+            {feedId && <FeedHeartbeat feedId={feedId} />}
+          </div>
+        </div>
+      </div>
+      <div className="relative grid gap-0 lg:grid-cols-[180px_minmax(0,1fr)] xl:grid-cols-[210px_minmax(0,1fr)]">
+        <div className="px-5 py-6 md:px-6 md:py-7">
           <p
             id="recommended-action-heading"
             className="font-mono text-[10px] tracking-[0.20em] uppercase text-gold-soft font-semibold"
           >
             Recommended next step
           </p>
-          <h2 className="mt-2 font-serif text-[42px] leading-none text-paper md:text-[48px]">
+          <h2 className="mt-2 font-serif text-[40px] leading-[0.94] text-paper md:text-[48px]">
             {command.title}
           </h2>
           <p className="mt-2 font-mono text-[11px] tracking-[0.12em] uppercase text-paper/70">
@@ -124,7 +211,7 @@ export function RecommendedAction({
             href={rec.href}
             data-recommendation-id={rec.id}
             className={cn(
-              "mt-6 inline-flex h-10 items-center gap-2 rounded-pill px-4",
+              "mt-6 inline-flex h-10 items-center gap-1.5 rounded-pill px-3 whitespace-nowrap",
               "bg-paper text-ink transition-colors hover:bg-gold-soft",
               "font-mono text-[12px] tracking-[0.06em] font-semibold",
               "outline-none focus-visible:ring-2 focus-visible:ring-gold/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#071116]",
@@ -134,20 +221,53 @@ export function RecommendedAction({
             {rec.label}
             <ArrowRight size={12} className="opacity-70" aria-hidden />
           </Link>
+          <VerdictActions
+            verdictState={command.title}
+            spyState={spyState}
+            spxState={spxState}
+            sessionDate={sessionDate ?? new Date().toISOString().slice(0, 10)}
+          />
 
-          <div className="mt-7 grid max-w-2xl grid-cols-2 gap-y-4 border-l-2 border-gold pl-4 md:grid-cols-4 md:divide-x md:divide-paper/20">
-            <HeroMetric label="Confidence" value={`${confidence}%`} tone="text-gold-soft" />
-            <HeroMetric label="Risk exposure" value="Low" tone="text-bull-soft" />
-            <HeroMetric label="Reward setup" value="Neutral" tone="text-gold-soft" />
-            <HeroMetric label="Trend context" value="Range" tone="text-paper" />
-          </div>
+          <ScorecardMetrics
+            confidence={confidence}
+            activeProjection={activeProjection}
+            entryCostStatus={activeEntryCostStatus}
+            className="mt-7 lg:hidden"
+          />
+          {!entryCostInScorecard && activeProjection ? (
+            <ContractProjectionCard
+              projection={activeProjection}
+              compact
+              className="mt-5 border-paper/15 bg-paper/[0.06] text-paper [&_.text-ink]:!text-paper [&_.text-ink-3]:!text-paper/58 [&_.text-ink-4]:!text-paper/42 [&_.bg-paper]:!bg-paper/[0.08] [&_.bg-paper-2\\/55]:!bg-paper/[0.08]"
+            />
+          ) : !entryCostInScorecard ? (
+            <div className="mt-5 rounded-soft border border-paper/10 bg-paper/[0.045] px-3 py-2.5">
+              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-paper/42">
+                Entry cost model
+              </p>
+              <p className="mt-1 text-[12px] leading-snug text-paper/58">
+                Publishes when the live option chain has usable Greeks. No placeholder debit is shown.
+              </p>
+            </div>
+          ) : null}
         </div>
 
-        <CommandRailDiagram chart={activeChart} accent={chartAccent} />
+        <CommandRailDiagram
+          spyChart={spyChart}
+          spxChart={spxChart}
+          spyProjection={spyProjection}
+          spxProjection={spxProjection}
+          spyEntryCostStatus={spyEntryCostStatus}
+          spxEntryCostStatus={spxEntryCostStatus}
+          initialEngine={rec.id === "live-spx" ? "ES" : "SPY"}
+          fallbackAccent={chartAccent}
+          frameless={unifiedChrome}
+          confidence={confidence}
+        />
 
-        <aside className="border-t border-paper/10 px-6 py-5 lg:border-l lg:border-t-0 lg:px-5 lg:py-7">
+        <aside className="border-t border-paper/10 px-6 py-5 lg:col-span-2 lg:px-6 lg:py-5">
           <div className="flex items-center gap-2 text-gold-soft">
-            <CalendarClock size={15} aria-hidden />
+            <Hourglass size={15} aria-hidden />
             <span className="font-mono text-[10px] tracking-[0.18em] uppercase font-semibold">
               Next event
             </span>
@@ -155,10 +275,10 @@ export function RecommendedAction({
           {showContext && (
             <div
               data-testid="recommended-action-context"
-              className="mt-4 space-y-4 font-mono text-meta tabular-nums text-paper/78"
+              className="mt-4 grid gap-3 font-mono text-meta tabular-nums text-paper/78 sm:grid-cols-2 xl:grid-cols-4"
             >
               {spyNextEventISO && (
-                <div>
+                <div className="rounded-soft border border-paper/10 bg-paper/[0.035] px-3 py-2.5">
                   <div className="text-[10px] uppercase tracking-[0.16em] text-paper/45">
                     SPY {spyEventVerb}
                   </div>
@@ -168,7 +288,7 @@ export function RecommendedAction({
                 </div>
               )}
               {spxNextEventISO && (
-                <div className="border-t border-paper/10 pt-4">
+                <div className="rounded-soft border border-paper/10 bg-paper/[0.035] px-3 py-2.5">
                   <div className="text-[10px] uppercase tracking-[0.16em] text-paper/45">
                     ES {spxEventVerb}
                   </div>
@@ -177,7 +297,7 @@ export function RecommendedAction({
                   </div>
                 </div>
               )}
-              <div className="border-t border-paper/10 pt-4">
+              <div className="rounded-soft border border-paper/10 bg-paper/[0.035] px-3 py-2.5">
                 <div className="text-[10px] uppercase tracking-[0.16em] text-paper/45">
                   Data window
                 </div>
@@ -185,9 +305,9 @@ export function RecommendedAction({
                   {activeChart ? `${activeChart.label} ${activeChart.date}` : "Awaiting bars"}
                 </div>
               </div>
-              <div className="border-t border-paper/10 pt-4">
+              <div className="rounded-soft border border-paper/10 bg-paper/[0.035] px-3 py-2.5">
                 <div className="text-[10px] uppercase tracking-[0.16em] text-gold-soft">
-                  Hold filter
+                  Session posture
                 </div>
                 <div className="mt-1 text-paper">Neutral</div>
               </div>
@@ -203,41 +323,435 @@ function HeroMetric({
   label,
   value,
   tone,
+  tooltip,
+  compact = false,
+  className,
 }: {
   label: string;
   value: string;
   tone: string;
+  tooltip?: string;
+  compact?: boolean;
+  className?: string;
 }) {
   return (
-    <div className="md:px-5 first:md:pl-0">
-      <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-gold-soft/80">
-        {label}
+    <div
+      className={cn(
+        "rounded-soft border border-paper/10 bg-paper/[0.045]",
+        compact ? "min-h-[74px] px-3 py-2" : "px-3 py-2.5",
+        className,
+      )}
+    >
+      <div
+        className={cn(
+          "flex items-center gap-1.5 font-mono uppercase text-paper/42",
+          compact
+            ? "text-[8px] tracking-[0.13em]"
+            : "text-[9px] tracking-[0.16em]",
+        )}
+      >
+        <span>{label}</span>
+        {tooltip && (
+          <InfoTooltip label={label} content={tooltip} placement="top">
+            <span
+              aria-label={`${label} details`}
+              className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-paper/12 text-[9px] text-paper/58 outline-none focus-visible:ring-2 focus-visible:ring-gold/60"
+            >
+              ?
+            </span>
+          </InfoTooltip>
+        )}
       </div>
-      <div className={cn("mt-1 font-serif text-[23px] leading-none", tone)}>
+      <div
+        className={cn(
+          "mt-1 font-serif leading-none",
+          compact ? "text-[19px]" : "text-[23px]",
+          tone,
+        )}
+      >
         {value}
       </div>
     </div>
   );
 }
 
-function CommandRailDiagram({
-  chart,
-  accent,
+function ScorecardMetrics({
+  confidence,
+  activeProjection,
+  entryCostStatus,
+  compact = false,
+  className,
 }: {
-  chart?: StructureChartData | null;
-  accent: "bull" | "gold" | "violet" | "neutral";
+  confidence: number;
+  activeProjection?: ContractProjection | null;
+  entryCostStatus: EntryCostStatus;
+  compact?: boolean;
+  className?: string;
 }) {
+  const entryTone = activeProjection
+    ? "text-gold-soft"
+    : entryCostStatus === "active"
+      ? "text-bull-soft"
+      : compact
+      ? "text-paper/76 text-[15px] leading-tight"
+      : "text-paper/72 text-[19px] leading-tight";
+  const entryCopy = entryCostCopy(activeProjection, entryCostStatus);
+
+  if (compact) {
+    return (
+      <div
+        className={cn(
+          "grid grid-cols-5 gap-2 rounded-[12px] border border-paper/10 bg-[#071116]/88 p-2 shadow-[0_18px_50px_-38px_rgba(0,0,0,0.95)]",
+          className,
+        )}
+      >
+        <HeroMetric compact label="Confidence" value={`${confidence}%`} tone="text-gold-soft" />
+        <HeroMetric compact label="Risk exposure" value="Low" tone="text-bull-soft" />
+        <HeroMetric compact label="Reward setup" value="Neutral" tone="text-gold-soft" />
+        <HeroMetric compact label="Trend context" value="Range" tone="text-paper" />
+        <HeroMetric
+          compact
+          label="Entry cost"
+          value={entryCopy.value}
+          tone={entryTone}
+          tooltip={entryCopy.tooltip}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="hidden min-h-[238px] border-t border-paper/10 px-4 py-7 lg:block lg:border-t-0">
-      <div className="relative h-full min-h-[190px]">
-        <StructurePathChart
-          data={chart}
-          variant="dark"
-          accent={accent}
-          height={190}
-          title="recommended path"
+    <div className={cn("max-w-2xl", className)}>
+      <div className="grid grid-cols-2 gap-2">
+        <HeroMetric label="Confidence" value={`${confidence}%`} tone="text-gold-soft" />
+        <HeroMetric label="Risk exposure" value="Low" tone="text-bull-soft" />
+        <HeroMetric label="Reward setup" value="Neutral" tone="text-gold-soft" />
+        <HeroMetric label="Trend context" value="Range" tone="text-paper" />
+      </div>
+      <div className="mt-2">
+        <HeroMetric
+          label="Entry cost"
+          value={entryCopy.value}
+          tone={entryTone}
+          tooltip={entryCopy.tooltip}
+          className="min-h-[70px]"
         />
       </div>
     </div>
   );
+}
+
+function CommandRailDiagram({
+  spyChart,
+  spxChart,
+  spyProjection,
+  spxProjection,
+  spyEntryCostStatus,
+  spxEntryCostStatus,
+  initialEngine,
+  fallbackAccent,
+  frameless = false,
+  confidence,
+}: {
+  spyChart?: StructureChartData | null;
+  spxChart?: StructureChartData | null;
+  spyProjection?: ContractProjection | null;
+  spxProjection?: ContractProjection | null;
+  spyEntryCostStatus: EntryCostStatus;
+  spxEntryCostStatus: EntryCostStatus;
+  initialEngine: "SPY" | "ES";
+  fallbackAccent: "bull" | "gold" | "violet" | "neutral";
+  frameless?: boolean;
+  confidence: number;
+}) {
+  const [engine, setEngine] = useState<"SPY" | "ES">(initialEngine);
+  const [direction, setDirection] = useState<"left" | "right">("right");
+  const chart = engine === "ES" ? spxChart : spyChart;
+  const projection = engine === "ES" ? spxProjection : spyProjection;
+  const entryCostStatus = engine === "ES" ? spxEntryCostStatus : spyEntryCostStatus;
+  const accent = engine === "ES" ? "violet" : fallbackAccent;
+  const otherEngine = engine === "SPY" ? "ES" : "SPY";
+
+  const selectEngine = (next: "SPY" | "ES") => {
+    if (next === engine) return;
+    setDirection(next === "ES" ? "right" : "left");
+    setEngine(next);
+  };
+
+  const metricRail = (
+    <ScorecardMetrics
+      confidence={confidence}
+      activeProjection={projection}
+      entryCostStatus={entryCostStatus}
+      compact
+    />
+  );
+
+  if (!chart) {
+    return (
+      <div className="hidden min-h-[820px] border-t border-paper/10 px-3 py-6 lg:block lg:border-l lg:border-t-0">
+        <div
+          className={cn(
+            "relative flex h-full min-h-[768px] flex-col gap-4 overflow-hidden px-7 py-7 text-center",
+            frameless
+              ? "rounded-none border-0 bg-paper/[0.018]"
+              : "rounded-[10px] border border-paper/10 bg-paper/[0.035]",
+          )}
+        >
+          <ChartLensSwitcher
+            engine={engine}
+            otherEngine={otherEngine}
+            onSelect={selectEngine}
+          />
+          <EmptyWorkspaceChart />
+          {metricRail}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="hidden min-h-[820px] border-t border-paper/10 px-3 py-6 lg:block lg:border-l lg:border-t-0">
+      <div className="relative flex h-full min-h-[768px] flex-col gap-4">
+        <ChartLensSwitcher
+          engine={engine}
+          otherEngine={otherEngine}
+          onSelect={selectEngine}
+        />
+        <div
+          key={engine}
+          className={cn(
+            "slate-lens-panel",
+            direction === "right"
+              ? "slate-lens-enter-right"
+              : "slate-lens-enter-left",
+          )}
+        >
+          <StructurePathChart
+            data={chart}
+            variant="dark"
+            accent={accent}
+            height={610}
+            title={`${engine} path vs structure`}
+            frameless={frameless}
+          />
+        </div>
+        {metricRail}
+        <style>{lensStyles}</style>
+      </div>
+    </div>
+  );
+}
+
+function ChartLensSwitcher({
+  engine,
+  otherEngine,
+  onSelect,
+}: {
+  engine: "SPY" | "ES";
+  otherEngine: "SPY" | "ES";
+  onSelect: (engine: "SPY" | "ES") => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-[12px] border border-paper/10 bg-paper/[0.04] px-3 py-2">
+      <div>
+        <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-paper/45">
+          Workspace lens
+        </div>
+        <div className="mt-0.5 font-mono text-[11px] uppercase tracking-[0.12em] text-gold-soft">
+          {engine} structure chart
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <div
+          role="tablist"
+          aria-label="Workspace chart engine"
+          className="grid grid-cols-2 rounded-pill border border-paper/10 bg-[#071116]/72 p-1"
+        >
+          {(["SPY", "ES"] as const).map((item) => (
+            <button
+              key={item}
+              type="button"
+              role="tab"
+              aria-selected={engine === item}
+              onClick={() => onSelect(item)}
+              className={cn(
+                "h-8 rounded-pill px-3 font-mono text-[11px] uppercase tracking-[0.10em] transition",
+                "outline-none focus-visible:ring-2 focus-visible:ring-gold/60",
+                engine === item
+                  ? "bg-paper text-ink"
+                  : "text-paper/58 hover:text-paper",
+              )}
+            >
+              {item}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => onSelect(otherEngine)}
+          aria-label={`Show ${otherEngine} chart`}
+          className={cn(
+            "group inline-flex h-9 w-9 items-center justify-center rounded-full",
+            "border border-gold/35 bg-gold-soft/10 text-gold-soft transition",
+            "hover:bg-gold-soft hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/70",
+          )}
+        >
+          {engine === "SPY" ? (
+            <ChevronRight
+              size={16}
+              className="transition-transform group-hover:translate-x-0.5"
+              aria-hidden
+            />
+          ) : (
+            <ChevronLeft
+              size={16}
+              className="transition-transform group-hover:-translate-x-0.5"
+              aria-hidden
+            />
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const lensStyles = `
+  @keyframes slateLensFromRight {
+    from { opacity: 0; transform: translateX(22px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes slateLensFromLeft {
+    from { opacity: 0; transform: translateX(-22px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  .slate-lens-panel {
+    will-change: opacity, transform;
+  }
+  .slate-lens-enter-right {
+    animation: slateLensFromRight 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .slate-lens-enter-left {
+    animation: slateLensFromLeft 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .slate-lens-enter-right,
+    .slate-lens-enter-left {
+      animation: none !important;
+    }
+  }
+`;
+
+function EmptyWorkspaceChart() {
+  return (
+    <div className="relative flex min-h-[376px] w-full flex-1 flex-col">
+      <div className="flex items-center justify-between gap-3 border-b border-paper/10 pb-3">
+        <div className="text-left">
+          <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-paper/42">
+            Recommended path
+          </p>
+          <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.16em] text-gold-soft/72">
+            Awaiting bars and rails
+          </p>
+        </div>
+        <span className="rounded-[4px] border border-paper/10 bg-paper/[0.035] px-2 py-1 font-mono text-[8px] uppercase tracking-[0.14em] text-paper/42">
+          No synthetic chart
+        </span>
+      </div>
+
+      <div className="relative flex-1">
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.07)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:52px_52px] opacity-55"
+        />
+        <svg
+          aria-hidden
+          className="absolute inset-0 h-full w-full"
+          viewBox="0 0 720 420"
+          preserveAspectRatio="none"
+        >
+          {[80, 180, 280, 360].map((y, index) => (
+            <line
+              key={y}
+              x1="36"
+              x2="684"
+              y1={y}
+              y2={y}
+              stroke="rgba(244,228,192,0.18)"
+              strokeWidth={index === 1 ? 1.6 : 1}
+              strokeDasharray={index === 1 ? "none" : "8 10"}
+            />
+          ))}
+          <path
+            d="M 54 314 C 156 286 218 272 304 288 S 468 304 652 244"
+            fill="none"
+            stroke="rgba(244,228,192,0.24)"
+            strokeWidth="2.2"
+            strokeDasharray="10 14"
+          />
+          <circle cx="54" cy="314" r="4" fill="rgba(244,228,192,0.45)" />
+          <circle cx="652" cy="244" r="4" fill="rgba(244,228,192,0.45)" />
+        </svg>
+        <div className="absolute inset-0 grid place-items-center">
+          <div className="max-w-md rounded-[12px] border border-paper/10 bg-[#071116]/88 px-6 py-5 shadow-[0_18px_50px_-35px_rgba(0,0,0,0.9)]">
+            <div className="mx-auto grid h-14 w-14 place-items-center rounded-[14px] border border-gold/25 bg-gold-soft/10 text-gold-soft">
+              <span className="h-3 w-3 rounded-full bg-current animate-breathe" />
+            </div>
+            <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.18em] text-gold-soft/76">
+              Workspace chart awaiting bars
+            </p>
+            <p className="mx-auto mt-3 max-w-sm text-[14px] leading-relaxed text-paper/68">
+              Actual price path, rails, and line touches will fill this canvas
+              when the data feed resolves. Until then, no fake levels are drawn.
+            </p>
+            <div className="mx-auto mt-5 grid max-w-sm grid-cols-3 gap-2 font-mono text-[9px] uppercase tracking-[0.12em] text-paper/48">
+              <span className="rounded-soft border border-paper/10 bg-paper/[0.04] px-2 py-2">
+                No fake chart
+              </span>
+              <span className="rounded-soft border border-paper/10 bg-paper/[0.04] px-2 py-2">
+                No entry
+              </span>
+              <span className="rounded-soft border border-paper/10 bg-paper/[0.04] px-2 py-2">
+                Brief first
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type EntryCostStatus = "active" | "waiting" | "unavailable";
+
+function entryCostCopy(
+  projection: ContractProjection | null | undefined,
+  status: EntryCostStatus,
+): { value: string; tooltip: string } {
+  if (projection) {
+    return {
+      value: `$${projection.projectedEntry.debitPerContract}`,
+      tooltip:
+        "Estimated option debit at the planned entry line from the live chain and Greeks.",
+    };
+  }
+  if (status === "active") {
+    return {
+      value: "Chain active",
+      tooltip:
+        "The option chain is live. No debit is shown because the current slate has no unresolved entry projection with a valid option quote.",
+    };
+  }
+  if (status === "unavailable") {
+    return {
+      value: "No chain",
+      tooltip:
+        "The option-chain feed is unavailable for this engine right now, so the slate will not invent a debit.",
+    };
+  }
+  return {
+    value: "Chain waiting",
+    tooltip:
+      "The entry-cost model publishes only after the live option chain returns a usable quote and Greeks for the planned entry.",
+  };
 }

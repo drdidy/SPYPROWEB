@@ -5,6 +5,7 @@ import { SectionLabel } from "@/components/ui/SectionLabel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { loadLiveSnapshot } from "@/lib/snapshot-fetch";
+import { nearReferencePriceLabel } from "@/lib/market-data-quality";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -28,18 +29,18 @@ export default async function Page() {
       <PageHeader
         eyebrow="Intelligence - 09"
         title="Order Flow"
-        lede="Unusual Whales options flow and dealer gamma exposure."
+        lede="Options-flow pressure, dark-pool context, and dealer gamma exposure."
         source={source}
       />
 
       {!flow && !gex ? (
         <CommandEmptyState
-          eyebrow="Flow feed standby"
+          eyebrow="Flow feed unavailable"
           title="No flow or GEX feed is available."
-          body="The app is not receiving Unusual Whales flow or dealer gamma in this snapshot. No substitute prints, premiums, or flip points are rendered until the upstream provides them."
+          body="The app is not receiving options-flow or dealer-gamma data in this snapshot. No substitute prints, premiums, or flip points are rendered until the upstream provides them."
           rows={[
-            { label: "Flow", value: "Waiting" },
-            { label: "GEX", value: "Waiting" },
+            { label: "Flow", value: "Unavailable" },
+            { label: "GEX", value: "Unavailable" },
             { label: "Policy", value: "No fake tape" },
           ]}
         />
@@ -66,8 +67,8 @@ export default async function Page() {
             />
             <CommandStat
               label="Flip point"
-              value={gex?.flipPoint !== null && gex?.flipPoint !== undefined ? gex.flipPoint.toFixed(2) : "-"}
-              note="If supplied by feed"
+              value={nearReferencePriceLabel(gex?.flipPoint, snap.currentPrice)}
+              note={gex ? "Checked against SPY spot" : "If supplied by feed"}
               tone="teal"
             />
           </div>
@@ -82,9 +83,9 @@ export default async function Page() {
             <CardBody>
               {!flow ? (
                 <CommandEmptyState
-                  eyebrow="Print tape"
+                  eyebrow="Print tape unavailable"
                   title="Flow has not returned yet."
-                  body="Unusual Whales returned no flow data for this snapshot. The premium bars and top prints appear only when the upstream response carries real prints."
+                  body="The options-flow provider returned no flow data for this snapshot. The premium bars and top prints appear only when the upstream response carries real prints."
                   rows={[
                     { label: "Ticker", value: "SPY" },
                     { label: "Premium", value: "Unavailable" },
@@ -143,7 +144,7 @@ export default async function Page() {
             />
             <CardBody>
               {!gex ? (
-                <div className="py-6 text-[13px] text-ink-3">GEX has not returned from Unusual Whales.</div>
+                <div className="py-6 text-[13px] text-ink-3">GEX has not returned from the options-flow provider.</div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <CommandStat
@@ -153,7 +154,7 @@ export default async function Page() {
                   />
                   <CommandStat
                     label="Flip point"
-                    value={gex.flipPoint !== null ? gex.flipPoint.toFixed(2) : "-"}
+                    value={nearReferencePriceLabel(gex.flipPoint, snap.currentPrice)}
                     tone="teal"
                   />
                 </div>

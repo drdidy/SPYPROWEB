@@ -6,6 +6,26 @@ entries grow newest-first.
 
 ## [Unreleased]
 
+### Production UI audit and shared polish
+
+- Added a full-route production UI/UX audit covering Landing, Decision Slate, Channels, Replay, Foresight, Options, Intelligence, Brief, Learning, Journal, Signal Log, and Configuration.
+- Compacted shared in-app page headers and removed non-semantic decorative header geometry from secondary workspaces.
+- Simplified shared empty-state chrome so missing data reads as an operational state rather than a marketing panel.
+- Added a shared compliance/build footer to app routes that did not already have a route-specific footer.
+- Removed user-facing provider names from Order Flow copy and kept the tab framed around measured flow/gamma data.
+- Gated the sidebar workspace label by runtime environment so local builds do not claim to be production.
+
+### ES Pivot Fan framework
+
+- Confirmed the ES Low Pivot is the post-noon RTH low wick, not the low close, and locked it with explicit tests.
+- Added the optional overnight higher-pivot minor ascending watch line when overnight closes above the prior RTH high close.
+- Labeled the minor line consistently in ES Channel, Dashboard, Replay, Foresight, and demo data without letting it override the major fan read.
+- Reframed the ES engine around a professional Pivot Fan model: High Fan Ceiling/Floor and Low Fan Ceiling/Floor.
+- Added `fanRead` to the ES snapshot contract so Dashboard, ES Channel, Brief, and Replay can display the same zone summary.
+- Updated ES play selection for above-ceilings, between-ceilings, below-ceilings, and below-High-Fan-Floor regimes, including the HP-ceiling sell to HP-floor and LP-ceiling buy through HP-ceiling reads.
+- Replaced stale ES "channel/rails/six-line" user-facing language across the app with Pivot Fan copy and labels.
+- Expanded SPX/ES engine tests for fan-zone classification, play construction, and API serialization.
+
 ### Decision Slate — presentation upgrade (P1)
 
 Twelve P1 items, all landed.

@@ -43,8 +43,15 @@ def _parse_date(path: str) -> date | None:
         return None
 
 
-def _fetch_intraday_5m(symbol: str, day: date) -> list[dict]:
-    """Pull 5m bars for `day`'s RTH session in CT."""
+def _fetch_intraday_5m(
+    symbol: str,
+    day: date,
+    *,
+    window_start: datetime,
+    window_end: datetime,
+    prepost: bool,
+) -> list[dict]:
+    """Pull 5m bars for `day` inside the replay window in CT."""
     try:
         import yfinance as yf
     except Exception:
@@ -61,7 +68,7 @@ def _fetch_intraday_5m(symbol: str, day: date) -> list[dict]:
             progress=False,
             auto_adjust=False,
             actions=False,
-            prepost=False,
+            prepost=prepost,
         )
     except Exception:
         return []
@@ -71,17 +78,13 @@ def _fetch_intraday_5m(symbol: str, day: date) -> list[dict]:
     if hasattr(df.columns, "nlevels") and df.columns.nlevels > 1:
         df.columns = df.columns.get_level_values(0)
 
-    # RTH window in CT: 08:30 - 15:00 inclusive.
-    rth_start = datetime.combine(day, time(8, 30), tzinfo=CT)
-    rth_end = datetime.combine(day, time(15, 0), tzinfo=CT)
-
     rows: list[dict] = []
     for ts, row in df.iterrows():
         try:
             ct_ts = ts.tz_convert(CT) if ts.tzinfo else ts.tz_localize("UTC").tz_convert(CT)
         except Exception:
             continue
-        if ct_ts < rth_start or ct_ts > rth_end:
+        if ct_ts < window_start or ct_ts > window_end:
             continue
         try:
             rows.append({
@@ -110,8 +113,20 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
             return
 
-        spy = _fetch_intraday_5m("SPY", target)
-        es = _fetch_intraday_5m("ES=F", target)
+        spy = _fetch_intraday_5m(
+            "SPY",
+            target,
+            window_start=datetime.combine(target, time(3, 0), tzinfo=CT),
+            window_end=datetime.combine(target, time(15, 0), tzinfo=CT),
+            prepost=True,
+        )
+        es = _fetch_intraday_5m(
+            "ES=F",
+            target,
+            window_start=datetime.combine(target - timedelta(days=1), time(17, 0), tzinfo=CT),
+            window_end=datetime.combine(target, time(15, 0), tzinfo=CT),
+            prepost=True,
+        )
 
         payload: dict = {
             "date": target.isoformat(),

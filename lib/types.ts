@@ -47,6 +47,11 @@ export interface DynamicLine {
   zoneType: ZoneType;
   isPrimary: boolean;
   currentValue: number; // value at "now"
+  entryValue?: number; // value at the 08:00 CT operating reference
+  entryReferenceTime?: string;
+  touchWindowStart?: string;
+  touchWindowEnd?: string;
+  liveValue?: number | null; // current projected value when currentValue is entry-anchored for display
   distanceFromPrice: number; // signed dollars
 }
 
@@ -143,7 +148,7 @@ export interface Candle {
 
 // ---------------------------------------------------------------------------
 // SPX Prophet — second symbol surface
-// Modeled on the SPPRO engine: overnight channel + previous-day RTH refs,
+// Modeled on the SPPRO engine: ES Pivot Fan + previous-day RTH refs,
 // scenario classifier, primary + alternate plays, confluence score.
 // ---------------------------------------------------------------------------
 
@@ -158,11 +163,22 @@ export type SPXScenario =
   | "BELOW_DESCENDING"
   | "OUTSIDE_PLAY"; // scenario 7: stand down
 
+export type SPXFanZone =
+  | "ABOVE_BOTH_CEILINGS"
+  | "BETWEEN_CEILINGS"
+  | "BELOW_BOTH_CEILINGS"
+  | "BELOW_HIGH_FLOOR"
+  | "PENDING";
+
 export type SPXLineKind =
-  | "CHANNEL_CEILING"
-  | "CHANNEL_FLOOR"
   | "PREV_RTH_HIGH_ASC"
-  | "PREV_RTH_LOW_DESC";
+  | "PREV_RTH_HIGH_DESC"
+  | "PREV_RTH_LOW_ASC"
+  | "PREV_RTH_LOW_DESC"
+  | "SWING_HIGH_ASC"
+  | "SWING_HIGH_DESC"
+  | "SWING_LOW_ASC"
+  | "SWING_LOW_DESC";
 
 export type SPXAction = "TAKE" | "SELECTIVE" | "STAND_DOWN";
 
@@ -185,6 +201,8 @@ export interface SPXLine {
   anchorTime: string;
   slopePerHour: number; // +1.04 or -1.04
   currentValue: number; // projected to as-of
+  entryValue?: number | null; // projected to the 08:00 CT operating reference
+  entryReferenceTime?: string | null;
   distanceFromPrice: number; // signed
 }
 
@@ -205,7 +223,7 @@ export interface SPXContractSuggestion {
 }
 
 export interface SPXConfluenceFactor {
-  key: "asian" | "london" | "reaction" | "factor4_tbd" | "factor5_tbd";
+  key: "asian" | "london" | "reaction";
   label: string;
   value: number; // 0..1 normalized
   weight: number; // 0..1
@@ -227,15 +245,17 @@ export interface SPXSnapshotMeta {
   quoteError: string | null;
   barsCount: number;
   lookbackHours: number;
-  // Offset actually fed into the engine (= computedOffset, unless
-  // SPX_ES_OFFSET_OVERRIDE is set, in which case = the override).
+  // Offset actually fed into the ES structure engine. This should be 0
+  // because ES lines must remain in native ES coordinates.
   appliedOffset: number;
   // Offset derived from the live quote pair, ignoring any override.
   // Useful for noticing when yfinance and your broker disagree.
   computedOffset?: number;
+  // Offset requested by env/config for diagnostics. Not applied to ES lines.
+  requestedOffset?: number;
   // "computed" or "env_override" — tells you whether the displayed
   // offset is from the live quote or from SPX_ES_OFFSET_OVERRIDE.
-  offsetSource?: "computed" | "env_override" | "historical_replay";
+  offsetSource?: "native_es" | "computed" | "env_override" | "historical_replay";
   // Sub-algorithm that produced the offset when offsetSource is
   // "computed". One of:
   //   "close_anchored"   — daily SPX close + ES bar whose close
@@ -278,6 +298,14 @@ export interface SPXSnapshot {
     reason: string;
     noChannelReason?: SPXNoChannelReason;
   };
+
+  fanRead?: {
+    zone: SPXFanZone;
+    label: string;
+    summary: string;
+    primaryReference: SPXLineKind | null;
+    secondaryReference: SPXLineKind | null;
+  } | null;
 
   lines: SPXLine[];
 
@@ -322,4 +350,13 @@ export interface SPXSnapshot {
     watch: [number, number];
     go: [number, number];
   };
+  rthBias?: {
+    direction: "BULLISH" | "BEARISH" | "PENDING";
+    openPrice: number | null;
+    referenceLine: SPXLineKind | null;
+    referenceValue: number | null;
+    continuationLine: SPXLineKind | null;
+    continuationValue: number | null;
+    note: string;
+  } | null;
 }

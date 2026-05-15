@@ -4,26 +4,25 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import type { SPXSnapshot } from "@/lib/types";
 
 export function SPXSessionOrigin({ snap }: { snap: SPXSnapshot }) {
-  const tokyoHH = snap.sessions.tokyo.high > snap.sessions.sydney.high;
-  const tokyoHL = snap.sessions.tokyo.low > snap.sessions.sydney.low;
-  const tokyoLH = snap.sessions.tokyo.high < snap.sessions.sydney.high;
-  const tokyoLL = snap.sessions.tokyo.low < snap.sessions.sydney.low;
-
-  const ascendingProof = tokyoHH && tokyoHL;
-  const descendingProof = tokyoLH && tokyoLL;
-
+  const hasSydney = isMeasured(snap.sessions.sydney.high) && isMeasured(snap.sessions.sydney.low);
+  const hasTokyo = isMeasured(snap.sessions.tokyo.high) && isMeasured(snap.sessions.tokyo.low);
+  const canCompare = hasSydney && hasTokyo;
+  const tokyoHH = canCompare && snap.sessions.tokyo.high > snap.sessions.sydney.high;
+  const tokyoHL = canCompare && snap.sessions.tokyo.low > snap.sessions.sydney.low;
+  const tokyoLH = canCompare && snap.sessions.tokyo.high < snap.sessions.sydney.high;
+  const tokyoLL = canCompare && snap.sessions.tokyo.low < snap.sessions.sydney.low;
   return (
     <Card>
       <CardHeader
         eyebrow="Origin"
-        title="Why today's channel"
-        meta="Sydney 17:00–20:00 CT · Tokyo 21:00–03:00 CT · Overnight anchors 15:00–03:00 CT"
+        title="Why today's framework"
+        meta="Previous RTH high close and post-noon low wick"
       />
       <CardBody className="px-0 pb-0">
         <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-rule">
           <SessionPanel
             name="Sydney"
-            window="17:00–20:00 CT"
+            window="17:00-20:00 CT"
             high={snap.sessions.sydney.high}
             low={snap.sessions.sydney.low}
             highTime={snap.sessions.sydney.highTime}
@@ -31,7 +30,7 @@ export function SPXSessionOrigin({ snap }: { snap: SPXSnapshot }) {
           />
           <SessionPanel
             name="Tokyo"
-            window="21:00–03:00 CT"
+            window="21:00-03:00 CT"
             high={snap.sessions.tokyo.high}
             low={snap.sessions.tokyo.low}
             highTime={snap.sessions.tokyo.highTime}
@@ -63,25 +62,13 @@ export function SPXSessionOrigin({ snap }: { snap: SPXSnapshot }) {
           />
           <div className="p-5">
             <div className="flex items-center justify-between mb-3">
-              <span className="eyebrow text-ink-3">Determination</span>
-              <StatusPill
-                variant={
-                  snap.channel.direction === "ASCENDING"
-                    ? "confirmed"
-                    : snap.channel.direction === "DESCENDING"
-                      ? "breached"
-                      : "stale"
-                }
-              >
-                {snap.channel.direction}
+              <span className="eyebrow text-ink-3">Framework</span>
+              <StatusPill variant={snap.lines.length >= 4 ? "confirmed" : "stale"}>
+                {snap.lines.length >= 4 ? "FOUR LINE" : "RESOLVING"}
               </StatusPill>
             </div>
             <div className="text-[13px] text-ink-2 leading-relaxed">
-              {ascendingProof
-                ? "Tokyo printed a higher high and a higher low than Sydney. Range is rising; we draw an ascending channel."
-                : descendingProof
-                  ? "Tokyo printed a lower high and a lower low than Sydney. Range is falling; we draw a descending channel."
-                  : "Tokyo's range is mixed against Sydney, so expansion or contraction. No channel today; stand down."}
+              {determinationText(snap)}
             </div>
             <div className="mt-4 hr-rule" />
             <div className="mt-3 grid grid-cols-2 gap-3 text-[11px]">
@@ -136,9 +123,18 @@ function SessionPanel({
       <div className="mt-3 flex justify-between text-[11px]">
         <span className="text-ink-3">Range</span>
         <span className="font-mono tabular-nums text-ink" data-num>
-          {(high - low).toFixed(2)} pts
+          {isMeasured(high) && isMeasured(low) ? `${(high - low).toFixed(2)} pts` : "-"}
         </span>
       </div>
+      {isMeasured(high) && isMeasured(low) ? (
+        <div className="mt-3 h-2 rounded-full bg-paper-2">
+          <div className="h-full w-full rounded-full bg-ink/18" />
+        </div>
+      ) : (
+        <p className="mt-3 text-[11px] leading-snug text-ink-3">
+          Data missing or session not started.
+        </p>
+      )}
     </div>
   );
 }
@@ -160,9 +156,7 @@ function Stat({
       : tone === "bear"
         ? "text-bear-ink"
         : "text-ink";
-  const t = new Date(time);
-  const hh = String(t.getHours()).padStart(2, "0");
-  const mm = String(t.getMinutes()).padStart(2, "0");
+  const measured = isMeasured(value);
   return (
     <div className="px-2.5 py-1.5 rounded-soft bg-paper-2/60">
       <div className="eyebrow text-ink-3">{label}</div>
@@ -170,10 +164,10 @@ function Stat({
         className={`font-mono text-sm font-semibold tabular-nums ${cls}`}
         data-num
       >
-        {value.toFixed(2)}
+        {measured ? value.toFixed(2) : "-"}
       </div>
       <div className="font-mono text-[9px] text-ink-3 tabular-nums mt-0.5">
-        {hh}:{mm} CT
+        {measured ? formatClock(time) : "Data missing"}
       </div>
     </div>
   );
@@ -188,9 +182,7 @@ function Anchor({
   value: number;
   time: string;
 }) {
-  const t = new Date(time);
-  const hh = String(t.getHours()).padStart(2, "0");
-  const mm = String(t.getMinutes()).padStart(2, "0");
+  const measured = isMeasured(value);
   return (
     <div className="px-2.5 py-1.5 rounded-soft bg-paper shadow-rule">
       <div className="eyebrow text-ink-3 mb-0.5">{label}</div>
@@ -199,12 +191,32 @@ function Anchor({
           className="font-mono text-sm font-semibold tabular-nums text-ink"
           data-num
         >
-          {value.toFixed(2)}
+          {measured ? value.toFixed(2) : "-"}
         </span>
         <span className="font-mono text-[10px] text-ink-3 tabular-nums">
-          {hh}:{mm} CT
+          {measured ? formatClock(time) : "Data missing"}
         </span>
       </div>
     </div>
   );
 }
+
+function isMeasured(value: number): boolean {
+  return Number.isFinite(value) && value > 0;
+}
+
+function formatClock(time: string): string {
+  const t = new Date(time);
+  if (Number.isNaN(t.getTime())) return "--:-- CT";
+  const hh = String(t.getHours()).padStart(2, "0");
+  const mm = String(t.getMinutes()).padStart(2, "0");
+  return `${hh}:${mm} CT`;
+}
+
+function determinationText(snap: SPXSnapshot): string {
+  if (snap.lines.length >= 4) {
+    return snap.channel.reason;
+  }
+  return "The ES Pivot Fan resolves after the previous RTH high close and post-noon low wick are available.";
+}
+

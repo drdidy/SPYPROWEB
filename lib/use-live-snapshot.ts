@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 
 import { adaptSnapshot, applySpxSessionGate, type RawSnapshot, type AdaptedSnapshot } from "./snapshot-adapter";
+import { canonicalizeEsSnapshot } from "./canonical-es";
 import {
   decision as mockDecision,
   shellState as mockShell,
@@ -95,7 +96,7 @@ export function useLiveSPX(initial?: SPXSnapshot): SPXSnapshot {
   // shows "TAKE · 5872.00" on weekends before the first poll completes.
   // Gate the seed so the very first paint is honest.
   const [snap, setSnap] = useState<SPXSnapshot>(
-    () => initial ?? applySpxSessionGate(mockSpx),
+    () => canonicalizeEsSnapshot(initial ?? applySpxSessionGate(canonicalizeEsSnapshot(mockSpx))),
   );
   useEffect(() => {
     let abort = false;
@@ -106,11 +107,11 @@ export function useLiveSPX(initial?: SPXSnapshot): SPXSnapshot {
           // API failed — keep what we have, but ensure it's gated for
           // the current moment (session phase may have changed since
           // mount, e.g. a Sunday 17:00 transition).
-          if (!abort) setSnap((s) => applySpxSessionGate(s));
+          if (!abort) setSnap((s) => applySpxSessionGate(canonicalizeEsSnapshot(s)));
           return;
         }
         const next = (await res.json()) as SPXSnapshot;
-        if (!abort) setSnap(applySpxSessionGate(next));
+        if (!abort) setSnap(applySpxSessionGate(canonicalizeEsSnapshot(next)));
       } catch {
         // keep last good
       }

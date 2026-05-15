@@ -6,9 +6,32 @@ export const dynamic = "force-static";
 
 const integrations = [
   { name: "Market data sync", detail: "Server-side credentials for quotes and engine inputs", lane: "Market data" },
-  { name: "Unusual Whales", detail: "Flow, dark pools, GEX, SPY/SPX chains, and Greeks", lane: "Options" },
+  { name: "Options flow feed", detail: "Flow, dark pools, GEX, SPY/SPX chains, and Greeks", lane: "Options" },
   { name: "Market data feed", detail: "ES/SPY hourly bars plus VIX/DXY/^TNX", lane: "Market data" },
-  { name: "OpenAI", detail: "Daily brief synthesis from market, options, and engine structure", lane: "Brief" },
+  { name: "Brief synthesis", detail: "Session narrative generated from market, options, and engine structure", lane: "Brief" },
+];
+
+const preferences = [
+  {
+    label: "Symbol focus",
+    value: "SPY + ES",
+    note: "Both engines stay visible on the slate; execution tabs can focus by route.",
+  },
+  {
+    label: "Slope source",
+    value: "Engine locked",
+    note: "SPY and ES projection slopes are read from server constants, not browser controls.",
+  },
+  {
+    label: "Action gates",
+    value: "Rules v1.0.0",
+    note: "State transitions, confluence thresholds, and guardrails are controlled by the engine.",
+  },
+  {
+    label: "Timezone",
+    value: "Market anchored",
+    note: "Session windows remain CT-anchored; user-time annotations render on decision surfaces.",
+  },
 ];
 
 export default function Page() {
@@ -41,15 +64,18 @@ export default function Page() {
       <Card>
         <CardBody>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            {["Symbol focus", "Slope override", "Action gates", "Timezone"].map((label) => (
-              <div key={label} className="rounded-card border border-rule bg-paper-2/55 p-4">
-                <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-3">{label}</div>
-                <div className="mt-5 font-serif text-[24px] leading-none text-ink-3 italic">Coming soon</div>
+            {preferences.map((pref) => (
+              <div key={pref.label} className="rounded-card border border-rule bg-paper-2/55 p-4">
+                <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-3">{pref.label}</div>
+                <div className="mt-4 font-serif text-[24px] leading-none text-ink">{pref.value}</div>
+                <p className="mt-3 text-[12px] leading-snug text-ink-3">{pref.note}</p>
               </div>
             ))}
           </div>
           <p className="mt-5 text-[13px] text-ink-3 leading-relaxed max-w-2xl">
-            User-specific preferences are intentionally parked until auth and persistence land. Until then, the app uses the production engine configuration.
+            These are the active production defaults for this build. User-specific
+            persistence is disabled until the account store is connected, so the
+            browser never presents controls that cannot be saved.
           </p>
         </CardBody>
       </Card>

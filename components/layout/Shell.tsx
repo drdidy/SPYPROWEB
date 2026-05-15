@@ -4,11 +4,13 @@ import { usePathname } from "next/navigation";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { CommandPalette } from "./CommandPalette";
+import { AppFooter } from "./AppFooter";
 
 export function Shell({ children }: { children: ReactNode }) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const pathname = usePathname();
+  const hasRouteFooter = ["/dashboard", "/brief", "/spy", "/es"].includes(pathname || "");
 
   // Auto-close the mobile drawer on navigation so the user lands on
   // the new page without the menu still covering it.
@@ -58,7 +60,10 @@ export function Shell({ children }: { children: ReactNode }) {
                 aria-hidden
                 className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_18%_0%,rgba(184,130,31,0.14),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.82),transparent)]"
               />
-              <div className="relative">{children}</div>
+              <div className="relative">
+                {children}
+                {!hasRouteFooter && <AppFooter />}
+              </div>
             </div>
           </div>
         </main>

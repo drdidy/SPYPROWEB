@@ -8,22 +8,32 @@ def test_snapshot_basic_shape(es_candles_ascending_inside, es_offset, as_of):
     snap = compute_snapshot(es_candles_ascending_inside, es_offset, as_of)
     assert snap.symbol == "SPX"
     assert snap.session_date_ct == "2026-05-08"
-    # Channel resolves ASCENDING from synthetic Tokyo HH+HL.
+    # Four major fan lines are active; the minor overnight-higher-pivot watch
+    # appears only when overnight closes above the prior RTH high close.
     assert snap.channel.direction == "ASCENDING"
-    # Four lines: 2 channel rails + 2 prev-RTH refs.
     assert len(snap.lines) == 4
     kinds = {l.kind for l in snap.lines}
-    assert kinds == {"CHANNEL_FLOOR", "CHANNEL_CEILING", "PREV_RTH_HIGH_ASC", "PREV_RTH_LOW_DESC"}
+    assert kinds == {
+        "PREV_RTH_HIGH_ASC",
+        "PREV_RTH_HIGH_DESC",
+        "PREV_RTH_LOW_ASC",
+        "PREV_RTH_LOW_DESC",
+    }
+    assert snap.rth_bias is not None
+    assert snap.rth_bias.reference_line == "PREV_RTH_HIGH_DESC"
+    assert snap.fan_read is not None
+    assert snap.fan_read.zone == "BELOW_BOTH_CEILINGS"
 
 
 def test_snapshot_inside_ascending_with_plays(es_candles_ascending_inside, es_offset, as_of):
     snap = compute_snapshot(es_candles_ascending_inside, es_offset, as_of)
-    assert snap.scenario == "INSIDE_ASCENDING"
+    assert snap.scenario == "ABOVE_DESCENDING"
     assert snap.plays.primary is not None
     assert snap.plays.alternate is not None
-    assert snap.plays.primary.side == "BUY"
-    assert snap.plays.primary.entry_line == "CHANNEL_FLOOR"
-    assert snap.plays.alternate.side == "SELL"
+    assert snap.plays.primary.side == "SELL"
+    assert snap.plays.primary.entry_line == "PREV_RTH_LOW_ASC"
+    assert snap.plays.primary.exit_line == "PREV_RTH_HIGH_DESC"
+    assert snap.plays.alternate.side == "BUY"
 
 
 def test_snapshot_invalidation_uses_entry_rail(es_candles_ascending_inside, es_offset, as_of):
@@ -37,8 +47,8 @@ def test_snapshot_contracts_match_play_sides(es_candles_ascending_inside, es_off
     snap = compute_snapshot(es_candles_ascending_inside, es_offset, as_of)
     assert snap.contracts.for_primary is not None
     assert snap.contracts.for_alternate is not None
-    assert snap.contracts.for_primary.type == "CALL"   # primary is BUY
-    assert snap.contracts.for_alternate.type == "PUT"  # alternate is SELL
+    assert snap.contracts.for_primary.type == "PUT"   # primary is SELL
+    assert snap.contracts.for_alternate.type == "CALL"  # alternate is BUY
     # SPX 5pt board.
     assert snap.contracts.for_primary.strike % 5 == 0
     assert snap.contracts.for_alternate.strike % 5 == 0
@@ -48,7 +58,74 @@ def test_snapshot_confluence_action_present(es_candles_ascending_inside, es_offs
     snap = compute_snapshot(es_candles_ascending_inside, es_offset, as_of)
     assert snap.confluence.action in ("TAKE", "SELECTIVE", "STAND_DOWN")
     assert 0 <= snap.confluence.score <= 100
-    assert len(snap.confluence.factors) == 5
+    assert len(snap.confluence.factors) == 3
+
+
+def test_snapshot_live_state_uses_completed_9am_fan_touch(
+    es_candles_ascending_inside,
+    es_offset,
+):
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from _lib.spx.candles import Candle
+
+    ct = ZoneInfo("America/Chicago")
+    session = datetime(2026, 5, 8, tzinfo=ct)
+    candles = [
+        *es_candles_ascending_inside,
+        Candle(
+            t=session.replace(hour=9),
+            o=5885.00,
+            h=5886.00,
+            l=5883.50,
+            c=5885.50,
+        ),
+    ]
+
+    snap = compute_snapshot(candles, es_offset, session.replace(hour=10, minute=7))
+
+    assert snap.current_state == "COOLDOWN"
+    assert snap.flip_condition is not None
+    assert "Touch-window buy completed" in snap.flip_condition
+    assert any("Touch-window buy triggered" in event.event for event in snap.decision_trace)
+
+
+def test_snapshot_8am_setup_candle_arms_9am_entry(
+    es_candles_ascending_inside,
+    es_offset,
+):
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from _lib.spx.candles import Candle
+
+    ct = ZoneInfo("America/Chicago")
+    session = datetime(2026, 5, 8, tzinfo=ct)
+    candles = [
+        *es_candles_ascending_inside,
+        Candle(
+            t=session.replace(hour=8),
+            o=5885.00,
+            h=5886.00,
+            l=5883.50,
+            c=5884.50,
+        ),
+        Candle(
+            t=session.replace(hour=9),
+            o=5884.75,
+            h=5891.00,
+            l=5884.25,
+            c=5890.00,
+        ),
+    ]
+
+    snap = compute_snapshot(candles, es_offset, session.replace(hour=10, minute=7))
+
+    assert snap.current_state == "COOLDOWN"
+    assert snap.flip_condition is not None
+    assert "Touch-window buy completed" in snap.flip_condition
+    assert any("8:00 setup buy triggered" in event.event for event in snap.decision_trace)
 
 
 def test_snapshot_serializes_to_camelcase_json(es_candles_ascending_inside, es_offset, as_of):
@@ -60,16 +137,31 @@ def test_snapshot_serializes_to_camelcase_json(es_candles_ascending_inside, es_o
     assert "sessionDateCT" in js
     assert "scenarioExplanation" in js
     assert "reentryWatch" in js
+    assert "fanRead" in js
     # nested camelCase
     assert "changePct" in js["price"]
     assert "currentValue" in js["lines"][0]
 
 
-def test_snapshot_price_is_last_close_in_spx_space(es_candles_ascending_inside, es_offset, as_of):
-    """ES candle close + offset = SPX last."""
+def test_snapshot_price_is_last_close_in_native_es_space(es_candles_ascending_inside, es_offset, as_of):
+    """ES Channel keeps the displayed price and structure lines native to ES."""
     snap = compute_snapshot(es_candles_ascending_inside, es_offset, as_of)
-    # Last bar before 09:35 is the 09:00 bar with c=5872.00 (in SPX space).
-    assert snap.price.last == pytest.approx(5872.00)
+    # Last bar before 09:35 is the 09:00 ES bar with c=5860.00.
+    assert snap.price.last == pytest.approx(5860.00)
+
+
+def test_snapshot_prev_rth_lines_do_not_apply_es_to_spx_offset(es_candles_ascending_inside, es_offset, as_of):
+    snap = compute_snapshot(es_candles_ascending_inside, es_offset, as_of)
+    by_kind = {line.kind: line for line in snap.lines}
+
+    assert by_kind["PREV_RTH_HIGH_ASC"].anchor_price == pytest.approx(5864.00)
+    assert by_kind["PREV_RTH_HIGH_ASC"].entry_value == pytest.approx(5883.76)
+    assert by_kind["PREV_RTH_HIGH_DESC"].anchor_price == pytest.approx(5864.00)
+    assert by_kind["PREV_RTH_HIGH_DESC"].entry_value == pytest.approx(5844.24)
+    assert by_kind["PREV_RTH_LOW_ASC"].anchor_price == pytest.approx(5855.00)
+    assert by_kind["PREV_RTH_LOW_ASC"].entry_value == pytest.approx(5875.80)
+    assert by_kind["PREV_RTH_LOW_DESC"].anchor_price == pytest.approx(5855.00)
+    assert by_kind["PREV_RTH_LOW_DESC"].entry_value == pytest.approx(5834.20)
 
 
 def test_snapshot_rejects_empty_candles(as_of):

@@ -2,7 +2,7 @@
 // trigger / exit definitions without touching component code.
 //
 // Each entry powers the info popover on a phase rail cell. The rail
-// component itself reads from this single map so SPY and SPX share
+// component itself reads from this single map so SPY and ES share
 // definitions where they overlap and diverge only when the spec calls
 // for it.
 
@@ -26,7 +26,7 @@ export interface PhaseDefinition {
 }
 
 // Slate refinement (2026-05): labels are now sentence case — only
-// ticker tokens (SPY, SPX) and one tier of section eyebrows still
+// ticker tokens (SPY, ES) and one tier of section eyebrows still
 // shout. Tooltip body copy is plain-English, no jargon.
 export const PHASE_DEFINITIONS: Record<EngineState, PhaseDefinition> = {
   PRE_CONFIG: {
@@ -37,7 +37,7 @@ export const PHASE_DEFINITIONS: Record<EngineState, PhaseDefinition> = {
     enterOn:
       "Default state at the start of every session, before the engine's overnight or premarket window opens.",
     exitOn:
-      "When the setup window starts (SPY: 03:00 CT, SPX: 17:00 CT the previous day).",
+      "When the setup window starts (SPY: 03:00 CT, ES: 17:00 CT the previous day).",
   },
   STAND_DOWN: {
     label: "Stand down",
@@ -52,25 +52,25 @@ export const PHASE_DEFINITIONS: Record<EngineState, PhaseDefinition> = {
     label: "Watch",
     short: "Watch",
     summary:
-      "Price is approaching a primary trigger, but no setup is qualified yet.",
-    enterOn: "Price moves within the proximity threshold of a primary line.",
+      "Price is approaching active structure, but no setup is qualified yet.",
+    enterOn: "Price moves into the engine watch zone.",
     exitOn:
-      "A rejection candle prints (advances to Wait) or price moves away (back to Stand down).",
+      "A qualified condition advances to Wait, or price moves away.",
   },
   WAIT: {
     label: "Wait",
     short: "Wait",
     summary:
-      "A rejection candle has printed. The engine is waiting for the next bar to confirm.",
-    enterOn: "First qualifying rejection candle on a primary line.",
-    exitOn: "Confirmation candle (advances to Armed) or invalidation (back to Watch).",
+      "The engine has an active setup and is waiting for qualified confirmation.",
+    enterOn: "First qualified structural condition.",
+    exitOn: "Qualified confirmation advances to Armed, or invalidation returns to Watch.",
   },
   ARMED: {
     label: "Armed",
     short: "Armed",
     summary:
-      "Confirmation has printed. The trade setup is live and the entry trigger is armed.",
-    enterOn: "Confirmation candle following a qualified rejection.",
+      "Qualified confirmation is in. The trade setup is armed.",
+    enterOn: "Qualified confirmation after a valid setup.",
     exitOn:
       "Trigger fires (advances to Go) or a candle closes past invalidation (back to Wait).",
   },
@@ -91,3 +91,4 @@ export const PHASE_DEFINITIONS: Record<EngineState, PhaseDefinition> = {
     exitOn: "The next session's setup window opens.",
   },
 };
+
