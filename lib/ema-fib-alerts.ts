@@ -250,6 +250,12 @@ async function sendTelegramMessage(title: string, text: string): Promise<Notific
     });
     if (!res.ok) {
       const err = await res.text().catch(() => "");
+      if (res.status === 400 && /chat not found/i.test(err)) {
+        const fallbackChatId = await resolveTelegramChatId(token);
+        if (fallbackChatId && String(fallbackChatId) !== String(chatId)) {
+          return sendTelegramMessageToChat(token, fallbackChatId, title, text);
+        }
+      }
       return { attempted: true, delivered: false, error: `Telegram ${res.status}: ${err.slice(0, 160)}` };
     }
     return { attempted: true, delivered: true, error: null };
@@ -259,6 +265,65 @@ async function sendTelegramMessage(title: string, text: string): Promise<Notific
       delivered: false,
       error: error instanceof Error ? error.message : "Telegram request failed.",
     };
+  }
+}
+
+async function sendTelegramMessageToChat(
+  token: string,
+  chatId: string | number,
+  title: string,
+  text: string,
+): Promise<NotificationResult> {
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: `${title}\n\n${text}`,
+        disable_web_page_preview: true,
+      }),
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const err = await res.text().catch(() => "");
+      return { attempted: true, delivered: false, error: `Telegram fallback ${res.status}: ${err.slice(0, 160)}` };
+    }
+    return { attempted: true, delivered: true, error: null };
+  } catch (error) {
+    return {
+      attempted: true,
+      delivered: false,
+      error: error instanceof Error ? error.message : "Telegram fallback request failed.",
+    };
+  }
+}
+
+async function resolveTelegramChatId(token: string): Promise<string | number | null> {
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates?limit=25`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      ok?: boolean;
+      result?: Array<{
+        message?: { chat?: { id?: string | number } };
+        channel_post?: { chat?: { id?: string | number } };
+        edited_message?: { chat?: { id?: string | number } };
+      }>;
+    };
+    if (!data.ok || !Array.isArray(data.result)) return null;
+    for (const update of [...data.result].reverse()) {
+      const id =
+        update.message?.chat?.id ??
+        update.channel_post?.chat?.id ??
+        update.edited_message?.chat?.id;
+      if (id !== undefined && id !== null) return id;
+    }
+    return null;
+  } catch {
+    return null;
   }
 }
 
