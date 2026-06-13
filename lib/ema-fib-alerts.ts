@@ -7,6 +7,11 @@ import {
   type EmaFibAlertRecord,
   type EmaFibDirection,
 } from "@/lib/contracts/ema-fib-alert";
+import {
+  configuredTelegramChatId,
+  readStoredTelegramChatId,
+  telegramBotToken,
+} from "@/lib/telegram-alerts";
 
 const ROOT =
   process.env.VERCEL === "1"
@@ -231,41 +236,32 @@ export async function sendAlertNotification(
 }
 
 async function sendTelegramMessage(title: string, text: string): Promise<NotificationResult> {
-  const token = process.env.TELEGRAM_BOT_TOKEN || process.env.SPYPROPHET_TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID || process.env.SPYPROPHET_TELEGRAM_CHAT_ID;
-  if (!token || !chatId) return { attempted: false, delivered: false, error: null };
+  const token = telegramBotToken();
+  const chatId = configuredTelegramChatId();
+  if (!token) return { attempted: false, delivered: false, error: null };
 
-  const body = {
-    chat_id: chatId,
-    text: `${title}\n\n${text}`,
-    disable_web_page_preview: true,
-  };
+  const candidates = [
+    chatId,
+    await readStoredTelegramChatId(),
+    await resolveTelegramChatId(token),
+  ].filter((value, index, arr): value is string | number => {
+    if (value === null || value === undefined || value === "") return false;
+    return arr.findIndex((candidate) => String(candidate) === String(value)) === index;
+  });
 
-  try {
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      const err = await res.text().catch(() => "");
-      if (res.status === 400 && /chat not found/i.test(err)) {
-        const fallbackChatId = await resolveTelegramChatId(token);
-        if (fallbackChatId && String(fallbackChatId) !== String(chatId)) {
-          return sendTelegramMessageToChat(token, fallbackChatId, title, text);
-        }
-      }
-      return { attempted: true, delivered: false, error: `Telegram ${res.status}: ${err.slice(0, 160)}` };
-    }
-    return { attempted: true, delivered: true, error: null };
-  } catch (error) {
-    return {
-      attempted: true,
-      delivered: false,
-      error: error instanceof Error ? error.message : "Telegram request failed.",
-    };
+  let lastError: string | null = null;
+  for (const candidate of candidates) {
+    const result = await sendTelegramMessageToChat(token, candidate, title, text);
+    if (result.delivered) return result;
+    lastError = result.error;
+    if (!/chat not found/i.test(result.error ?? "")) break;
   }
+
+  return {
+    attempted: candidates.length > 0,
+    delivered: false,
+    error: lastError || "No reachable Telegram chat configured.",
+  };
 }
 
 async function sendTelegramMessageToChat(
@@ -287,14 +283,14 @@ async function sendTelegramMessageToChat(
     });
     if (!res.ok) {
       const err = await res.text().catch(() => "");
-      return { attempted: true, delivered: false, error: `Telegram fallback ${res.status}: ${err.slice(0, 160)}` };
+      return { attempted: true, delivered: false, error: `Telegram ${res.status}: ${err.slice(0, 160)}` };
     }
     return { attempted: true, delivered: true, error: null };
   } catch (error) {
     return {
       attempted: true,
       delivered: false,
-      error: error instanceof Error ? error.message : "Telegram fallback request failed.",
+      error: error instanceof Error ? error.message : "Telegram request failed.",
     };
   }
 }

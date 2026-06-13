@@ -54,6 +54,16 @@ SPYPROPHET_ALERT_WEBHOOK_URL=https://...
 SPYPROPHET_ALERT_WEBHOOK_TOKEN=optional-bearer-token
 ```
 
+If `TELEGRAM_CHAT_ID` is wrong or missing, the app can bind the chat through
+the Telegram bot webhook:
+
+```text
+POST https://www.spyprophet.app/api/telegram/configure?token=YOUR_SHARED_SECRET
+```
+
+Then send `/start` to the SPY Prophet Telegram bot once. The app stores that
+chat in Upstash Redis and uses it for future alerts.
+
 ## TradingView Setup
 
 1. Open the Pine Editor.
