@@ -121,13 +121,13 @@ export function buildOperatorMessage(payload: EmaFibAlertPayload): {
     return {
       priority: "entry",
       title: `${symbol} ENTRY: ${side} Fib 50 rejection`,
-      text: [
+      text: addPayloadNote(payload, [
         `${symbol} ${side} continuation confirmed.`,
         `Fib 50: ${fib} | Last: ${last}`,
         `Exit plan: 1.5 fib at ${extension}`,
         `Invalidation: ${stop}`,
         `Source: 21/50 EMA cross + clean Fib 50 rejection.`,
-      ].join("\n"),
+      ]).join("\n"),
     };
   }
 
@@ -135,12 +135,12 @@ export function buildOperatorMessage(payload: EmaFibAlertPayload): {
     return {
       priority: "armed",
       title: `${symbol} ARMED: watch Fib 50`,
-      text: [
+      text: addPayloadNote(payload, [
         `${symbol} ${side} continuation structure is armed.`,
         `Watch Fib 50: ${fib}`,
         `Target if confirmed: ${extension}`,
         `No entry until price touches and closes on the continuation side.`,
-      ].join("\n"),
+      ]).join("\n"),
     };
   }
 
@@ -148,11 +148,11 @@ export function buildOperatorMessage(payload: EmaFibAlertPayload): {
     return {
       priority: "exit",
       title: `${symbol} EXIT: 1.5 fib reached`,
-      text: [
+      text: addPayloadNote(payload, [
         `${symbol} ${side} target reached.`,
         `1.5 fib: ${extension}`,
         `Last: ${last}`,
-      ].join("\n"),
+      ]).join("\n"),
     };
   }
 
@@ -160,24 +160,29 @@ export function buildOperatorMessage(payload: EmaFibAlertPayload): {
     return {
       priority: "invalid",
       title: `${symbol} INVALIDATED`,
-      text: [
+      text: addPayloadNote(payload, [
         `${symbol} ${side} continuation invalidated.`,
         `Fib 50: ${fib} | Last: ${last}`,
         `Stop/reference: ${stop}`,
-      ].join("\n"),
+      ]).join("\n"),
     };
   }
 
   return {
     priority: "watch",
     title: `${symbol} WATCH: EMA cross`,
-    text: [
+    text: addPayloadNote(payload, [
       `${symbol} ${side} 21/50 EMA cross detected.`,
       `Fib 50: ${fib}`,
       `Target if confirmed: ${extension}`,
       `Wait for clean rejection before entry.`,
-    ].join("\n"),
+    ]).join("\n"),
   };
+}
+
+function addPayloadNote(payload: EmaFibAlertPayload, lines: string[]): string[] {
+  const note = payload.note?.trim();
+  return note ? [...lines, `Note: ${note}`] : lines;
 }
 
 export async function appendEmaFibAlertRecord(record: EmaFibAlertRecord): Promise<{
