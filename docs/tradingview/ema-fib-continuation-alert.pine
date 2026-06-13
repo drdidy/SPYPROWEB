@@ -1,0 +1,138 @@
+//@version=5
+indicator("SPY Prophet - EMA Fib Continuation Alert", overlay=true, max_lines_count=30, max_labels_count=30)
+
+signalSymbol = input.string("SPX", "SPY Prophet Symbol", options=["SPY", "SPX", "ES"])
+lookbackBars = input.int(90, "Pre-cross pivot lookback", minval=20, maxval=240)
+retestBars = input.int(60, "Retest window after cross", minval=5, maxval=180)
+requireCandleColor = input.bool(true, "Require rejection candle color")
+showLevels = input.bool(true, "Show Fib 50 / 1.5 levels")
+
+ema21 = ta.ema(close, 21)
+ema50 = ta.ema(close, 50)
+crossUp = ta.crossover(ema21, ema50)
+crossDown = ta.crossunder(ema21, ema50)
+
+plot(ema21, "EMA 21", color=color.new(color.rgb(48, 75, 215), 0), linewidth=2)
+plot(ema50, "EMA 50", color=color.new(color.black, 0), linewidth=2)
+
+findLowerPivotBeforeCross(int maxLookback) =>
+    float best = na
+    int bestOffset = na
+    for i = 1 to maxLookback
+        if low[i] < ema50[i] and (na(best) or low[i] < best)
+            best := low[i]
+            bestOffset := i
+    [best, bestOffset]
+
+findHigherPivotAfterLower(int lowerOffset, int maxLookback) =>
+    float best = na
+    int bestOffset = na
+    int usable = na(lowerOffset) ? maxLookback : math.max(lowerOffset - 1, 1)
+    for i = 0 to usable
+        if high[i] > ema50[i] and (na(best) or high[i] > best)
+            best := high[i]
+            bestOffset := i
+    [best, bestOffset]
+
+findHigherPivotBeforeCross(int maxLookback) =>
+    float best = na
+    int bestOffset = na
+    for i = 1 to maxLookback
+        if high[i] > ema50[i] and (na(best) or high[i] > best)
+            best := high[i]
+            bestOffset := i
+    [best, bestOffset]
+
+findLowerPivotAfterHigher(int higherOffset, int maxLookback) =>
+    float best = na
+    int bestOffset = na
+    int usable = na(higherOffset) ? maxLookback : math.max(higherOffset - 1, 1)
+    for i = 0 to usable
+        if low[i] < ema50[i] and (na(best) or low[i] < best)
+            best := low[i]
+            bestOffset := i
+    [best, bestOffset]
+
+var bool armed = false
+var int armedBar = na
+var string direction = ""
+var float pivotLow = na
+var float pivotHigh = na
+var float fib50 = na
+var float extension150 = na
+var float stop = na
+var line fibLine = na
+var line extLine = na
+
+buildJson(string kind) =>
+    string body = "{"
+    body += "\"schemaVersion\":1,"
+    body += "\"source\":\"tradingview\","
+    body += "\"strategy\":\"ema21_ema50_fib50_continuation\","
+    body += "\"symbol\":\"" + signalSymbol + "\","
+    body += "\"ticker\":\"" + syminfo.ticker + "\","
+    body += "\"timeframe\":\"" + timeframe.period + "\","
+    body += "\"eventAt\":\"" + str.format_time(time, "yyyy-MM-dd'T'HH:mm:ssXXX") + "\","
+    body += "\"kind\":\"" + kind + "\","
+    body += "\"direction\":\"" + direction + "\","
+    body += "\"last\":" + str.tostring(close, format.mintick) + ","
+    body += "\"ema21\":" + str.tostring(ema21, format.mintick) + ","
+    body += "\"ema50\":" + str.tostring(ema50, format.mintick) + ","
+    body += "\"pivotLow\":" + str.tostring(pivotLow, format.mintick) + ","
+    body += "\"pivotHigh\":" + str.tostring(pivotHigh, format.mintick) + ","
+    body += "\"fib50\":" + str.tostring(fib50, format.mintick) + ","
+    body += "\"extension150\":" + str.tostring(extension150, format.mintick) + ","
+    body += "\"stop\":" + str.tostring(stop, format.mintick) + ","
+    body += "\"candle\":{\"open\":" + str.tostring(open, format.mintick) + ",\"high\":" + str.tostring(high, format.mintick) + ",\"low\":" + str.tostring(low, format.mintick) + ",\"close\":" + str.tostring(close, format.mintick) + "}"
+    body += "}"
+    body
+
+if crossUp
+    [lo, loOffset] = findLowerPivotBeforeCross(lookbackBars)
+    [hi, hiOffset] = findHigherPivotAfterLower(loOffset, lookbackBars)
+    if not na(lo) and not na(hi) and hi > lo
+        armed := true
+        armedBar := bar_index
+        direction := "long"
+        pivotLow := lo
+        pivotHigh := hi
+        fib50 := lo + (hi - lo) * 0.5
+        extension150 := hi + (hi - lo) * 0.5
+        stop := lo
+        alert(buildJson("ema_cross"), alert.freq_once_per_bar_close)
+        alert(buildJson("fib50_armed"), alert.freq_once_per_bar_close)
+
+if crossDown
+    [hi, hiOffset] = findHigherPivotBeforeCross(lookbackBars)
+    [lo, loOffset] = findLowerPivotAfterHigher(hiOffset, lookbackBars)
+    if not na(lo) and not na(hi) and hi > lo
+        armed := true
+        armedBar := bar_index
+        direction := "short"
+        pivotLow := lo
+        pivotHigh := hi
+        fib50 := lo + (hi - lo) * 0.5
+        extension150 := lo - (hi - lo) * 0.5
+        stop := hi
+        alert(buildJson("ema_cross"), alert.freq_once_per_bar_close)
+        alert(buildJson("fib50_armed"), alert.freq_once_per_bar_close)
+
+if armed and bar_index - armedBar > retestBars
+    armed := false
+
+touchedFib = armed and low <= fib50 and high >= fib50
+longReject = direction == "long" and touchedFib and close >= fib50 and (not requireCandleColor or close > open)
+shortReject = direction == "short" and touchedFib and close <= fib50 and (not requireCandleColor or close < open)
+entry = longReject or shortReject
+
+if entry
+    alert(buildJson("entry"), alert.freq_once_per_bar_close)
+    armed := false
+
+if showLevels and (crossUp or crossDown)
+    line.delete(fibLine)
+    line.delete(extLine)
+    fibLine := line.new(bar_index, fib50, bar_index + retestBars, fib50, color=color.new(color.orange, 0), width=2)
+    extLine := line.new(bar_index, extension150, bar_index + retestBars, extension150, color=color.new(color.red, 0), width=2)
+    label.new(bar_index, fib50, "Fib 50", style=label.style_label_left, color=color.new(color.orange, 10), textcolor=color.black)
+    label.new(bar_index, extension150, "Fib 1.5", style=label.style_label_left, color=color.new(color.red, 10), textcolor=color.white)
