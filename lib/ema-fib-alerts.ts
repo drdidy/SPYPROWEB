@@ -115,23 +115,37 @@ export function buildOperatorMessage(payload: EmaFibAlertPayload): {
   text: string;
   priority: "watch" | "armed" | "entry" | "exit" | "invalid";
 } {
-  const side = payload.direction === "long" ? "LONG" : "SHORT";
+  const isLong = payload.direction === "long";
+  const side = isLong ? "LONG" : "SHORT";
   const symbol = payload.symbol;
   const fib = fmt(payload.fib50);
   const extension = fmt(payload.extension150);
   const last = fmt(payload.last);
   const stop = payload.stop === null ? "-" : fmt(payload.stop);
+  const pivotPath = `${fmt(payload.pivotLow)} -> ${fmt(payload.pivotHigh)}`;
+  const closeRule = isLong
+    ? `Candle tagged Fib 50 and closed back above ${fib}.`
+    : `Candle tagged Fib 50 and closed back below ${fib}.`;
+  const waitRule = isLong
+    ? `Wait for a pullback into ${fib}, then a close back above it.`
+    : `Wait for a rally into ${fib}, then a close back below it.`;
+  const entryWindow = isLong
+    ? "Entry window: next 1-minute candle after the bullish rejection close."
+    : "Entry window: next 1-minute candle after the bearish rejection close.";
 
   if (payload.kind === "entry" || payload.kind === "fib50_rejection") {
     return {
       priority: "entry",
-      title: `${symbol} ENTRY: ${side} Fib 50 rejection`,
+      title: `${symbol} ENTRY NOW: ${side} Fib 50 rejection`,
       text: addPayloadNote(payload, [
-        `${symbol} ${side} continuation confirmed.`,
-        `Fib 50: ${fib} | Last: ${last}`,
-        `Exit plan: 1.5 fib at ${extension}`,
-        `Invalidation: ${stop}`,
-        `Source: 21/50 EMA cross + clean Fib 50 rejection.`,
+        `Setup confirmed: 21 EMA / 50 EMA continuation on ${payload.timeframe}m.`,
+        closeRule,
+        entryWindow,
+        `Entry reference: ${last}.`,
+        `Target / planned exit: Fib 1.5 at ${extension}.`,
+        `Invalidation reference: ${stop}.`,
+        `Swing map: ${pivotPath}.`,
+        "This is an alert only. Confirm spread, contract price, and liquidity before acting.",
       ]).join("\n"),
     };
   }
@@ -139,12 +153,14 @@ export function buildOperatorMessage(payload: EmaFibAlertPayload): {
   if (payload.kind === "fib50_armed") {
     return {
       priority: "armed",
-      title: `${symbol} ARMED: watch Fib 50`,
+      title: `${symbol} TESTING: Fib 50 continuation line`,
       text: addPayloadNote(payload, [
-        `${symbol} ${side} continuation structure is armed.`,
-        `Watch Fib 50: ${fib}`,
-        `Target if confirmed: ${extension}`,
-        `No entry until price touches and closes on the continuation side.`,
+        `Price is testing the Fib 50 continuation line at ${fib}.`,
+        waitRule,
+        "Do not enter from the touch alone. Wait for the candle close.",
+        `If confirmed, target / planned exit is Fib 1.5 at ${extension}.`,
+        `Invalidation reference: ${stop}.`,
+        `Swing map: ${pivotPath}.`,
       ]).join("\n"),
     };
   }
@@ -152,11 +168,12 @@ export function buildOperatorMessage(payload: EmaFibAlertPayload): {
   if (payload.kind === "exit_target") {
     return {
       priority: "exit",
-      title: `${symbol} EXIT: 1.5 fib reached`,
+      title: `${symbol} EXIT: Fib 1.5 reached`,
       text: addPayloadNote(payload, [
-        `${symbol} ${side} target reached.`,
-        `1.5 fib: ${extension}`,
-        `Last: ${last}`,
+        `${symbol} ${side} continuation target reached.`,
+        `Fib 1.5: ${extension}.`,
+        `Last: ${last}.`,
+        "Execution note: planned target zone reached; reassess before any new setup.",
       ]).join("\n"),
     };
   }
@@ -166,21 +183,25 @@ export function buildOperatorMessage(payload: EmaFibAlertPayload): {
       priority: "invalid",
       title: `${symbol} INVALIDATED`,
       text: addPayloadNote(payload, [
-        `${symbol} ${side} continuation invalidated.`,
-        `Fib 50: ${fib} | Last: ${last}`,
-        `Stop/reference: ${stop}`,
+        `${symbol} ${side} continuation setup is no longer valid.`,
+        `Last: ${last}.`,
+        `Fib 50: ${fib}.`,
+        `Invalidation reference: ${stop}.`,
+        "Action: stand down until a fresh EMA cross creates a new swing map.",
       ]).join("\n"),
     };
   }
 
   return {
     priority: "watch",
-    title: `${symbol} WATCH: EMA cross`,
+    title: `${symbol} CROSS: build Fib 50 map`,
     text: addPayloadNote(payload, [
-      `${symbol} ${side} 21/50 EMA cross detected.`,
-      `Fib 50: ${fib}`,
-      `Target if confirmed: ${extension}`,
-      `Wait for clean rejection before entry.`,
+      `${symbol} ${side} 21 EMA / 50 EMA cross detected on ${payload.timeframe}m.`,
+      `Swing map: ${pivotPath}.`,
+      `Fib 50 decision line: ${fib}.`,
+      `Target if confirmed: Fib 1.5 at ${extension}.`,
+      waitRule,
+      "No entry yet. Wait for the Fib 50 touch-and-close confirmation.",
     ]).join("\n"),
   };
 }

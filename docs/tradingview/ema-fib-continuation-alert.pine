@@ -27,11 +27,12 @@ findLowerPivotBeforeCross(int maxLookback) =>
 findHigherPivotAfterLower(int lowerOffset, int maxLookback) =>
     float best = na
     int bestOffset = na
-    int usable = na(lowerOffset) ? maxLookback : math.max(lowerOffset - 1, 1)
-    for i = 0 to usable
-        if high[i] > ema50[i] and (na(best) or high[i] > best)
-            best := high[i]
-            bestOffset := i
+    int usable = na(lowerOffset) ? maxLookback : lowerOffset - 1
+    if usable >= 1
+        for i = 1 to usable
+            if high[i] > ema50[i] and (na(best) or high[i] > best)
+                best := high[i]
+                bestOffset := i
     [best, bestOffset]
 
 findHigherPivotBeforeCross(int maxLookback) =>
@@ -46,15 +47,19 @@ findHigherPivotBeforeCross(int maxLookback) =>
 findLowerPivotAfterHigher(int higherOffset, int maxLookback) =>
     float best = na
     int bestOffset = na
-    int usable = na(higherOffset) ? maxLookback : math.max(higherOffset - 1, 1)
-    for i = 0 to usable
-        if low[i] < ema50[i] and (na(best) or low[i] < best)
-            best := low[i]
-            bestOffset := i
+    int usable = na(higherOffset) ? maxLookback : higherOffset - 1
+    if usable >= 1
+        for i = 1 to usable
+            if low[i] < ema50[i] and (na(best) or low[i] < best)
+                best := low[i]
+                bestOffset := i
     [best, bestOffset]
 
 var bool armed = false
+var bool fibTouchAlerted = false
+var bool tradeActive = false
 var int armedBar = na
+var int entryBar = na
 var string direction = ""
 var float pivotLow = na
 var float pivotHigh = na
@@ -99,8 +104,10 @@ if crossUp
         fib50 := lo + (hi - lo) * 0.5
         extension150 := hi + (hi - lo) * 0.5
         stop := lo
+        fibTouchAlerted := false
+        tradeActive := false
+        entryBar := na
         alert(buildJson("ema_cross"), alert.freq_once_per_bar_close)
-        alert(buildJson("fib50_armed"), alert.freq_once_per_bar_close)
 
 if crossDown
     [hi, hiOffset] = findHigherPivotBeforeCross(lookbackBars)
@@ -114,20 +121,49 @@ if crossDown
         fib50 := lo + (hi - lo) * 0.5
         extension150 := lo - (hi - lo) * 0.5
         stop := hi
+        fibTouchAlerted := false
+        tradeActive := false
+        entryBar := na
         alert(buildJson("ema_cross"), alert.freq_once_per_bar_close)
-        alert(buildJson("fib50_armed"), alert.freq_once_per_bar_close)
 
 if armed and bar_index - armedBar > retestBars
     armed := false
+
+armedInvalid = armed and ((direction == "long" and close < stop) or (direction == "short" and close > stop))
+if armedInvalid
+    alert(buildJson("invalidated"), alert.freq_once_per_bar_close)
+    armed := false
+    fibTouchAlerted := false
+    tradeActive := false
+    entryBar := na
 
 touchedFib = armed and low <= fib50 and high >= fib50
 longReject = direction == "long" and touchedFib and close >= fib50 and (not requireCandleColor or close > open)
 shortReject = direction == "short" and touchedFib and close <= fib50 and (not requireCandleColor or close < open)
 entry = longReject or shortReject
 
+if touchedFib and not fibTouchAlerted and not entry
+    alert(buildJson("fib50_armed"), alert.freq_once_per_bar_close)
+    fibTouchAlerted := true
+
 if entry
     alert(buildJson("entry"), alert.freq_once_per_bar_close)
     armed := false
+    fibTouchAlerted := false
+    tradeActive := true
+    entryBar := bar_index
+
+targetReached = tradeActive and bar_index >= entryBar and ((direction == "long" and high >= extension150) or (direction == "short" and low <= extension150))
+tradeInvalid = tradeActive and bar_index >= entryBar and ((direction == "long" and close < stop) or (direction == "short" and close > stop))
+
+if targetReached
+    alert(buildJson("exit_target"), alert.freq_once_per_bar_close)
+    tradeActive := false
+    entryBar := na
+else if tradeInvalid
+    alert(buildJson("invalidated"), alert.freq_once_per_bar_close)
+    tradeActive := false
+    entryBar := na
 
 if showLevels and (crossUp or crossDown)
     line.delete(fibLine)

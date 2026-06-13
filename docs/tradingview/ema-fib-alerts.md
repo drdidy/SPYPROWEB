@@ -17,7 +17,7 @@ https://www.spyprophet.app/api/tradingview/ema-fib?token=YOUR_SHARED_SECRET
    - pivot high above pivot low,
    - Fib 50 midpoint,
    - Fib 1.5 extension,
-   - clean rejection candle at Fib 50,
+   - clean rejection candle at Fib 50 when the alert is an entry,
    - signal freshness.
 4. Accepted signals are logged and routed to Telegram when configured.
 
@@ -86,14 +86,25 @@ https://www.spyprophet.app/api/tradingview/ema-fib?token=YOUR_SHARED_SECRET
 Telegram messages are intentionally short and actionable:
 
 ```text
-SPX ENTRY: SHORT Fib 50 rejection
+SPX ENTRY NOW: SHORT Fib 50 rejection
 
-SPX SHORT continuation confirmed.
-Fib 50: 7432.60 | Last: 7429.40
-Exit plan: 1.5 fib at 7381.50
-Invalidation: 7459.10
-Source: 21/50 EMA cross + clean Fib 50 rejection.
+Setup confirmed: 21 EMA / 50 EMA continuation on 1m.
+Candle tagged Fib 50 and closed back below 7432.60.
+Entry window: next 1-minute candle after the bearish rejection close.
+Entry reference: 7429.40.
+Target / planned exit: Fib 1.5 at 7381.50.
+Invalidation reference: 7459.10.
+Swing map: 7406.10 -> 7459.10.
+This is an alert only. Confirm spread, contract price, and liquidity before acting.
 ```
+
+The lifecycle is:
+
+1. `CROSS` - the 21 EMA / 50 EMA cross is detected and the Fib map is built.
+2. `TESTING` - price has reached the Fib 50 line, but there is no entry yet.
+3. `ENTRY NOW` - the candle touched Fib 50 and closed on the continuation side.
+4. `EXIT` - Fib 1.5 target was reached.
+5. `INVALIDATED` - the setup failed before or after entry.
 
 Rejected signals are logged but not sent to Telegram.
 
