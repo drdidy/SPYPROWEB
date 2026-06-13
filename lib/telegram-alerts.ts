@@ -14,6 +14,12 @@ export interface TelegramChatBinding {
   source: "env" | "store";
 }
 
+export interface TelegramBotProfile {
+  id: number;
+  username: string | null;
+  firstName: string | null;
+}
+
 export function telegramBotToken(): string | null {
   return process.env.TELEGRAM_BOT_TOKEN || process.env.SPYPROPHET_TELEGRAM_BOT_TOKEN || null;
 }
@@ -88,6 +94,29 @@ export function maskChatId(chatId: string | number | null): string | null {
   const value = String(chatId);
   if (value.length <= 4) return "****";
   return `${value.slice(0, 2)}***${value.slice(-2)}`;
+}
+
+export async function readTelegramBotProfile(): Promise<TelegramBotProfile | null> {
+  const token = telegramBotToken();
+  if (!token) return null;
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/getMe`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      ok?: boolean;
+      result?: { id?: number; username?: string; first_name?: string };
+    };
+    if (!data.ok || typeof data.result?.id !== "number") return null;
+    return {
+      id: data.result.id,
+      username: data.result.username || null,
+      firstName: data.result.first_name || null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function redisGet(key: string): Promise<string | null> {

@@ -5,6 +5,7 @@ import {
   alertSecrets,
   configuredTelegramChatId,
   maskChatId,
+  readTelegramBotProfile,
   readStoredTelegramChatId,
   telegramBotToken,
 } from "@/lib/telegram-alerts";
@@ -48,9 +49,13 @@ export default function Page() {
 async function ConfigurationPage() {
   const storedTelegramChat = await readStoredTelegramChatId();
   const envTelegramChat = configuredTelegramChatId();
+  const telegramBotProfile = await readTelegramBotProfile();
   const botReady = !!telegramBotToken();
   const secretReady = alertSecrets().length > 0;
   const baseUrl = "https://www.spyprophet.app";
+  const telegramBotLink = telegramBotProfile?.username
+    ? `https://t.me/${telegramBotProfile.username}`
+    : null;
 
   return (
     <div className="w-full max-w-[1280px] pb-16 space-y-8">
@@ -102,7 +107,11 @@ async function ConfigurationPage() {
               label="Telegram bot"
               value={botReady ? "Installed" : "Missing"}
               ok={botReady}
-              note="Production bot token stays server-side."
+              note={
+                telegramBotProfile?.username
+                  ? `Bot @${telegramBotProfile.username}`
+                  : "Production bot token stays server-side."
+              }
             />
             <AlertStatusTile
               label="Telegram chat"
@@ -136,6 +145,20 @@ async function ConfigurationPage() {
                 <span className="font-semibold text-ink">3.</span> Send
                 <span className="font-mono text-ink"> /start </span>
                 to the SPY Prophet Telegram bot once.
+                {telegramBotLink ? (
+                  <>
+                    {" "}
+                    <a
+                      className="font-semibold text-gold-ink underline decoration-dotted underline-offset-4"
+                      href={telegramBotLink}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open bot
+                    </a>
+                    .
+                  </>
+                ) : null}
               </li>
             </ol>
             <p className="mt-3 text-[12px] leading-relaxed text-ink-3">

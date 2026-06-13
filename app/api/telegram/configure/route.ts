@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   isAuthorizedAlertToken,
   maskChatId,
+  readTelegramBotProfile,
   readStoredTelegramChatId,
   telegramBotToken,
 } from "@/lib/telegram-alerts";
@@ -40,12 +41,19 @@ export async function POST(req: NextRequest) {
     | null;
 
   const storedChat = await readStoredTelegramChatId();
+  const botProfile = await readTelegramBotProfile();
   return NextResponse.json({
     ok: telegramRes.ok && telegramBody?.ok !== false,
     telegram: {
       ok: telegramBody?.ok ?? telegramRes.ok,
       description: telegramBody?.description ?? null,
     },
+    bot: botProfile
+      ? {
+          username: botProfile.username,
+          link: botProfile.username ? `https://t.me/${botProfile.username}` : null,
+        }
+      : null,
     storedChat: maskChatId(storedChat),
     nextStep: storedChat
       ? "Telegram chat is already bound."
