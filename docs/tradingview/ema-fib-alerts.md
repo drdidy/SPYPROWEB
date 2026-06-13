@@ -69,6 +69,8 @@ chat in Upstash Redis and uses it for future alerts.
 1. Open the Pine Editor.
 2. Paste `docs/tradingview/ema-fib-continuation-alert.pine`.
 3. Add it to the 1-minute SPX, SPY, or ES chart.
+   Leave `SPY Prophet Symbol` set to `Auto`; the script and webhook infer
+   SPY/SPX/ES from the TradingView ticker.
 4. Create an alert.
 5. Condition: the indicator, then `Any alert() function call`.
 6. Frequency: `Once Per Bar Close`.

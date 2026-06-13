@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   appendEmaFibAlertRecord,
   buildEmaFibAlertId,
+  normalizeEmaFibPayload,
   parseEmaFibPayload,
   readEmaFibAlerts,
   sendAlertNotification,
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const payload = parsed.data;
+  const payload = normalizeEmaFibPayload(parsed.data);
   const validation = validateEmaFibAlert(payload);
   const notification = await sendAlertNotification(payload, validation);
   const record = {

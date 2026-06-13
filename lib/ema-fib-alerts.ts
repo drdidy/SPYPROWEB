@@ -6,6 +6,7 @@ import {
   EmaFibAlertPayload,
   type EmaFibAlertRecord,
   type EmaFibDirection,
+  type EmaFibSymbol,
 } from "@/lib/contracts/ema-fib-alert";
 import {
   configuredTelegramChatId,
@@ -34,6 +35,13 @@ export interface NotificationResult {
 
 export function parseEmaFibPayload(raw: unknown) {
   return EmaFibAlertPayload.safeParse(raw);
+}
+
+export function normalizeEmaFibPayload(payload: EmaFibAlertPayload): EmaFibAlertPayload {
+  return {
+    ...payload,
+    symbol: inferSymbolFromTicker(payload.ticker) ?? payload.symbol,
+  };
 }
 
 export function validateEmaFibAlert(payload: EmaFibAlertPayload): AlertValidation {
@@ -95,6 +103,14 @@ export function validateEmaFibAlert(payload: EmaFibAlertPayload): AlertValidatio
     status: reasons.length ? "rejected" : "accepted",
     reasons,
   };
+}
+
+function inferSymbolFromTicker(ticker: string): EmaFibSymbol | null {
+  const clean = ticker.toUpperCase().replace(/[^A-Z0-9!]/g, "");
+  if (clean === "SPY") return "SPY";
+  if (clean.includes("SPX500") || clean === "SPX") return "SPX";
+  if (clean === "ES" || clean === "ES1!" || clean.startsWith("ES")) return "ES";
+  return null;
 }
 
 export function buildEmaFibAlertId(payload: EmaFibAlertPayload): string {

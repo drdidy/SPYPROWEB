@@ -1,11 +1,15 @@
 //@version=5
 indicator("SPY Prophet - EMA Fib Continuation Alert", overlay=true, max_lines_count=30, max_labels_count=30)
 
-signalSymbol = input.string("SPX", "SPY Prophet Symbol", options=["SPY", "SPX", "ES"])
+signalSymbolInput = input.string("Auto", "SPY Prophet Symbol", options=["Auto", "SPY", "SPX", "ES"])
 lookbackBars = input.int(90, "Pre-cross pivot lookback", minval=20, maxval=240)
 retestBars = input.int(60, "Retest window after cross", minval=5, maxval=180)
 requireCandleColor = input.bool(true, "Require rejection candle color")
 showLevels = input.bool(true, "Show Fib 50 / 1.5 levels")
+
+tickerUpper = str.upper(syminfo.ticker)
+autoSymbol = str.contains(tickerUpper, "SPY") ? "SPY" : str.contains(tickerUpper, "ES") ? "ES" : "SPX"
+signalSymbol = signalSymbolInput == "Auto" ? autoSymbol : signalSymbolInput
 
 ema21 = ta.ema(close, 21)
 ema50 = ta.ema(close, 50)
