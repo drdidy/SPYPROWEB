@@ -78,12 +78,13 @@ async function readBody(req: NextRequest): Promise<unknown | null> {
 function authorize(req: NextRequest):
   | { ok: true }
   | { ok: false; status: number; error: string } {
-  const configured =
-    process.env.SPYPROPHET_TRADINGVIEW_WEBHOOK_SECRET ||
-    process.env.ALERT_SECRET;
+  const configured = [
+    process.env.SPYPROPHET_TRADINGVIEW_WEBHOOK_SECRET,
+    process.env.ALERT_SECRET,
+  ].filter((value): value is string => !!value);
   const isProduction = process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
 
-  if (!configured) {
+  if (configured.length === 0) {
     if (isProduction) {
       return {
         ok: false,
@@ -101,7 +102,7 @@ function authorize(req: NextRequest):
   const bearer = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
   const supplied = queryToken || headerToken || bearer;
 
-  if (supplied !== configured) {
+  if (!supplied || !configured.includes(supplied)) {
     return { ok: false, status: 401, error: "Unauthorized TradingView webhook." };
   }
 
