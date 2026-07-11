@@ -20,7 +20,13 @@ type Bar = {
   c: number;
   v?: number;
 };
-type ReplayPayload = { date: string; spy: Bar[]; es: Bar[]; error?: string };
+type ReplayPayload = {
+  date: string;
+  spy: Bar[];
+  es: Bar[];
+  error?: string;
+  source?: { spy?: string; es?: string };
+};
 
 const SPEEDS = [1, 2, 4] as const;
 
@@ -47,6 +53,8 @@ export function ReplayLab({ initialDate }: { initialDate: string | null }) {
         if (!active) return;
         setPayload(data);
         const count = Math.max(data.spy?.length ?? 0, data.es?.length ?? 0);
+        const preferred = data.spy?.length ? data.spy : data.es;
+        setCursor(initialCursor(preferred ?? []));
         setStatus(count ? "ready" : "empty");
       })
       .catch(() => active && setStatus("error"));
@@ -89,13 +97,30 @@ export function ReplayLab({ initialDate }: { initialDate: string | null }) {
   const sessionLow = visible.length
     ? Math.min(...visible.map((bar) => bar.l))
     : null;
+  const previous = visible.length > 1 ? visible[visible.length - 2] : null;
+  const barRange = current ? current.h - current.l : null;
+  const barRead = current
+    ? current.c >= current.o
+      ? "Bullish close"
+      : "Bearish close"
+    : "Waiting";
+  const closeRead = current && previous
+    ? current.c > previous.c
+      ? "Higher close"
+      : current.c < previous.c
+        ? "Lower close"
+        : "Flat close"
+    : "Waiting";
+  const rangeLocation = current && sessionHigh !== null && sessionLow !== null && sessionHigh > sessionLow
+    ? ((current.c - sessionLow) / (sessionHigh - sessionLow)) * 100
+    : null;
 
   return (
     <div className="bg-carbon text-white">
       <header className="grid border-b border-white/20 lg:grid-cols-[1fr_auto] lg:items-end">
         <div className="p-5 py-10 md:p-10">
           <p className="microlabel text-lime">Session replay</p>
-          <h1 className="mt-6 text-[13vw] font-black leading-[0.86] tracking-[-0.015em] sm:text-[48px] md:text-[70px] xl:text-[90px]">
+          <h1 className="mt-6 text-[13vw] font-black leading-[0.86] tracking-normal sm:text-[48px] md:text-[70px] xl:text-[90px]">
             Slow the market down.
           </h1>
           <p className="mt-6 max-w-[680px] text-[15px] leading-relaxed text-white/60">
@@ -141,6 +166,10 @@ export function ReplayLab({ initialDate }: { initialDate: string | null }) {
           <p className="num mt-3 text-[14px] font-black">{date}</p>
           <ReadLabel label="Bars loaded" className="mt-10" />
           <p className="num mt-3 text-[14px] font-black">{bars.length}</p>
+          <ReadLabel label="Verified source" className="mt-10" />
+          <p className="microlabel mt-3 text-mineral">
+            {payload?.source?.[instrument.toLowerCase() as "spy" | "es"] ?? "Replay API"}
+          </p>
           <ReadLabel label="Session range" className="mt-10" />
           <p className="num mt-3 text-[12px] font-bold leading-relaxed text-white/75">
             {sessionHigh !== null && sessionLow !== null ? (
@@ -157,11 +186,11 @@ export function ReplayLab({ initialDate }: { initialDate: string | null }) {
         </div>
 
         <div className="hud-grid relative min-h-[430px] overflow-hidden border-b border-white/20 lg:border-b-0 lg:border-r">
-          {status === "ready" && visible.length > 1 ? (
+          {status === "ready" && visible.length > 0 ? (
             <>
-              <PathChart bars={visible} />
+              <CandleChart bars={visible} instrument={instrument} />
               <span className="microlabel absolute left-4 top-4 border border-white/25 bg-carbon px-2.5 py-1.5 text-white/65">
-                {instrument} / close path
+                {instrument} / candles / bar by bar
               </span>
               {current && (
                 <span className="num absolute bottom-4 right-4 bg-carbon px-2.5 py-1.5 text-[11px] text-white/65">
@@ -228,6 +257,15 @@ export function ReplayLab({ initialDate }: { initialDate: string | null }) {
             <p className="microlabel mt-2 text-white/60">
               From session open / points
             </p>
+          </div>
+          <div className="mt-8 border-t border-white/25 pt-5">
+            <ReadLabel label="Bar read" accent />
+            <p className="mt-3 text-[18px] font-black">{barRead}</p>
+            <p className="mt-2 text-[12px] font-bold text-white/70">{closeRead}</p>
+            <div className="mt-5 border-t border-white/15">
+              <Read label="Bar range" value={barRange ?? undefined} />
+              <Read label="Range location" value={rangeLocation ?? undefined} suffix="%" />
+            </div>
           </div>
         </div>
       </section>
@@ -303,58 +341,73 @@ export function ReplayLab({ initialDate }: { initialDate: string | null }) {
   );
 }
 
-function PathChart({ bars }: { bars: Bar[] }) {
-  const width = 1000;
-  const height = 560;
-  const pad = 40;
-  const values = bars.flatMap((bar) => [bar.h, bar.l]);
+function CandleChart({ bars, instrument }: { bars: Bar[]; instrument: "SPY" | "ES" }) {
+  const width = 1100;
+  const height = 600;
+  const pad = { left: 28, right: 96, top: 34, bottom: 54 };
+  const windowBars = bars.slice(-110);
+  const values = windowBars.flatMap((bar) => [bar.h, bar.l]);
   const min = Math.min(...values);
   const max = Math.max(...values);
-  const span = Math.max(max - min, 0.01);
-  const x = (index: number) =>
-    (index / Math.max(1, bars.length - 1)) * width;
+  const rawSpan = Math.max(max - min, instrument === "SPY" ? 0.05 : 0.5);
+  const floor = min - rawSpan * 0.08;
+  const ceiling = max + rawSpan * 0.08;
+  const span = ceiling - floor;
+  const plotWidth = width - pad.left - pad.right;
+  const plotHeight = height - pad.top - pad.bottom;
+  const step = plotWidth / Math.max(1, windowBars.length);
+  const candleWidth = Math.max(2.5, Math.min(10, step * 0.58));
+  const x = (index: number) => pad.left + step * index + step / 2;
   const y = (value: number) =>
-    height - ((value - min) / span) * (height - pad * 2) - pad;
-
-  const closePoints = bars
-    .map((bar, index) => `${x(index)},${y(bar.c)}`)
-    .join(" ");
-  const bandPoints = [
-    ...bars.map((bar, index) => `${x(index)},${y(bar.h)}`),
-    ...[...bars].reverse().map((bar, index) => {
-      const originalIndex = bars.length - 1 - index;
-      return `${x(originalIndex)},${y(bar.l)}`;
-    }),
-  ].join(" ");
-  const areaPoints = `0,${height} ${closePoints} ${x(bars.length - 1)},${height}`;
-  const last = bars[bars.length - 1];
+    pad.top + ((ceiling - value) / span) * plotHeight;
+  const last = windowBars[windowBars.length - 1];
+  const open = windowBars[0];
+  const yTicks = Array.from({ length: 6 }, (_, index) => ceiling - (span * index) / 5);
+  const tickIndexes = Array.from(new Set([0, Math.floor((windowBars.length - 1) * 0.25), Math.floor((windowBars.length - 1) * 0.5), Math.floor((windowBars.length - 1) * 0.75), windowBars.length - 1]));
+  const precision = instrument === "SPY" ? 2 : 1;
 
   return (
     <svg
       viewBox={`0 0 ${width} ${height}`}
       className="absolute inset-0 h-full w-full"
       preserveAspectRatio="none"
-      aria-label="Replay price path"
+      aria-label={`${instrument} candlestick replay chart from ${timeShort(open.t)} to ${timeShort(last.t)}`}
       role="img"
     >
-      <polygon points={bandPoints} fill="rgba(255,255,255,0.07)" />
-      <polygon points={areaPoints} fill="rgba(184,242,61,0.07)" />
-      <polyline
-        points={closePoints}
-        fill="none"
-        stroke="#B8F23D"
-        strokeWidth="3.5"
-        vectorEffect="non-scaling-stroke"
-      />
+      {yTicks.map((value) => (
+        <g key={value}>
+          <line x1={pad.left} y1={y(value)} x2={width - pad.right} y2={y(value)} stroke="rgba(255,255,255,0.12)" vectorEffect="non-scaling-stroke" />
+          <text x={width - pad.right + 12} y={y(value) + 4} fill="rgba(255,255,255,0.68)" fontSize="12" fontFamily="ui-monospace, monospace">{value.toFixed(precision)}</text>
+        </g>
+      ))}
+      <line x1={pad.left} y1={y(open.o)} x2={width - pad.right} y2={y(open.o)} stroke="rgba(216,200,148,0.52)" strokeDasharray="7 7" vectorEffect="non-scaling-stroke" />
+      <text x={pad.left + 8} y={y(open.o) - 8} fill="#D8C894" fontSize="11" fontWeight="700" fontFamily="ui-monospace, monospace">SESSION OPEN</text>
+      {windowBars.map((bar, index) => {
+        const rising = bar.c >= bar.o;
+        const color = rising ? "#8FD3C8" : "#E67560";
+        const bodyTop = y(Math.max(bar.o, bar.c));
+        const bodyHeight = Math.max(2, Math.abs(y(bar.o) - y(bar.c)));
+        return (
+          <g key={`${bar.t}-${index}`}>
+            <line x1={x(index)} y1={y(bar.h)} x2={x(index)} y2={y(bar.l)} stroke={color} strokeWidth="1.25" vectorEffect="non-scaling-stroke" />
+            <rect x={x(index) - candleWidth / 2} y={bodyTop} width={candleWidth} height={bodyHeight} fill={rising ? "rgba(143,211,200,0.82)" : "rgba(230,117,96,0.86)"} stroke={color} strokeWidth="0.75" vectorEffect="non-scaling-stroke" />
+          </g>
+        );
+      })}
+      {tickIndexes.map((index) => (
+        <text key={index} x={x(index)} y={height - 18} textAnchor="middle" fill="rgba(255,255,255,0.62)" fontSize="11" fontFamily="ui-monospace, monospace">{timeShort(windowBars[index].t)}</text>
+      ))}
       <line
-        x1={x(bars.length - 1)}
-        y1="0"
-        x2={x(bars.length - 1)}
-        y2={height}
-        stroke="rgba(255,255,255,0.25)"
+        x1={pad.left}
+        y1={y(last.c)}
+        x2={width - pad.right}
+        y2={y(last.c)}
+        stroke="rgba(143,211,200,0.48)"
+        strokeDasharray="4 5"
         vectorEffect="non-scaling-stroke"
       />
-      <circle cx={x(bars.length - 1)} cy={y(last.c)} r="8" fill="#FF5B4D" />
+      <rect x={width - pad.right + 5} y={y(last.c) - 12} width="84" height="24" fill="#8FD3C8" />
+      <text x={width - pad.right + 47} y={y(last.c) + 4} textAnchor="middle" fill="#07090A" fontSize="12" fontWeight="800" fontFamily="ui-monospace, monospace">{last.c.toFixed(precision)}</text>
     </svg>
   );
 }
@@ -408,12 +461,12 @@ function Control({
   );
 }
 
-function Read({ label, value }: { label: string; value?: number }) {
+function Read({ label, value, suffix = "" }: { label: string; value?: number; suffix?: string }) {
   return (
     <div className="flex items-center justify-between border-b border-white/15 py-3">
       <span className="microlabel text-white/60">{label}</span>
       <span className="num text-[13px] font-black">
-        {typeof value === "number" ? value.toFixed(2) : "--"}
+        {typeof value === "number" ? `${value.toFixed(2)}${suffix}` : "--"}
       </span>
     </div>
   );
@@ -430,10 +483,37 @@ function time(value: string) {
     : value;
 }
 
+function timeShort(value: string) {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime())
+    ? new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/Chicago",
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(date)
+    : value;
+}
+
 function recentWeekday() {
   const date = new Date();
   do {
     date.setDate(date.getDate() - 1);
   } while ([0, 6].includes(date.getDay()));
   return date.toISOString().slice(0, 10);
+}
+
+function initialCursor(bars: Bar[]) {
+  const firstRth = bars.findIndex((bar) => {
+    const date = new Date(bar.t);
+    if (!Number.isFinite(date.getTime())) return false;
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Chicago",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(date);
+    const value = (type: "hour" | "minute") => Number(parts.find((part) => part.type === type)?.value ?? 0);
+    return value("hour") * 60 + value("minute") >= 8 * 60 + 30;
+  });
+  return firstRth >= 0 ? firstRth + 1 : Math.min(Math.max(1, bars.length), 24);
 }

@@ -36,26 +36,26 @@ export function ReviewAIClient() {
 
   return (
     <div className="bg-optic text-carbon">
-      <header className="grid border-b border-carbon xl:grid-cols-[minmax(0,1.2fr)_420px]">
-        <div className="p-5 py-10 md:p-10 xl:p-14">
+      <header className="grid border-b border-white/10 bg-carbon text-white xl:grid-cols-[minmax(0,1.2fr)_420px]">
+        <div className="cinematic-grid p-5 py-10 md:p-10 xl:p-14">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="microlabel bg-carbon px-2.5 py-1.5 text-lime">Review AI</span>
-            <span className="microlabel text-carbon/60">Evidence bound / no silent retuning</span>
+            <span className="microlabel border border-mineral/30 px-2.5 py-1.5 text-mineral">Review AI</span>
+            <span className="microlabel text-white/65">Evidence bound / no silent retuning</span>
           </div>
-          <h1 className="mt-8 max-w-[900px] text-[13vw] font-black leading-[0.88] tracking-[-0.01em] sm:text-[52px] md:text-[72px] xl:text-[88px]">
-            Review the day.<br /><span className="text-cobalt">Improve the process.</span>
+          <h1 className="mt-8 max-w-[900px] text-[13vw] font-black leading-[0.88] tracking-normal sm:text-[52px] md:text-[72px] xl:text-[88px]">
+            Review the day.<br /><span className="text-mineral">Improve the process.</span>
           </h1>
-          <p className="mt-7 max-w-[720px] text-[15px] leading-relaxed text-carbon/65 md:text-[17px]">
+          <p className="mt-7 max-w-[720px] text-[15px] leading-relaxed text-white/60 md:text-[17px]">
             The desk joins TradingView alerts, replay bars, option memory, the Daily Brief, and verified news context. It can propose research, but one unusual session can never rewrite production rules.
           </p>
         </div>
-        <div className="flex flex-col justify-between border-t border-carbon bg-lime p-5 md:p-8 xl:border-l xl:border-t-0">
+        <div className="flex flex-col justify-between border-t border-mineral/20 bg-ink p-5 text-white md:p-8 xl:border-l xl:border-t-0">
           <div>
             <p className="microlabel">Next-session directive</p>
             <h2 className="mt-5 text-[30px] font-black leading-[0.98]">{snapshot.ai.headline}</h2>
-            <p className="mt-5 text-[13px] font-semibold leading-relaxed text-carbon/75">{snapshot.ai.nextSessionFocus}</p>
+            <p className="mt-5 text-[13px] font-semibold leading-relaxed text-white/60">{snapshot.ai.nextSessionFocus}</p>
           </div>
-          <div className="mt-10 border-t border-carbon pt-4">
+          <div className="mt-10 border-t border-white/20 pt-4">
             <p className="microlabel">Synthesis / {snapshot.ai.used ? snapshot.ai.source : "deterministic fallback"}</p>
             <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.06em]">Memory / {snapshot.persistence}</p>
           </div>
@@ -76,7 +76,7 @@ export function ReviewAIClient() {
       </section>
 
       <section className="grid border-b border-carbon lg:grid-cols-[0.72fr_1.28fr]">
-        <div className="bg-cobalt p-5 text-white md:p-10">
+        <div className="bg-context p-5 text-white md:p-10">
           <p className="microlabel">Session scorecard / {snapshot.sessionDate}</p>
           <div className="mt-9 grid grid-cols-2 border border-white/35">
             <Score label="Wins" value={snapshot.scorecard.wins} />

@@ -78,30 +78,30 @@ export function TodayConsole({
   return (
     <div>
       {/* ========================= COMMAND HEADER ======================== */}
-      <section className="grid border-b border-carbon xl:grid-cols-[minmax(0,1.45fr)_minmax(380px,0.55fr)]">
-        <div className="flex flex-col justify-between px-5 py-10 md:px-10 md:py-12 xl:px-14">
+      <section className="grid border-b border-white/10 bg-carbon text-white xl:grid-cols-[minmax(0,1.45fr)_minmax(380px,0.55fr)]">
+        <div className="cinematic-grid flex flex-col justify-between px-5 py-10 md:px-10 md:py-12 xl:px-14">
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <SourceTag label="SPY" source={spySource} />
               <SourceTag label="ES / SPX" source={spxSource} />
-              <span className="microlabel ml-1 text-carbon/60">
-                Today / Chicago
+              <span className="microlabel ml-1 text-white/65">
+                Private desk / Chicago
               </span>
             </div>
 
             <div className="mt-10 flex flex-wrap items-center gap-x-5 gap-y-3">
-              <p className="microlabel text-cobalt">Current command</p>
+              <p className="microlabel text-mineral">Current command</p>
               <StateLadder current={state} live={liveEnough} />
             </div>
 
-            <h1 className="mt-5 max-w-[900px] text-[13vw] font-black leading-[0.88] tracking-[-0.01em] sm:text-[48px] md:text-[62px] xl:text-[76px]">
+            <h1 className="mt-5 max-w-[900px] text-[13vw] font-black leading-[0.88] tracking-normal sm:text-[48px] md:text-[62px] xl:text-[76px]">
               {command.label}
             </h1>
-            <p className="mt-6 max-w-[720px] text-[15px] font-medium leading-relaxed text-carbon/65 md:text-[17px]">
+            <p className="mt-6 max-w-[720px] text-[15px] font-medium leading-relaxed text-white/60 md:text-[17px]">
               {command.body}
             </p>
           </div>
-          <div className="mt-14 grid grid-cols-2 border-t border-carbon sm:grid-cols-4">
+          <div className="mt-14 grid grid-cols-2 border-t border-white/20 sm:grid-cols-4">
             <CommandFact label="Focus" value={spxUsable ? "ES / SPX" : "SPY"} />
             <CommandFact
               label="Direction"
@@ -121,12 +121,12 @@ export function TodayConsole({
           </div>
         </div>
 
-        <aside className="flex flex-col border-t border-carbon bg-lime p-5 text-carbon md:p-8 xl:border-l xl:border-t-0">
+        <aside className="flex flex-col border-t border-mineral/20 bg-ink p-5 text-white md:p-8 xl:border-l xl:border-t-0">
           <p className="microlabel">Proof stack</p>
           <h2 className="mt-5 max-w-[380px] text-[28px] font-black leading-[0.98] md:text-[32px]">
             A trade is only as strong as its weakest proof.
           </h2>
-          <div className="mt-9 border-t border-carbon">
+          <div className="mt-9 border-t border-white/20">
             <ProofRow done={liveEnough} label="Verified market source" />
             <ProofRow done={aligned} label="SPY and ES context agree" />
             <ProofRow
@@ -139,7 +139,7 @@ export function TodayConsole({
             />
           </div>
           {degraded && (
-            <div className="mt-auto flex gap-3 border border-carbon bg-optic p-4 pt-4 text-[12px] font-semibold leading-relaxed">
+            <div className="mt-auto flex gap-3 border border-coral/40 bg-coral/10 p-4 pt-4 text-[12px] font-semibold leading-relaxed">
               <AlertTriangle className="mt-0.5 shrink-0" size={16} />
               Stale, mock, or unavailable data can describe system health, but
               it cannot issue a trade.
@@ -189,7 +189,7 @@ export function TodayConsole({
 
       {/* ===================== TICKET / RISK / ALERTS ==================== */}
       <section className="grid border-b border-carbon xl:grid-cols-[1.1fr_0.9fr]">
-        <div id="contract" className="bg-cobalt p-5 text-white md:p-10">
+        <div id="contract" className="bg-context p-5 text-white md:p-10">
           <div className="flex items-center justify-between gap-4">
             <p className="microlabel">Execution ticket</p>
             <span className="microlabel border border-white/40 px-2.5 py-1.5 text-white">
@@ -247,13 +247,13 @@ function StateLadder({
               "microlabel border px-2 py-1.5",
               active
                 ? step.stage === "ENTER"
-                  ? "border-carbon bg-lime"
+                  ? "border-lime bg-lime text-carbon"
                   : step.stage === "READY"
-                    ? "border-carbon bg-carbon text-lime"
+                    ? "border-mineral bg-white/[0.04] text-mineral"
                     : step.stage === "EXIT"
-                      ? "border-carbon bg-cobalt text-white"
-                    : "border-carbon bg-carbon text-optic"
-                : "border-carbon/25 text-carbon/60",
+                      ? "border-context bg-context text-white"
+                    : "border-white/40 bg-white/[0.04] text-white"
+                : "border-white/25 text-white/65",
             )}
             aria-current={active ? "step" : undefined}
           >
@@ -489,11 +489,11 @@ function AlertBlock() {
 
 function ProofRow({ done, label }: { done: boolean; label: string }) {
   return (
-    <div className="flex min-h-14 items-center gap-3 border-b border-carbon py-3">
+    <div className="flex min-h-14 items-center gap-3 border-b border-white/15 py-3">
       <span
         className={cn(
-          "grid h-5 w-5 shrink-0 place-items-center border border-carbon",
-          done && "bg-carbon",
+          "grid h-5 w-5 shrink-0 place-items-center border border-white/30",
+          done && "border-lime bg-lime/10",
         )}
         aria-hidden="true"
       >
@@ -501,16 +501,16 @@ function ProofRow({ done, label }: { done: boolean; label: string }) {
           <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
             <path
               d="M1.5 5.5L4.5 8.5L9.5 2.5"
-              stroke="#B8F23D"
+              stroke="#C7FF45"
               strokeWidth="2"
             />
           </svg>
         ) : (
-          <span className="h-1.5 w-1.5 bg-carbon/30" />
+          <span className="h-1.5 w-1.5 bg-white/20" />
         )}
       </span>
       <span className="text-[13px] font-black">{label}</span>
-      <span className="microlabel ml-auto shrink-0 text-carbon/70">
+      <span className="microlabel ml-auto shrink-0 text-white/65">
         {done ? "Held" : "Missing"}
       </span>
     </div>
@@ -527,13 +527,13 @@ function CommandFact({
   accent?: "go" | "stop";
 }) {
   return (
-    <div className="border-b border-carbon/15 py-4 pr-4 sm:border-b-0 sm:border-r sm:px-4 sm:first:pl-0 sm:last:border-r-0">
-      <p className="microlabel text-carbon/60">{label}</p>
+    <div className="border-b border-white/15 py-4 pr-4 sm:border-b-0 sm:border-r sm:px-4 sm:first:pl-0 sm:last:border-r-0">
+      <p className="microlabel text-white/65">{label}</p>
       <p
         className={cn(
           "mt-2.5 text-[13px] font-black",
-          accent === "go" && "text-go-ink",
-          accent === "stop" && "text-stop-ink",
+          accent === "go" && "text-lime",
+          accent === "stop" && "text-coral",
         )}
       >
         {value}
@@ -547,8 +547,8 @@ function SourceTag({ label, source }: { label: string; source: string }) {
   return (
     <span
       className={cn(
-        "microlabel border border-carbon px-2.5 py-1.5",
-        valid ? "bg-lime" : "bg-white text-stop-ink",
+        "microlabel border px-2.5 py-1.5",
+        valid ? "border-lime bg-lime text-carbon" : "border-coral/40 bg-coral/10 text-coral",
       )}
     >
       {label} / {source}

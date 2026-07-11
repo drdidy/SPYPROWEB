@@ -29,14 +29,14 @@ export function ConsentBanner() {
     >
       <div>
         <div className="flex items-center justify-between border-b border-white/20 px-4 py-3">
-          <span className="text-[9px] font-black uppercase tracking-[0.12em] text-[#B8F23D]">Privacy</span>
-          <span className="text-[9px] font-bold uppercase tracking-[0.1em] text-white/50">Your choice</span>
+          <span className="text-[9px] font-black uppercase tracking-[0.12em] text-lime">Privacy</span>
+          <span className="text-[9px] font-bold uppercase tracking-[0.1em] text-white/65">Your choice</span>
         </div>
         <p className="px-4 py-3 text-[11px] leading-relaxed text-white/80 md:text-[12px]">
           Essential cookies run SPY Prophet. Allow anonymous analytics to help improve the workspace?{" "}
           <Link
             href="/privacy"
-            className="ml-1 font-black text-[#B8F23D] underline underline-offset-4"
+            className="ml-1 font-black text-lime underline underline-offset-4"
           >
             Privacy
           </Link>
@@ -53,7 +53,7 @@ export function ConsentBanner() {
           <button
             type="button"
             onClick={() => setConsent("accepted")}
-            className="min-h-12 bg-[#B8F23D] px-5 text-[9px] font-black uppercase text-black hover:bg-white"
+            className="min-h-12 bg-lime px-5 text-[9px] font-black uppercase text-carbon hover:bg-white"
           >
             Accept analytics
           </button>

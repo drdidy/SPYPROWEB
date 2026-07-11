@@ -57,14 +57,13 @@ export function MarketAtlas({
     <div className="bg-carbon text-white">
       <header className="grid border-b border-white/20 lg:grid-cols-[1fr_auto] lg:items-end">
         <div className="px-5 py-10 md:px-10 md:py-14">
-          <p className="microlabel text-lime">Market atlas</p>
-          <h1 className="mt-6 max-w-[1050px] text-[13vw] font-black leading-[0.86] tracking-[-0.015em] sm:text-[50px] md:text-[72px] xl:text-[96px]">
-            Structure without the chart clutter.
+          <p className="microlabel text-mineral">Private market map</p>
+          <h1 className="mt-6 max-w-[1050px] text-[13vw] font-black leading-[0.86] tracking-normal sm:text-[50px] md:text-[72px] xl:text-[96px]">
+            Structure without the chart clutter. Keep the method private.
           </h1>
           <p className="mt-7 max-w-[720px] text-[15px] leading-relaxed text-white/60">
-            Diagonal shelves define the larger corridor. Horizontal rails
-            define the next intraday decision. Neither one is an entry by
-            itself.
+            The map reveals verified decision levels, distance, and available
+            room. The proprietary hierarchy behind them remains protected.
           </p>
         </div>
         <Link
@@ -82,21 +81,17 @@ export function MarketAtlas({
       <section className="grid lg:grid-cols-2">
         <AtlasInstrument
           symbol="SPY"
-          subtitle="Intraday rails"
+          subtitle="Intraday decision field"
           source={spySource}
           price={spyValid ? spy.currentPrice : Number.NaN}
           levels={spyLevels}
-          decay="0.12 / trading hour"
-          spacing="3.4 points"
         />
         <AtlasInstrument
           symbol="ES / SPX"
-          subtitle="Lead-market shelves"
+          subtitle="Lead-market decision field"
           source={spxSource}
           price={spxValid ? spx.price.last : Number.NaN}
           levels={esLevels}
-          decay="1.04 / trading hour"
-          spacing="34 points"
           className="border-t border-white/20 lg:border-l lg:border-t-0"
         />
       </section>
@@ -104,7 +99,7 @@ export function MarketAtlas({
       <section className="grid border-t border-white/20 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="bg-optic p-5 py-12 text-carbon md:p-10">
           <p className="microlabel text-cobalt">Confluence rule</p>
-          <h2 className="mt-6 max-w-[820px] text-[36px] font-black leading-[0.92] tracking-[-0.01em] md:text-[52px] xl:text-[64px]">
+          <h2 className="mt-6 max-w-[820px] text-[36px] font-black leading-[0.92] tracking-normal md:text-[52px] xl:text-[64px]">
             A beautiful setup with no room is still a bad trade.
           </h2>
           <div className="mt-10 grid border-t border-carbon sm:grid-cols-2">
@@ -132,7 +127,7 @@ export function MarketAtlas({
             <Rule
               number="03"
               title="Target needs room"
-              body="A nearby shelf can invalidate an otherwise clean reward plan."
+              body="A nearby decision level can invalidate an otherwise clean reward plan."
             />
           </ol>
         </div>
@@ -147,8 +142,6 @@ function AtlasInstrument({
   source,
   price,
   levels,
-  decay,
-  spacing,
   className = "",
 }: {
   symbol: string;
@@ -156,8 +149,6 @@ function AtlasInstrument({
   source: string;
   price: number;
   levels: AtlasLevel[];
-  decay: string;
-  spacing: string;
   className?: string;
 }) {
   const valid = usable(source);
@@ -225,7 +216,7 @@ function AtlasInstrument({
                   Verified geometry unavailable
                 </p>
                 <p className="mt-2 text-[12px] text-white/60">
-                  The field remains empty instead of drawing sample rails.
+                  The field remains empty instead of inventing sample levels.
                 </p>
               </div>
             </div>
@@ -263,7 +254,7 @@ function AtlasInstrument({
                     >
                       {index + 1} · {level.label}
                     </span>
-                    <span aria-hidden="true" className="text-[10px] text-white/40">
+                    <span aria-hidden="true" className="text-[10px] text-white/65">
                       {level.direction.toUpperCase().includes("DESC")
                         ? "↘"
                         : level.direction.toUpperCase().includes("ASC")
@@ -290,25 +281,12 @@ function AtlasInstrument({
         </div>
       </div>
 
-      <div className="border-t border-white/20">
-        <p className="microlabel px-5 pt-4 text-white/60">
-          Rail model constants / configuration, not live data
+      <div className="border-t border-white/20 px-5 py-4">
+        <p className="microlabel text-white/65">
+          Protected model / verified outputs only
         </p>
-        <div className="grid grid-cols-2">
-          <AtlasMetric label="Decay" value={decay} />
-          <AtlasMetric label="Spacing" value={spacing} />
-        </div>
       </div>
     </article>
-  );
-}
-
-function AtlasMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="border-r border-white/20 p-5 pt-3 last:border-r-0">
-      <p className="microlabel text-white/60">{label}</p>
-      <p className="num mt-2 text-[12px] font-black">{value}</p>
-    </div>
   );
 }
 

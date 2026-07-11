@@ -13,16 +13,20 @@ const config: Config = {
       // SPY Prophet operational palette. Five inks, no tints, no
       // gradients. Everything else is derived with alpha.
       colors: {
-        optic: "#F5F6F1", // optic white — light operational surface
-        carbon: "#0A0B0C", // carbon black — dark operational surface
-        lime: "#B8F23D", // electric lime — command / go
-        cobalt: "#3157FF", // cobalt blue — instruction / context
-        coral: "#FF5B4D", // signal coral — stop / invalidation
+        optic: "#F0F1ED", // pearl — light operational surface
+        carbon: "#07090A", // obsidian — cinematic operational surface
+        ink: "#0D1110",
+        lime: "#D8C894", // muted champagne — command / emphasis
+        mineral: "#8FD3C8", // quiet telemetry
+        context: "#147A72",
+        cobalt: "#147A72", // compatibility alias for existing context UI
+        coral: "#E67560", // restrained ember — stop / invalidation
 
         // Accessible ink variants for small text on light surfaces.
-        "go-ink": "#087A50",
-        "stop-ink": "#B52F24",
-        "warn-ink": "#8A5A00",
+        "go-ink": "#087454",
+        "context-ink": "#126A63",
+        "stop-ink": "#A92F1E",
+        "warn-ink": "#775600",
       },
 
       fontFamily: {

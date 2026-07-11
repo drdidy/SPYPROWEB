@@ -73,27 +73,27 @@ export function ProphetHeader() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 border-b border-carbon bg-optic">
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-carbon text-optic shadow-[0_12px_36px_rgba(0,0,0,0.22)]">
         <div className="flex h-[64px] items-stretch" data-testid="topbar">
           <Link
             href="/dashboard"
-            className="flex shrink-0 items-center gap-3 border-r border-carbon px-4 md:w-[228px] md:px-6"
+            className="flex shrink-0 items-center gap-3 border-r border-white/10 px-4 md:w-[210px] md:px-5"
           >
-            <span className="grid h-9 w-9 shrink-0 place-items-center bg-carbon text-[16px] font-black text-lime">
+            <span className="grid h-9 w-9 shrink-0 place-items-center border border-mineral/30 bg-white/[0.04] text-[16px] font-black text-lime">
               P
             </span>
             <span className="hidden sm:block">
               <span className="block text-[13px] font-black uppercase tracking-[0.08em]">
                 SPY Prophet
               </span>
-              <span className="microlabel mt-1 block text-[10px] text-carbon/60">
-                Decision system
+              <span className="microlabel mt-1 block text-[10px] text-white/65">
+                Private intelligence
               </span>
             </span>
           </Link>
 
           <nav
-            className="hidden items-stretch lg:flex"
+            className="hidden items-stretch xl:flex"
             aria-label="Primary navigation"
           >
             {NAV.map((item) => {
@@ -104,14 +104,14 @@ export function ProphetHeader() {
                   href={item.href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "relative flex items-center gap-2.5 border-r border-carbon/15 px-5 text-[12px] font-black uppercase tracking-[0.08em] transition-colors xl:px-6",
-                    active ? "bg-lime text-carbon" : "hover:bg-white",
+                    "relative flex items-center gap-2 border-r border-white/10 px-3.5 text-[11px] font-black uppercase tracking-[0.08em] transition-colors 2xl:px-5",
+                    active ? "bg-white/[0.06] text-lime" : "text-white/65 hover:bg-white/[0.04] hover:text-white",
                   )}
                 >
                   <span
                     className={cn(
                       "font-mono text-[10px] font-bold",
-                      active ? "text-carbon/70" : "text-cobalt",
+                      active ? "text-mineral" : "text-white/65",
                     )}
                   >
                     {item.index}
@@ -123,12 +123,12 @@ export function ProphetHeader() {
           </nav>
 
           <div className="ml-auto flex items-stretch">
-            <div className="hidden items-center gap-3 border-l border-carbon/15 px-5 md:flex">
+            <div className="hidden items-center gap-3 border-l border-white/10 px-4 2xl:flex">
               <span
                 className={cn(
                   "h-2.5 w-2.5",
                   alertsReady === true
-                    ? "bg-go-ink"
+                    ? "bg-lime"
                     : alertsReady === false
                       ? "bg-coral"
                       : "animate-blink bg-cobalt",
@@ -136,7 +136,7 @@ export function ProphetHeader() {
                 aria-hidden="true"
               />
               <div>
-                <p className="microlabel text-carbon/60">Telegram</p>
+                <p className="microlabel text-white/65">Telegram</p>
                 <p className="mt-1 text-[11px] font-bold leading-none">
                   {alertsReady === true
                     ? "Connected"
@@ -146,8 +146,8 @@ export function ProphetHeader() {
                 </p>
               </div>
             </div>
-            <div className="hidden min-w-[128px] flex-col items-start justify-center border-l border-carbon/15 px-5 xl:flex">
-              <p className="microlabel text-carbon/60">Chicago</p>
+            <div className="hidden min-w-[128px] flex-col items-start justify-center border-l border-white/10 px-4 2xl:flex">
+              <p className="microlabel text-white/65">Chicago</p>
               <p className="num mt-1 text-[13px] font-bold leading-none">
                 {clock ? `${clock} CT` : "--:--:-- CT"}
               </p>
@@ -156,8 +156,8 @@ export function ProphetHeader() {
               href="/settings"
               aria-current={isActive("/settings") ? "page" : undefined}
               className={cn(
-                "hidden items-center border-l border-carbon/15 px-5 text-[12px] font-black uppercase tracking-[0.08em] lg:flex",
-                isActive("/settings") ? "bg-lime" : "hover:bg-white",
+                "hidden items-center border-l border-white/10 px-4 text-[11px] font-black uppercase tracking-[0.08em] xl:flex",
+                isActive("/settings") ? "bg-white/[0.06] text-lime" : "text-white/65 hover:bg-white/[0.04] hover:text-white",
               )}
             >
               Settings
@@ -165,7 +165,7 @@ export function ProphetHeader() {
             <button
               type="button"
               onClick={() => setMenuOpen((value) => !value)}
-              className="grid w-[58px] place-items-center border-l border-carbon/15 lg:hidden"
+              className="grid w-[58px] place-items-center border-l border-white/10 xl:hidden"
               aria-expanded={menuOpen}
               aria-controls="prophet-mobile-nav"
               aria-label={menuOpen ? "Close navigation" : "Open navigation"}
@@ -178,7 +178,7 @@ export function ProphetHeader() {
         {menuOpen && (
           <nav
             id="prophet-mobile-nav"
-            className="grid border-t border-carbon bg-carbon text-optic lg:hidden"
+            className="grid border-t border-white/10 bg-carbon text-optic xl:hidden"
             aria-label="Mobile navigation"
           >
             {NAV.map((item) => {
@@ -190,13 +190,13 @@ export function ProphetHeader() {
                   aria-current={active ? "page" : undefined}
                   className={cn(
                     "flex h-16 items-center gap-4 border-b border-white/15 px-5 text-[15px] font-black uppercase tracking-[0.08em]",
-                    active && "bg-lime text-carbon",
+                    active && "bg-white/[0.07] text-lime",
                   )}
                 >
                   <span
                     className={cn(
                       "font-mono text-[10px] font-bold",
-                      active ? "text-carbon/70" : "text-lime",
+                      active ? "text-mineral" : "text-white/65",
                     )}
                   >
                     {item.index}
@@ -209,13 +209,13 @@ export function ProphetHeader() {
               href="/settings"
               className={cn(
                 "flex h-16 items-center gap-4 px-5 text-[15px] font-black uppercase tracking-[0.08em]",
-                isActive("/settings") && "bg-lime text-carbon",
+                isActive("/settings") && "bg-white/[0.07] text-lime",
               )}
             >
               <span
                 className={cn(
                   "font-mono text-[10px] font-bold",
-                  isActive("/settings") ? "text-carbon/70" : "text-lime",
+                  isActive("/settings") ? "text-mineral" : "text-white/65",
                 )}
               >
                 07
@@ -225,12 +225,12 @@ export function ProphetHeader() {
           </nav>
         )}
       </header>
-      <div className="flex h-8 items-center overflow-hidden border-b border-carbon bg-carbon text-optic">
-        <p className="microlabel flex h-full shrink-0 items-center bg-cobalt px-4 text-white">
-          Operating rule
+      <div className="flex h-8 items-center overflow-hidden border-b border-white/10 bg-ink text-optic">
+        <p className="microlabel flex h-full shrink-0 items-center border-r border-mineral/20 px-4 text-mineral">
+          Protocol
         </p>
         <p className="truncate px-4 font-mono text-[10px] font-bold uppercase tracking-[0.08em] text-white/70">
-          No verified source. No command. No contract. No exception.
+          Verify source. Read state. Respect risk. Then act.
         </p>
       </div>
     </>

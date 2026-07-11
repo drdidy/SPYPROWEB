@@ -6,7 +6,7 @@ import "./globals.css";
 const SITE_URL = "https://www.spyprophet.app";
 const SITE_NAME = "SPY Prophet";
 const SITE_DESC =
-  "A live SPY and SPX trading command system connecting market structure, 1-minute confirmation, SPXW contract selection, alerts, and replay.";
+  "Private decision intelligence for SPY, ES, and SPXW, joining preparation, live command, alerts, replay, and evidence-bound review.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     "SPX",
     "options trading",
     "SPXW 0DTE",
-    "market structure",
+    "market decision intelligence",
     "trading alerts",
     "decision support",
     "trade replay",
@@ -89,7 +89,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#F5F6F1",
+  themeColor: "#07090A",
   colorScheme: "light",
   width: "device-width",
   initialScale: 1,

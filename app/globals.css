@@ -15,8 +15,8 @@
 
   body {
     font-feature-settings: "ss01", "ss03", "cv11";
-    background-color: #f5f6f1;
-    color: #0a0b0c;
+    background-color: #f0f1ed;
+    color: #07090a;
   }
 
   /* Numeric surfaces: every price, distance, percent, or countdown
@@ -31,14 +31,14 @@
   }
 
   ::selection {
-    background: #b8f23d;
-    color: #0a0b0c;
+    background: #d8c894;
+    color: #07090a;
   }
 
   /* Standard focus-visible: 2px cobalt outline, square corners, at
      zero specificity so component-level rings can still override. */
   :where(button, a, [role="button"], [tabindex], input, select, summary):focus-visible {
-    outline: 2px solid #3157ff;
+    outline: 2px solid #147a72;
     outline-offset: 2px;
     border-radius: 0;
   }
@@ -52,12 +52,12 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #b9bcb3;
+    background: #aeb3ac;
     border-radius: 0;
-    border: 2px solid #f5f6f1;
+    border: 2px solid #f0f1ed;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #0a0b0c;
+    background: #07090a;
   }
 }
 
@@ -87,6 +87,19 @@
       linear-gradient(rgba(10, 11, 12, 0.07) 1px, transparent 1px),
       linear-gradient(90deg, rgba(10, 11, 12, 0.045) 1px, transparent 1px);
     background-size: 100% 64px, 84px 100%;
+  }
+
+  .cinematic-grid {
+    background-image:
+      linear-gradient(rgba(137, 217, 207, 0.1) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(137, 217, 207, 0.055) 1px, transparent 1px);
+    background-size: 100% 72px, 92px 100%;
+  }
+
+  .cinematic-glass {
+    background: rgba(7, 9, 10, 0.78);
+    border: 1px solid rgba(137, 217, 207, 0.2);
+    backdrop-filter: blur(18px);
   }
 
   /* Diagonal hatch for "no data / closed" zones. */

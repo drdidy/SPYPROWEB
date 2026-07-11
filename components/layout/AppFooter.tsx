@@ -32,8 +32,8 @@ export function AppFooter() {
             </span>
           </div>
           <p className="mt-6 max-w-[460px] text-[13px] leading-relaxed text-white/60">
-            A market decision instrument for SPY, ES, and SPXW. Context before
-            entry. Proof before action. Defined risk before execution.
+            Private decision intelligence for SPY, ES, and SPXW. A quieter
+            command layer for preparation, execution, and review.
           </p>
           <p className="microlabel mt-6 text-white/60">
             Decision support, not financial advice
