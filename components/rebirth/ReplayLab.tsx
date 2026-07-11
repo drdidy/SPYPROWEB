@@ -10,7 +10,7 @@ import {
   SkipBack,
   SkipForward,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -43,6 +43,15 @@ type WeeklyControl = {
   slopePerBar: number;
   gateIndices: number[];
   method: string;
+};
+
+type GateReaction = {
+  at: string;
+  localIndex: number;
+  index: number;
+  value: number;
+  kind: "hold" | "reject" | "break";
+  label: string;
 };
 
 const SPEEDS = [1, 2, 4] as const;
@@ -140,6 +149,13 @@ export function ReplayLab({ initialDate }: { initialDate: string | null }) {
   const weeklyRead = weeklyContext && current && control
     ? weeklyDecisionRead(current, weeklyContext.support.value, weeklyContext.resistance.value, control)
     : "Weekly map unavailable";
+  const quality = replayQuality(bars);
+  const reactionTolerance = control
+    ? control.zoneWidth ? control.zoneWidth / 2 : Math.max(0.5, control.spacing * 0.025)
+    : 0;
+  const weeklyEvents = control && showWeekly
+    ? gateReactions(visible, 0, control, reactionTolerance).slice(-4).reverse()
+    : [];
 
   return (
     <div className="bg-carbon text-white">
@@ -184,15 +200,35 @@ export function ReplayLab({ initialDate }: { initialDate: string | null }) {
         </div>
       </header>
 
+      <ReplayTransport
+        bars={bars}
+        cursor={cursor}
+        playing={playing}
+        speed={speed}
+        setCursor={setCursor}
+        setPlaying={setPlaying}
+        setSpeed={setSpeed}
+      />
+
       <section className="grid min-h-[620px] lg:grid-cols-[210px_1fr_270px]">
-        <div className="border-b border-white/20 p-5 lg:border-b-0 lg:border-r lg:p-7">
+        <div className="order-2 border-b border-white/20 p-5 lg:order-none lg:border-b-0 lg:border-r lg:p-7">
           <ReadLabel label="Instrument" />
           <p className="mt-3 text-[32px] font-black">{instrument}</p>
           <ReadLabel label="Session date" className="mt-10" />
           <p className="num mt-3 text-[14px] font-black">{date}</p>
           <ReadLabel label="Bars loaded" className="mt-10" />
           <p className="num mt-3 text-[14px] font-black">{bars.length}</p>
-          <ReadLabel label="Verified source" className="mt-10" />
+          <ReadLabel label="Data integrity" className="mt-10" />
+          <div className="mt-3 flex items-baseline justify-between gap-3">
+            <p className={cn("microlabel", quality.tone)}>{quality.label}</p>
+            <p className="num text-[11px] text-white/65">{quality.continuity.toFixed(1)}%</p>
+          </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-white/45">
+            {quality.gaps === 0
+              ? "No missing 5-minute intervals in the loaded window."
+              : `${quality.gaps} interval gap${quality.gaps === 1 ? "" : "s"}; largest ${quality.largestGap} minutes.`}
+          </p>
+          <ReadLabel label="Data source" className="mt-10" />
           <p className="microlabel mt-3 text-mineral">
             {payload?.source?.[instrument.toLowerCase() as "spy" | "es"] ?? "Replay API"}
           </p>
@@ -232,7 +268,7 @@ export function ReplayLab({ initialDate }: { initialDate: string | null }) {
           <p className="microlabel mt-3 text-lime">Replay only</p>
         </div>
 
-        <div className="hud-grid relative min-h-[430px] overflow-hidden border-b border-white/20 lg:border-b-0 lg:border-r">
+        <div className="hud-grid order-1 relative min-h-[430px] overflow-hidden border-b border-white/20 lg:order-none lg:border-b-0 lg:border-r">
           {status === "ready" && visible.length > 0 ? (
             <>
               <CandleChart
@@ -246,8 +282,15 @@ export function ReplayLab({ initialDate }: { initialDate: string | null }) {
               </span>
               {current && (
                 <span className="num absolute bottom-4 right-4 bg-carbon px-2.5 py-1.5 text-[11px] text-white/65">
-                  {time(bars[0].t)} → {time(current.t)}
+                  {time(bars[0].t)} to {time(current.t)}
                 </span>
+              )}
+              {showWeekly && control && (
+                <div className="absolute bottom-4 left-4 flex flex-wrap gap-x-4 gap-y-2 border border-white/20 bg-carbon/95 px-3 py-2 font-mono text-[9px] font-bold uppercase tracking-[0.08em] text-white/60">
+                  <LegendDot color="#8FD3C8" label="Support response" />
+                  <LegendDot color="#E67560" label="Resistance response" />
+                  <LegendDot color="#D8C894" label="Gate close-through" />
+                </div>
               )}
             </>
           ) : (
@@ -283,7 +326,7 @@ export function ReplayLab({ initialDate }: { initialDate: string | null }) {
           )}
         </div>
 
-        <div className="p-5 lg:p-7">
+        <div className="order-3 p-5 lg:order-none lg:p-7">
           <ReadLabel label="Current bar" accent />
           <p className="num mt-4 text-[22px] font-black">
             {current ? time(current.t) : "--"}
@@ -330,77 +373,90 @@ export function ReplayLab({ initialDate }: { initialDate: string | null }) {
               Roles update at the replay cursor. A close through a gate can turn prior resistance into support, or support into resistance.
             </p>
           </div>
+          <div className="mt-8 border-t border-white/25 pt-5">
+            <ReadLabel label="Gate tape" />
+            {weeklyEvents.length ? (
+              <div className="mt-3 divide-y divide-white/15 border-y border-white/15">
+                {weeklyEvents.map((event) => (
+                  <div key={`${event.at}-${event.index}-${event.kind}`} className="py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className={cn(
+                        "microlabel",
+                        event.kind === "hold" ? "text-mineral" : event.kind === "reject" ? "text-coral" : "text-lime",
+                      )}>
+                        {event.kind === "break" ? "Close-through" : event.kind}
+                      </span>
+                      <span className="num text-[10px] text-white/55">{timeShort(event.at)}</span>
+                    </div>
+                    <p className="mt-1.5 text-[11px] leading-relaxed text-white/55">{event.label}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-3 text-[11px] leading-relaxed text-white/45">
+                No confirmed gate interaction has printed by this replay bar.
+              </p>
+            )}
+          </div>
         </div>
       </section>
 
-      <section className="grid border-y border-white/20 bg-black p-4 md:grid-cols-[auto_auto_1fr_auto] md:items-center md:gap-5 md:px-8">
-        <div className="flex" role="group" aria-label="Replay transport">
-          <Control
-            label="Reset"
-            onClick={() => {
-              setCursor(1);
-              setPlaying(false);
-            }}
-            icon={RotateCcw}
-          />
-          <Control
-            label="Back one bar"
-            onClick={() => setCursor((value) => Math.max(1, value - 1))}
-            icon={SkipBack}
-          />
-          <Control
-            label={playing ? "Pause" : "Play"}
-            onClick={() => setPlaying((value) => !value)}
-            icon={playing ? Pause : Play}
-            active
-          />
-          <Control
-            label="Forward one bar"
-            onClick={() =>
-              setCursor((value) => Math.min(bars.length, value + 1))
-            }
-            icon={SkipForward}
-          />
-        </div>
-        <div
-          className="mt-3 flex md:mt-0"
-          role="group"
-          aria-label="Playback speed"
-        >
-          {SPEEDS.map((value) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setSpeed(value)}
-              aria-pressed={speed === value}
-              className={cn(
-                "grid h-11 w-11 place-items-center border border-white/20 font-mono text-[11px] font-bold",
-                speed === value
-                  ? "border-lime bg-lime/15 text-lime"
-                  : "text-white/65 hover:text-white",
-              )}
-            >
-              {value}×
-            </button>
-          ))}
-        </div>
-        <input
-          aria-label="Replay position"
-          type="range"
-          min={1}
-          max={Math.max(1, bars.length)}
-          value={Math.min(cursor, Math.max(1, bars.length))}
-          onChange={(event) => {
-            setPlaying(false);
-            setCursor(Number(event.target.value));
-          }}
-          className="my-4 h-1.5 w-full cursor-pointer accent-lime md:my-0"
-        />
-        <p className="num text-right text-[11px] font-bold text-white/65">
-          {cursor} / {bars.length || 0}
-        </p>
-      </section>
     </div>
+  );
+}
+
+function ReplayTransport({
+  bars,
+  cursor,
+  playing,
+  speed,
+  setCursor,
+  setPlaying,
+  setSpeed,
+}: {
+  bars: Bar[];
+  cursor: number;
+  playing: boolean;
+  speed: (typeof SPEEDS)[number];
+  setCursor: Dispatch<SetStateAction<number>>;
+  setPlaying: Dispatch<SetStateAction<boolean>>;
+  setSpeed: Dispatch<SetStateAction<(typeof SPEEDS)[number]>>;
+}) {
+  return (
+    <section className="grid border-b border-white/20 bg-black p-4 md:grid-cols-[auto_auto_1fr_auto] md:items-center md:gap-5 md:px-8">
+      <div className="flex" role="group" aria-label="Replay transport">
+        <Control label="Reset" onClick={() => { setCursor(1); setPlaying(false); }} icon={RotateCcw} />
+        <Control label="Back one bar" onClick={() => setCursor((value) => Math.max(1, value - 1))} icon={SkipBack} />
+        <Control label={playing ? "Pause" : "Play"} onClick={() => setPlaying((value) => !value)} icon={playing ? Pause : Play} active />
+        <Control label="Forward one bar" onClick={() => setCursor((value) => Math.min(bars.length, value + 1))} icon={SkipForward} />
+      </div>
+      <div className="mt-3 flex md:mt-0" role="group" aria-label="Playback speed">
+        {SPEEDS.map((value) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setSpeed(value)}
+            aria-pressed={speed === value}
+            className={cn(
+              "grid h-11 w-11 place-items-center border border-white/20 font-mono text-[11px] font-bold",
+              speed === value ? "border-lime bg-lime/15 text-lime" : "text-white/65 hover:text-white",
+            )}
+          >
+            {value}x
+          </button>
+        ))}
+      </div>
+      <input
+        aria-label="Replay position"
+        type="range"
+        min={1}
+        max={Math.max(1, bars.length)}
+        value={Math.min(cursor, Math.max(1, bars.length))}
+        onChange={(event) => { setPlaying(false); setCursor(Number(event.target.value)); }}
+        className="my-4 h-1.5 w-full cursor-pointer accent-lime md:my-0"
+      />
+      <p className="num text-right text-[11px] font-bold text-white/65">{cursor} / {bars.length || 0}</p>
+    </section>
   );
 }
 
@@ -585,6 +641,15 @@ function ReadLabel({
   );
 }
 
+function LegendDot({ color, label }: { color: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} aria-hidden="true" />
+      {label}
+    </span>
+  );
+}
+
 function LayerToggle({
   label,
   icon: Icon,
@@ -691,14 +756,7 @@ function gateReactions(
   control: WeeklyControl,
   tolerance: number,
 ) {
-  const reactions: Array<{
-    at: string;
-    localIndex: number;
-    index: number;
-    value: number;
-    kind: "hold" | "reject" | "break";
-    label: string;
-  }> = [];
+  const reactions: GateReaction[] = [];
   for (let localIndex = 1; localIndex < bars.length; localIndex += 1) {
     const bar = bars[localIndex];
     const previous = bars[localIndex - 1];
@@ -729,6 +787,24 @@ function gateReactions(
     }
   }
   return reactions.slice(-18);
+}
+
+function replayQuality(bars: Bar[]) {
+  if (bars.length < 2) {
+    return { label: "Insufficient", tone: "text-coral", continuity: 0, gaps: 0, largestGap: 0 };
+  }
+  const intervals = bars.slice(1).map((bar, index) => Math.round((Date.parse(bar.t) - Date.parse(bars[index].t)) / 60_000));
+  const missing = intervals.filter((minutes) => minutes > 7);
+  const continuity = ((intervals.length - missing.length) / intervals.length) * 100;
+  const label = continuity >= 99 ? "Clean" : continuity >= 95 ? "Usable" : "Caution";
+  const tone = continuity >= 99 ? "text-mineral" : continuity >= 95 ? "text-lime" : "text-coral";
+  return {
+    label,
+    tone,
+    continuity,
+    gaps: missing.length,
+    largestGap: missing.length ? Math.max(...missing) : 0,
+  };
 }
 
 function time(value: string) {

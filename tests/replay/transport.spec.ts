@@ -45,6 +45,12 @@ test("Replay renders readable moving candlesticks for SPY and ES", async ({ page
   await expect(page.getByRole("button", { name: "Weekly gates" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByText("WEEKLY RESISTANCE", { exact: true })).toBeVisible();
   await expect(page.getByText("WEEKLY SUPPORT", { exact: true })).toBeVisible();
+  await expect(page.getByText("Data integrity")).toBeVisible();
+  await expect(page.getByText("Gate tape")).toBeVisible();
+  await page.getByRole("button", { name: "Weekly gates" }).click();
+  await expect(page.getByText("WEEKLY RESISTANCE", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Weekly gates" }).click();
+  await expect(page.getByText("WEEKLY RESISTANCE", { exact: true })).toBeVisible();
   const slider = page.getByLabel("Replay position");
   const spyBefore = Number(await slider.inputValue());
   await page.getByRole("button", { name: "Play" }).click();
@@ -94,7 +100,7 @@ function buildReplayBars() {
     zoneWidth: 0.4,
     valueAtFirstBar: 738.6,
     slopePerBar: 0.01,
-    gateIndices: [-2, -1, 0, 1, 2],
+    gateIndices: [-4, -3, -2, -1, 0, 1, 2, 3, 4],
     method: "Completed Monday 12-2 CT high carried through the week",
   };
   return {

@@ -165,10 +165,9 @@ function reconstructWeeklyControl(
     return stamp > anchor.stamp && stamp <= firstStamp && isTradingClockBar(bar, instrument);
   }).length;
   const valueAtFirstBar = anchor.bar.h - slopePerBar * clockBars;
-  const middleIndex = Math.floor(targetBars.length / 2);
-  const controlAtMiddle = valueAtFirstBar - slopePerBar * middleIndex;
-  const sessionMiddle = (Math.min(...targetBars.map((bar) => bar.l)) + Math.max(...targetBars.map((bar) => bar.h))) / 2;
-  const centerIndex = Math.round((sessionMiddle - controlAtMiddle) / spacing);
+  // Select the visible family from the first replay bar only. Using the full
+  // session range here would leak information that was not known at the open.
+  const centerIndex = Math.round((targetBars[0].c - valueAtFirstBar) / spacing);
 
   return {
     sourceDate: anchor.date,
@@ -180,7 +179,7 @@ function reconstructWeeklyControl(
     zoneWidth,
     valueAtFirstBar: round(valueAtFirstBar, 4),
     slopePerBar: round(slopePerBar, 6),
-    gateIndices: Array.from({ length: 5 }, (_, index) => centerIndex + index - 2),
+    gateIndices: Array.from({ length: 9 }, (_, index) => centerIndex + index - 4),
     method: weekday >= 2 && anchor.date === monday
       ? "Completed Monday 12-2 CT high carried through the week"
       : "Latest completed 12-2 CT high used until Monday control is available",
