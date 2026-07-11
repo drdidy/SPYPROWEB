@@ -46,6 +46,10 @@ test("Replay renders readable moving candlesticks for SPY and ES", async ({ page
   await expect(page.getByText("WEEKLY RESISTANCE", { exact: true })).toBeVisible();
   await expect(page.getByText("WEEKLY SUPPORT", { exact: true })).toBeVisible();
   await expect(page.getByText("Data integrity")).toBeVisible();
+  await expect(page.getByText("Historical context")).toBeVisible();
+  await expect(page.getByText(/VIX regime:/)).toBeVisible();
+  await expect(page.getByText("Engine archive")).toBeVisible();
+  await expect(page.getByText("ENTRY", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Gate tape")).toBeVisible();
   await page.getByRole("button", { name: "Weekly gates" }).click();
   await expect(page.getByText("WEEKLY RESISTANCE", { exact: true })).toHaveCount(0);
@@ -119,5 +123,18 @@ function buildReplayBars() {
         zoneWidth: null,
       },
     },
+    context: {
+      spx: spy.map((bar) => ({ ...bar, o: bar.o * 10, h: bar.h * 10, l: bar.l * 10, c: bar.c * 10 })),
+      vix: spy.map((bar) => ({ ...bar, o: 18.1, h: 18.3, l: 17.9, c: 18.2 })),
+    },
+    events: [{
+      id: "accepted-entry",
+      at: spy[0].t,
+      symbol: "SPY",
+      kind: "entry",
+      direction: "long",
+      price: spy[0].c,
+      status: "accepted",
+    }],
   };
 }

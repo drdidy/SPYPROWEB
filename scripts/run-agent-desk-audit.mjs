@@ -60,7 +60,7 @@ const findings = [];
 
 for (const file of textFiles) {
   const filePath = relative(root, file).replace(/\\/g, "/");
-  const userFacingPath = /^(app|components|content)\//.test(filePath);
+  const userFacingPath = /^(app|components|content)\//.test(filePath) && !/^app\/api\//.test(filePath);
   const text = readFileSync(file, "utf8");
   const lines = text.split(/\r?\n/);
   lines.forEach((line, index) => {

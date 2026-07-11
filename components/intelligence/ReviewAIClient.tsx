@@ -1,6 +1,7 @@
 "use client";
 
 import { BrainCircuit, CalendarDays, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
+import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 
 import type { DailyIntelligenceSnapshot, ReviewedTrade } from "@/lib/intelligence/daily";
@@ -36,8 +37,10 @@ export function ReviewAIClient() {
 
   return (
     <div className="bg-optic text-carbon">
-      <header className="grid border-b border-white/10 bg-carbon text-white xl:grid-cols-[minmax(0,1.2fr)_420px]">
-        <div className="cinematic-grid p-5 py-10 md:p-10 xl:p-14">
+      <header className="relative grid overflow-hidden border-b border-white/10 bg-carbon text-white xl:grid-cols-[minmax(0,1.2fr)_420px]">
+        <Image src="/images/prophet-evidence-archive-v1.png" alt="" fill className="object-cover object-right opacity-55" sizes="100vw" />
+        <div className="absolute inset-0 bg-gradient-to-r from-carbon via-carbon/90 to-carbon/25" />
+        <div className="cinematic-grid relative z-10 p-5 py-10 md:p-10 xl:p-14">
           <div className="flex flex-wrap items-center gap-3">
             <span className="microlabel border border-mineral/30 px-2.5 py-1.5 text-mineral">Review AI</span>
             <span className="microlabel text-white/65">Evidence bound / no silent retuning</span>
@@ -49,7 +52,7 @@ export function ReviewAIClient() {
             The desk joins TradingView alerts, replay bars, option memory, the Daily Brief, and verified news context. It can propose research, but one unusual session can never rewrite production rules.
           </p>
         </div>
-        <div className="flex flex-col justify-between border-t border-mineral/20 bg-ink p-5 text-white md:p-8 xl:border-l xl:border-t-0">
+        <div className="relative z-10 flex flex-col justify-between border-t border-mineral/20 bg-ink/90 p-5 text-white backdrop-blur-sm md:p-8 xl:border-l xl:border-t-0">
           <div>
             <p className="microlabel">Next-session directive</p>
             <h2 className="mt-5 text-[30px] font-black leading-[0.98]">{snapshot.ai.headline}</h2>

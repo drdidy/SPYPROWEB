@@ -1,7 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { readEmaFibAlerts } from "@/lib/ema-fib-alerts";
+
 type Instrument = "SPY" | "ES";
 type Bar = { t: string; o: number; h: number; l: number; c: number; v?: number };
+type ReplayEvent = {
+  id: string;
+  at: string;
+  symbol: "SPY" | "SPX" | "ES";
+  kind: string;
+  direction: "long" | "short";
+  price: number;
+  status: "accepted";
+};
 type WeeklyControl = {
   sourceDate: string;
   sourceWindow: string;
@@ -29,15 +40,32 @@ export async function GET(request: NextRequest) {
 
   const historyStart = addDays(date, -10);
   const historyEnd = addDays(date, 1);
-  const [massiveSpy, yahooSpy, yahooEs] = await Promise.all([
+  const [massiveSpy, yahooSpy, yahooEs, yahooSpx, yahooVix, storedAlerts] = await Promise.all([
     fetchMassiveBars("SPY", historyStart, historyEnd),
     fetchYahooBars("SPY", historyStart, historyEnd),
     fetchYahooBars("ES=F", historyStart, historyEnd),
+    fetchYahooBars("^GSPC", historyStart, historyEnd),
+    fetchYahooBars("^VIX", historyStart, historyEnd),
+    readEmaFibAlerts(500).catch(() => []),
   ]);
   const spyHistory = massiveSpy.length ? massiveSpy : yahooSpy;
   const esHistory = yahooEs;
   const spy = sessionBars(spyHistory, date, "SPY");
   const es = sessionBars(esHistory, date, "ES");
+  const spxContext = cashSessionBars(yahooSpx, date);
+  const vixContext = cashSessionBars(yahooVix, date);
+  const events: ReplayEvent[] = storedAlerts
+    .filter((record) => record.status === "accepted" && chicagoParts(new Date(record.payload.eventAt)).date === date)
+    .map((record) => ({
+      id: record.id,
+      at: record.payload.eventAt,
+      symbol: record.payload.symbol,
+      kind: record.payload.kind,
+      direction: record.payload.direction,
+      price: record.payload.last,
+      status: "accepted" as const,
+    }))
+    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
 
   return NextResponse.json(
     {
@@ -48,9 +76,14 @@ export async function GET(request: NextRequest) {
         spy: reconstructWeeklyControl(spyHistory, spy, date, "SPY"),
         es: reconstructWeeklyControl(esHistory, es, date, "ES"),
       },
+      context: { spx: spxContext, vix: vixContext },
+      events,
       source: {
         spy: massiveSpy.length ? "massive" : yahooSpy.length ? "yahoo" : "unavailable",
         es: yahooEs.length ? "yahoo" : "unavailable",
+        spx: yahooSpx.length ? "yahoo" : "unavailable",
+        vix: yahooVix.length ? "yahoo" : "unavailable",
+        events: events.length ? "archived TradingView alerts" : "unavailable",
       },
       ...(!spy.length && !es.length
         ? { error: "No verified intraday bars are available for this completed session." }
@@ -139,6 +172,14 @@ function sessionBars(history: Bar[], date: string, instrument: Instrument): Bar[
       return parts.date === date && minute >= 3 * 60 && minute <= 15 * 60;
     }
     return (parts.date === priorDate && minute >= 17 * 60) || (parts.date === date && minute <= 15 * 60);
+  });
+}
+
+function cashSessionBars(history: Bar[], date: string): Bar[] {
+  return history.filter((bar) => {
+    const parts = chicagoParts(new Date(bar.t));
+    const minute = parts.hour * 60 + parts.minute;
+    return parts.date === date && minute >= 8 * 60 + 30 && minute <= 15 * 60;
   });
 }
 

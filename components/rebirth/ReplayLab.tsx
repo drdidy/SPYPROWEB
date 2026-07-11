@@ -27,8 +27,20 @@ type ReplayPayload = {
   spy: Bar[];
   es: Bar[];
   error?: string;
-  source?: { spy?: string; es?: string };
+  source?: { spy?: string; es?: string; spx?: string; vix?: string; events?: string };
   controls?: { spy?: WeeklyControl | null; es?: WeeklyControl | null };
+  context?: { spx?: Bar[]; vix?: Bar[] };
+  events?: ReplayEvent[];
+};
+
+type ReplayEvent = {
+  id: string;
+  at: string;
+  symbol: "SPY" | "SPX" | "ES";
+  kind: string;
+  direction: "long" | "short";
+  price: number;
+  status: "accepted";
 };
 
 type WeeklyControl = {
@@ -156,6 +168,13 @@ export function ReplayLab({ initialDate }: { initialDate: string | null }) {
   const weeklyEvents = control && showWeekly
     ? gateReactions(visible, 0, control, reactionTolerance).slice(-4).reverse()
     : [];
+  const historicalSpx = current ? latestAtOrBefore(payload?.context?.spx ?? [], current.t) : null;
+  const historicalVix = current ? latestAtOrBefore(payload?.context?.vix ?? [], current.t) : null;
+  const archivedEvents = (payload?.events ?? []).filter((event) => {
+    const symbolMatch = instrument === "SPY" ? event.symbol === "SPY" : event.symbol === "ES" || event.symbol === "SPX";
+    return symbolMatch && (!current || Date.parse(event.at) <= Date.parse(current.t));
+  });
+  const vixRegime = historicalVix ? historicalVix.c < 15 ? "Calm" : historicalVix.c < 20 ? "Normal" : historicalVix.c < 25 ? "Elevated" : "High" : "Unavailable";
 
   return (
     <div className="bg-carbon text-white">
@@ -276,6 +295,7 @@ export function ReplayLab({ initialDate }: { initialDate: string | null }) {
                 instrument={instrument}
                 control={showWeekly ? control : null}
                 showReactions={showReactions}
+                events={archivedEvents}
               />
               <span className="microlabel absolute left-4 top-4 border border-white/25 bg-carbon px-2.5 py-1.5 text-white/65">
                 {instrument} / candles / bar by bar
@@ -374,6 +394,30 @@ export function ReplayLab({ initialDate }: { initialDate: string | null }) {
             </p>
           </div>
           <div className="mt-8 border-t border-white/25 pt-5">
+            <ReadLabel label="Historical context" accent />
+            <div className="mt-3 border-y border-white/15">
+              <Read label="SPX cash" value={historicalSpx?.c} />
+              <Read label="VIX" value={historicalVix?.c} />
+              {instrument === "ES" && current && historicalSpx && <Read label="ES - SPX basis" value={current.c - historicalSpx.c} />}
+            </div>
+            <p className="mt-3 text-[11px] leading-relaxed text-white/50">VIX regime: <span className="font-bold text-mineral">{vixRegime}</span>. Context appears only when a historical cash-session bar exists at or before the replay cursor.</p>
+          </div>
+          <div className="mt-8 border-t border-white/25 pt-5">
+            <ReadLabel label="Engine archive" accent />
+            {archivedEvents.length ? (
+              <div className="mt-3 divide-y divide-white/15 border-y border-white/15">
+                {archivedEvents.slice(-5).reverse().map((event) => (
+                  <div key={event.id} className="flex items-center justify-between gap-3 py-3">
+                    <span className={cn("microlabel", eventTone(event))}>{eventLabel(event)}</span>
+                    <span className="num text-[10px] text-white/55">{timeShort(event.at)} / {event.price.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-3 text-[11px] leading-relaxed text-white/45">No accepted TradingView Engine event is archived for this instrument by the replay cursor. Replay does not infer or invent one.</p>
+            )}
+          </div>
+          <div className="mt-8 border-t border-white/25 pt-5">
             <ReadLabel label="Gate tape" />
             {weeklyEvents.length ? (
               <div className="mt-3 divide-y divide-white/15 border-y border-white/15">
@@ -465,11 +509,13 @@ function CandleChart({
   instrument,
   control,
   showReactions,
+  events,
 }: {
   bars: Bar[];
   instrument: "SPY" | "ES";
   control: WeeklyControl | null;
   showReactions: boolean;
+  events: ReplayEvent[];
 }) {
   const width = 1100;
   const height = 600;
@@ -544,6 +590,17 @@ function CandleChart({
           <g key={`${bar.t}-${index}`}>
             <line x1={x(index)} y1={y(bar.h)} x2={x(index)} y2={y(bar.l)} stroke={color} strokeWidth="1.25" vectorEffect="non-scaling-stroke" />
             <rect x={x(index) - candleWidth / 2} y={bodyTop} width={candleWidth} height={bodyHeight} fill={rising ? "rgba(143,211,200,0.82)" : "rgba(230,117,96,0.86)"} stroke={color} strokeWidth="0.75" vectorEffect="non-scaling-stroke" />
+          </g>
+        );
+      })}
+      {events.filter((event) => Date.parse(event.at) >= Date.parse(windowBars[0].t) && Date.parse(event.at) <= Date.parse(last.t)).map((event) => {
+        const localIndex = nearestBarIndex(windowBars, event.at);
+        const color = eventToneColor(event);
+        const eventY = y(event.price);
+        return (
+          <g key={event.id} aria-label={`${eventLabel(event)} at ${event.price.toFixed(2)}`}>
+            <circle cx={x(localIndex)} cy={eventY} r="6" fill={color} stroke="#07090A" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+            <text x={x(localIndex)} y={eventY - 12} textAnchor="middle" fill={color} fontSize="9" fontWeight="800" fontFamily="ui-monospace, monospace">{eventLabel(event)}</text>
           </g>
         );
       })}
@@ -827,6 +884,54 @@ function timeShort(value: string) {
         minute: "2-digit",
       }).format(date)
     : value;
+}
+
+function latestAtOrBefore(bars: Bar[], at: string) {
+  const stamp = Date.parse(at);
+  let found: Bar | null = null;
+  for (const bar of bars) {
+    if (Date.parse(bar.t) > stamp) break;
+    found = bar;
+  }
+  return found;
+}
+
+function nearestBarIndex(bars: Bar[], at: string) {
+  const stamp = Date.parse(at);
+  let best = 0;
+  let distance = Number.POSITIVE_INFINITY;
+  bars.forEach((bar, index) => {
+    const next = Math.abs(Date.parse(bar.t) - stamp);
+    if (next < distance) {
+      distance = next;
+      best = index;
+    }
+  });
+  return best;
+}
+
+function eventLabel(event: ReplayEvent) {
+  if (event.kind === "price_cross_50") return "WATCH";
+  if (event.kind.includes("entry") || event.kind === "fib50_rejection") return "ENTRY";
+  if (event.kind === "exit_target") return "TARGET";
+  if (event.kind === "invalidated") return "INVALID";
+  if (event.kind === "exit_timeout") return "FLAT";
+  if (event.kind.includes("zone") || event.kind === "fib50_armed") return "READY";
+  return "CROSS";
+}
+
+function eventTone(event: ReplayEvent) {
+  const label = eventLabel(event);
+  if (label === "TARGET" || label === "ENTRY") return "text-lime";
+  if (label === "INVALID") return "text-coral";
+  return "text-mineral";
+}
+
+function eventToneColor(event: ReplayEvent) {
+  const label = eventLabel(event);
+  if (label === "TARGET" || label === "ENTRY") return "#8FD3C8";
+  if (label === "INVALID") return "#E67560";
+  return "#D8C894";
 }
 
 function recentWeekday() {

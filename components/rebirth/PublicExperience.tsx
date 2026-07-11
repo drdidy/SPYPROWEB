@@ -33,16 +33,16 @@ export function PublicExperience() {
       <section ref={heroRef} className="relative flex min-h-[92svh] flex-col overflow-hidden border-b border-white/15">
         <motion.div className="absolute -inset-[2%]" style={reduced ? undefined : { y: imageY, scale: imageScale }}>
           <Image
-            src="/images/prophet-observatory-cinematic-v2.png"
-            alt="A private market decision observatory overlooking a city at night"
+            src="/images/prophet-observatory-cinematic-v3.png"
+            alt="A private market decision observatory overlooking Chicago at sunrise"
             fill
             priority
-            className="object-cover object-[64%_center]"
+            className="object-cover object-[68%_center] brightness-[1.14] saturate-[0.92]"
             sizes="100vw"
           />
         </motion.div>
-        <div className="absolute inset-0 bg-carbon/35" />
-        <div className="absolute inset-y-0 left-0 w-full bg-carbon/75 md:w-[68%] xl:w-[58%]" />
+        <div className="absolute inset-0 bg-carbon/10" />
+        <div className="absolute inset-0 bg-gradient-to-r from-carbon/85 via-carbon/55 to-transparent md:w-[76%] xl:w-[66%]" />
         <Atmosphere />
 
         <header className="relative z-20 flex h-[74px] items-center border-b border-white/15 px-5 md:px-9">
@@ -171,13 +171,13 @@ export function PublicExperience() {
       </section>
 
       <section className="relative min-h-[680px] overflow-hidden border-b border-white/15">
-        <Image src="/images/prophet-observatory-cinematic-v2.png" alt="The private SPY Prophet decision environment" fill className="object-cover object-[72%_center] opacity-55" sizes="100vw" />
-        <div className="absolute inset-0 bg-carbon/55" />
+        <Image src="/images/market-duality-hall-v1.png" alt="A bronze bull and bear facing each other in an institutional market hall" fill className="object-cover object-center" sizes="100vw" />
+        <div className="absolute inset-0 bg-gradient-to-r from-carbon/90 via-carbon/50 to-carbon/20" />
         <div className="relative z-10 mx-auto flex min-h-[680px] max-w-[1500px] items-end px-5 py-20 md:px-9 md:py-28">
           <Reveal>
-            <p className="microlabel text-lime">Controlled disclosure</p>
-            <h2 className="mt-7 max-w-[960px] text-[48px] font-black leading-[0.9] tracking-normal md:text-[76px] xl:text-[96px]">The advantage stays inside the system.</h2>
-            <p className="mt-7 max-w-[590px] text-[15px] leading-relaxed text-white/[0.68]">Operators see the decision, its evidence status, and its risk. Public visitors never receive the formulas, hierarchy, or proprietary structure model that creates it.</p>
+            <p className="microlabel text-mineral">Market posture</p>
+            <h2 className="mt-7 max-w-[960px] text-[48px] font-black leading-[0.9] tracking-normal md:text-[76px] xl:text-[96px]">Direction is earned.<br />Never assumed.</h2>
+            <p className="mt-7 max-w-[620px] text-[15px] leading-relaxed text-white/[0.72]">Bullish and bearish possibilities remain context until price, structure, and risk resolve into one qualified decision. The operator sees the decision. The proprietary machinery stays inside the system.</p>
           </Reveal>
         </div>
       </section>
