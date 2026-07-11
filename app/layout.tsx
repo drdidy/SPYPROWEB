@@ -6,7 +6,7 @@ import "./globals.css";
 const SITE_URL = "https://www.spyprophet.app";
 const SITE_NAME = "SPY Prophet";
 const SITE_DESC =
-  "Private decision intelligence for SPY, ES, and SPXW, joining preparation, live command, alerts, replay, and evidence-bound review.";
+  "A structured trading workspace for SPY, ES, and SPXW with live setup guidance, alerts, session replay, and daily trade review.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     "SPX",
     "options trading",
     "SPXW 0DTE",
-    "market decision intelligence",
+    "trading plan",
     "trading alerts",
     "decision support",
     "trade replay",

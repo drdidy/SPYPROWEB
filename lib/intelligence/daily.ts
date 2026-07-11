@@ -216,11 +216,11 @@ function reviewTrade(pair: TradePair, replay: { spy?: ReplayBar[]; es?: ReplayBa
 }
 
 function tradeLesson(input: { outcome: ReviewedTrade["outcome"]; durationMinutes: number; targetProgressPct: number | null; realizedR: number | null }): string {
-  if (input.outcome === "WIN" && input.durationMinutes <= 15) return "The setup converted quickly. Preserve the confirmation rule and avoid chasing after the first expansion.";
-  if (input.outcome === "WIN") return "The thesis held, but patience was required. The defined stop mattered more than intrabar noise.";
-  if ((input.targetProgressPct ?? 0) >= 70) return "The trade made meaningful progress before failing. Study partial-profit and breakeven behavior across similar cases before changing the default.";
-  if (input.outcome === "TIMEOUT" && (input.realizedR ?? 0) > 0) return "The target did not complete, but the session cutoff protected positive R. Keep timeout separate from a structural loss.";
-  return "The setup failed before proving enough favorable excursion. Review higher-timeframe agreement, entry timing, and available target room.";
+  if (input.outcome === "WIN" && input.durationMinutes <= 15) return "The target was reached within 15 minutes. Keep the same confirmation rule and do not chase a later entry after the move has already expanded.";
+  if (input.outcome === "WIN") return "The target was reached after a longer hold. Review the normal pullbacks during the trade, but keep the defined stop unchanged.";
+  if ((input.targetProgressPct ?? 0) >= 70) return "Price covered at least 70% of the distance to target before reversing. Test partial profit or breakeven management across similar trades before changing the live rules.";
+  if (input.outcome === "TIMEOUT" && (input.realizedR ?? 0) > 0) return "The target was not reached before the session cutoff, but the trade was still positive. Record it as a timeout rather than a structural loss.";
+  return "The trade failed before making enough progress toward target. Compare higher-timeframe direction, entry timing, and room to the next mapped level.";
 }
 
 function summarize(trades: ReviewedTrade[]): DailyIntelligenceSnapshot["scorecard"] {
@@ -243,7 +243,7 @@ function buildImprovements(trades: ReviewedTrade[], rolling: TradePair[]): Daily
   const rows: DailyIntelligenceSnapshot["improvements"] = [];
   const lateFailures = trades.filter((trade) => trade.outcome !== "WIN" && (trade.targetProgressPct ?? 0) >= 70);
   if (lateFailures.length) rows.push({
-    title: "Protect mature progress",
+    title: "Review trades that nearly reached target",
     finding: `${lateFailures.length} trade${lateFailures.length === 1 ? "" : "s"} reached at least 70% of target before failing to complete.`,
     action: "Research a partial or breakeven rule across at least 10 comparable sessions. Do not change production from this day alone.",
     confidence: lateFailures.length >= 3 ? "MEDIUM" : "LEARNING",
@@ -251,7 +251,7 @@ function buildImprovements(trades: ReviewedTrade[], rolling: TradePair[]): Daily
   });
   const quickFailures = trades.filter((trade) => trade.outcome === "LOSS" && trade.durationMinutes <= 10);
   if (quickFailures.length) rows.push({
-    title: "Audit immediate adverse moves",
+    title: "Review losses within ten minutes",
     finding: `${quickFailures.length} loss${quickFailures.length === 1 ? "" : "es"} invalidated within ten minutes of entry.`,
     action: "Compare the confirmation candle, 5/20-minute alignment, and room to the next mapped level before proposing a filter.",
     confidence: quickFailures.length >= 3 ? "MEDIUM" : "LEARNING",
@@ -259,14 +259,14 @@ function buildImprovements(trades: ReviewedTrade[], rolling: TradePair[]): Daily
   });
   const windowStats = rollingWindowStats(rolling);
   if (windowStats.best && windowStats.best.count >= 5) rows.push({
-    title: "Respect the proven time block",
+    title: "Compare results by entry window",
     finding: `${windowStats.best.label} leads the recent sample at ${windowStats.best.winRate.toFixed(0)}% across ${windowStats.best.count} decided trades.`,
-    action: "Treat this as context, not permission. The full setup must still confirm.",
+    action: "Use the stronger time window as supporting context. Every normal entry rule must still pass.",
     confidence: windowStats.best.count >= 10 ? "HIGH" : "MEDIUM",
     sample: windowStats.best.count,
   });
   if (!rows.length) rows.push({
-    title: "Keep collecting clean evidence",
+    title: "Collect more completed trades",
     finding: trades.length ? "No repeated failure pattern cleared the minimum evidence threshold today." : "No completed engine trade was available for this session.",
     action: "Preserve the current rules and collect the next completed session before changing entries, exits, or timing.",
     confidence: "LEARNING",
@@ -305,19 +305,19 @@ function buildNextSessionPlan({
   const headlines = newsHeadlines(macro);
   const briefHeadline = stringValue(brief?.tldr) ?? stringValue(brief?.brief);
   return {
-    headline: scorecard.losses ? "Reset the process. Demand complete proof." : "Carry the process forward, not the outcome.",
+    headline: scorecard.losses ? "Review the loss before changing any rule." : "Keep the current rules for the next session.",
     context: briefHeadline?.slice(0, 360) ?? "Live context will populate when the connected Daily Brief and market feeds are available.",
     focus: [
-      "Verify SPY and ES sources before reading direction.",
-      "Map the nearest control level and confirm there is room to target.",
+      "Confirm that the SPY and ES feeds are current before using any signal.",
+      "Check the nearest control level and make sure the planned target is not blocked.",
       improvements[0]?.action ?? "Wait for the full confirmation sequence.",
     ],
     avoid: [
-      "Do not let one session silently retune the strategy.",
+      "Do not change the strategy because of one unusual session.",
       "Do not enter from a level without the engine confirmation close.",
       "Do not use estimated option premium when the live chain is unavailable.",
     ],
-    newsWatch: headlines.length ? headlines : ["No verified headline feed is available. Treat news risk as unknown, not absent."],
+    newsWatch: headlines.length ? headlines : ["No verified news feed is available. News risk is unknown until the feed returns."],
   };
 }
 
@@ -342,7 +342,7 @@ async function synthesizeWithAI(input: {
   const provider = aiProvider();
   if (!provider) return fallback;
   const prompt = JSON.stringify({
-    instruction: "Review only the supplied evidence. Do not invent news, trades, prices, causes, or probabilities. Do not promise profitability. A single day may suggest research but may not justify a production rule change. Return JSON with headline, review, timingLesson, nextSessionFocus, and riskRule. Each value must be plain English and under 220 characters.",
+    instruction: "Review only the supplied evidence. Do not invent news, trades, prices, causes, or probabilities. Do not promise profitability. A single day may suggest research but may not justify a production rule change. Use direct, natural language with specific facts. Avoid slogans, metaphors, fragments, and abstract phrases. Return JSON with headline, review, timingLesson, nextSessionFocus, and riskRule. Each value must be plain English and under 220 characters.",
     sessionDate: input.sessionDate,
     scorecard: input.scorecard,
     trades: input.trades,
@@ -366,8 +366,8 @@ function aiProvider(): { name: string; url: string; key: string; model: string; 
 
 async function callAI(provider: NonNullable<ReturnType<typeof aiProvider>>, prompt: string): Promise<string | null> {
   const body = provider.responses
-    ? { model: provider.model, instructions: "You are SPY Prophet Review AI, an evidence-bound trading process reviewer.", input: prompt, max_output_tokens: 700 }
-    : { model: provider.model, messages: [{ role: "system", content: "You are SPY Prophet Review AI, an evidence-bound trading process reviewer." }, { role: "user", content: prompt }], temperature: 0.1, max_tokens: 700 };
+    ? { model: provider.model, instructions: "You are SPY Prophet Review AI. Explain completed trades in direct, specific language. Avoid slogans and abstract coaching phrases.", input: prompt, max_output_tokens: 700 }
+    : { model: provider.model, messages: [{ role: "system", content: "You are SPY Prophet Review AI. Explain completed trades in direct, specific language. Avoid slogans and abstract coaching phrases." }, { role: "user", content: prompt }], temperature: 0.1, max_tokens: 700 };
   const response = await fetch(provider.url, { method: "POST", headers: { authorization: `Bearer ${provider.key}`, "content-type": "application/json" }, body: JSON.stringify(body), cache: "no-store", signal: AbortSignal.timeout(14_000) });
   if (!response.ok) return null;
   const json = await response.json() as Record<string, unknown>;

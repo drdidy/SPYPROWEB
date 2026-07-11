@@ -13,17 +13,15 @@ export default function Page() {
         <div className="flex flex-col justify-between bg-lime p-5 md:p-10">
           <p className="microlabel">Prophet field manual</p>
           <p className="mt-20 max-w-[320px] text-[14px] font-bold leading-relaxed">
-            Learn slowly here so you can act clearly when the market moves
-            quickly.
+            Learn the rules before the session so you do not have to interpret them while price is moving.
           </p>
         </div>
         <div className="p-5 py-10 md:p-10">
           <h1 className="max-w-[860px] text-[12vw] font-black leading-[0.86] tracking-[-0.01em] sm:text-[46px] md:text-[68px] xl:text-[90px]">
-            Learn the language of the decision.
+            Learn how to read each instruction.
           </h1>
           <p className="mt-7 max-w-[650px] text-[15px] leading-relaxed text-carbon/60">
-            Market structure, risk, options, and review discipline. Proprietary
-            engine logic remains private.
+            Understand market structure, risk, options, alerts, and Replay. The proprietary calculations remain private.
           </p>
         </div>
       </header>

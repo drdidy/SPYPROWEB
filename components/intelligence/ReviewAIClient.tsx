@@ -43,18 +43,18 @@ export function ReviewAIClient() {
         <div className="cinematic-grid relative z-10 p-5 py-10 md:p-10 xl:p-14">
           <div className="flex flex-wrap items-center gap-3">
             <span className="microlabel border border-mineral/30 px-2.5 py-1.5 text-mineral">Review AI</span>
-            <span className="microlabel text-white/65">Evidence bound / no silent retuning</span>
+            <span className="microlabel text-white/65">Uses recorded signals and completed sessions</span>
           </div>
           <h1 className="mt-8 max-w-[900px] text-[13vw] font-black leading-[0.88] tracking-normal sm:text-[52px] md:text-[72px] xl:text-[88px]">
-            Review the day.<br /><span className="text-mineral">Improve the process.</span>
+            Review the trade.<br /><span className="text-mineral">Prepare for tomorrow.</span>
           </h1>
           <p className="mt-7 max-w-[720px] text-[15px] leading-relaxed text-white/60 md:text-[17px]">
-            The desk joins TradingView alerts, replay bars, option memory, the Daily Brief, and verified news context. It can propose research, but one unusual session can never rewrite production rules.
+            Review AI compares TradingView alerts, replay bars, options data, the Daily Brief, and verified news. It explains what happened and suggests what deserves further testing. It never changes the trading rules automatically.
           </p>
         </div>
         <div className="relative z-10 flex flex-col justify-between border-t border-mineral/20 bg-ink/90 p-5 text-white backdrop-blur-sm md:p-8 xl:border-l xl:border-t-0">
           <div>
-            <p className="microlabel">Next-session directive</p>
+            <p className="microlabel">Plan for the next session</p>
             <h2 className="mt-5 text-[30px] font-black leading-[0.98]">{snapshot.ai.headline}</h2>
             <p className="mt-5 text-[13px] font-semibold leading-relaxed text-white/60">{snapshot.ai.nextSessionFocus}</p>
           </div>
@@ -93,7 +93,7 @@ export function ReviewAIClient() {
           <div className="flex items-center justify-between gap-4 border-b border-carbon pb-4">
             <div>
               <p className="microlabel text-cobalt">Completed trade review</p>
-              <h2 className="mt-2 text-[26px] font-black">What the evidence actually says</h2>
+              <h2 className="mt-2 text-[26px] font-black">What happened in the completed trade</h2>
             </div>
             <BrainCircuit size={24} className="text-cobalt" aria-hidden="true" />
           </div>
@@ -104,9 +104,9 @@ export function ReviewAIClient() {
       <section className="border-b border-carbon bg-carbon text-white">
         <div className="grid lg:grid-cols-[0.38fr_0.62fr]">
           <div className="border-b border-white/20 p-5 py-10 md:p-10 lg:border-b-0 lg:border-r">
-            <p className="microlabel text-lime">Research queue</p>
-            <h2 className="mt-6 text-[36px] font-black leading-[0.95] md:text-[48px]">Improve without overfitting.</h2>
-            <p className="mt-6 text-[13px] leading-relaxed text-white/90">Recommendations graduate only when repeated evidence supports them. Until then, they remain visible research questions.</p>
+            <p className="microlabel text-lime">Ideas to test</p>
+            <h2 className="mt-6 text-[36px] font-black leading-[0.95] md:text-[48px]">Test changes before using them live.</h2>
+            <p className="mt-6 text-[13px] leading-relaxed text-white/90">A suggested improvement remains a research idea until enough completed trades support it.</p>
           </div>
           <div>
             {snapshot.improvements.map((item, index) => (
@@ -129,8 +129,8 @@ export function ReviewAIClient() {
 
       <section className="grid border-b border-carbon xl:grid-cols-3">
         <PlanColumn label="Focus" title={snapshot.nextSession.headline} items={snapshot.nextSession.focus} tone="lime" />
-        <PlanColumn label="Avoid" title="Protect the process" items={snapshot.nextSession.avoid} tone="coral" />
-        <PlanColumn label="News and event watch" title="Context, never permission" items={snapshot.nextSession.newsWatch} tone="cobalt" />
+        <PlanColumn label="Avoid" title="What not to do" items={snapshot.nextSession.avoid} tone="coral" />
+        <PlanColumn label="News and event watch" title="Events that may change volatility" items={snapshot.nextSession.newsWatch} tone="cobalt" />
       </section>
 
       <section className="flex flex-wrap items-center gap-4 bg-white px-5 py-4 md:px-10">
@@ -179,7 +179,7 @@ function PlanColumn({ label, title, items, tone }: { label: string; title: strin
 }
 
 function EmptyReview() {
-  return <div className="mt-7 flex gap-3 border border-carbon/25 bg-white p-5"><TriangleAlert size={17} className="mt-0.5 shrink-0 text-cobalt" /><div><p className="text-[14px] font-black">No completed engine trade for this date.</p><p className="mt-2 text-[12px] leading-relaxed text-carbon/60">The desk will not manufacture a lesson. Select another date or wait for the next completed alert sequence.</p></div></div>;
+  return <div className="mt-7 flex gap-3 border border-carbon/25 bg-white p-5"><TriangleAlert size={17} className="mt-0.5 shrink-0 text-cobalt" /><div><p className="text-[14px] font-black">No completed engine trade for this date.</p><p className="mt-2 text-[12px] leading-relaxed text-carbon/60">A trade review requires a completed entry and exit. Select another date or wait for the next completed alert sequence.</p></div></div>;
 }
 
 function DeskLoading() { return <div className="hatch grid min-h-[680px] place-items-center"><div className="text-center"><BrainCircuit className="mx-auto animate-pulse text-cobalt" size={30} /><p className="mt-5 text-[24px] font-black">Reviewing verified evidence</p></div></div>; }

@@ -59,11 +59,11 @@ export function MarketAtlas({
         <div className="px-5 py-10 md:px-10 md:py-14">
           <p className="microlabel text-mineral">Private market map</p>
           <h1 className="mt-6 max-w-[1050px] text-[13vw] font-black leading-[0.86] tracking-normal sm:text-[50px] md:text-[72px] xl:text-[96px]">
-            Structure without the chart clutter. Keep the method private.
+            See the levels that matter now.
           </h1>
           <p className="mt-7 max-w-[720px] text-[15px] leading-relaxed text-white/60">
-            The map reveals verified decision levels, distance, and available
-            room. The proprietary hierarchy behind them remains protected.
+            Compare current price with the nearest verified support and
+            resistance. Check the distance to each level before taking a trade.
           </p>
         </div>
         <Link
@@ -81,14 +81,14 @@ export function MarketAtlas({
       <section className="grid lg:grid-cols-2">
         <AtlasInstrument
           symbol="SPY"
-          subtitle="Intraday decision field"
+          subtitle="Intraday levels"
           source={spySource}
           price={spyValid ? spy.currentPrice : Number.NaN}
           levels={spyLevels}
         />
         <AtlasInstrument
           symbol="ES / SPX"
-          subtitle="Lead-market decision field"
+          subtitle="ES and SPX levels"
           source={spxSource}
           price={spxValid ? spx.price.last : Number.NaN}
           levels={esLevels}
@@ -98,9 +98,9 @@ export function MarketAtlas({
 
       <section className="grid border-t border-white/20 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="bg-optic p-5 py-12 text-carbon md:p-10">
-          <p className="microlabel text-cobalt">Confluence rule</p>
+          <p className="microlabel text-cobalt">Room to target</p>
           <h2 className="mt-6 max-w-[820px] text-[36px] font-black leading-[0.92] tracking-normal md:text-[52px] xl:text-[64px]">
-            A beautiful setup with no room is still a bad trade.
+            Skip the trade when the next level blocks the target.
           </h2>
           <div className="mt-10 grid border-t border-carbon sm:grid-cols-2">
             <RoomRead symbol="SPY" level={spyLevels[0] ?? null} />
@@ -112,12 +112,12 @@ export function MarketAtlas({
           </div>
         </div>
         <div className="bg-coral p-5 py-12 text-carbon md:p-10">
-          <p className="microlabel">Map discipline</p>
+          <p className="microlabel">How to use the map</p>
           <ol className="mt-8 border-t border-carbon">
             <Rule
               number="01"
-              title="Touch is context"
-              body="The Engine still has to confirm."
+              title="A touch is not an entry"
+              body="Wait for the Engine confirmation before entering."
             />
             <Rule
               number="02"
@@ -127,7 +127,7 @@ export function MarketAtlas({
             <Rule
               number="03"
               title="Target needs room"
-              body="A nearby decision level can invalidate an otherwise clean reward plan."
+              body="A nearby mapped level can block an otherwise valid target."
             />
           </ol>
         </div>
@@ -301,7 +301,7 @@ function RoomRead({
 }) {
   return (
     <div className={`py-7 sm:px-7 sm:first:pl-0 ${className}`}>
-      <p className="microlabel text-carbon/60">{symbol} nearest decision</p>
+      <p className="microlabel text-carbon/60">{symbol} nearest level</p>
       <p className="mt-4 text-[26px] font-black md:text-[28px]">
         {level?.label ?? "Waiting"}
       </p>

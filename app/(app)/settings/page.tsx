@@ -14,11 +14,10 @@ export default function Page() {
         </div>
         <div className="p-5 py-10 md:p-10">
           <h1 className="max-w-[850px] text-[12vw] font-black leading-[0.86] tracking-[-0.01em] sm:text-[44px] md:text-[64px] xl:text-[84px]">
-            Connections you can trust.
+            Check every connection before the market opens.
           </h1>
           <p className="mt-6 max-w-[660px] text-[15px] leading-relaxed text-carbon/60">
-            Only real delivery and feed state is shown here. A connected bot is
-            operational metadata, not permission to trade.
+            Confirm market data, Telegram delivery, and system readiness here. A connected service only confirms delivery; it does not confirm a trade.
           </p>
         </div>
       </header>

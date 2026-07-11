@@ -32,8 +32,7 @@ export function AppFooter() {
             </span>
           </div>
           <p className="mt-6 max-w-[460px] text-[13px] leading-relaxed text-white/60">
-            Private decision intelligence for SPY, ES, and SPXW. A quieter
-            command layer for preparation, execution, and review.
+            Decision support for SPY, ES, and SPXW. Prepare the session, follow confirmed alerts, and review completed trades.
           </p>
           <p className="microlabel mt-6 text-white/60">
             Decision support, not financial advice

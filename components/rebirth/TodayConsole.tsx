@@ -122,9 +122,9 @@ export function TodayConsole({
         </div>
 
         <aside className="flex flex-col border-t border-mineral/20 bg-ink p-5 text-white md:p-8 xl:border-l xl:border-t-0">
-          <p className="microlabel">Proof stack</p>
+          <p className="microlabel">Trade requirements</p>
           <h2 className="mt-5 max-w-[380px] text-[28px] font-black leading-[0.98] md:text-[32px]">
-            A trade is only as strong as its weakest proof.
+            Every requirement must pass before entry.
           </h2>
           <div className="mt-9 border-t border-white/20">
             <ProofRow done={liveEnough} label="Verified market source" />
@@ -154,9 +154,9 @@ export function TodayConsole({
       <section className="bg-carbon text-white">
         <div className="flex items-center justify-between gap-4 border-b border-white/15 px-5 py-4 md:px-10">
           <div>
-            <p className="microlabel text-white/60">Live structure field</p>
+            <p className="microlabel text-white/60">Nearest market levels</p>
             <h2 className="mt-1.5 text-[17px] font-black uppercase tracking-[0.02em]">
-              Only the nearest decisions
+              Support, resistance, and room to target
             </h2>
           </div>
           <Link
@@ -618,31 +618,31 @@ function commandFor(state: EngineState, live: boolean) {
     };
   if (state === "GO")
     return {
-      label: "ENTER DEFINED",
-      body: "Confirmation is complete. Execute only with the displayed stop, target, and live-chain contract.",
+      label: "ENTER NOW",
+      body: "The setup is confirmed. Use only the displayed entry, stop, target, and live-chain contract.",
       tone: "go" as const,
     };
   if (state === "ARMED")
     return {
       label: "GET READY",
-      body: "The structure is armed. Wait for the confirmation close. Do not anticipate it.",
+      body: "The setup is close. Wait for the confirmation candle to close before entering.",
       tone: "ready" as const,
     };
   if (state === "WATCH" || state === "WAIT")
     return {
-      label: "WAIT FOR PROOF",
-      body: "Price is near a decision, but the trade has not earned confirmation.",
+      label: "WATCH THE LEVEL",
+      body: "Price is near an important level, but the entry conditions are not complete.",
       tone: "ready" as const,
     };
   if (state === "COOLDOWN")
     return {
-      label: "PROTECT THE DAY",
-      body: "The trade cycle is complete. Demand a fully independent setup before considering another entry.",
+      label: "TRADE COMPLETE",
+      body: "The previous trade is finished. Do not re-enter unless a completely new setup is confirmed.",
       tone: "go" as const,
     };
   return {
     label: "NO TRADE",
-    body: "The structure does not offer a clean, defined setup. Waiting is the position.",
+    body: "No setup currently meets the entry rules. Stay out until one does.",
     tone: "stop" as const,
   };
 }

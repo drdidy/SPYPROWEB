@@ -51,11 +51,10 @@ export default async function Page({
         </div>
         <div className="p-5 py-10 md:p-10">
           <h1 className="max-w-[820px] text-[12vw] font-black leading-[0.88] tracking-[-0.01em] sm:text-[44px] md:text-[64px] xl:text-[82px]">
-            The decision trail, without the noise.
+            Review every signal from the session.
           </h1>
           <p className="mt-7 max-w-[680px] text-[15px] leading-relaxed text-carbon/60">
-            Trade candidates, structure changes, risk blocks, and notes. Replay
-            keeps the complete bar-by-bar evidence.
+            See trade alerts, level changes, risk warnings, and notes in time order. Open Replay when you need the candles behind an event.
           </p>
           <Link
             href="/replay"
@@ -122,9 +121,9 @@ export default async function Page({
             >
               <span className="h-1.5 w-1.5 bg-carbon/30" />
             </span>
-            <h2 className="mt-6 text-[32px] font-black">Nothing qualified.</h2>
+            <h2 className="mt-6 text-[32px] font-black">No qualifying event was recorded.</h2>
             <p className="mt-3 text-[13px] text-carbon/65">
-              A quiet journal is a valid outcome.
+              The system did not record a trade, structure change, risk warning, or note for this filter.
             </p>
           </div>
         </section>

@@ -182,11 +182,10 @@ export function ReplayLab({ initialDate }: { initialDate: string | null }) {
         <div className="p-5 py-10 md:p-10">
           <p className="microlabel text-lime">Session replay</p>
           <h1 className="mt-6 text-[13vw] font-black leading-[0.86] tracking-normal sm:text-[48px] md:text-[70px] xl:text-[90px]">
-            Slow the market down.
+            Replay the session bar by bar.
           </h1>
           <p className="mt-6 max-w-[680px] text-[15px] leading-relaxed text-white/60">
-            Move bar by bar through SPY or ES. Replay is review, never a live
-            command.
+            Review SPY or ES without seeing future candles. Check what was known at each moment and where an actual Engine alert appeared.
           </p>
         </div>
         <div className="m-5 flex flex-wrap border border-white/30 lg:m-10">

@@ -7,18 +7,19 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { AppFooter } from "@/components/layout/AppFooter";
+import { MarketDepthJourney } from "@/components/rebirth/MarketDepthJourney";
 
 const decisions = [
-  { index: "01", label: "Watch", title: "Attention, not action.", body: "A meaningful decision is approaching. Observe it without anticipating it.", icon: Eye },
-  { index: "02", label: "Ready", title: "The condition is forming.", body: "Prepare the execution. The system is still waiting for proof.", icon: ScanLine },
-  { index: "03", label: "Enter", title: "The decision is complete.", body: "Direction, risk, objective, and execution context arrive together.", icon: ArrowUpRight },
-  { index: "04", label: "Exit", title: "Close the loop.", body: "Target or invalidation ends the decision. Review begins immediately.", icon: ShieldCheck },
+  { index: "01", label: "Watch", title: "A setup may be forming.", body: "Pay attention, but do not enter. The required confirmation has not appeared yet.", icon: Eye },
+  { index: "02", label: "Get ready", title: "The entry conditions are close.", body: "Check the direction, level, contract, and risk. The trade still needs final confirmation.", icon: ScanLine },
+  { index: "03", label: "Enter", title: "The setup is confirmed.", body: "The entry, target, and invalidation are shown together so the decision is defined before you act.", icon: ArrowUpRight },
+  { index: "04", label: "Exit", title: "The trade is finished.", body: "Exit when the target is reached, the setup is invalidated, or the trading window closes.", icon: ShieldCheck },
 ];
 
 const surfaces = [
-  ["Today", "One command for the live session."],
-  ["Replay", "The market slowed down to decision speed."],
-  ["Review AI", "Evidence carried into the next session."],
+  ["Today", "The current setup, risk, and next instruction."],
+  ["Replay", "Review the session without seeing future candles."],
+  ["Review AI", "Compare completed trades and prepare for tomorrow."],
 ];
 
 export function PublicExperience() {
@@ -29,7 +30,7 @@ export function PublicExperience() {
   const imageScale = useTransform(scrollYProgress, [0, 1], [1.02, 1.1]);
 
   return (
-    <div className="overflow-hidden bg-carbon text-optic">
+    <div className="overflow-x-clip bg-carbon text-optic">
       <section ref={heroRef} className="relative flex min-h-[92svh] flex-col overflow-hidden border-b border-white/15">
         <motion.div className="absolute -inset-[2%]" style={reduced ? undefined : { y: imageY, scale: imageScale }}>
           <Image
@@ -50,7 +51,7 @@ export function PublicExperience() {
             <span className="grid h-10 w-10 place-items-center border border-lime/70 bg-carbon/70 text-[17px] font-black text-lime backdrop-blur">P</span>
             <span>
               <span className="block text-[13px] font-black uppercase tracking-[0.08em]">SPY Prophet</span>
-              <span className="microlabel mt-1 block text-white/55">Private decision intelligence</span>
+              <span className="microlabel mt-1 block text-white/55">Live trade planning and review</span>
             </span>
           </Link>
           <nav className="ml-auto hidden items-center gap-8 md:flex" aria-label="Public navigation">
@@ -66,7 +67,7 @@ export function PublicExperience() {
         <div className="relative z-10 flex flex-1 flex-col justify-between px-5 pb-8 pt-10 md:px-9 md:pb-10">
           <div className="flex items-center gap-3">
             <span className="h-2 w-2 animate-blink bg-lime" />
-            <span className="microlabel text-lime">Chicago decision desk</span>
+            <span className="microlabel text-lime">Chicago trading desk</span>
             <HeroClock />
           </div>
 
@@ -79,9 +80,9 @@ export function PublicExperience() {
               <RevealLine reduced={Boolean(reduced)} delay={0.18}><span className="text-lime">Prophet.</span></RevealLine>
             </h1>
             <motion.div initial={reduced ? false : { opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.32, duration: 0.75 }} className="mt-8 max-w-[680px] border-l border-lime/70 pl-5">
-              <p className="text-[22px] font-bold leading-tight text-white md:text-[30px]">Know what must happen next.</p>
+              <p className="text-[22px] font-bold leading-tight text-white md:text-[30px]">Stop guessing. Wait for the market to confirm the trade.</p>
               <p className="mt-4 max-w-[600px] text-[14px] leading-relaxed text-white/[0.68] md:text-[16px]">
-                A private operating system for clearer market decisions. It compresses live context into one disciplined sequence without exposing the machinery behind it.
+                SPY Prophet watches price structure, market context, risk, and options data, then tells you when to watch, prepare, enter, and exit. The method stays private. The instructions stay clear.
               </p>
             </motion.div>
             <motion.div initial={reduced ? false : { y: 18 }} animate={{ y: 0 }} transition={{ delay: 0.44, duration: 0.75 }} className="mt-9 flex flex-wrap gap-3">
@@ -95,36 +96,38 @@ export function PublicExperience() {
           </div>
 
           <div className="grid border-y border-white/15 bg-carbon/45 backdrop-blur-md sm:grid-cols-3">
-            <HeroFact label="Command" value="One state at a time" />
-            <HeroFact label="Risk" value="Defined before action" />
-            <HeroFact label="Memory" value="Every decision preserved" />
+            <HeroFact label="Live state" value="One instruction at a time" />
+            <HeroFact label="Trade risk" value="Defined before entry" />
+            <HeroFact label="Review" value="Every signal is recorded" />
           </div>
         </div>
         <a href="#experience" aria-label="Continue" className="absolute bottom-0 right-0 z-20 hidden h-20 w-20 place-items-center border-l border-t border-white/15 bg-carbon/55 text-white transition-colors hover:bg-lime hover:text-carbon md:grid"><ArrowDown size={18} /></a>
       </section>
+
+      <MarketDepthJourney />
 
       <section id="experience" className="relative border-b border-white/15 px-5 py-24 md:px-9 md:py-36">
         <div className="mx-auto max-w-[1500px]">
           <Reveal>
             <p className="microlabel text-mineral">The experience</p>
             <h2 className="mt-7 max-w-[1220px] text-[46px] font-black leading-[0.92] tracking-normal md:text-[76px] xl:text-[104px]">
-              Markets are loud.<br />Your command should not be.
+              Everyone says the market is unpredictable.<br />We do not try to predict it.
             </h2>
           </Reveal>
           <div className="mt-20 grid border-t border-white/20 lg:grid-cols-[0.42fr_0.58fr]">
             <div className="border-b border-white/15 py-10 pr-8 lg:border-b-0 lg:border-r">
               <p className="microlabel text-white/65">Designed for the moment</p>
               <p className="mt-6 max-w-[430px] text-[16px] leading-relaxed text-white/[0.68]">
-                When the market accelerates, the interface removes explanation and elevates the next decision. No decorative dashboard. No competing signals. No public blueprint of the method.
+                We define the conditions for a trade, wait for price to meet them, and stay out when they do not. That turns uncertainty into a decision you can repeat and review.
               </p>
             </div>
             <div className="relative min-h-[360px] overflow-hidden py-10 lg:pl-12">
               <div className="absolute inset-y-10 left-0 w-px bg-mineral/40 lg:left-12" />
               <div className="space-y-8 pl-7 lg:pl-12">
                 {[
-                  ["Before", "Prepare the field without predicting the outcome."],
-                  ["During", "Receive one state, one action, and one defined risk."],
-                  ["After", "Turn the completed decision into tomorrow's discipline."],
+                  ["Before", "Check the session, key levels, market direction, and risk."],
+                  ["During", "Follow the current instruction: watch, get ready, enter, or exit."],
+                  ["After", "Replay the trade and record what the evidence actually showed."],
                 ].map(([label, text], index) => (
                   <motion.div key={label} initial={reduced ? false : { opacity: 0, x: 22 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true, amount: 0.6 }} transition={{ delay: index * 0.1, duration: 0.65 }} className="relative grid gap-3 border-b border-white/15 pb-8 md:grid-cols-[110px_1fr]">
                     <span className="absolute -left-[31px] top-1 h-2 w-2 bg-lime lg:-left-[51px]" />
@@ -144,10 +147,10 @@ export function PublicExperience() {
             <Reveal className="grid gap-8 lg:grid-cols-[0.48fr_0.52fr] lg:items-end">
               <div>
                 <p className="microlabel text-lime">The command sequence</p>
-                <h2 className="mt-7 text-[46px] font-black leading-[0.92] tracking-normal md:text-[72px]">Four states.<br />No ambiguity.</h2>
+                <h2 className="mt-7 text-[46px] font-black leading-[0.92] tracking-normal md:text-[72px]">Four instructions.<br />One clear process.</h2>
               </div>
               <p className="max-w-[500px] text-[15px] leading-relaxed text-white/60 lg:justify-self-end">
-                The experience explains what to do, not how the proprietary model arrives there. Methodology stays private. Decision discipline stays visible.
+                Each instruction tells you what is happening now and what must happen next. The proprietary calculations remain protected.
               </p>
             </Reveal>
           </div>
@@ -170,23 +173,11 @@ export function PublicExperience() {
         </ol>
       </section>
 
-      <section className="relative min-h-[680px] overflow-hidden border-b border-white/15">
-        <Image src="/images/market-duality-hall-v1.png" alt="A bronze bull and bear facing each other in an institutional market hall" fill className="object-cover object-center" sizes="100vw" />
-        <div className="absolute inset-0 bg-gradient-to-r from-carbon/90 via-carbon/50 to-carbon/20" />
-        <div className="relative z-10 mx-auto flex min-h-[680px] max-w-[1500px] items-end px-5 py-20 md:px-9 md:py-28">
-          <Reveal>
-            <p className="microlabel text-mineral">Market posture</p>
-            <h2 className="mt-7 max-w-[960px] text-[48px] font-black leading-[0.9] tracking-normal md:text-[76px] xl:text-[96px]">Direction is earned.<br />Never assumed.</h2>
-            <p className="mt-7 max-w-[620px] text-[15px] leading-relaxed text-white/[0.72]">Bullish and bearish possibilities remain context until price, structure, and risk resolve into one qualified decision. The operator sees the decision. The proprietary machinery stays inside the system.</p>
-          </Reveal>
-        </div>
-      </section>
-
       <section id="review" className="border-b border-white/15 bg-optic text-carbon">
         <div className="mx-auto max-w-[1500px] px-5 py-24 md:px-9 md:py-32">
           <Reveal>
             <p className="microlabel text-context-ink">The operating loop</p>
-            <h2 className="mt-7 max-w-[1000px] text-[46px] font-black leading-[0.92] tracking-normal md:text-[76px]">Live clarity.<br />Permanent memory.</h2>
+            <h2 className="mt-7 max-w-[1000px] text-[46px] font-black leading-[0.92] tracking-normal md:text-[76px]">Use the plan live.<br />Review every decision after.</h2>
           </Reveal>
           <div className="mt-16 grid border-y border-carbon lg:grid-cols-3">
             {surfaces.map(([label, body], index) => (
@@ -207,8 +198,8 @@ export function PublicExperience() {
       <section className="bg-lime px-5 py-20 text-carbon md:px-9 md:py-28">
         <div className="mx-auto grid max-w-[1500px] gap-10 lg:grid-cols-[1fr_360px] lg:items-end">
           <Reveal>
-            <p className="microlabel">Private intelligence. Decisive delivery.</p>
-            <h2 className="mt-7 max-w-[1050px] text-[48px] font-black leading-[0.9] tracking-normal md:text-[78px] xl:text-[98px]">See less.<br />Know more.</h2>
+            <p className="microlabel">A defined process for fast markets.</p>
+            <h2 className="mt-7 max-w-[1050px] text-[48px] font-black leading-[0.9] tracking-normal md:text-[78px] xl:text-[98px]">Trade from a plan.<br />Not from panic.</h2>
           </Reveal>
           <Link href="/dashboard" className="group inline-flex h-16 items-center justify-between bg-carbon px-6 text-[11px] font-black uppercase tracking-[0.08em] text-white transition-colors hover:bg-white hover:text-carbon">Enter today&apos;s console <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" /></Link>
         </div>
