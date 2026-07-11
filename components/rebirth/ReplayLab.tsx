@@ -1,7 +1,9 @@
 "use client";
 
 import {
+  Activity,
   CalendarDays,
+  Layers3,
   Pause,
   Play,
   RotateCcw,
@@ -26,6 +28,21 @@ type ReplayPayload = {
   es: Bar[];
   error?: string;
   source?: { spy?: string; es?: string };
+  controls?: { spy?: WeeklyControl | null; es?: WeeklyControl | null };
+};
+
+type WeeklyControl = {
+  sourceDate: string;
+  sourceWindow: string;
+  anchorAt: string;
+  anchorPrice: number;
+  slopePerHour: number;
+  spacing: number;
+  zoneWidth: number | null;
+  valueAtFirstBar: number;
+  slopePerBar: number;
+  gateIndices: number[];
+  method: string;
 };
 
 const SPEEDS = [1, 2, 4] as const;
@@ -37,6 +54,8 @@ export function ReplayLab({ initialDate }: { initialDate: string | null }) {
   const [cursor, setCursor] = useState(1);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1);
+  const [showWeekly, setShowWeekly] = useState(true);
+  const [showReactions, setShowReactions] = useState(true);
   const [status, setStatus] = useState<"loading" | "ready" | "empty" | "error">(
     "loading",
   );
@@ -89,6 +108,7 @@ export function ReplayLab({ initialDate }: { initialDate: string | null }) {
   }, [playing, bars.length, speed]);
 
   const visible = bars.slice(0, cursor);
+  const control = instrument === "SPY" ? payload?.controls?.spy ?? null : payload?.controls?.es ?? null;
   const current = visible.at(-1) ?? null;
   const change = current && bars[0] ? current.c - bars[0].o : null;
   const sessionHigh = visible.length
@@ -114,6 +134,12 @@ export function ReplayLab({ initialDate }: { initialDate: string | null }) {
   const rangeLocation = current && sessionHigh !== null && sessionLow !== null && sessionHigh > sessionLow
     ? ((current.c - sessionLow) / (sessionHigh - sessionLow)) * 100
     : null;
+  const weeklyContext = current && control
+    ? nearestWeeklyLevels(control, current.c, visible.length - 1)
+    : null;
+  const weeklyRead = weeklyContext && current && control
+    ? weeklyDecisionRead(current, weeklyContext.support.value, weeklyContext.resistance.value, control)
+    : "Weekly map unavailable";
 
   return (
     <div className="bg-carbon text-white">
@@ -170,6 +196,27 @@ export function ReplayLab({ initialDate }: { initialDate: string | null }) {
           <p className="microlabel mt-3 text-mineral">
             {payload?.source?.[instrument.toLowerCase() as "spy" | "es"] ?? "Replay API"}
           </p>
+          <ReadLabel label="Replay layers" className="mt-10" />
+          <div className="mt-3 grid gap-2">
+            <LayerToggle
+              label="Weekly gates"
+              icon={Layers3}
+              active={showWeekly}
+              onClick={() => setShowWeekly((value) => !value)}
+            />
+            <LayerToggle
+              label="Gate reactions"
+              icon={Activity}
+              active={showReactions}
+              onClick={() => setShowReactions((value) => !value)}
+              disabled={!showWeekly}
+            />
+          </div>
+          {control && (
+            <p className="mt-4 text-[11px] leading-relaxed text-white/50">
+              {control.method}. Source {control.sourceDate}, {control.sourceWindow}.
+            </p>
+          )}
           <ReadLabel label="Session range" className="mt-10" />
           <p className="num mt-3 text-[12px] font-bold leading-relaxed text-white/75">
             {sessionHigh !== null && sessionLow !== null ? (
@@ -188,7 +235,12 @@ export function ReplayLab({ initialDate }: { initialDate: string | null }) {
         <div className="hud-grid relative min-h-[430px] overflow-hidden border-b border-white/20 lg:border-b-0 lg:border-r">
           {status === "ready" && visible.length > 0 ? (
             <>
-              <CandleChart bars={visible} instrument={instrument} />
+              <CandleChart
+                bars={visible}
+                instrument={instrument}
+                control={showWeekly ? control : null}
+                showReactions={showReactions}
+              />
               <span className="microlabel absolute left-4 top-4 border border-white/25 bg-carbon px-2.5 py-1.5 text-white/65">
                 {instrument} / candles / bar by bar
               </span>
@@ -267,6 +319,17 @@ export function ReplayLab({ initialDate }: { initialDate: string | null }) {
               <Read label="Range location" value={rangeLocation ?? undefined} suffix="%" />
             </div>
           </div>
+          <div className="mt-8 border-t border-white/25 pt-5">
+            <ReadLabel label="Weekly map" accent />
+            <p className="mt-3 text-[18px] font-black leading-tight">{weeklyRead}</p>
+            <div className="mt-5 border-t border-white/15">
+              <Read label="Resistance" value={weeklyContext?.resistance.value} />
+              <Read label="Support" value={weeklyContext?.support.value} />
+            </div>
+            <p className="mt-3 text-[11px] leading-relaxed text-white/50">
+              Roles update at the replay cursor. A close through a gate can turn prior resistance into support, or support into resistance.
+            </p>
+          </div>
         </div>
       </section>
 
@@ -341,12 +404,34 @@ export function ReplayLab({ initialDate }: { initialDate: string | null }) {
   );
 }
 
-function CandleChart({ bars, instrument }: { bars: Bar[]; instrument: "SPY" | "ES" }) {
+function CandleChart({
+  bars,
+  instrument,
+  control,
+  showReactions,
+}: {
+  bars: Bar[];
+  instrument: "SPY" | "ES";
+  control: WeeklyControl | null;
+  showReactions: boolean;
+}) {
   const width = 1100;
   const height = 600;
   const pad = { left: 28, right: 96, top: 34, bottom: 54 };
   const windowBars = bars.slice(-110);
-  const values = windowBars.flatMap((bar) => [bar.h, bar.l]);
+  const absoluteStart = bars.length - windowBars.length;
+  const weekly = control && windowBars.length
+    ? nearestWeeklyLevels(control, windowBars.at(-1)!.c, bars.length - 1)
+    : null;
+  const weeklyValues = weekly
+    ? [
+        gateValue(control!, weekly.support.index, absoluteStart),
+        gateValue(control!, weekly.support.index, bars.length - 1),
+        gateValue(control!, weekly.resistance.index, absoluteStart),
+        gateValue(control!, weekly.resistance.index, bars.length - 1),
+      ]
+    : [];
+  const values = [...windowBars.flatMap((bar) => [bar.h, bar.l]), ...weeklyValues];
   const min = Math.min(...values);
   const max = Math.max(...values);
   const rawSpan = Math.max(max - min, instrument === "SPY" ? 0.05 : 0.5);
@@ -382,6 +467,18 @@ function CandleChart({ bars, instrument }: { bars: Bar[]; instrument: "SPY" | "E
       ))}
       <line x1={pad.left} y1={y(open.o)} x2={width - pad.right} y2={y(open.o)} stroke="rgba(216,200,148,0.52)" strokeDasharray="7 7" vectorEffect="non-scaling-stroke" />
       <text x={pad.left + 8} y={y(open.o) - 8} fill="#D8C894" fontSize="11" fontWeight="700" fontFamily="ui-monospace, monospace">SESSION OPEN</text>
+      {control && weekly && (
+        <WeeklyGateLayer
+          bars={windowBars}
+          absoluteStart={absoluteStart}
+          control={control}
+          supportIndex={weekly.support.index}
+          resistanceIndex={weekly.resistance.index}
+          x={x}
+          y={y}
+          showReactions={showReactions}
+        />
+      )}
       {windowBars.map((bar, index) => {
         const rising = bar.c >= bar.o;
         const color = rising ? "#8FD3C8" : "#E67560";
@@ -412,6 +509,60 @@ function CandleChart({ bars, instrument }: { bars: Bar[]; instrument: "SPY" | "E
   );
 }
 
+function WeeklyGateLayer({
+  bars,
+  absoluteStart,
+  control,
+  supportIndex,
+  resistanceIndex,
+  x,
+  y,
+  showReactions,
+}: {
+  bars: Bar[];
+  absoluteStart: number;
+  control: WeeklyControl;
+  supportIndex: number;
+  resistanceIndex: number;
+  x: (index: number) => number;
+  y: (value: number) => number;
+  showReactions: boolean;
+}) {
+  const lines = [
+    { index: resistanceIndex, label: "WEEKLY RESISTANCE", color: "#E67560" },
+    { index: supportIndex, label: "WEEKLY SUPPORT", color: "#8FD3C8" },
+  ];
+  const tolerance = control.zoneWidth ? control.zoneWidth / 2 : Math.max(0.5, control.spacing * 0.025);
+
+  return (
+    <g aria-label="Historically reconstructed weekly control gates">
+      {lines.map((line) => {
+        const points = bars.map((_, index) => `${x(index)},${y(gateValue(control, line.index, absoluteStart + index))}`).join(" ");
+        const firstValue = gateValue(control, line.index, absoluteStart);
+        const lastValue = gateValue(control, line.index, absoluteStart + bars.length - 1);
+        const bandPoints = control.zoneWidth
+          ? `${x(0)},${y(firstValue + tolerance)} ${x(bars.length - 1)},${y(lastValue + tolerance)} ${x(bars.length - 1)},${y(lastValue - tolerance)} ${x(0)},${y(firstValue - tolerance)}`
+          : null;
+        return (
+          <g key={`${line.label}-${line.index}`}>
+            {bandPoints && <polygon points={bandPoints} fill={line.color} opacity="0.08" />}
+            <polyline points={points} fill="none" stroke={line.color} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+            <text x={x(bars.length - 1) - 8} y={y(lastValue) - 8} textAnchor="end" fill={line.color} fontSize="10" fontWeight="800" fontFamily="ui-monospace, monospace">
+              {line.label}
+            </text>
+          </g>
+        );
+      })}
+      {showReactions && gateReactions(bars, absoluteStart, control, tolerance).map((reaction) => (
+        <g key={`${reaction.at}-${reaction.index}-${reaction.kind}`}>
+          <circle cx={x(reaction.localIndex)} cy={y(reaction.value)} r="4.5" fill={reaction.kind === "hold" ? "#8FD3C8" : reaction.kind === "reject" ? "#E67560" : "#D8C894"} stroke="#07090A" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+          <title>{reaction.label}</title>
+        </g>
+      ))}
+    </g>
+  );
+}
+
 function ReadLabel({
   label,
   className,
@@ -431,6 +582,39 @@ function ReadLabel({
     >
       {label}
     </p>
+  );
+}
+
+function LayerToggle({
+  label,
+  icon: Icon,
+  active,
+  disabled = false,
+  onClick,
+}: {
+  label: string;
+  icon: typeof Play;
+  active: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={active}
+      className={cn(
+        "flex min-h-10 items-center gap-2 border px-3 text-left font-mono text-[10px] font-bold uppercase tracking-[0.1em] transition-colors",
+        active
+          ? "border-lime/60 bg-lime/10 text-lime"
+          : "border-white/20 text-white/55 hover:border-white/40 hover:text-white",
+        disabled && "cursor-not-allowed opacity-35",
+      )}
+    >
+      <Icon size={14} aria-hidden="true" />
+      {label}
+    </button>
   );
 }
 
@@ -470,6 +654,81 @@ function Read({ label, value, suffix = "" }: { label: string; value?: number; su
       </span>
     </div>
   );
+}
+
+function gateValue(control: WeeklyControl, index: number, barIndex: number) {
+  return control.valueAtFirstBar + index * control.spacing - control.slopePerBar * barIndex;
+}
+
+function nearestWeeklyLevels(control: WeeklyControl, price: number, barIndex: number) {
+  const levels = control.gateIndices
+    .map((index) => ({ index, value: gateValue(control, index, barIndex) }))
+    .sort((a, b) => a.value - b.value);
+  const support = levels.filter((level) => level.value <= price).at(-1) ?? levels[0];
+  const resistance = levels.find((level) => level.value > price) ?? levels.at(-1)!;
+  return { support, resistance };
+}
+
+function weeklyDecisionRead(
+  bar: Bar,
+  support: number,
+  resistance: number,
+  control: WeeklyControl,
+) {
+  const tolerance = control.zoneWidth ? control.zoneWidth / 2 : Math.max(0.5, control.spacing * 0.025);
+  if (Math.abs(bar.c - resistance) <= tolerance || (bar.h >= resistance - tolerance && bar.c < resistance)) {
+    return "Testing weekly resistance";
+  }
+  if (Math.abs(bar.c - support) <= tolerance || (bar.l <= support + tolerance && bar.c > support)) {
+    return "Testing weekly support";
+  }
+  return "Between weekly gates";
+}
+
+function gateReactions(
+  bars: Bar[],
+  absoluteStart: number,
+  control: WeeklyControl,
+  tolerance: number,
+) {
+  const reactions: Array<{
+    at: string;
+    localIndex: number;
+    index: number;
+    value: number;
+    kind: "hold" | "reject" | "break";
+    label: string;
+  }> = [];
+  for (let localIndex = 1; localIndex < bars.length; localIndex += 1) {
+    const bar = bars[localIndex];
+    const previous = bars[localIndex - 1];
+    const candidates = control.gateIndices.flatMap((index) => {
+      const absoluteIndex = absoluteStart + localIndex;
+      const value = gateValue(control, index, absoluteIndex);
+      const previousValue = gateValue(control, index, absoluteIndex - 1);
+      const crossedUp = previous.c < previousValue && bar.c > value;
+      const crossedDown = previous.c > previousValue && bar.c < value;
+      const held = previous.c >= previousValue && bar.l <= value + tolerance && bar.c > value;
+      const rejected = previous.c <= previousValue && bar.h >= value - tolerance && bar.c < value;
+      if (!crossedUp && !crossedDown && !held && !rejected) return [];
+      const kind = crossedUp || crossedDown ? "break" as const : held ? "hold" as const : "reject" as const;
+      const label = crossedUp
+        ? "Closed above weekly gate; watch resistance become support"
+        : crossedDown
+          ? "Closed below weekly gate; watch support become resistance"
+          : held
+            ? "Weekly support held on the close"
+            : "Weekly resistance rejected on the close";
+      return [{ at: bar.t, localIndex, index, value, kind, label, distance: Math.abs(bar.c - value) }];
+    });
+    if (candidates.length) {
+      const closest = candidates.sort((a, b) => a.distance - b.distance)[0];
+      const prior = reactions.at(-1);
+      const repeatsCluster = prior && prior.index === closest.index && prior.kind === closest.kind && localIndex - prior.localIndex < 3;
+      if (!repeatsCluster) reactions.push(closest);
+    }
+  }
+  return reactions.slice(-18);
 }
 
 function time(value: string) {

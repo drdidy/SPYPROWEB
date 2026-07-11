@@ -42,6 +42,9 @@ test("Replay renders readable moving candlesticks for SPY and ES", async ({ page
   await page.goto("/replay?date=2026-04-29", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByRole("img", { name: /SPY candlestick replay chart/i })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("button", { name: "Weekly gates" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText("WEEKLY RESISTANCE", { exact: true })).toBeVisible();
+  await expect(page.getByText("WEEKLY SUPPORT", { exact: true })).toBeVisible();
   const slider = page.getByLabel("Replay position");
   const spyBefore = Number(await slider.inputValue());
   await page.getByRole("button", { name: "Play" }).click();
@@ -81,5 +84,34 @@ function buildReplayBars() {
     h: 7420 + Math.cos(index / 4) * 4 + index * 0.4 + 1.1,
     l: 7420 + Math.cos(index / 4) * 4 + index * 0.4 - 1.2,
   }));
-  return { date: "2026-04-29", spy, es };
+  const control = {
+    sourceDate: "2026-04-27",
+    sourceWindow: "12:00-14:00 CT",
+    anchorAt: "2026-04-27T17:00:00.000Z",
+    anchorPrice: 741.2,
+    slopePerHour: 0.12,
+    spacing: 3.4,
+    zoneWidth: 0.4,
+    valueAtFirstBar: 738.6,
+    slopePerBar: 0.01,
+    gateIndices: [-2, -1, 0, 1, 2],
+    method: "Completed Monday 12-2 CT high carried through the week",
+  };
+  return {
+    date: "2026-04-29",
+    spy,
+    es,
+    controls: {
+      spy: control,
+      es: {
+        ...control,
+        anchorPrice: 7442,
+        valueAtFirstBar: 7418,
+        slopePerHour: 1.04,
+        slopePerBar: 1.04 / 12,
+        spacing: 34,
+        zoneWidth: null,
+      },
+    },
+  };
 }

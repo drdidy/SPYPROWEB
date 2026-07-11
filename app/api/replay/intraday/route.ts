@@ -1,6 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 
+type Instrument = "SPY" | "ES";
 type Bar = { t: string; o: number; h: number; l: number; c: number; v?: number };
+type WeeklyControl = {
+  sourceDate: string;
+  sourceWindow: string;
+  anchorAt: string;
+  anchorPrice: number;
+  slopePerHour: number;
+  spacing: number;
+  zoneWidth: number | null;
+  valueAtFirstBar: number;
+  slopePerBar: number;
+  gateIndices: number[];
+  method: string;
+};
+
+const CT = "America/Chicago";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,19 +27,27 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "missing or invalid date" }, { status: 400 });
   }
 
+  const historyStart = addDays(date, -10);
+  const historyEnd = addDays(date, 1);
   const [massiveSpy, yahooSpy, yahooEs] = await Promise.all([
-    fetchMassiveBars("SPY", date),
-    fetchYahooBars("SPY", date),
-    fetchYahooBars("ES=F", date),
+    fetchMassiveBars("SPY", historyStart, historyEnd),
+    fetchYahooBars("SPY", historyStart, historyEnd),
+    fetchYahooBars("ES=F", historyStart, historyEnd),
   ]);
-  const spy = massiveSpy.length ? massiveSpy : yahooSpy;
-  const es = yahooEs;
+  const spyHistory = massiveSpy.length ? massiveSpy : yahooSpy;
+  const esHistory = yahooEs;
+  const spy = sessionBars(spyHistory, date, "SPY");
+  const es = sessionBars(esHistory, date, "ES");
 
   return NextResponse.json(
     {
       date,
       spy,
       es,
+      controls: {
+        spy: reconstructWeeklyControl(spyHistory, spy, date, "SPY"),
+        es: reconstructWeeklyControl(esHistory, es, date, "ES"),
+      },
       source: {
         spy: massiveSpy.length ? "massive" : yahooSpy.length ? "yahoo" : "unavailable",
         es: yahooEs.length ? "yahoo" : "unavailable",
@@ -36,29 +60,30 @@ export async function GET(request: NextRequest) {
   );
 }
 
-async function fetchMassiveBars(symbol: string, date: string): Promise<Bar[]> {
+async function fetchMassiveBars(symbol: string, start: string, end: string): Promise<Bar[]> {
   const key = process.env.MASSIVE_API_KEY?.trim() || process.env.POLYGON_API_KEY?.trim();
   if (!key) return [];
-  const url = new URL(`https://api.massive.com/v2/aggs/ticker/${encodeURIComponent(symbol)}/range/5/minute/${date}/${date}`);
+  const url = new URL(`https://api.massive.com/v2/aggs/ticker/${encodeURIComponent(symbol)}/range/5/minute/${start}/${end}`);
   url.searchParams.set("adjusted", "true");
   url.searchParams.set("sort", "asc");
-  url.searchParams.set("limit", "5000");
+  url.searchParams.set("limit", "50000");
   url.searchParams.set("apiKey", key);
   try {
     const response = await timedFetch(url);
     if (!response.ok) return [];
     const payload = (await response.json()) as { results?: Array<Record<string, unknown>> };
-    return sanitizeProviderBars(payload.results ?? [], date, "SPY");
+    return sanitizeProviderBars(payload.results ?? [], start, end);
   } catch {
     return [];
   }
 }
 
-async function fetchYahooBars(symbol: string, date: string): Promise<Bar[]> {
-  const center = Date.parse(`${date}T12:00:00Z`);
+async function fetchYahooBars(symbol: string, start: string, end: string): Promise<Bar[]> {
+  const from = Date.parse(`${start}T00:00:00Z`) - 24 * 60 * 60 * 1000;
+  const through = Date.parse(`${end}T00:00:00Z`) + 2 * 24 * 60 * 60 * 1000;
   const url = new URL(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`);
-  url.searchParams.set("period1", String(Math.floor((center - 36 * 60 * 60 * 1000) / 1000)));
-  url.searchParams.set("period2", String(Math.floor((center + 36 * 60 * 60 * 1000) / 1000)));
+  url.searchParams.set("period1", String(Math.floor(from / 1000)));
+  url.searchParams.set("period2", String(Math.floor(through / 1000)));
   url.searchParams.set("interval", "5m");
   url.searchParams.set("includePrePost", "true");
   url.searchParams.set("events", "div,splits");
@@ -79,35 +104,130 @@ async function fetchYahooBars(symbol: string, date: string): Promise<Bar[]> {
       c: quote.close?.[index],
       v: quote.volume?.[index],
     }));
-    return sanitizeProviderBars(rows, date, symbol === "SPY" ? "SPY" : "ES");
+    return sanitizeProviderBars(rows, start, end);
   } catch {
     return [];
   }
 }
 
-function sanitizeProviderBars(rows: Array<Record<string, unknown>>, date: string, instrument: "SPY" | "ES"): Bar[] {
-  return rows.flatMap((row) => {
+function sanitizeProviderBars(rows: Array<Record<string, unknown>>, start: string, end: string): Bar[] {
+  const deduped = new Map<number, Bar>();
+  for (const row of rows) {
     const stamp = number(row.t);
     const o = number(row.o);
     const h = number(row.h);
     const l = number(row.l);
     const c = number(row.c);
     const v = number(row.v);
-    if (stamp === null || o === null || h === null || l === null || c === null) return [];
-    const parts = chicagoParts(new Date(stamp));
-    if (parts.date !== date) return [];
+    if (
+      stamp === null || o === null || h === null || l === null || c === null ||
+      o <= 0 || h <= 0 || l <= 0 || c <= 0 || h < l
+    ) continue;
+    const date = chicagoParts(new Date(stamp)).date;
+    if (date < start || date > end) continue;
+    deduped.set(stamp, { t: new Date(stamp).toISOString(), o, h, l, c, ...(v === null ? {} : { v }) });
+  }
+  return [...deduped.values()].sort((a, b) => Date.parse(a.t) - Date.parse(b.t));
+}
+
+function sessionBars(history: Bar[], date: string, instrument: Instrument): Bar[] {
+  const priorDate = addDays(date, -1);
+  return history.filter((bar) => {
+    const parts = chicagoParts(new Date(bar.t));
     const minute = parts.hour * 60 + parts.minute;
-    const inWindow = instrument === "SPY"
-      ? minute >= 3 * 60 && minute <= 15 * 60
-      : minute >= 0 && minute <= 15 * 60;
-    if (!inWindow) return [];
-    return [{ t: new Date(stamp).toISOString(), o, h, l, c, ...(v === null ? {} : { v }) }];
-  }).sort((a, b) => Date.parse(a.t) - Date.parse(b.t));
+    if (instrument === "SPY") {
+      return parts.date === date && minute >= 3 * 60 && minute <= 15 * 60;
+    }
+    return (parts.date === priorDate && minute >= 17 * 60) || (parts.date === date && minute <= 15 * 60);
+  });
+}
+
+function reconstructWeeklyControl(
+  history: Bar[],
+  targetBars: Bar[],
+  date: string,
+  instrument: Instrument,
+): WeeklyControl | null {
+  if (!history.length || !targetBars.length) return null;
+  const monday = weekMonday(date);
+  const weekday = isoWeekday(date);
+  const preferred = weekday >= 2 ? monday : addDays(monday, -3);
+  const anchor = findAnchor(history, preferred, date);
+  if (!anchor) return null;
+
+  const slopePerHour = instrument === "SPY" ? 0.12 : 1.04;
+  const spacing = instrument === "SPY" ? 3.4 : 34;
+  const zoneWidth = instrument === "SPY" ? 0.4 : null;
+  const slopePerBar = slopePerHour * (5 / 60);
+  const firstStamp = Date.parse(targetBars[0].t);
+  const clockBars = history.filter((bar) => {
+    const stamp = Date.parse(bar.t);
+    return stamp > anchor.stamp && stamp <= firstStamp && isTradingClockBar(bar, instrument);
+  }).length;
+  const valueAtFirstBar = anchor.bar.h - slopePerBar * clockBars;
+  const middleIndex = Math.floor(targetBars.length / 2);
+  const controlAtMiddle = valueAtFirstBar - slopePerBar * middleIndex;
+  const sessionMiddle = (Math.min(...targetBars.map((bar) => bar.l)) + Math.max(...targetBars.map((bar) => bar.h))) / 2;
+  const centerIndex = Math.round((sessionMiddle - controlAtMiddle) / spacing);
+
+  return {
+    sourceDate: anchor.date,
+    sourceWindow: "12:00-14:00 CT",
+    anchorAt: anchor.bar.t,
+    anchorPrice: round(anchor.bar.h),
+    slopePerHour,
+    spacing,
+    zoneWidth,
+    valueAtFirstBar: round(valueAtFirstBar, 4),
+    slopePerBar: round(slopePerBar, 6),
+    gateIndices: Array.from({ length: 5 }, (_, index) => centerIndex + index - 2),
+    method: weekday >= 2 && anchor.date === monday
+      ? "Completed Monday 12-2 CT high carried through the week"
+      : "Latest completed 12-2 CT high used until Monday control is available",
+  };
+}
+
+function findAnchor(history: Bar[], preferred: string, targetDate: string) {
+  const candidates = [preferred, ...Array.from({ length: 7 }, (_, index) => addDays(preferred, -(index + 1)))];
+  for (const candidate of candidates) {
+    if (candidate >= targetDate && candidate !== preferred) continue;
+    const window = history.filter((bar) => {
+      const parts = chicagoParts(new Date(bar.t));
+      const minute = parts.hour * 60 + parts.minute;
+      return parts.date === candidate && minute >= 12 * 60 && minute < 14 * 60;
+    });
+    if (!window.length) continue;
+    const bar = window.reduce((highest, current) => current.h > highest.h ? current : highest);
+    return { date: candidate, bar, stamp: Date.parse(bar.t) };
+  }
+  return null;
+}
+
+function isTradingClockBar(bar: Bar, instrument: Instrument) {
+  const parts = chicagoParts(new Date(bar.t));
+  const minute = parts.hour * 60 + parts.minute;
+  if (instrument === "SPY") return minute >= 3 * 60 && minute < 19 * 60;
+  return minute < 16 * 60 || minute >= 17 * 60;
+}
+
+function weekMonday(date: string) {
+  return addDays(date, 1 - isoWeekday(date));
+}
+
+function isoWeekday(date: string) {
+  const day = new Date(`${date}T12:00:00Z`).getUTCDay();
+  return day === 0 ? 7 : day;
+}
+
+function addDays(date: string, days: number) {
+  const value = new Date(`${date}T12:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
 }
 
 function chicagoParts(value: Date) {
   const pieces = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Chicago",
+    timeZone: CT,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -121,6 +241,11 @@ function chicagoParts(value: Date) {
     hour: Number(part("hour")),
     minute: Number(part("minute")),
   };
+}
+
+function round(value: number, precision = 2) {
+  const factor = 10 ** precision;
+  return Math.round(value * factor) / factor;
 }
 
 function number(value: unknown): number | null {
