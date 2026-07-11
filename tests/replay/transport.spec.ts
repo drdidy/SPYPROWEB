@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("Replay has independent moving transports for SPY and ES", async ({ page }) => {
+test("Replay renders readable moving candlesticks for SPY and ES", async ({ page }) => {
   const replayBars = buildReplayBars();
   await page.addInitScript((payload) => {
     const originalFetch = window.fetch.bind(window);
@@ -41,28 +41,23 @@ test("Replay has independent moving transports for SPY and ES", async ({ page })
 
   await page.goto("/replay?date=2026-04-29", { waitUntil: "domcontentloaded" });
 
-  const spyChart = page.getByTestId("spy-replay-chart");
-  const esChart = page.getByTestId("es-replay-chart");
-  await expect(spyChart).toBeVisible({ timeout: 20_000 });
-  await expect(esChart).toBeVisible({ timeout: 20_000 });
-
-  const spySlider = page.getByLabel(/SPY .* replay timeline/i);
-  const esSlider = page.getByLabel(/ES .* replay timeline/i);
-
-  const spyBefore = Number(await spySlider.inputValue());
-  await page.getByTestId("spy-replay-play").click();
-  await expect(page.getByTestId("spy-replay-play")).toHaveText(/Pause SPY/i);
+  await expect(page.getByRole("img", { name: /SPY candlestick replay chart/i })).toBeVisible({ timeout: 20_000 });
+  const slider = page.getByLabel("Replay position");
+  const spyBefore = Number(await slider.inputValue());
+  await page.getByRole("button", { name: "Play" }).click();
+  await expect(page.getByRole("button", { name: "Pause" })).toBeVisible();
   await page.waitForTimeout(900);
-  await page.getByTestId("spy-replay-play").click();
-  const spyAfter = Number(await spySlider.inputValue());
+  await page.getByRole("button", { name: "Pause" }).click();
+  const spyAfter = Number(await slider.inputValue());
   expect(spyAfter).toBeGreaterThan(spyBefore);
 
-  const esBefore = Number(await esSlider.inputValue());
-  await page.getByTestId("es-replay-play").click();
-  await expect(page.getByTestId("es-replay-play")).toHaveText(/Pause ES/i);
+  await page.getByRole("button", { name: "ES", exact: true }).click();
+  await expect(page.getByRole("img", { name: /ES candlestick replay chart/i })).toBeVisible();
+  const esBefore = Number(await slider.inputValue());
+  await page.getByRole("button", { name: "Play" }).click();
   await page.waitForTimeout(900);
-  await page.getByTestId("es-replay-play").click();
-  const esAfter = Number(await esSlider.inputValue());
+  await page.getByRole("button", { name: "Pause" }).click();
+  const esAfter = Number(await slider.inputValue());
   expect(esAfter).toBeGreaterThan(esBefore);
 });
 
