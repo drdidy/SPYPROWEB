@@ -1,8 +1,11 @@
 "use client";
 
-import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
+import { AnimatePresence, motion, useInView, useReducedMotion } from "framer-motion";
+import { Pause, Play } from "lucide-react";
 import Image from "next/image";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+
+const FRAME_DURATION_MS = 8500;
 
 const frames = [
   {
@@ -33,62 +36,105 @@ const frames = [
 
 export function MarketDepthJourney() {
   const section = useRef<HTMLElement>(null);
-  const reduced = useReducedMotion();
-  const { scrollYProgress } = useScroll({ target: section, offset: ["start start", "end end"] });
-  const journeyWidth = useTransform(scrollYProgress, [0, 1], ["0%", "100%"]);
+  const inView = useInView(section, { amount: 0.45 });
+  const reduced = Boolean(useReducedMotion());
+  const [active, setActive] = useState(0);
+  const [playing, setPlaying] = useState(true);
+
+  useEffect(() => {
+    if (!inView || !playing || reduced) return;
+    const timer = window.setInterval(() => {
+      setActive((current) => (current + 1) % frames.length);
+    }, FRAME_DURATION_MS);
+    return () => window.clearInterval(timer);
+  }, [inView, playing, reduced]);
+
+  const frame = frames[active];
 
   return (
-    <section ref={section} className="relative h-[420svh] border-b border-white/15 bg-carbon text-white">
-      <div className="sticky top-0 h-svh overflow-hidden">
-        {frames.map((frame, index) => (
-          <DepthFrame key={frame.src} frame={frame} index={index} progress={scrollYProgress} reduced={Boolean(reduced)} />
-        ))}
-        <div className="absolute inset-x-0 bottom-0 z-20 flex items-center gap-3 border-t border-white/20 bg-carbon/65 px-5 py-4 backdrop-blur-md md:px-9">
-          <span className="microlabel text-mineral">Scroll to look inside the market</span>
-          <div className="h-px flex-1 bg-white/20" />
-          <motion.span className="h-1.5 bg-mineral" style={{ width: journeyWidth }} />
+    <section ref={section} className="relative h-svh min-h-[640px] overflow-hidden border-b border-white/15 bg-carbon text-white">
+      {frames.map((item, index) => {
+        const visible = index === active;
+        return (
+          <motion.div
+            key={item.src}
+            className="absolute -inset-[5%]"
+            initial={false}
+            animate={{ opacity: visible ? 1 : 0, scale: visible && !reduced ? 1.15 : 1.02 }}
+            transition={{
+              opacity: { duration: reduced ? 0 : 2.4, ease: "easeInOut" },
+              scale: { duration: reduced ? 0 : 10.5, ease: "linear" },
+            }}
+            aria-hidden="true"
+          >
+            <Image
+              src={item.src}
+              alt=""
+              fill
+              priority={index < 2}
+              className="object-cover object-center"
+              sizes="100vw"
+            />
+          </motion.div>
+        );
+      })}
+
+      <div className="absolute inset-0 bg-gradient-to-r from-carbon/88 via-carbon/48 to-carbon/10" />
+      <div className="absolute inset-0 bg-gradient-to-t from-carbon/75 via-transparent to-carbon/20" />
+
+      <div className="relative z-10 flex h-full items-end px-5 pb-28 md:px-9 md:pb-32">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={frame.src}
+            className="max-w-[780px] border-l border-mineral/70 pl-5 md:pl-7"
+            initial={reduced ? false : { opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduced ? undefined : { opacity: 0, y: -18 }}
+            transition={{ duration: reduced ? 0 : 1.2, ease: "easeOut" }}
+            aria-live="polite"
+          >
+            <p className="microlabel text-mineral">0{active + 1} / {frame.eyebrow}</p>
+            <h2 className="mt-5 text-[42px] font-black leading-[0.9] tracking-normal md:text-[70px] xl:text-[88px]">{frame.title}</h2>
+            <p className="mt-5 max-w-[620px] text-[14px] font-semibold leading-relaxed text-white/75 md:text-[16px]">{frame.body}</p>
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      <div className="absolute inset-x-0 bottom-0 z-20 flex items-center gap-4 border-t border-white/20 bg-carbon/65 px-5 py-4 backdrop-blur-md md:px-9">
+        <span className="microlabel hidden text-mineral sm:block">Inside the market</span>
+        <div className="flex flex-1 items-center gap-2" aria-label="Cinematic scenes">
+          {frames.map((item, index) => (
+            <button
+              key={item.src}
+              type="button"
+              onClick={() => setActive(index)}
+              className="group relative h-7 flex-1"
+              aria-label={`Show scene ${index + 1}: ${item.eyebrow}`}
+              aria-current={index === active ? "step" : undefined}
+            >
+              <span className="absolute inset-x-0 top-1/2 h-px bg-white/25 transition-colors group-hover:bg-white/60" />
+              {index === active && (
+                <motion.span
+                  key={`${active}-${playing}-${inView}`}
+                  className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 bg-mineral"
+                  initial={{ scaleX: 0, transformOrigin: "left" }}
+                  animate={{ scaleX: playing && inView && !reduced ? 1 : 0.15 }}
+                  transition={{ duration: playing && inView && !reduced ? FRAME_DURATION_MS / 1000 : 0.3, ease: "linear" }}
+                />
+              )}
+            </button>
+          ))}
         </div>
+        <button
+          type="button"
+          onClick={() => setPlaying((current) => !current)}
+          className="grid size-10 shrink-0 place-items-center border border-white/30 text-white transition-colors hover:border-mineral hover:text-mineral"
+          aria-label={playing ? "Pause cinematic sequence" : "Play cinematic sequence"}
+          title={playing ? "Pause" : "Play"}
+        >
+          {playing ? <Pause size={15} aria-hidden="true" /> : <Play size={15} aria-hidden="true" />}
+        </button>
       </div>
     </section>
-  );
-}
-
-function DepthFrame({
-  frame,
-  index,
-  progress,
-  reduced,
-}: {
-  frame: (typeof frames)[number];
-  index: number;
-  progress: ReturnType<typeof useScroll>["scrollYProgress"];
-  reduced: boolean;
-}) {
-  const start = index * 0.25;
-  const center = start + 0.125;
-  const end = start + 0.25;
-  const opacity = useTransform(
-    progress,
-    index === 0 ? [0, center, end] : [Math.max(0, start - 0.035), start, center, end],
-    index === 0 ? [1, 1, 0] : [0, 1, 1, index === frames.length - 1 ? 1 : 0],
-  );
-  const scale = useTransform(progress, [start, end], reduced ? [1, 1] : [1, 1.24]);
-  const copyY = useTransform(progress, [start, center, end], reduced ? [0, 0, 0] : [30, 0, -24]);
-
-  return (
-    <motion.div className="absolute inset-0" style={{ opacity }}>
-      <motion.div className="absolute -inset-[5%]" style={{ scale }}>
-        <Image src={frame.src} alt="" fill priority={index === 0} className="object-cover object-center" sizes="100vw" />
-      </motion.div>
-      <div className="absolute inset-0 bg-gradient-to-r from-carbon/88 via-carbon/48 to-carbon/10" />
-      <div className="absolute inset-0 bg-gradient-to-t from-carbon/70 via-transparent to-carbon/20" />
-      <motion.div className="relative z-10 flex h-full items-end px-5 pb-24 md:px-9 md:pb-28" style={{ y: copyY }}>
-        <div className="max-w-[780px] border-l border-mineral/70 pl-5 md:pl-7">
-          <p className="microlabel text-mineral">0{index + 1} / {frame.eyebrow}</p>
-          <h2 className="mt-5 text-[42px] font-black leading-[0.9] tracking-normal md:text-[70px] xl:text-[88px]">{frame.title}</h2>
-          <p className="mt-5 max-w-[620px] text-[14px] font-semibold leading-relaxed text-white/75 md:text-[16px]">{frame.body}</p>
-        </div>
-      </motion.div>
-    </motion.div>
   );
 }
