@@ -53,10 +53,10 @@ function Pivot({ p }: { p: Pivot }) {
           {p.price.toFixed(2)}
         </div>
         <div className="text-[11px] text-ink-2 mt-0.5">
-          {p.source} · {p.candleColor.toLowerCase()} candle
+          {isHigh ? "Upper anchor" : "Lower anchor"} - {p.candleColor.toLowerCase()} candle
           {p.fallbackUsed && (
             <span className="ml-2 text-[10px] font-mono text-gold-ink uppercase tracking-[0.10em]">
-              fallback
+              backup
             </span>
           )}
         </div>

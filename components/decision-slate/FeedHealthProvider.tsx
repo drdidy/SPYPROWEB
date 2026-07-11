@@ -230,7 +230,7 @@ export function DegradedModeBanner({ className }: { className?: string }) {
         className,
       )}
     >
-      {names} feed {failed.length === 1 ? "is" : "are"} unavailable. We are
+      {names} {failed.length === 1 ? "read is" : "reads are"} unavailable. We are
       waiting for the next update{eta ? ` around ${formatTime(eta)}` : ""}.
       Other slate panels remain available.
     </div>

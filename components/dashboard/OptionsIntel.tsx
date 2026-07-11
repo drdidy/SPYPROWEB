@@ -33,8 +33,8 @@ export function OptionsIntelPanel({
     return (
       <Card>
         <CardHeader
-          eyebrow="Options Intelligence"
-          title="Dealer & flow"
+          eyebrow="Execution Lens"
+          title="Option ticket waiting"
           action={
             <>
               {healthAction}
@@ -45,20 +45,20 @@ export function OptionsIntelPanel({
         <CardBody className="space-y-4 py-8">
           <div>
             <div className="font-serif text-headline text-ink-3 italic font-light">
-              Options chain not yet loaded.
+              Waiting for a tradable chain.
             </div>
             <p className="mt-2 text-[13px] text-ink-3 leading-relaxed max-w-xl">
-              The current expiration has not returned a complete strike ladder yet.
-              The panel is paused instead of fabricating dealer, flow, or entry-cost values.
+              The engine read stays primary. Once the chain is available, this
+              lens translates the read into a contract and entry-cost estimate.
             </p>
           </div>
           <div className="grid gap-2 sm:grid-cols-3">
             <EmptyChainStat
-              label="Live chain"
-              value={chainStatus === "loaded" ? "Partial" : "Waiting"}
+              label="Lens"
+              value={chainStatus === "loaded" ? "Ready" : "Waiting"}
             />
-            <EmptyChainStat label="Contract model" value={projection ? "Available" : "Pending"} />
-            <EmptyChainStat label="Retry cadence" value="Manual + clock" />
+            <EmptyChainStat label="Decision path" value="Engine first" />
+            <EmptyChainStat label="Focus" value="Execution" />
           </div>
           {projection && <ContractProjectionCard projection={projection} />}
           <div className="flex flex-wrap items-center gap-3 pt-2">
@@ -69,10 +69,10 @@ export function OptionsIntelPanel({
               onClick={() => window.location.reload()}
             >
               <RefreshCw size={13} strokeWidth={1.75} />
-              Retry chain
+              Refresh page
             </Button>
             <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-3">
-              Next automatic refresh follows the session clock
+              Execution lens waits for measured chain data
             </span>
           </div>
         </CardBody>
@@ -95,9 +95,9 @@ export function OptionsIntelPanel({
 
   return (
     <Card>
-      <CardHeader
-        eyebrow="Options Intelligence"
-        title="Dealer & flow"
+        <CardHeader
+          eyebrow="Execution Lens"
+          title="Options execution lens"
         action={
           <>
             {healthAction}

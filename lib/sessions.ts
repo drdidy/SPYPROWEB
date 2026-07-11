@@ -45,7 +45,8 @@ export interface SessionInfo {
   nextSignificantEvent: { label: string; at: Date };
 }
 
-// 2026 NYSE full-day holidays. TODO: replace with calendar API.
+// 2026 NYSE full-day holidays. Replace with a calendar API when the
+// app moves beyond the launch-year schedule.
 const HOLIDAYS_2026: ReadonlySet<string> = new Set([
   "2026-01-01", // New Year's Day
   "2026-01-19", // MLK Jr Day

@@ -22,7 +22,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from . import prophet_core as pc
-from . import tastytrade
+from . import schwab
 
 BASE = "https://api.unusualwhales.com/api"
 CT = ZoneInfo("America/Chicago")
@@ -271,7 +271,7 @@ def _broker_contract(row: dict) -> dict:
 
 
 def _chain_from_broker(ticker: str, session_date: str, require_expiration: str | None = None) -> dict | None:
-    chain = tastytrade.fetch_chain_snapshot(ticker, underlying_price=None, span=None)
+    chain = schwab.fetch_chain_snapshot(ticker, underlying_price=None, span=None)
     if not chain:
         return None
     expiration = chain.get("expiration")

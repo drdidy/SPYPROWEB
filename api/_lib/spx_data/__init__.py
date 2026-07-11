@@ -9,7 +9,7 @@ Quick start:
     from datetime import datetime
     from zoneinfo import ZoneInfo
 
-    fetcher = build_default_fetcher()    # tastytrade -> yfinance fallback
+    fetcher = build_default_fetcher()    # schwab -> yfinance fallback
     snap = build_snapshot_from_fetcher(
         fetcher,
         as_of=datetime.now(ZoneInfo("America/Chicago")),
@@ -36,6 +36,7 @@ from ..spx import compute_snapshot
 
 from .fallback import CompositeFetcher
 from .protocol import Fetcher, FetcherUnavailable, SyncQuote
+from .schwab_backend import SchwabFetcher
 from .tastytrade_backend import TastytradeFetcher
 from .yfinance_backend import YFinanceFetcher
 
@@ -44,6 +45,7 @@ __all__ = [
     "Fetcher",
     "FetcherUnavailable",
     "SyncQuote",
+    "SchwabFetcher",
     "TastytradeFetcher",
     "YFinanceFetcher",
     "build_default_fetcher",
@@ -52,14 +54,14 @@ __all__ = [
 
 
 def build_default_fetcher() -> Fetcher:
-    """Tastytrade primary, yfinance secondary.
+    """Schwab primary, yfinance secondary.
 
-    Tastytrade falls back gracefully (raises FetcherUnavailable) when
+    Schwab falls back gracefully (raises FetcherUnavailable) when
     env vars aren't configured, so this is safe to call on a fresh
     checkout — yfinance will serve every request until you wire the
     broker.
     """
-    return CompositeFetcher(primary=TastytradeFetcher(), secondary=YFinanceFetcher())
+    return CompositeFetcher(primary=SchwabFetcher(), secondary=YFinanceFetcher())
 
 
 def build_snapshot_from_fetcher(

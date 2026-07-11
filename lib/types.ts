@@ -7,6 +7,9 @@ export type LineKind =
   | "LD"
   | "ANC_ASC"
   | "ANC_DESC"
+  | "CONTROL"
+  | "NORTH_GATE"
+  | "SOUTH_GATE"
   | "PDH"
   | "PDL"
   | "DAY_OPEN";
@@ -199,11 +202,159 @@ export interface SPXLine {
   name: string; // e.g. "Channel Ceiling"
   anchorPrice: number;
   anchorTime: string;
-  slopePerHour: number; // +1.04 or -1.04
+  slopePerHour: number;
   currentValue: number; // projected to as-of
   entryValue?: number | null; // projected to the 08:00 CT operating reference
   entryReferenceTime?: string | null;
   distanceFromPrice: number; // signed
+}
+
+export interface SPXDeviationFanLine {
+  index: number;
+  label: string;
+  value: number;
+  currentValue: number;
+  openValue: number;
+  distanceFromPrice: number;
+  isMain: boolean;
+}
+
+export interface SPXDeviationFanBias {
+  direction: "BULLISH" | "BEARISH" | "NEUTRAL" | "PENDING";
+  openPrice: number | null;
+  mainValue: number;
+  distanceFromMain: number | null;
+  note: string;
+}
+
+export interface SPXDeviationFanSignal {
+  side: "BUY" | "SELL";
+  windowKey: "SETUP" | "PRIMARY" | "EXTENSION" | "CLOSED";
+  windowLabel: string;
+  lineIndex: number;
+  lineLabel: string;
+  lineValue: number;
+  candleTime: string;
+  nextCandleTime: string;
+  close: number;
+  note: string;
+}
+
+export interface SPXDeviationEntryWindow {
+  key: "SETUP" | "PRIMARY" | "EXTENSION" | "CLOSED";
+  label: string;
+  start: string;
+  end: string;
+  status: "UPCOMING" | "ACTIVE" | "CLOSED";
+  guidance: string;
+}
+
+export interface SPXDeviationZone {
+  label: string;
+  posture: string;
+  lowerLine: string | null;
+  upperLine: string | null;
+  callEntryLine?: string | null;
+  callEntryValue?: number | null;
+  putEntryLine?: string | null;
+  putEntryValue?: number | null;
+  roomRead?: string | null;
+  brokenGateLine?: string | null;
+  brokenGateValue?: number | null;
+  brokenGateRole?: "RESISTANCE" | "SUPPORT" | null;
+  brokenGateNote?: string | null;
+  nextReference: string;
+  distanceToNext: number;
+  guidance: string;
+}
+
+export interface SPXDeviationHourlyClose {
+  hour: number;
+  label: string;
+  time: string;
+  close: number;
+}
+
+export interface SPXDescendingDeviationFan {
+  anchor: SPXAnchor;
+  slopePerHour: number;
+  spacing: number;
+  windowStart: string;
+  entryReferenceTime: string;
+  windowEnd: string;
+  extensionEnd: string;
+  entryMain: number;
+  currentMain: number;
+  openMain: number;
+  openBias: SPXDeviationFanBias;
+  zone: SPXDeviationZone;
+  activeWindow: SPXDeviationEntryWindow;
+  entryWindows: SPXDeviationEntryWindow[];
+  hourlyCloses: SPXDeviationHourlyClose[];
+  nearestLine: SPXDeviationFanLine;
+  lines: SPXDeviationFanLine[];
+  recentSignals: SPXDeviationFanSignal[];
+}
+
+export type SPXControlTradeStatus =
+  | "WAITING"
+  | "ARMED"
+  | "TRIGGERED"
+  | "CLOSED"
+  | "NO_CASH_SESSION";
+
+export type SPXControlMapId = "DESCENDING_CLOSE" | "ASCENDING_LOW";
+
+export interface SPXControlPlanMap {
+  id: SPXControlMapId;
+  label: string;
+  direction: "DESCENDING" | "ASCENDING";
+  anchor: SPXAnchor;
+  slopePerHour: number;
+  controlValue: number;
+  armDistance: number;
+  distanceFromOpen: number | null;
+  status: "ARMED" | "DISTANT" | "PENDING";
+}
+
+export interface SPXControlPlanSetup {
+  side: "BUY" | "SELL";
+  contractType: "CALL" | "PUT";
+  mapId: SPXControlMapId;
+  mapLabel: string;
+  entryLine: SPXLineKind;
+  entryLineLabel: string;
+  lineValue: number;
+  entryPrice: number;
+  targetPrice: number;
+  targetDistance: number;
+  status: "WATCHING" | "TRIGGERED" | "CHASING";
+  thesis: string;
+}
+
+export interface SPXControlPlanSignal extends SPXControlPlanSetup {
+  signalTime: string;
+  entryTime: string;
+  signalOpen: number;
+  signalHigh: number;
+  signalLow: number;
+  signalClose: number;
+  note: string;
+}
+
+export interface SPXControlTradePlan {
+  status: SPXControlTradeStatus;
+  label: string;
+  entryReferenceTime: string;
+  signalWindowStart: string;
+  signalWindowEnd: string;
+  targetDistance: number;
+  primaryMap: SPXControlPlanMap;
+  oppositeMap: SPXControlPlanMap;
+  activeTrade: SPXControlPlanSignal | null;
+  setups: SPXControlPlanSetup[];
+  signals: SPXControlPlanSignal[];
+  guidance: string;
 }
 
 export interface SPXTrade {
@@ -272,6 +423,30 @@ export interface SPXSnapshotMeta {
   esSpot: number;
   quoteCapturedAt: string;
   asOf: string;
+}
+
+export interface SPXReplayBlock {
+  isReplay: boolean;
+  date: string | null;
+  session: {
+    open: number;
+    close: number;
+    netPts: number;
+  } | null;
+  verdictOutcome: "WIN" | "LOSS" | "PUSH" | "N_A" | null;
+  verdictPnl: number | null;
+  entry?: {
+    time?: string | null;
+    price?: number | null;
+    side?: "BUY" | "SELL" | string | null;
+    line?: SPXLineKind | string | null;
+    rule?: string | null;
+  } | null;
+  exit?: {
+    time?: string | null;
+    price?: number | null;
+    rule?: string | null;
+  } | null;
 }
 
 export interface SPXSnapshot {
@@ -351,7 +526,7 @@ export interface SPXSnapshot {
     go: [number, number];
   };
   rthBias?: {
-    direction: "BULLISH" | "BEARISH" | "PENDING";
+    direction: "BULLISH" | "BEARISH" | "NEUTRAL" | "PENDING";
     openPrice: number | null;
     referenceLine: SPXLineKind | null;
     referenceValue: number | null;
@@ -359,4 +534,7 @@ export interface SPXSnapshot {
     continuationValue: number | null;
     note: string;
   } | null;
+  descendingDeviationFan?: SPXDescendingDeviationFan | null;
+  controlTradePlan?: SPXControlTradePlan | null;
+  replay?: SPXReplayBlock | null;
 }

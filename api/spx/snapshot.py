@@ -34,6 +34,7 @@ if str(_API_ROOT) not in sys.path:
 
 from _lib.spx_data import build_default_fetcher, build_snapshot_with_provenance  # noqa: E402
 from _lib.spx.time_utils import hours_between  # noqa: E402
+from _lib.options_chains import effective_chain_date  # noqa: E402
 
 CT = ZoneInfo("America/Chicago")
 SNAPSHOT_TTL = float(os.environ.get("SPX_SNAPSHOT_TTL", "30"))
@@ -58,6 +59,13 @@ def _resolve_offset_override() -> float | None:
         return float(raw.strip())
     except (TypeError, ValueError):
         return None
+
+
+def _resolve_control_mode() -> str:
+    raw = os.environ.get("ES_CONTROL_MAP_MODE", "").strip().lower()
+    if raw in {"dealer_pressure", "gamma_flip", "dealer_selling"}:
+        return "dealer_pressure"
+    return "normal"
 
 
 # ---------------------------------------------------------------------------
@@ -92,6 +100,8 @@ def _build_payload(replay_date: date | None = None) -> dict:
         fetcher,
         as_of,
         offset_override=offset_override,
+        expiration=date.fromisoformat(effective_chain_date(as_of)),
+        control_mode=_resolve_control_mode(),
     )
     payload = snap.model_dump(by_alias=True)
     payload["_meta"] = _public_meta(meta)
@@ -113,6 +123,8 @@ def _public_meta(meta: dict) -> dict:
             return value
         text = value
         replacements = {
+            "schwab_quote": "primary_quote",
+            "schwab": "primary",
             "tastytrade_quote": "primary_quote",
             "tastytrade": "primary",
             "yfinance": "fallback",
@@ -206,6 +218,8 @@ def _build_spx_replay_block(payload: dict, replay_date: date | None) -> dict:
 
     block["verdictOutcome"] = replay_result["outcome"]
     block["verdictPnl"] = replay_result["pnl"]
+    block["entry"] = replay_result.get("entry")
+    block["exit"] = replay_result.get("exit")
     return block
 
 
@@ -241,6 +255,7 @@ def _grade_replay_from_rail_tag(payload: dict, replay_date: date, offset: float)
                 "side": side,
                 "entry": entry_value,
                 "distance": abs(float(bar["open"]) - entry_value),
+                "line": str(line.get("kind") or ""),
             })
         if not triggers:
             continue
@@ -251,7 +266,22 @@ def _grade_replay_from_rail_tag(payload: dict, replay_date: date, offset: float)
         side = trigger["side"]
         pnl = close_price - entry_price if side == "BUY" else entry_price - close_price
         outcome = "WIN" if pnl > 0 else ("LOSS" if pnl < 0 else "PUSH")
-        return {"outcome": outcome, "pnl": round(pnl, 2)}
+        return {
+            "outcome": outcome,
+            "pnl": round(pnl, 2),
+            "entry": {
+                "time": t.isoformat(),
+                "price": round(entry_price, 2),
+                "side": side,
+                "line": trigger.get("line") or None,
+                "rule": "ES_DEVIATION_REJECTION",
+            },
+            "exit": {
+                "time": t.isoformat(),
+                "price": round(close_price, 2),
+                "rule": "HOURLY_CLOSE",
+            },
+        }
 
     return None
 

@@ -6,12 +6,12 @@ import "./globals.css";
 const SITE_URL = "https://www.spyprophet.app";
 const SITE_NAME = "SPY Prophet";
 const SITE_DESC =
-  "A decision workspace for serious retail traders. Read the day before the day reads you. Same routine every morning. A workspace, not a feed.";
+  "A live SPY and SPX trading command system connecting market structure, 1-minute confirmation, SPXW contract selection, alerts, and replay.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: `${SITE_NAME} - Discipline before conviction`,
+    default: `${SITE_NAME} | Know what must happen next`,
     template: `%s - ${SITE_NAME}`,
   },
   description: SITE_DESC,
@@ -21,17 +21,18 @@ export const metadata: Metadata = {
     "ES",
     "SPX",
     "options trading",
-    "trading workspace",
+    "SPXW 0DTE",
+    "market structure",
+    "trading alerts",
     "decision support",
-    "anchor trading",
-    "decision slate",
+    "trade replay",
   ],
   authors: [{ name: SITE_NAME }],
   creator: SITE_NAME,
   publisher: SITE_NAME,
   alternates: { canonical: "/" },
   openGraph: {
-    title: `${SITE_NAME} - Discipline before conviction`,
+    title: `${SITE_NAME} | Know what must happen next`,
     description: SITE_DESC,
     url: SITE_URL,
     siteName: SITE_NAME,
@@ -42,13 +43,13 @@ export const metadata: Metadata = {
         url: "/og-default.png",
         width: 1200,
         height: 630,
-        alt: `${SITE_NAME} - a decision workspace for serious retail traders.`,
+        alt: `${SITE_NAME} command desk for SPY, ES, and SPXW trading decisions.`,
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: `${SITE_NAME} - Discipline before conviction`,
+    title: `${SITE_NAME} | Know what must happen next`,
     description: SITE_DESC,
     images: ["/og-default.png"],
   },
@@ -63,12 +64,32 @@ export const metadata: Metadata = {
       "max-video-preview": -1,
     },
   },
-  // icon.tsx + apple-icon.tsx routes serve 32x32 + 180x180.
-  // PWA 192/512 sizes are advertised through manifest.ts.
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/icons/app-64.png", sizes: "64x64", type: "image/png" },
+      { url: "/icons/icon-96.png", sizes: "96x96", type: "image/png" },
+      { url: "/icons/icon-144.png", sizes: "144x144", type: "image/png" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      {
+        url: "/icons/apple-touch-icon.png",
+        sizes: "180x180",
+        type: "image/png",
+      },
+    ],
+  },
+  appleWebApp: {
+    capable: true,
+    title: SITE_NAME,
+    statusBarStyle: "default",
+  },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#FAF8F3",
+  themeColor: "#F5F6F1",
   colorScheme: "light",
   width: "device-width",
   initialScale: 1,
@@ -81,7 +102,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
-      <body className="bg-canvas text-ink font-sans antialiased min-h-screen">
+      <body className="bg-optic text-carbon font-sans antialiased min-h-screen">
         {children}
       </body>
     </html>

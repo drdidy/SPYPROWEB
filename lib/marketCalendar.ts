@@ -2,9 +2,9 @@
 // market is open, and when it opens next. Drives the TopBar session
 // status string. NYSE schedule (matches CME equity-future RTH).
 //
-// 2026 holidays + early-close days hardcoded below. Add a TODO to
-// swap in a calendar API when the project graduates beyond a single
-// year of operating runway. Other years return naive weekend logic.
+// 2026 holidays + early-close days are defined below. Swap in a
+// calendar API when the project needs multi-year operating runway.
+// Other years return naive weekend logic.
 
 export type SessionState =
   | "PRE_MARKET"
@@ -28,9 +28,9 @@ export interface SessionStatus {
 }
 
 // 2026 NYSE full-day holidays. Format: YYYY-MM-DD.
-// TODO(2027+): pull from a calendar feed (e.g. nyse-holidays npm
-// package or a small worker). Hardcoded for now to avoid runtime
-// uncertainty and drift between dev / prod.
+// Pull from a calendar feed for 2027+ when the app expands beyond the
+// current launch calendar. Hardcoded for now to avoid runtime drift
+// between dev and prod.
 const HOLIDAYS_2026: Set<string> = new Set([
   "2026-01-01", // New Year's Day
   "2026-01-19", // MLK Jr Day

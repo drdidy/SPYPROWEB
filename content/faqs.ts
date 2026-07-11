@@ -9,15 +9,15 @@ export const FAQS = [
   },
   {
     q: "Is this a signal service or a workspace?",
-    a: "A workspace. Signals are a small piece of it. The real value is the routine. Same read, same lines, same bar, every day. Run it long enough and reading the day stops feeling like work.",
+    a: "A command workspace. It maps SPY and ES structure, waits for a confirmed setup, defines risk, and displays an SPXW contract only when the live chain is usable.",
   },
   {
     q: "Which symbols are covered?",
-    a: "SPY and ES, side by side. Each gets its own surface tuned to how it actually trades. We'll add other liquid index instruments when our read on them is as good.",
+    a: "The trading product is deliberately focused on SPY, ES, SPX, and SPXW options.",
   },
   {
     q: "How does Prophet decide?",
-    a: "One bar pulls several factors into one yes-or-no answer. The bar is high. Most setups don't clear it. The ones that do are rare and easy to read.",
+    a: "The Map identifies meaningful structure. The Engine waits for the price-cross, pivot, close, and room conditions. Context can warn, but price confirmation makes the decision.",
   },
   {
     q: "Will this work in my time zone?",
@@ -25,7 +25,7 @@ export const FAQS = [
   },
   {
     q: "What's included today?",
-    a: "Today's decision, the ES Pivot Fan, the levels in play, the structure read, the day's foresight, the options cockpit, the signal log, and a daily brief.",
+    a: "Today, Prophet Map, SPXW Contract Desk, Replay, Journal, Learn, and Telegram alert settings.",
   },
   {
     q: "Is it advice?",

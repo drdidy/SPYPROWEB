@@ -107,8 +107,8 @@ export function PreviewState({
         </button>
       </header>
       <p className="text-meta text-ink-3 max-w-2xl">
-        These are sample values, not live data. Real bias, conviction, grade,
-        and active levels populate when the next setup window opens.
+        Preview values are shown only as a layout guide. Live bias, conviction,
+        grade, and active levels populate when the next setup window opens.
       </p>
       <div
         // v4 #14: strict 1fr 1fr grid. Both cards share the same
@@ -134,7 +134,7 @@ export function PreviewState({
           headline="Take the fan read"
           price="6,124.50"
           delta="+12.40"
-          subtitle="The Pivot Fan maps ES from the prior RTH high close and post-noon low wick."
+          subtitle="The ES Control Map marks the Control Line and working gates for the session."
           conviction={73}
           convictionMax={100}
           convictionLabel="73 / 100"

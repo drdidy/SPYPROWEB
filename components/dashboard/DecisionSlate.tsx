@@ -2,6 +2,7 @@
 import { Card } from "@/components/ui/Card";
 import { GradeBadge } from "@/components/ui/GradeBadge";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { formatDisplayLabel } from "@/lib/display-labels";
 import type { DecisionState, SignalQuality, TradeSignal } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
@@ -53,7 +54,7 @@ export function DecisionSlate({
               </span>
             </div>
             <StatusPill variant={finalToVariant[decision.finalDecision]} pulse>
-              {decision.finalDecision.replace(/_/g, " ")}
+              {formatDisplayLabel(decision.finalDecision)}
             </StatusPill>
           </div>
 

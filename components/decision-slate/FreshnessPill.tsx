@@ -1,23 +1,10 @@
 "use client";
 
-// Single source of truth for "how fresh is this slate?". Replaces the
-// duplicated red dot + "Updated 10:50 CT" + per-card as-of stamps.
-// Thresholds per the spec:
-//   green : age < 60s
-//   amber : 60s..300s
-//   red   : > 300s or unparseable
-//
-// The pill self-refreshes every second so the color stays honest even
-// when the upstream snapshot isn't polling. Tooltip surfaces both UTC
-// and CT timestamps + the data source.
-
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 interface Props {
-  /** ISO timestamp of the snapshot the rest of the slate is rendering. */
   freshnessISO: string;
-  /** Internal feed label; visible copy is deliberately provider-neutral. */
   source: string;
   className?: string;
 }
@@ -48,12 +35,12 @@ export function FreshnessPill({ freshnessISO, source, className }: Props) {
     broken: "text-bear-soft",
   }[tone];
 
-  const ctLabel = Number.isFinite(ts) ? formatCT(ts) : "—";
-  const utcLabel = Number.isFinite(ts) ? formatUTC(ts) : "—";
+  const ctLabel = Number.isFinite(ts) ? formatCT(ts) : "--";
+  const statusLabel =
+    tone === "fresh" ? "Fresh" : tone === "stale" ? "Aging" : "Stale";
 
-  // Title carries the rich tooltip; visible label stays compact.
   void source;
-  const title = `Updated ${ctLabel} · ${utcLabel} UTC · market data feed`;
+  const title = `${statusLabel} session read. Updated ${ctLabel}.`;
 
   return (
     <span
@@ -62,9 +49,6 @@ export function FreshnessPill({ freshnessISO, source, className }: Props) {
       aria-label={title}
       data-testid="freshness-pill"
       data-tone={tone}
-      // v5 #16: aria-live="polite" so AT users hear the new
-      // timestamp when the snapshot refreshes. atomic so the full
-      // text is re-announced rather than the diff.
       aria-live="polite"
       aria-atomic="true"
       className={cn(
@@ -78,29 +62,22 @@ export function FreshnessPill({ freshnessISO, source, className }: Props) {
         {tone === "fresh" && (
           <span className="absolute inline-flex h-full w-full rounded-full bg-bull opacity-50 animate-breathe" />
         )}
-        <span className={cn("relative inline-flex rounded-full h-1.5 w-1.5", dotClass)} />
+        <span className={cn("relative inline-flex h-1.5 w-1.5 rounded-full", dotClass)} />
       </span>
       <span className={cn("font-mono text-[10px] tabular-nums", textTone)}>
-        Updated {ctLabel}
+        {statusLabel} - {ctLabel}
       </span>
     </span>
   );
 }
 
 function formatCT(ms: number): string {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Chicago",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(new Date(ms)) + " CT";
-}
-
-function formatUTC(ms: number): string {
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone: "UTC",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(new Date(ms));
+  return (
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Chicago",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(new Date(ms)) + " CT"
+  );
 }

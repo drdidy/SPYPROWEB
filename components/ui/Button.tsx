@@ -25,9 +25,10 @@ const s: Record<Size, string> = {
 export const Button = forwardRef<
   HTMLButtonElement,
   ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size }
->(({ className, variant = "secondary", size = "md", ...props }, ref) => (
+>(({ className, variant = "secondary", size = "md", type = "button", ...props }, ref) => (
   <button
     ref={ref}
+    type={type}
     className={cn(
       "inline-flex items-center justify-center gap-1.5 rounded-soft font-medium tracking-tight transition-all duration-150 ease-swift disabled:opacity-40 disabled:pointer-events-none",
       v[variant],

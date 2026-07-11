@@ -1,46 +1,46 @@
 export const SPY_CHANNEL_COPY = {
   hero: {
-    eyebrow: "SPY · Channel · Session today",
-    title: "SPY operating map.",
-    titleLead: "SPY operating",
-    titleEmphasis: "map.",
+    eyebrow: "SPY Channel",
+    title: "SPY Channel",
+    titleLead: "Today's SPY",
+    titleEmphasis: "Control Map.",
     subtitle:
-      "Anchor lines, trigger proximity, tape, and guardrails stay in one operating surface.",
+      "Control Line, gates, confirmation, and trade checks stay in one operating surface.",
   },
   anchorSlate: {
-    label: "Anchor Slate",
+    label: "Control Map",
     fallbackHeadline: "Waiting on confirmation",
     noAnchor:
-      "No anchor today. The channel falls back to nearest qualified structure until a fresh anchor qualifies.",
+      "SPY Control Map is resolving. Gates appear as soon as the prior-session pivot is available.",
   },
   sections: {
     plays: {
       number: "01",
-      title: "Plays",
-      optionsTitle: "Options Intelligence",
+      title: "Trade Plan",
+      optionsTitle: "Execution Lens",
     },
     lines: {
       number: "02",
-      title: "Lines",
-      triggerMapTitle: "Trigger Map",
-      biasTitle: "Pre-Open Bias",
+      title: "Control Gates",
+      triggerMapTitle: "Control Room",
+      biasTitle: "Opening Bias",
     },
     tape: {
       number: "03",
-      title: "Tape",
-      signalTapeTitle: "Signal Tape",
-      guardrailsTitle: "Risk Guardrails",
+      title: "Session Review",
+      signalTapeTitle: "Session Pulse",
+      guardrailsTitle: "Trade Checks",
     },
   },
   empty: {
     triggerMap:
-      "No qualified levels yet. Levels arm during the premarket window once structure is confirmed.",
+      "SPY Control Map is resolving. Gates appear when the prior-session pivot is available.",
     options:
-      "Options intelligence is waiting for the provider session. Prior-session context appears when available.",
+      "Execution context appears only when it improves the active read.",
     tape: "Session still warming up. The tape fills as levels, bias, and guardrails change.",
   },
   footer: {
-    left: "Prophet · SPY channel",
+    left: "Prophet - SPY Control Map",
     right: "Session surface",
   },
 } as const;

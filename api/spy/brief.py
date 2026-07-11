@@ -2,8 +2,8 @@
 
 The Daily Brief is the synthesis layer. It gathers:
   - SPY snapshot data and app structure lines
-  - ES Pivot Fan snapshot data
-  - options intelligence from Unusual Whales
+  - ES Control Map snapshot data
+  - broker-backed options chain context
   - market context from the existing market-data pipeline
   - optional news and economic-calendar context
 
@@ -28,7 +28,7 @@ _API_ROOT = Path(__file__).resolve().parents[1]
 if str(_API_ROOT) not in sys.path:
     sys.path.insert(0, str(_API_ROOT))
 
-from _lib import ai_router, data_sources, macro_context, unusual_whales  # noqa: E402
+from _lib import ai_router, data_sources, macro_context, options_chains  # noqa: E402
 from _lib.spx_data import build_default_fetcher, build_snapshot_with_provenance  # noqa: E402
 
 CT = ZoneInfo("America/Chicago")
@@ -67,15 +67,15 @@ decision-support app. The user reads this before the cash open to plan
 the day.
 
 You receive a compact JSON dossier from the app. It contains market
-data, SPY premarket-anchor structure, ES Pivot Fan structure,
-options flow, dark-pool, GEX, and option-chain summaries. Use only the
+data, SPY Control Line structure, ES Control Map structure,
+and option-chain summaries. Use only the
 facts provided. Also read the macro/news block when available; if it is
 unavailable, say "live headlines are unavailable" rather than saying there is
 no news. Do not invent news, prices, entries, probabilities, or levels.
 
 Write in simple trader language. No hype. No guarantees. Make it
 practical: what the tape is saying, which side has the cleaner setup,
-which lines matter first, what confirms the idea, what invalidates it,
+which Control Line or gate matters first, what confirms the idea, what invalidates it,
 and when to stand down.
 
 Return JSON only, with this exact shape:
@@ -114,7 +114,7 @@ Return JSON only, with this exact shape:
 Rules:
 - No markdown. No bullets. No literal asterisks.
 - Lead with the story. It should read like a calm trading-room recap:
-  first the market backdrop, then SPY, then ES, then options/news,
+  first the market backdrop, then SPY, then ES, then execution/news,
   then the exact decision. A novice should understand why the plan is
   stand down, watch, or act without reading a glossary first.
 - Never mention the model, provider, infrastructure, or env vars.
@@ -387,7 +387,7 @@ def _options_symbol_summary(symbol: dict) -> dict:
 
 
 def _options_facts() -> dict:
-    bundle = unusual_whales.fetch_options_bundle(("SPY", "SPX"))
+    bundle = options_chains.fetch_options_bundle(("SPY", "SPX"))
     symbols = bundle.get("symbols") if isinstance(bundle, dict) else {}
     return {
         "available": bool(bundle.get("available")) if isinstance(bundle, dict) else False,
@@ -446,7 +446,7 @@ def _brief_dossier() -> dict:
     return {
         "generatedAt": generated_at.isoformat(),
         "coversSession": _session_covered_by(generated_at),
-        "purpose": "pre-open planning brief for SPY/SPX options trading",
+        "purpose": "Control Line and gate planning brief for SPY/SPX options trading",
         "dataPolicy": "use provided values only; no synthetic market values",
             "SPY": _spy_facts(spy_snapshot),
             "ES": _spx_facts(),
@@ -465,7 +465,7 @@ def _engine_fallback_sections(dossier: dict) -> dict:
     opts = dossier.get("options") or {}
     spy_price = (spy.get("price") or {}).get("last")
     spy_state = spy.get("state") or "WAIT"
-    spy_reason = spy.get("rationale") or "SPY structure is still resolving."
+    spy_reason = spy.get("rationale") or "SPY Control Map is still resolving."
     es_state = es.get("state") if es.get("available") else "unavailable"
     es_scenario = es.get("scenario") if es.get("available") else None
     spy_opts = opts.get("SPY") or {}
@@ -480,9 +480,9 @@ def _engine_fallback_sections(dossier: dict) -> dict:
         f"SPY is trading around {spy_price if spy_price is not None else 'an unavailable last price'} while the engine is in "
         f"{spy_state}. The important point is discipline: {spy_reason} ES is {es_state}"
         + (f" with {es_scenario} context" if es_scenario else "")
-        + f", so the futures read is a backdrop, not a reason to force a trade. Options flow is {flow.get('lean', 'unavailable')} "
-        f"and dealer gamma is {gex.get('regime', 'unavailable')}; missing options data remains a no-read. "
-        f"{news_use} The plan is to respect the nearest line, wait for confirmation, and stand down if price breaks structure instead of reacting cleanly."
+        + f", so the futures Control Map is context, not a reason to force a trade. Options chains are "
+        f"{'available' if opts.get('available') else 'unavailable'}; missing execution data remains a no-read. "
+        f"{news_use} The plan is to respect the nearest Control Line or gate, wait for confirmation, and stand down if price breaks structure instead of reacting cleanly."
     )
 
     sections = [
@@ -492,17 +492,17 @@ def _engine_fallback_sections(dossier: dict) -> dict:
         },
         {
             "section": "SPY_PLAN",
-            "body": f"The first structural line to watch is {first_line.get('line', 'not resolved')} near {first_line.get('level', 'n/a')}. Confirmation should come from the app trigger and next-bar logic, not from chasing a move before the line is tested.",
+            "body": f"The first Control Map level to watch is {first_line.get('line', 'not resolved')} near {first_line.get('level', 'n/a')}. Confirmation should come from the app trigger and next-bar logic, not from chasing a move before the gate is tested.",
         },
         {
             "section": "ES_PLAN",
-            "body": f"ES Pivot Fan state is {es_state}"
+            "body": f"ES Control Map state is {es_state}"
             + (f" with scenario {es_scenario}." if es_scenario else ".")
-            + " Use the ES fan references as context for whether SPY structure is supported or fighting the futures read.",
+            + " Use the ES Control Line and gates as context for whether SPY structure is supported or fighting the futures read.",
         },
         {
             "section": "OPTIONS_PRESSURE",
-            "body": f"SPY flow reads {flow.get('lean', 'unavailable')}; dealer gamma reads {gex.get('regime', 'unavailable')}. Treat missing options sections as no-read, not as neutral.",
+            "body": "Use the options lens for tradable chain and contract-cost context only. Premium pressure overlays are not required for the launch read.",
         },
         {
             "section": "NEWS_AND_CALENDAR",
@@ -514,7 +514,7 @@ def _engine_fallback_sections(dossier: dict) -> dict:
         },
         {
             "section": "OPENING_CHECKLIST",
-            "body": "Mark the nearest SPY line, check whether ES is aligned or conflicting, confirm options pressure is not fighting the setup, wait for touch or rejection confirmation, and keep risk defined before entry.",
+            "body": "Mark the nearest SPY gate, check whether ES is aligned or conflicting, review the execution ticket, wait for touch or rejection confirmation, and keep risk defined before entry.",
         },
     ]
     return {
@@ -547,7 +547,7 @@ def _sections_to_text(structured: dict) -> str:
         "MARKET_READ": "Market read",
         "SPY_PLAN": "SPY plan",
         "ES_PLAN": "ES plan",
-        "OPTIONS_PRESSURE": "Options pressure",
+        "OPTIONS_PRESSURE": "Options execution",
         "NEWS_AND_CALENDAR": "News and calendar",
         "WHAT_CHANGES_THE_PLAN": "What changes the plan",
         "OPENING_CHECKLIST": "Opening checklist",

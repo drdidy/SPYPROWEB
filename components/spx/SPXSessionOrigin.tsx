@@ -14,9 +14,9 @@ export function SPXSessionOrigin({ snap }: { snap: SPXSnapshot }) {
   return (
     <Card>
       <CardHeader
-        eyebrow="Origin"
-        title="Why today's framework"
-        meta="Previous RTH high close and post-noon low wick"
+        eyebrow="Why These Levels"
+        title="Session origin"
+        meta="Prior-session anchors"
       />
       <CardBody className="px-0 pb-0">
         <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-rule">
@@ -63,8 +63,8 @@ export function SPXSessionOrigin({ snap }: { snap: SPXSnapshot }) {
           <div className="p-5">
             <div className="flex items-center justify-between mb-3">
               <span className="eyebrow text-ink-3">Framework</span>
-              <StatusPill variant={snap.lines.length >= 4 ? "confirmed" : "stale"}>
-                {snap.lines.length >= 4 ? "FOUR LINE" : "RESOLVING"}
+              <StatusPill variant={snap.controlTradePlan ? "confirmed" : "stale"}>
+                {snap.controlTradePlan?.status ?? "RESOLVING"}
               </StatusPill>
             </div>
             <div className="text-[13px] text-ink-2 leading-relaxed">
@@ -214,9 +214,17 @@ function formatClock(time: string): string {
 }
 
 function determinationText(snap: SPXSnapshot): string {
-  if (snap.lines.length >= 4) {
-    return snap.channel.reason;
+  const plan = snap.controlTradePlan;
+  if (plan) {
+    const map =
+      plan.activeTrade?.mapId === plan.oppositeMap.id ||
+      plan.setups[0]?.mapId === plan.oppositeMap.id
+        ? plan.oppositeMap
+        : plan.primaryMap.status === "ARMED"
+          ? plan.primaryMap
+          : plan.oppositeMap;
+    return `${map.direction === "DESCENDING" ? "Descending" : "Ascending"} Control Plan anchored at ${map.anchor.price.toFixed(2)}. Control Line is ${map.controlValue.toFixed(2)}.`;
   }
-  return "The ES Pivot Fan resolves after the previous RTH high close and post-noon low wick are available.";
+  return "The ES Control Map resolves after the prior-session Control Plan anchor is available.";
 }
 

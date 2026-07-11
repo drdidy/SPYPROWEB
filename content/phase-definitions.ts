@@ -30,7 +30,7 @@ export interface PhaseDefinition {
 // shout. Tooltip body copy is plain-English, no jargon.
 export const PHASE_DEFINITIONS: Record<EngineState, PhaseDefinition> = {
   PRE_CONFIG: {
-    label: "Pre-config",
+    label: "Pre-Config",
     short: "Pre",
     summary:
       "The engine hasn't observed its setup window yet. No lines or envelope are plotted.",
@@ -40,7 +40,7 @@ export const PHASE_DEFINITIONS: Record<EngineState, PhaseDefinition> = {
       "When the setup window starts (SPY: 03:00 CT, ES: 17:00 CT the previous day).",
   },
   STAND_DOWN: {
-    label: "Stand down",
+    label: "Stand Down",
     short: "Stand",
     summary:
       "The engine has run and the setup is plotted, but conditions don't favor a trade.",

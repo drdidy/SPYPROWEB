@@ -51,7 +51,7 @@ const FLAG_DEFINITIONS: Record<FlagName, FlagDefinition> = {
   slate_hero_v2: flag("SLATE_HERO_V2", true),
   slate_verdict_chrome: flag("SLATE_VERDICT_CHROME", true),
   slate_entry_cost_tile: flag("SLATE_ENTRY_COST_TILE", true),
-  slate_state_rail: flag("SLATE_STATE_RAIL", true),
+  slate_state_rail: flag("SLATE_STATE_RAIL", false),
   slate_feed_health: flag("SLATE_FEED_HEALTH", true),
   slate_a11y: flag("SLATE_A11Y", false),
   verdict_actions: flag("VERDICT_ACTIONS", false),

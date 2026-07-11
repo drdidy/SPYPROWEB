@@ -19,6 +19,7 @@ const ROUTES: Array<{
   { path: "/privacy", changeFrequency: "yearly", priority: 0.3 },
   { path: "/disclosures", changeFrequency: "yearly", priority: 0.3 },
   { path: "/risk", changeFrequency: "yearly", priority: 0.3 },
+  { path: "/methodology", changeFrequency: "monthly", priority: 0.5 },
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {

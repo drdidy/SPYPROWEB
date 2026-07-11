@@ -5,7 +5,7 @@
 //   - PRE_CONFIG / STAND_DOWN  → daily-brief
 //   - WAIT / WATCH (SPY)       → live-spy
 //   - WAIT / WATCH (SPX)       → live-spx
-//   - ARMED / GO               → options-cockpit
+//   - ARMED / GO               → matching live channel
 //   - COOLDOWN                 → log-replay
 //   - Combined: most-active engine wins (GO > ARMED > WAIT > WATCH …)
 //
@@ -40,8 +40,8 @@ expectId(forState("WATCH", "SPY"), "live-spy", "SPY WATCH → live-spy");
 expectId(forState("WAIT", "SPY"), "live-spy", "SPY WAIT → live-spy");
 expectId(forState("WATCH", "SPX"), "live-spx", "SPX WATCH → live-spx");
 expectId(forState("WAIT", "SPX"), "live-spx", "SPX WAIT → live-spx");
-expectId(forState("ARMED", "SPY"), "options-cockpit", "ARMED → options-cockpit");
-expectId(forState("GO", "SPX"), "options-cockpit", "GO → options-cockpit");
+expectId(forState("ARMED", "SPY"), "live-spy", "ARMED → live-spy");
+expectId(forState("GO", "SPX"), "live-spx", "GO → live-spx");
 
 // --- combined dispatcher (priority rule) ---
 expectId(
@@ -61,12 +61,12 @@ expectId(
 );
 expectId(
   recommendationFor("ARMED", "WAIT"),
-  "options-cockpit",
+  "live-spy",
   "SPY ARMED beats SPX WAIT",
 );
 expectId(
   recommendationFor("WAIT", "GO"),
-  "options-cockpit",
+  "live-spx",
   "SPX GO beats SPY WAIT",
 );
 expectId(

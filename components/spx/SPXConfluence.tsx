@@ -2,6 +2,7 @@
 
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { formatDisplayLabel } from "@/lib/display-labels";
 import type { SPXAction, SPXConfluenceFactor } from "@/lib/types";
 
 const actionToVariant: Record<SPXAction, "confirmed" | "watching" | "stale"> = {
@@ -26,12 +27,12 @@ export function SPXConfluence({
   return (
     <Card>
       <CardHeader
-        eyebrow="Confluence"
-        title="Confluence read"
-        meta={`${liveFactors.length} live factor${liveFactors.length === 1 ? "" : "s"} in score`}
+        eyebrow="Confidence"
+        title="Read quality"
+        meta={`${liveFactors.length} active check${liveFactors.length === 1 ? "" : "s"}`}
         action={
           <StatusPill variant={actionToVariant[action]} pulse>
-            {action.replace(/_/g, " ")}
+            {formatDisplayLabel(action)}
           </StatusPill>
         }
       />
@@ -46,11 +47,11 @@ export function SPXConfluence({
         {liveFactors.length === 0 ? (
           <div className="px-5 py-8">
             <div className="font-serif text-headline text-ink-3 italic font-light">
-              Confluence not scored yet.
+              Confidence not scored yet.
             </div>
             <p className="mt-2 text-[13px] leading-relaxed text-ink-3">
-              The fan read needs usable session, London, or RTH reaction data
-              before this panel can add evidence.
+              The Control Map needs usable session, London, or RTH reaction
+              data before this panel can add evidence.
             </p>
           </div>
         ) : (
@@ -72,7 +73,7 @@ export function SPXConfluence({
                     {(factor.value * 100).toFixed(0)}
                     <span className="text-ink-4">
                       {" "}
-                      /100 · w {factor.weight.toFixed(2)}
+                      /100
                     </span>
                   </span>
                 </div>

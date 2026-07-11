@@ -1,4 +1,4 @@
-// Plain-text copy used by the Decision Slate. Centralized so non-
+// Text copy used by the Decision Slate. Centralized so non-
 // engineers can tweak strings without touching component code.
 //
 // Voice rule (slate refinement, 2026-05): calm, expert, plain English.
@@ -13,7 +13,7 @@ export const SLATE_COPY = {
   // ---- Card subtitles ----
   spySubtitle: "Bias is the directional lean from the overnight and premarket sessions.",
   spxSubtitle:
-    "The Pivot Fan maps ES from the prior RTH high close and post-noon low wick.",
+    "The ES Control Map marks the Control Line and working gates for the session.",
 
   // ---- Metric tooltips ----
   metric: {
@@ -21,9 +21,9 @@ export const SLATE_COPY = {
       spy: "1–5 score for setup quality. Combines bias strength, signal grade, and risk-reward.",
       spx: "0–100 confluence score. Combines Asian-session direction, London bias, and reaction strength at qualified levels.",
     },
-    bias: "Directional lean from the overnight session and premarket flow. Bullish, bearish, or neutral.",
+    bias: "Directional lean from the overnight and premarket read. Bullish, bearish, or neutral.",
     channel:
-      "Current ES Pivot Fan zone. It resolves from the prior RTH high close and post-noon low wick.",
+      "Current ES Control Map zone. It resolves from the prior session pivots and the 9 AM gate map.",
     grade:
       "Letter grade assigned after the trigger fires. A+, A, B+, B, C, D, or no-trade.",
   },
@@ -50,16 +50,16 @@ export const SLATE_COPY = {
   // log line, not a sentence.
   structureEmpty: {
     spy: "No active levels yet. SPY's primary lines plot during the 03:00–07:00 CT premarket window.",
-    spx: "No active levels yet. ES Pivot Fan resolves after the prior RTH pivots are available.",
+    spx: "No active levels yet. ES Control Map resolves after the prior RTH pivots are available.",
   },
 
   // ---- PRE-CONFIG briefing ----
   preConfig: {
     title: "Markets quiet",
-    body: "Both engines are between sessions. Bias, conviction, grade, and active levels populate once the next setup window opens.",
+    body: "The desk is between windows. The next clean read appears when the setup window opens.",
     // No more "Daily Brief integration pending" — end-user copy.
     watchAtOpen:
-      "What to watch at the open will appear here once the daily brief publishes (around 06:30 CT).",
+      "The open brief will surface the levels, bias, and risk notes that matter before the first decision window.",
   },
 
   // ---- Track-record copy ----
@@ -95,7 +95,7 @@ export const SLATE_COPY = {
     body:
       "SPY and ES stay separate until the slate asks for a decision. " +
       "The Decision Slate is your daily 'should I trade?' command center. " +
-      "Each engine — SPY (intraday premarket) and ES (Pivot Fan) — " +
+      "Each engine - SPY and ES Control Map - " +
       "moves through a fixed pipeline: Pre-config → Stand down → Watch → " +
       "Wait → Armed → Go → Cooldown. The page tells you what state each " +
       "engine is in, why, what to watch for, and how the engine has been performing recently.",

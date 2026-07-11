@@ -1,4 +1,5 @@
 "use client";
+
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 import { GradeBadge } from "@/components/ui/GradeBadge";
 import { Sparkline } from "@/components/ui/Sparkline";
@@ -34,8 +35,8 @@ export function SignalTape({
     return (
       <Card>
         <CardHeader
-          eyebrow="Signal Tape"
-          title="Today's prints"
+          eyebrow="Session Pulse"
+          title="Today's read"
           meta="No events yet"
           action={healthAction}
         />
@@ -45,8 +46,8 @@ export function SignalTape({
               Session still warming up.
             </div>
             <p className="mt-3 text-[13px] text-ink-3 leading-relaxed max-w-md">
-              No qualified touch, rejection, break, or risk event has printed
-              yet. New events post here as the engine observes them.
+              No qualified touch, rejection, break, or risk event has been recorded yet.
+              The pulse fills only when something worth your attention happens.
             </p>
           </div>
         </CardBody>
@@ -56,17 +57,17 @@ export function SignalTape({
   return (
     <Card>
       <CardHeader
-        eyebrow="Signal Tape"
-        title="Today's prints"
-        meta={`${ticks.length} event${ticks.length === 1 ? "" : "s"} · session live`}
+        eyebrow="Session Pulse"
+        title="Today's read"
+        meta={`${ticks.length} event${ticks.length === 1 ? "" : "s"}`}
         action={healthAction}
       />
       <CardBody className="px-0 pb-0">
         <div className="px-5 pb-4">
           <div className="mb-2 flex items-center justify-between">
-            <span className="eyebrow text-ink-3">Session event rail</span>
+            <span className="eyebrow text-ink-3">Session path</span>
             <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-3">
-              replay-linked
+              Tap any arrow
             </span>
           </div>
           <div className="relative h-7 rounded-soft border border-rule bg-paper-2 px-2">

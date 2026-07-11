@@ -1,5 +1,5 @@
 // Regression guard for the v9 "secret sauce" rule: the engine's
-// per-hour slope values (1.04 for ES, 0.20 for SPY) are
+// per-hour slope values for ES and SPY are
 // proprietary and must not appear in any user-visible string on
 // the dashboard, the channel pages, or the replay workspace.
 //
@@ -32,20 +32,38 @@ const files = [
   "components/spx/SPXChannelClient.tsx",
   "components/spx/SPXLineLadder.tsx",
   "components/spy/SPYChannelHero.tsx",
+  "components/stocks/StocksEngineClient.tsx",
+  "components/crypto/CryptoEngineClient.tsx",
   "components/replay/ReplayWorkspace.tsx",
   "app/(app)/dashboard/page.tsx",
+  "app/(marketing)/methodology/stocks/page.tsx",
+  "app/(marketing)/methodology/crypto/page.tsx",
+  "components/marketing/SurfacesGrid.tsx",
 ];
 
 // Patterns that would put a slope value on the rendered page.
 // Each is a tight phrase — easing curves like `[0.2, 0.8, 0.2, 1]`
 // and CSS values like `1.05rem` won't match any of these.
 const leaks = [
+  /\b1\.00 pts(?:\/hr)?\b/,
   /\b1\.04 pts(?:\/hr)?\b/,
   /\b0\.20 pts(?:\/hr)?\b/,
   /\bslope[^a-z]{0,4}\d+\.\d{1,2}\s*pts/i,
   /\bSlope\s*[±\-‑]\s*\d+\.\d{1,2}\s*pts/,
   /decaying at \d+\.\d+ pts/,
   /Bands decay at .*\d+\.\d+ pts/,
+  /\b0\.(?:027|040|049|060|066|100)%\b/,
+  /Hard-coded sector table/i,
+  /Tracked equities only/i,
+  /SectorSlope Rate/i,
+  /sector-calibrated/i,
+  /sector bucket/i,
+  /\b34\s*(?:pts|points)(?:\s*\/\s*hr|\s*per\s*hour)?\b/i,
+  /\b680\s*(?:pts|points)\b/i,
+  /\b0\.95\s*(?:pts|points)(?:\s*\/\s*hr|\s*per\s*hour)?\b/i,
+  /\b14\s*(?:pt|pts|point|points)\s*move\b/i,
+  /slope.*BTC/i,
+  /slope.*ETH/i,
 ];
 
 for (const rel of files) {

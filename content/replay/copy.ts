@@ -1,13 +1,13 @@
 export const replayCopy = {
   hero: {
-    eyebrow: "REPLAY · BACKTEST",
+    eyebrow: "REPLAY - BACKTEST",
     title: "Replay a session",
     helper: "Pick a session date. Replay reconstructs what the engine said against what price did.",
   },
   status: {
-    calibrationWritten: "Calibration written",
+    calibrationWritten: "Replay saved",
     calibrationMissing:
-      "No matching Foresight projection exists for this date, so calibration is a no-op.",
+      "No matching Foresight projection exists for this date, so the review stays read-only.",
   },
   chart: {
     title: "Tape against structure",

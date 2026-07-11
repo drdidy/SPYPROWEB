@@ -13,7 +13,7 @@ export function SectionLabel({
   return (
     <div className={cn("flex items-center gap-3", className)}>
       {number && (
-        <span className="grid h-7 min-w-7 place-items-center rounded-[8px] border border-gold/35 bg-[#071116] font-mono text-[10px] text-gold-soft shadow-[0_10px_26px_-20px_rgba(7,17,22,0.8)] tracking-[0.08em] uppercase">
+        <span className="contrast-dark grid h-7 min-w-7 place-items-center rounded-[8px] border border-gold/35 bg-[#071116] font-mono text-[10px] text-gold-soft shadow-[0_10px_26px_-20px_rgba(7,17,22,0.8)] tracking-[0.08em] uppercase">
           {number}
         </span>
       )}

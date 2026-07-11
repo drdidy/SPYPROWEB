@@ -21,7 +21,7 @@ from typing import Optional
 # uses a flat layout under api/. Use a deferred import so callers that
 # don't hit compute_snapshot can still import this module cheaply.
 
-from .candles import Candle
+from .candles import Candle, in_window
 from .channel import (
     Anchor,
     Channel,
@@ -35,7 +35,26 @@ from .channel import (
     tokyo_range,
 )
 from .confluence import evaluate as evaluate_confluence
-from .constants import DEFAULT_OTM_DISTANCE, DEFAULT_SLOPE_PER_HOUR, SPX_STRIKE_INCREMENT
+from .constants import (
+    DEFAULT_OTM_DISTANCE,
+    DEFAULT_SLOPE_PER_HOUR,
+    ES_DEVIATION_BANDS,
+    ES_DEVIATION_ENTRY_HOUR_CT,
+    ES_DEVIATION_EXTENSION_END_HOUR_CT,
+    ES_DEVIATION_SPACING,
+    ES_DEALER_PRESSURE_SLOPE_PER_HOUR,
+    ES_DEALER_PRESSURE_SPACING,
+    ES_DEVIATION_WINDOW_END_HOUR_CT,
+    ES_DEVIATION_WINDOW_START_HOUR_CT,
+    ES_DUAL_MAP_OPPOSITE_ARM_DISTANCE,
+    ES_DUAL_MAP_OPPOSITE_SLOPE_PER_HOUR,
+    ES_DUAL_MAP_PRIMARY_ARM_DISTANCE,
+    ES_DUAL_MAP_PRIMARY_SLOPE_PER_HOUR,
+    ES_HALF_GATE_TARGET,
+    ES_OPEN_BIAS_TOLERANCE,
+    ES_TICK_SIZE,
+    SPX_STRIKE_INCREMENT,
+)
 from .contracts import suggest_for_plays
 from .reentry import evaluate_reentry
 from .scenario import (
@@ -47,7 +66,12 @@ from .scenario import (
 )
 from .time_utils import (
     at_ct,
+    es_trading_hours_between,
+    hours_between,
+    is_trading_session_date,
+    next_es_candle_open,
     overnight_window,
+    previous_futures_session_date,
     previous_session_date,
     rth_window,
     session_date_ct,
@@ -155,7 +179,7 @@ def _touch_window_entry_from_lines(
     if not lines or not candles:
         return None
     as_of_ct = to_ct(as_of)
-    entry_reference = at_ct(session, time(8, 0))
+    entry_reference = at_ct(session, time(ES_DEVIATION_ENTRY_HOUR_CT, 0))
     refs: list[dict] = []
     for line in lines:
         try:
@@ -286,14 +310,14 @@ def _flip_condition_for(scenario: str, projected: list[ProjectedLine]) -> str:
     if scenario.startswith("INSIDE_"):
         if high_desc is not None:
             return (
-                f"Confirmed hourly close through High Fan Floor at {high_desc:.2f} "
+                f"Confirmed hourly close through the high-pivot control boundary at {high_desc:.2f} "
                 "arms the next ES entry."
             )
     if scenario.startswith("ABOVE_") and high_asc is not None:
-        return f"Watch High Fan Ceiling at {high_asc:.2f}; it is the buy-support reference above both fans."
+        return f"Watch the high-pivot upper boundary at {high_asc:.2f}; it is the support reference above the active map."
     if scenario.startswith("BELOW_") and low_desc is not None:
-        return f"Watch Low Fan Floor at {low_desc:.2f}; it is the buy reference below High Fan Floor."
-    return "ES Pivot Fan pending."
+        return f"Watch the low-pivot lower boundary at {low_desc:.2f}; it is the support reference below the high-pivot control boundary."
+    return "ES Control Map pending."
 
 def _decision_trace(
     *, as_of_iso: str, scenario: str, scenario_text: str,
@@ -301,11 +325,11 @@ def _decision_trace(
 ) -> list[dict]:
     """Chronological trace of the events that produced today's verdict."""
     trace: list[dict] = []
-    trace.append({"ts": as_of_iso, "event": f"Pivot Fan: {channel_reason}", "weight": "info"})
+    trace.append({"ts": as_of_iso, "event": f"Control Map: {channel_reason}", "weight": "info"})
     trace.append({"ts": as_of_iso, "event": f"Scenario {scenario.replace('_', ' ').lower()}", "weight": "key"})
     trace.append({
         "ts": as_of_iso,
-        "event": f"Confluence {confluence_score:.0f}/100 -> {action.replace('_', ' ').lower()}",
+        "event": f"Confidence {confluence_score:.0f}/100 -> {action.replace('_', ' ').lower()}",
         "weight": "key" if action == "TAKE" else "info",
     })
     if scenario_text:
@@ -370,7 +394,7 @@ def _rth_open_price(candles: list[Candle], session: date) -> Optional[float]:
 
 
 def _rth_bias_for(lines: list[Line], candles: list[Candle], session: date) -> Optional[dict]:
-    """RTH-open posture from the High Fan Floor."""
+    """RTH-open posture from the high-pivot control boundary."""
     high_asc = next((l for l in lines if l.kind == "PREV_RTH_HIGH_ASC"), None)
     high_desc = next((l for l in lines if l.kind == "PREV_RTH_HIGH_DESC"), None)
     low_desc = next((l for l in lines if l.kind == "PREV_RTH_LOW_DESC"), None)
@@ -390,7 +414,7 @@ def _rth_bias_for(lines: list[Line], candles: list[Candle], session: date) -> Op
             "continuationLine": "PREV_RTH_HIGH_ASC",
             "continuationValue": round(project_line(high_asc, open_at), 2) if high_asc else None,
             "note": (
-                "RTH posture pending: compare the opening print to High Fan Floor."
+                "RTH posture pending: compare the opening print to the high-pivot control boundary."
             ),
         }
 
@@ -404,8 +428,8 @@ def _rth_bias_for(lines: list[Line], candles: list[Candle], session: date) -> Op
             "continuationLine": "PREV_RTH_HIGH_ASC",
             "continuationValue": round(cont, 2) if cont is not None else None,
             "note": (
-                "RTH opened above High Fan Floor; watch for a push toward High Fan Ceiling, "
-                "then a return to the fan for the buy/sell decision."
+                "RTH opened above the high-pivot control boundary; watch for a push toward the upper boundary, "
+                "then a return to the map for the buy/sell decision."
             ),
         }
 
@@ -418,10 +442,825 @@ def _rth_bias_for(lines: list[Line], candles: list[Candle], session: date) -> Op
         "continuationLine": "PREV_RTH_LOW_DESC",
         "continuationValue": round(cont, 2) if cont is not None else None,
         "note": (
-            "RTH opened below High Fan Floor; watch for a push back into the high fan, "
-            "or a drop first toward Low Fan Floor."
+            "RTH opened below the high-pivot control boundary; watch for a push back into the map, "
+            "or a drop first toward the low-pivot lower boundary."
         ),
     }
+
+
+def _round_to_tick(value: float, tick: float = ES_TICK_SIZE) -> float:
+    return round(round(float(value) / tick) * tick, 2)
+
+
+def _deviation_line_value(
+    anchor: Anchor,
+    slope_per_hour: float,
+    at: datetime,
+    index: int,
+    *,
+    spacing: float = ES_DEVIATION_SPACING,
+) -> float:
+    return anchor.price + float(slope_per_hour) * es_trading_hours_between(anchor.time, at) + index * spacing
+
+
+def _deviation_label(index: int) -> str:
+    if index == 0:
+        return "Control Line"
+    side = "North Gate" if index > 0 else "South Gate"
+    numerals = {
+        1: "I",
+        2: "II",
+        3: "III",
+        4: "IV",
+    }
+    return f"{side} {numerals.get(abs(index), abs(index))}"
+
+
+def _next_candle_time(candles: list[Candle], index: int) -> datetime:
+    if index + 1 < len(candles):
+        return to_ct(candles[index + 1].t)
+    return next_es_candle_open(to_ct(candles[index].t))
+
+
+def _window_status(now: datetime, start: datetime, end: datetime) -> str:
+    now = to_ct(now)
+    if now < start:
+        return "UPCOMING"
+    if now < end:
+        return "ACTIVE"
+    return "CLOSED"
+
+
+def _deviation_window_for(at: datetime, entry_at: datetime, window_end: datetime, extension_end: datetime) -> tuple[str, str]:
+    at = to_ct(at)
+    if at < entry_at:
+        return "SETUP", "8-9 setup"
+    if at < window_end:
+        return "PRIMARY", "9-12 primary"
+    if at < extension_end:
+        return "EXTENSION", "12-2 extension"
+    return "CLOSED", "Closed"
+
+
+def _deviation_windows(now: datetime, window_start: datetime, entry_at: datetime, window_end: datetime, extension_end: datetime) -> list[dict]:
+    return [
+        {
+            "key": "SETUP",
+            "label": "8-9 setup",
+            "start": window_start.isoformat(),
+            "end": entry_at.isoformat(),
+            "status": _window_status(now, window_start, entry_at),
+            "guidance": "Map the open versus the 9 AM Control Line. Do not chase; prepare the institutional entry.",
+        },
+        {
+            "key": "PRIMARY",
+            "label": "9-12 primary entries",
+            "start": entry_at.isoformat(),
+            "end": window_end.isoformat(),
+            "status": _window_status(now, entry_at, window_end),
+            "guidance": "Best-quality window. Touch plus close through a 9 AM gate can trigger the next candle.",
+        },
+        {
+            "key": "EXTENSION",
+            "label": "12-2 extension/rejection",
+            "start": window_end.isoformat(),
+            "end": extension_end.isoformat(),
+            "status": _window_status(now, window_end, extension_end),
+            "guidance": "Track late rejection or continuation. Useful when a touch causes expansion, but label it post-window and avoid chasing after the move stretches.",
+        },
+    ]
+
+
+def _active_deviation_window(now: datetime, windows: list[dict]) -> dict:
+    for window in windows:
+        if window["status"] == "ACTIVE":
+            return window
+    if windows and to_ct(now) < to_ct(datetime.fromisoformat(windows[0]["start"])):
+        return windows[0]
+    return {
+        "key": "CLOSED",
+        "label": "Closed",
+        "start": windows[-1]["end"] if windows else to_ct(now).isoformat(),
+        "end": windows[-1]["end"] if windows else to_ct(now).isoformat(),
+        "status": "CLOSED",
+        "guidance": "The ES entry window is closed. Use the Control Map for review or risk management, not fresh entries.",
+    }
+
+
+def _deviation_zone(lines: list[dict], price: float, candles: Optional[list[Candle]] = None) -> dict:
+    ordered = sorted(lines, key=lambda item: float(item["currentValue"]))
+    if not ordered:
+        return {
+            "label": "Unavailable",
+            "posture": "WAIT",
+            "lowerLine": None,
+            "upperLine": None,
+            "callEntryLine": None,
+            "callEntryValue": None,
+            "putEntryLine": None,
+            "putEntryValue": None,
+            "roomRead": None,
+            "brokenGateLine": None,
+            "brokenGateValue": None,
+            "brokenGateRole": None,
+            "brokenGateNote": None,
+            "nextReference": "None",
+            "distanceToNext": 0.0,
+            "guidance": "The Control Map is waiting for the 9 AM reference.",
+        }
+    lower = None
+    upper = None
+    for line in ordered:
+        value = float(line["currentValue"])
+        if value <= price:
+            lower = line
+        if value > price and upper is None:
+            upper = line
+
+    nearest = min(ordered, key=lambda line: abs(float(line["currentValue"]) - price))
+    if lower and upper:
+        label = f"Between {lower['label']} and {upper['label']}"
+        call_entry_line = str(lower["label"])
+        call_entry_value = round(float(lower["currentValue"]), 2)
+        put_entry_line = str(upper["label"])
+        put_entry_value = round(float(upper["currentValue"]), 2)
+        room_read = (
+            f"Inside the {call_entry_line} to {put_entry_line} room. "
+            f"Calls must prove support at {call_entry_line}; puts must prove resistance at {put_entry_line}."
+        )
+    elif upper:
+        label = f"Below {upper['label']}"
+        call_entry_line = None
+        call_entry_value = None
+        put_entry_line = str(upper["label"])
+        put_entry_value = round(float(upper["currentValue"]), 2)
+        room_read = (
+            f"Below {put_entry_line}. First useful read is a reclaim or rejection at that gate."
+        )
+    else:
+        label = f"Above {lower['label'] if lower else ordered[-1]['label']}"
+        call_entry_line = str(lower["label"]) if lower else str(ordered[-1]["label"])
+        call_entry_value = round(float(lower["currentValue"] if lower else ordered[-1]["currentValue"]), 2)
+        put_entry_line = None
+        put_entry_value = None
+        room_read = (
+            f"Above {call_entry_line}. First useful read is a hold or failed retest at that gate."
+        )
+
+    nearest_value = float(nearest["currentValue"])
+    distance = round(nearest_value - price, 2)
+    if nearest["isMain"]:
+        posture = "AT_MAIN"
+        guidance = "Control Line room. Let the next gate reclaim or rejection resolve direction."
+    elif int(nearest["index"]) > 0:
+        posture = "UPPER_DEVIATION"
+        guidance = "North gate room. Reclaim from below favors continuation; rejection from below can become a sell next candle."
+    else:
+        posture = "LOWER_DEVIATION"
+        guidance = "South gate room. Reclaim from above favors bounce; loss from above can become a sell continuation."
+
+    broken = _broken_deviation_gate(ordered, candles or [])
+    if broken and broken["role"] == "RESISTANCE":
+        guidance = (
+            f"{broken['lineLabel']} was lost on an hourly close and now becomes resistance. "
+            "Stay patient until price retests or reclaims it."
+        )
+    elif broken and broken["role"] == "SUPPORT":
+        guidance = (
+            f"{broken['lineLabel']} was reclaimed on an hourly close and now becomes support. "
+            "Stay patient until price retests or loses it."
+        )
+
+    return {
+        "label": label,
+        "posture": posture,
+        "lowerLine": str(lower["label"]) if lower else None,
+        "upperLine": str(upper["label"]) if upper else None,
+        "callEntryLine": call_entry_line,
+        "callEntryValue": call_entry_value,
+        "putEntryLine": put_entry_line,
+        "putEntryValue": put_entry_value,
+        "roomRead": room_read,
+        "brokenGateLine": str(broken["lineLabel"]) if broken else None,
+        "brokenGateValue": round(float(broken["lineValue"]), 2) if broken else None,
+        "brokenGateRole": str(broken["role"]) if broken else None,
+        "brokenGateNote": str(broken["note"]) if broken else None,
+        "nextReference": str(nearest["label"]),
+        "distanceToNext": distance,
+        "guidance": guidance,
+    }
+
+
+def _broken_deviation_gate(lines: list[dict], candles: list[Candle]) -> Optional[dict]:
+    if len(candles) < 2:
+        return None
+    completed = sorted(candles, key=lambda c: to_ct(c.t))[-2:]
+    previous = completed[0]
+    latest = completed[1]
+    previous_close = float(previous.c)
+    latest_close = float(latest.c)
+    candidates: list[dict] = []
+    for line in lines:
+        value = float(line["currentValue"])
+        if previous_close > value and latest_close < value:
+            candidates.append({
+                "lineLabel": str(line["label"]),
+                "lineValue": value,
+                "role": "RESISTANCE",
+                "distance": abs(latest_close - value),
+                "note": (
+                    f"{str(line['label'])} was broken from above. Treat it as resistance until reclaimed."
+                ),
+            })
+        elif previous_close < value and latest_close > value:
+            candidates.append({
+                "lineLabel": str(line["label"]),
+                "lineValue": value,
+                "role": "SUPPORT",
+                "distance": abs(latest_close - value),
+                "note": (
+                    f"{str(line['label'])} was reclaimed from below. Treat it as support until lost."
+                ),
+            })
+    if not candidates:
+        return None
+    return min(candidates, key=lambda item: item["distance"])
+
+
+def _deviation_hour_label(hour: int) -> str:
+    return f"{hour:02d}:00"
+
+
+def _deviation_hourly_closes(candles: list[Candle], as_of: datetime, window_start: datetime, extension_end: datetime) -> list[dict]:
+    by_hour: dict[int, Candle] = {}
+    as_of_ct = to_ct(as_of)
+    for candle in sorted(candles, key=lambda c: to_ct(c.t)):
+        candle_time = to_ct(candle.t)
+        if candle_time > as_of_ct:
+            continue
+        if not (window_start <= candle_time <= extension_end):
+            continue
+        if not (8 <= candle_time.hour <= 14):
+            continue
+        by_hour[candle_time.hour] = candle
+    return [
+        {
+            "hour": hour,
+            "label": _deviation_hour_label(hour),
+            "time": to_ct(candle.t).isoformat(),
+            "close": round(float(candle.c), 2),
+        }
+        for hour, candle in sorted(by_hour.items())
+    ]
+
+
+def _deviation_fan_for(
+    *,
+    anchor: Optional[Anchor],
+    candles: list[Candle],
+    as_of: datetime,
+    session: date,
+    price: float,
+    slope_per_hour: float,
+    control_mode: str = "normal",
+    spacing: float = ES_DEVIATION_SPACING,
+) -> Optional[dict]:
+    """ES control grid from the previous-RTH pivot before 14:00 CT.
+
+    Normal mode draws the 9 AM Control Line from the prior high pivot with a
+    descending slope. Dealer-pressure mode draws it from the prior low pivot
+    with an ascending slope.
+    """
+    if anchor is None:
+        return None
+
+    as_of_ct = to_ct(as_of)
+    effective_slope = (
+        abs(float(slope_per_hour))
+        if control_mode == "dealer_pressure"
+        else -abs(float(slope_per_hour))
+    )
+    open_at = rth_window(session).start
+    window_start = at_ct(session, time(ES_DEVIATION_WINDOW_START_HOUR_CT, 0))
+    entry_at = at_ct(session, time(ES_DEVIATION_ENTRY_HOUR_CT, 0))
+    window_end = at_ct(session, time(ES_DEVIATION_WINDOW_END_HOUR_CT, 0))
+    extension_end = at_ct(session, time(ES_DEVIATION_EXTENSION_END_HOUR_CT, 0))
+    open_price = _rth_open_price(candles, session)
+    main_open = _round_to_tick(_deviation_line_value(anchor, effective_slope, open_at, 0, spacing=spacing))
+    main_entry = _round_to_tick(_deviation_line_value(anchor, effective_slope, entry_at, 0, spacing=spacing))
+
+    lines: list[dict] = []
+    for index in range(-ES_DEVIATION_BANDS, ES_DEVIATION_BANDS + 1):
+        entry_value = _round_to_tick(_deviation_line_value(anchor, effective_slope, entry_at, index, spacing=spacing))
+        open_value = _round_to_tick(_deviation_line_value(anchor, effective_slope, open_at, index, spacing=spacing))
+        lines.append({
+            "index": index,
+            "label": _deviation_label(index),
+            "value": entry_value,
+            "currentValue": entry_value,
+            "openValue": open_value,
+            "distanceFromPrice": round(entry_value - price, 2),
+            "isMain": index == 0,
+        })
+
+    cash_session_open = is_trading_session_date(session)
+    entry_windows = _deviation_windows(as_of_ct, window_start, entry_at, window_end, extension_end)
+    if not cash_session_open:
+        entry_windows = [
+            {**window, "status": "CLOSED", "guidance": "Cash market closed. ES futures are live; use the map for context, not a fresh RTH entry."}
+            for window in entry_windows
+        ]
+        active_window = {
+            "key": "CLOSED",
+            "label": "Cash market closed",
+            "start": window_start.isoformat(),
+            "end": extension_end.isoformat(),
+            "status": "CLOSED",
+            "guidance": "ES futures are live, but the normal cash-entry window is closed today.",
+        }
+    else:
+        active_window = _active_deviation_window(as_of_ct, entry_windows)
+    hourly_closes = _deviation_hourly_closes(candles, as_of_ct, window_start, extension_end)
+    session_bars = [
+        candle for candle in sorted(candles, key=lambda c: to_ct(c.t))
+        if window_start <= to_ct(candle.t) < extension_end and to_ct(candle.t) <= as_of_ct
+    ]
+    nearest = min(lines, key=lambda line: abs(float(line["distanceFromPrice"])))
+    zone = _deviation_zone(lines, price, session_bars)
+
+    if not cash_session_open:
+        open_bias = {
+            "direction": "PENDING",
+            "openPrice": None,
+            "mainValue": main_entry,
+            "distanceFromMain": None,
+            "note": "Cash market closed today; keep the live ES futures map, but do not force a normal RTH open bias.",
+        }
+    elif open_price is None:
+        open_bias = {
+            "direction": "PENDING",
+            "openPrice": None,
+            "mainValue": main_entry,
+            "distanceFromMain": None,
+            "note": "Opening bias pending: compare the RTH open against the 9 AM Control Line.",
+        }
+    else:
+        distance = round(open_price - main_entry, 2)
+        if distance > ES_OPEN_BIAS_TOLERANCE:
+            direction = "BULLISH"
+            note = (
+                "RTH opened above the Control Line; the Control Map marks a bullish day bias "
+                "until price loses a gate on a closing basis."
+            )
+        elif distance < -ES_OPEN_BIAS_TOLERANCE:
+            direction = "BEARISH"
+            note = (
+                "RTH opened below the Control Line; the Control Map marks a bearish day bias "
+                "until price reclaims a gate on a closing basis."
+            )
+        else:
+            direction = "NEUTRAL"
+            note = (
+                "RTH opened on the Control Line; treat the first gate close as the bias resolver."
+            )
+        open_bias = {
+            "direction": direction,
+            "openPrice": round(open_price, 2),
+            "mainValue": main_entry,
+            "distanceFromMain": distance,
+            "note": note,
+        }
+
+    signals: list[dict] = []
+    for candle_index, candle in enumerate(session_bars):
+        candle_time = to_ct(candle.t)
+        candidates: list[dict] = []
+        for line in lines:
+            line_value = _round_to_tick(
+                _deviation_line_value(
+                    anchor,
+                    effective_slope,
+                    candle_time,
+                    int(line["index"]),
+                    spacing=spacing,
+                )
+            )
+            if float(candle.l) <= line_value <= float(candle.h):
+                if float(candle.c) > line_value:
+                    side = "BUY"
+                elif float(candle.c) < line_value:
+                    side = "SELL"
+                else:
+                    continue
+                candidates.append({
+                    "side": side,
+                    "windowKey": _deviation_window_for(candle_time, entry_at, window_end, extension_end)[0],
+                    "windowLabel": _deviation_window_for(candle_time, entry_at, window_end, extension_end)[1],
+                    "lineIndex": int(line["index"]),
+                    "lineLabel": str(line["label"]),
+                    "lineValue": line_value,
+                    "candleTime": candle_time.isoformat(),
+                    "nextCandleTime": _next_candle_time(session_bars, candle_index).isoformat(),
+                    "close": round(float(candle.c), 2),
+                    "distance": abs(float(candle.c) - line_value),
+                })
+        if not candidates:
+            continue
+        signal = min(candidates, key=lambda item: item["distance"])
+        relation = "above" if signal["side"] == "BUY" else "below"
+        prefix = (
+            "Primary entry"
+            if signal["windowKey"] == "PRIMARY"
+            else "Post-window rejection/continuation"
+            if signal["windowKey"] == "EXTENSION"
+            else "Setup warning"
+        )
+        signal["note"] = (
+            f"{prefix}: ES touched {signal['lineLabel']} "
+            f"and closed {relation} it. {signal['side']} next candle is the read."
+        )
+        signal.pop("distance", None)
+        signals.append(signal)
+
+    return {
+        "anchor": {"price": round(anchor.price, 2), "time": anchor.time.isoformat()},
+        "slopePerHour": effective_slope,
+        "spacing": spacing,
+        "windowStart": window_start.isoformat(),
+        "entryReferenceTime": entry_at.isoformat(),
+        "windowEnd": window_end.isoformat(),
+        "extensionEnd": extension_end.isoformat(),
+        "entryMain": main_entry,
+        "currentMain": main_entry,
+        "openMain": main_open,
+        "openBias": open_bias,
+        "zone": zone,
+        "activeWindow": active_window,
+        "entryWindows": entry_windows,
+        "hourlyCloses": hourly_closes,
+        "nearestLine": nearest,
+        "lines": lines,
+        "recentSignals": signals[-5:],
+    }
+
+
+def _control_plan_line_value(anchor: Anchor, signed_slope: float, at: datetime) -> float:
+    return _round_to_tick(
+        anchor.price + float(signed_slope) * es_trading_hours_between(anchor.time, at)
+    )
+
+
+def _control_plan_map(
+    *,
+    id: str,
+    label: str,
+    direction: str,
+    anchor: Optional[Anchor],
+    signed_slope: float,
+    arm_distance: float,
+    reference_at: datetime,
+    price_for_distance: Optional[float],
+) -> Optional[dict]:
+    if anchor is None:
+        return None
+    control_value = _control_plan_line_value(anchor, signed_slope, reference_at)
+    distance = (
+        round(float(price_for_distance) - control_value, 2)
+        if price_for_distance is not None
+        else None
+    )
+    status = (
+        "PENDING"
+        if distance is None
+        else "ARMED"
+        if abs(distance) <= arm_distance
+        else "DISTANT"
+    )
+    return {
+        "id": id,
+        "label": label,
+        "direction": direction,
+        "anchor": {"price": round(anchor.price, 2), "time": anchor.time.isoformat()},
+        "slopePerHour": signed_slope,
+        "controlValue": control_value,
+        "armDistance": float(arm_distance),
+        "distanceFromOpen": distance,
+        "status": status,
+    }
+
+
+def _control_plan_signal_bars(
+    candles: list[Candle],
+    *,
+    as_of: datetime,
+    session: date,
+) -> list[dict]:
+    as_of_ct = to_ct(as_of)
+    buckets: dict[datetime, list[Candle]] = {}
+    for candle in sorted(candles, key=lambda c: to_ct(c.t)):
+        candle_time = to_ct(candle.t).replace(minute=0, second=0, microsecond=0)
+        if candle_time.date() != session:
+            continue
+        if candle_time.hour not in (8, 9, 10):
+            continue
+        if candle_time + timedelta(hours=1) > as_of_ct:
+            continue
+        buckets.setdefault(candle_time, []).append(candle)
+
+    bars: list[dict] = []
+    for hour, group in sorted(buckets.items()):
+        ordered = sorted(group, key=lambda c: to_ct(c.t))
+        bars.append({
+            "time": hour,
+            "open": float(ordered[0].o),
+            "high": max(float(c.h) for c in ordered),
+            "low": min(float(c.l) for c in ordered),
+            "close": float(ordered[-1].c),
+        })
+    return bars
+
+
+def _control_plan_setup_status(side: str, line_value: float, target_distance: float, price: float) -> str:
+    halfway = target_distance * 0.5
+    if side == "BUY" and price > line_value + halfway:
+        return "CHASING"
+    if side == "SELL" and price < line_value - halfway:
+        return "CHASING"
+    return "WATCHING"
+
+
+def _control_plan_setup(
+    *,
+    side: str,
+    map_info: dict,
+    entry_line: str,
+    line_label: str,
+    price: float,
+    status: Optional[str] = None,
+) -> dict:
+    target_distance = float(ES_HALF_GATE_TARGET)
+    line_value = float(map_info["controlValue"])
+    is_buy = side == "BUY"
+    target = line_value + target_distance if is_buy else line_value - target_distance
+    setup_status = status or _control_plan_setup_status(side, line_value, target_distance, price)
+    contract_type = "CALL" if is_buy else "PUT"
+    thesis = (
+        f"Support hold at {line_label}; first objective is Half-Gate."
+        if is_buy
+        else f"Resistance hold at {line_label}; first objective is Half-Gate."
+    )
+    return {
+        "side": side,
+        "contractType": contract_type,
+        "mapId": map_info["id"],
+        "mapLabel": map_info["label"],
+        "entryLine": entry_line,
+        "entryLineLabel": line_label,
+        "lineValue": round(line_value, 2),
+        "entryPrice": round(line_value, 2),
+        "targetPrice": round(target, 2),
+        "targetDistance": target_distance,
+        "status": setup_status,
+        "thesis": thesis,
+    }
+
+
+def _control_plan_signal(
+    *,
+    bar: dict,
+    map_info: dict,
+    entry_line: str,
+    line_label: str,
+    price: float,
+) -> Optional[dict]:
+    line_value = float(map_info["controlValue"])
+    tolerance = ES_TICK_SIZE / 2
+    buy_hit = (
+        float(bar["open"]) > line_value + tolerance
+        and float(bar["low"]) <= line_value
+        and float(bar["close"]) > line_value + tolerance
+    )
+    sell_hit = (
+        float(bar["open"]) < line_value - tolerance
+        and float(bar["high"]) >= line_value
+        and float(bar["close"]) < line_value - tolerance
+    )
+    if not buy_hit and not sell_hit:
+        return None
+    side = "BUY" if buy_hit else "SELL"
+    setup = _control_plan_setup(
+        side=side,
+        map_info=map_info,
+        entry_line=entry_line,
+        line_label=line_label,
+        price=price,
+        status=_control_plan_setup_status(side, line_value, float(ES_HALF_GATE_TARGET), price),
+    )
+    signal_time = to_ct(bar["time"])
+    entry_time = next_es_candle_open(signal_time)
+    setup.update({
+        "signalTime": signal_time.isoformat(),
+        "entryTime": entry_time.isoformat(),
+        "signalOpen": round(float(bar["open"]), 2),
+        "signalHigh": round(float(bar["high"]), 2),
+        "signalLow": round(float(bar["low"]), 2),
+        "signalClose": round(float(bar["close"]), 2),
+        "note": (
+            f"{signal_time.strftime('%H:%M')} CT candle touched {line_label} "
+            f"from {'above' if side == 'BUY' else 'below'} and closed "
+            f"{'above' if side == 'BUY' else 'below'} it. {side} at the next hourly open."
+        ),
+    })
+    return setup
+
+
+def _control_trade_plan_for(
+    *,
+    descending_anchor: Optional[Anchor],
+    ascending_anchor: Optional[Anchor],
+    candles: list[Candle],
+    as_of: datetime,
+    session: date,
+    price: float,
+) -> Optional[dict]:
+    reference_at = at_ct(session, time(ES_DEVIATION_WINDOW_START_HOUR_CT, 0))
+    window_end = at_ct(session, time(11, 0))
+    open_price = _rth_open_price(candles, session)
+    if open_price is None:
+        latest_before_ref = _last_candle_at(candles, reference_at)
+        open_price = float(latest_before_ref.c) if latest_before_ref is not None else None
+
+    primary_map = _control_plan_map(
+        id="DESCENDING_CLOSE",
+        label="Primary descending map",
+        direction="DESCENDING",
+        anchor=descending_anchor,
+        signed_slope=-abs(float(ES_DUAL_MAP_PRIMARY_SLOPE_PER_HOUR)),
+        arm_distance=float(ES_DUAL_MAP_PRIMARY_ARM_DISTANCE),
+        reference_at=reference_at,
+        price_for_distance=open_price,
+    )
+    opposite_map = _control_plan_map(
+        id="ASCENDING_LOW",
+        label="Opposite ascending map",
+        direction="ASCENDING",
+        anchor=ascending_anchor,
+        signed_slope=abs(float(ES_DUAL_MAP_OPPOSITE_SLOPE_PER_HOUR)),
+        arm_distance=float(ES_DUAL_MAP_OPPOSITE_ARM_DISTANCE),
+        reference_at=reference_at,
+        price_for_distance=open_price,
+    )
+    if primary_map is None or opposite_map is None:
+        return None
+
+    cash_session_open = is_trading_session_date(session)
+    selected_map = primary_map if primary_map["status"] == "ARMED" else opposite_map
+    entry_line = (
+        "PREV_RTH_HIGH_DESC"
+        if selected_map["id"] == "DESCENDING_CLOSE"
+        else "PREV_RTH_LOW_ASC"
+    )
+    entry_label = "Control Line"
+    setups = [
+        _control_plan_setup(
+            side="BUY",
+            map_info=selected_map,
+            entry_line=entry_line,
+            line_label=entry_label,
+            price=price,
+        ),
+        _control_plan_setup(
+            side="SELL",
+            map_info=selected_map,
+            entry_line=entry_line,
+            line_label=entry_label,
+            price=price,
+        ),
+    ]
+
+    signals: list[dict] = []
+    if cash_session_open:
+        for bar in _control_plan_signal_bars(candles, as_of=as_of, session=session):
+            signal = _control_plan_signal(
+                bar=bar,
+                map_info=selected_map,
+                entry_line=entry_line,
+                line_label=entry_label,
+                price=price,
+            )
+            if signal is not None:
+                signals.append(signal)
+
+    active_trade = signals[0] if signals else None
+    as_of_ct = to_ct(as_of)
+    if not cash_session_open:
+        status = "NO_CASH_SESSION"
+        label = "Cash session closed"
+        guidance = "ES futures may move, but the normal RTH entry model is inactive."
+    elif as_of_ct >= at_ct(session, time(12, 0)):
+        status = "CLOSED"
+        label = "Entry window closed"
+        guidance = "No new ES entries after the morning window. Use the plan only for replay."
+    elif active_trade is not None:
+        status = "TRIGGERED"
+        label = f"{active_trade['side']} next hourly open"
+        guidance = active_trade["note"]
+    elif selected_map["status"] == "ARMED":
+        status = "ARMED"
+        label = "Waiting for clean hourly touch"
+        guidance = "First clean 8, 9, or 10 AM candle touch controls the next hourly entry."
+    else:
+        status = "WAITING"
+        label = "Control map waiting"
+        guidance = "Primary map is distant; opposite map is the backup only if it gives the first clean touch."
+
+    return {
+        "status": status,
+        "label": label,
+        "entryReferenceTime": reference_at.isoformat(),
+        "signalWindowStart": reference_at.isoformat(),
+        "signalWindowEnd": window_end.isoformat(),
+        "targetDistance": float(ES_HALF_GATE_TARGET),
+        "primaryMap": primary_map,
+        "oppositeMap": opposite_map,
+        "activeTrade": active_trade,
+        "setups": setups,
+        "signals": signals[-5:],
+        "guidance": guidance,
+    }
+
+
+def _state_from_control_trade_plan(plan: dict) -> str:
+    status = str(plan.get("status") or "WAITING")
+    if status == "TRIGGERED":
+        return "GO"
+    if status == "ARMED":
+        return "ARMED"
+    if status == "CLOSED":
+        return "COOLDOWN"
+    if status == "NO_CASH_SESSION":
+        return "STAND_DOWN"
+    return "WAIT"
+
+
+def _prev_rth_high_pivot_anchor(candles: list[Candle], session: date) -> Optional[Anchor]:
+    """Highest prior-RTH 11 AM-3 PM close for the ES Control Line.
+
+    The close, not the wick, is the current calibrated anchor. Shortened
+    sessions fall back to the best available RTH close so the next session
+    still has a stable map.
+    """
+    prev, bars = _previous_rth_high_pivot_bars(candles, session)
+    if prev is None:
+        return None
+    high_bar = max(bars, key=lambda candle: float(candle.c))
+    return Anchor(price=float(high_bar.c), time=to_ct(high_bar.t))
+
+
+def _prev_rth_low_pivot_anchor(candles: list[Candle], session: date) -> Optional[Anchor]:
+    """Lowest prior-RTH 11 AM-3 PM wick for the opposite ES map."""
+    prev, bars = _previous_rth_low_pivot_bars(candles, session)
+    if prev is None:
+        return None
+    low_bar = min(bars, key=lambda candle: float(candle.l))
+    return Anchor(price=float(low_bar.l), time=to_ct(low_bar.t))
+
+
+def _previous_rth_high_pivot_bars(candles: list[Candle], session: date) -> tuple[Optional[date], list[Candle]]:
+    cursor = previous_futures_session_date(session)
+    for _ in range(7):
+        bars = in_window(candles, rth_window(cursor))
+        candidates = _control_high_candidate_bars(bars)
+        if candidates:
+            return cursor, candidates
+        cursor = previous_futures_session_date(cursor)
+    return None, []
+
+
+def _previous_rth_low_pivot_bars(candles: list[Candle], session: date) -> tuple[Optional[date], list[Candle]]:
+    cursor = previous_futures_session_date(session)
+    for _ in range(7):
+        bars = in_window(candles, rth_window(cursor))
+        candidates = _control_window_candidate_bars(bars)
+        if candidates:
+            return cursor, candidates
+        cursor = previous_futures_session_date(cursor)
+    return None, []
+
+
+def _control_high_candidate_bars(bars: list[Candle]) -> list[Candle]:
+    return _control_window_candidate_bars(bars)
+
+
+def _control_window_candidate_bars(bars: list[Candle]) -> list[Candle]:
+    control_window = [
+        candle for candle in bars
+        if time(11, 0) <= to_ct(candle.t).time() < time(15, 0)
+    ]
+    if len(control_window) >= 2:
+        return control_window
+    pre_close = [candle for candle in bars if to_ct(candle.t).time() < time(15, 0)]
+    return pre_close or control_window or bars
 
 
 # ---------------------------------------------------------------------------
@@ -438,6 +1277,7 @@ def compute_snapshot(
     otm_distance: float = DEFAULT_OTM_DISTANCE,
     strike_increment: int = SPX_STRIKE_INCREMENT,
     expiration: Optional[date] = None,
+    control_mode: str = "normal",
 ):
     """Build an SPXSnapshot from ES bars.
 
@@ -477,7 +1317,7 @@ def compute_snapshot(
     as_of_ct = to_ct(as_of)
     session = session_date_ct(as_of_ct)
 
-    # 1. ES Pivot Fan structure is computed in native ES coordinates.
+    # 1. ES structure is computed in native ES coordinates.
     #
     # The `es_to_spx_offset` argument is retained for API compatibility and
     # quote diagnostics, but it must not be applied to the six structure lines.
@@ -489,21 +1329,36 @@ def compute_snapshot(
     sydney = sydney_range(spx_candles, session)
     tokyo = tokyo_range(spx_candles, session)
 
-    # 3. Canonical ES Pivot Fan. Sydney/Tokyo ranges are diagnostics only.
+    # 3. Canonical ES structure. Sydney/Tokyo ranges are diagnostics only.
     channel = Channel(
         direction="ASCENDING",
         reason=(
-            "ES Pivot Fan active: High Fan and Low Fan references are projected "
-            "from the prior RTH high close and the post-noon RTH low wick. "
+            "ES Control Map active: high-pivot and low-pivot references are projected "
+            "from prior-session anchors. "
             "A higher overnight pivot adds a minor ascending watch line."
         ),
     )
 
-    # 4. Overnight anchors (direction-aware) + prev-RTH refs.
-    overnight_high, overnight_low = overnight_anchors(spx_candles, session)
+    # 4. Overnight anchors (diagnostic) + prev-RTH refs. During shortened
+    # holiday sessions the app can move to the next planning session before
+    # that session's overnight tape has printed. In that case, keep the
+    # Control Map alive by falling back to the prior futures session pivots.
     prev_rth = prev_rth_anchors(spx_candles, session)
+    pivot_high = _prev_rth_high_pivot_anchor(spx_candles, session)
+    pivot_low = _prev_rth_low_pivot_anchor(spx_candles, session)
+    if prev_rth is None and pivot_high is not None and pivot_low is not None:
+        prev_rth = (pivot_high, pivot_low)
     prev_rth_high = prev_rth[0] if prev_rth else None
     prev_rth_low = prev_rth[1] if prev_rth else None
+    try:
+        overnight_high, overnight_low = overnight_anchors(spx_candles, session)
+    except ValueError:
+        if prev_rth_high is not None and prev_rth_low is not None:
+            overnight_high, overnight_low = prev_rth_high, prev_rth_low
+        else:
+            last = _last_candle_at(spx_candles, as_of_ct)
+            fallback = Anchor(price=float(last.c), time=to_ct(last.t))
+            overnight_high, overnight_low = fallback, fallback
 
     # 5. Lines.
     lines = build_lines(
@@ -527,12 +1382,15 @@ def compute_snapshot(
 
     # 8. Contracts.
     expiry = expiration or session
+    dte_days = (expiry - session).days
+    dte_label = "0DTE" if dte_days <= 0 else f"{dte_days}DTE"
     p_contract, a_contract = suggest_for_plays(
         plays.primary,
         plays.alternate,
         expiry,
         otm_distance=otm_distance,
         increment=strike_increment,
+        dte_label=dte_label,
     )
 
     # 9. Re-entry watch.
@@ -594,22 +1452,51 @@ def compute_snapshot(
         as_of=as_of_ct,
         session=session,
     )
-    state_history = _state_history(as_of_iso=as_of_iso, current_state=current_state)
     planned_envelope = _planned_envelope_for(projected)
     score_bands = _score_bands()
     rth_bias = _rth_bias_for(lines, spx_candles, session)
-    if rth_bias is not None:
+    control_mode = "dealer_pressure" if control_mode == "dealer_pressure" else "normal"
+    control_slope = (
+        ES_DEALER_PRESSURE_SLOPE_PER_HOUR
+        if control_mode == "dealer_pressure"
+        else slope_per_hour
+    )
+    control_spacing = (
+        ES_DEALER_PRESSURE_SPACING
+        if control_mode == "dealer_pressure"
+        else ES_DEVIATION_SPACING
+    )
+    deviation_anchor = (
+        (_prev_rth_low_pivot_anchor(spx_candles, session) or prev_rth_low)
+        if control_mode == "dealer_pressure"
+        else (_prev_rth_high_pivot_anchor(spx_candles, session) or prev_rth_high)
+    )
+    descending_deviation_fan = _deviation_fan_for(
+        anchor=deviation_anchor,
+        candles=spx_candles,
+        as_of=as_of_ct,
+        session=session,
+        price=last_price,
+        slope_per_hour=control_slope,
+        control_mode=control_mode,
+        spacing=control_spacing,
+    )
+    control_trade_plan = _control_trade_plan_for(
+        descending_anchor=_prev_rth_high_pivot_anchor(spx_candles, session) or prev_rth_high,
+        ascending_anchor=_prev_rth_low_pivot_anchor(spx_candles, session) or prev_rth_low,
+        candles=spx_candles,
+        as_of=as_of_ct,
+        session=session,
+        price=last_price,
+    )
+    if control_trade_plan is not None:
+        current_state = _state_from_control_trade_plan(control_trade_plan)
         decision_trace.append({
             "ts": as_of_iso,
-            "event": f"RTH bias: {rth_bias['note']}",
+            "event": f"Half-Gate plan: {control_trade_plan['guidance']}",
             "weight": "key",
         })
-    if touch_window is not None:
-        decision_trace.append({
-            "ts": to_ct(touch_window["entryTime"]).isoformat(),
-            "event": _touch_window_trace(touch_window),
-            "weight": "key",
-        })
+    state_history = _state_history(as_of_iso=as_of_iso, current_state=current_state)
 
     # ---- Build the Pydantic model (camelCase aliases) ----
 
@@ -702,6 +1589,8 @@ def compute_snapshot(
             )
             if rth_bias else None
         ),
+        descendingDeviationFan=descending_deviation_fan,
+        controlTradePlan=control_trade_plan,
     )
     return snapshot
 
@@ -715,7 +1604,7 @@ def _line_model(l: Line, projected: list[ProjectedLine], price: float, session: 
     """Convert internal Line + projection into the schema's SPXLine."""
     from .schema import SPXLine
     cur = next(p.value for p in projected if p.kind == l.kind)
-    entry_reference = at_ct(session, time(8, 0))
+    entry_reference = at_ct(session, time(ES_DEVIATION_ENTRY_HOUR_CT, 0))
     entry_value = project_line(l, entry_reference)
     return SPXLine(
         kind=l.kind,
@@ -732,10 +1621,10 @@ def _line_model(l: Line, projected: list[ProjectedLine], price: float, session: 
 
 def _line_display_name(kind: str) -> str:
     name_map = {
-        "PREV_RTH_HIGH_ASC": "High Fan Ceiling",
-        "PREV_RTH_HIGH_DESC": "High Fan Floor",
-        "PREV_RTH_LOW_ASC": "Low Fan Ceiling",
-        "PREV_RTH_LOW_DESC": "Low Fan Floor",
+        "PREV_RTH_HIGH_ASC": "High-pivot upper boundary",
+        "PREV_RTH_HIGH_DESC": "High-pivot control boundary",
+        "PREV_RTH_LOW_ASC": "Low-pivot upper boundary",
+        "PREV_RTH_LOW_DESC": "Low-pivot lower boundary",
         "SWING_HIGH_ASC": "Overnight Higher Pivot - Minor Ascending",
         "SWING_HIGH_DESC": "Overnight Swing High - Descending",
         "SWING_LOW_ASC": "Overnight Swing Low - Ascending",

@@ -5,7 +5,6 @@
 @layer base {
   :root {
     color-scheme: light;
-    --grid-line: rgba(20, 22, 26, 0.04);
   }
 
   html {
@@ -16,41 +15,35 @@
 
   body {
     font-feature-settings: "ss01", "ss03", "cv11";
-    background-color: #faf8f3;
-    color: #14161a;
+    background-color: #f5f6f1;
+    color: #0a0b0c;
   }
 
-  /* v10 P1-6: tabular-nums applies wherever a price, R-multiple,
-     percent, score, or countdown is rendered. Three opt-in
-     surfaces:
-       .num            — body utility class
-       [data-num]      — adapter-emitted spans
-       [data-testid="countdown"]  — every <Countdown /> instance
-     Together these cover every numeric on the slate without
-     touching headline copy or label text. */
+  /* Numeric surfaces: every price, distance, percent, or countdown
+     renders in Geist Mono with tabular figures. Opt in via .num,
+     [data-num], or the countdown test id. */
   .num,
   [data-num],
   [data-testid="countdown"] {
     font-variant-numeric: tabular-nums;
     font-family: var(--font-geist-mono);
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
   }
 
   ::selection {
-    background: rgba(184, 130, 31, 0.22);
-    color: #14161a;
+    background: #b8f23d;
+    color: #0a0b0c;
   }
 
-  /* v7 P1-3: standard focus-visible utility — 2px brand-tint
-     outline + 2px offset. Applied via the `:where()` wrapper at
-     zero specificity so component-level rings (e.g. focus-visible:
-     ring-2 ring-gold/40 on slate buttons) still win when set. */
-  :where(button, a, [role="button"], [tabindex]):focus-visible {
-    outline: 2px solid rgba(184, 130, 31, 0.55);
+  /* Standard focus-visible: 2px cobalt outline, square corners, at
+     zero specificity so component-level rings can still override. */
+  :where(button, a, [role="button"], [tabindex], input, select, summary):focus-visible {
+    outline: 2px solid #3157ff;
     outline-offset: 2px;
-    border-radius: 6px;
+    border-radius: 0;
   }
 
+  /* Square operational scrollbar — carbon on optic, no pill radius. */
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
@@ -59,57 +52,90 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #d4cbb6;
-    border-radius: 999px;
-    border: 2px solid #faf8f3;
+    background: #b9bcb3;
+    border-radius: 0;
+    border: 2px solid #f5f6f1;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #b8a888;
+    background: #0a0b0c;
   }
 }
 
 @layer components {
-  /* paper-like surface, no glassmorphism */
-  .surface {
-    background: #ffffff;
-    box-shadow: 0 1px 0 0 #e8e2d2, 0 1px 2px -1px rgba(20, 22, 26, 0.04);
-  }
-
-  /* tabular eyebrow label */
-  .eyebrow {
+  /* Mono microlabel — the smallest sanctioned type on any surface.
+     10px floor: nothing user-facing renders below this size. */
+  .microlabel {
+    font-family: var(--font-geist-mono);
     font-size: 10px;
-    line-height: 1;
-    letter-spacing: 0.16em;
+    line-height: 1.1;
+    letter-spacing: 0.18em;
     text-transform: uppercase;
-    font-weight: 600;
-    color: #6b7280;
+    font-weight: 700;
   }
 
-  /* hairline horizontal divider */
-  .hr-rule {
-    height: 1px;
-    background: #e8e2d2;
+  /* Instrument grid fields (dark surfaces). */
+  .hud-grid {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.09) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px);
+    background-size: 100% 64px, 84px 100%;
   }
 
-  /* fine vertical rule */
-  .vr-rule {
-    width: 1px;
-    background: #e8e2d2;
+  /* Instrument grid fields (light surfaces). */
+  .hud-grid-light {
+    background-image:
+      linear-gradient(rgba(10, 11, 12, 0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(10, 11, 12, 0.045) 1px, transparent 1px);
+    background-size: 100% 64px, 84px 100%;
   }
 
-  /* dotted leaders for editorial number lists */
-  .leader {
-    background-image: radial-gradient(circle, #c8cdd3 1px, transparent 1px);
-    background-position: bottom;
-    background-size: 4px 4px;
-    background-repeat: repeat-x;
+  /* Diagonal hatch for "no data / closed" zones. */
+  .hatch {
+    background-image: repeating-linear-gradient(
+      -45deg,
+      rgba(255, 255, 255, 0.05) 0,
+      rgba(255, 255, 255, 0.05) 1px,
+      transparent 1px,
+      transparent 9px
+    );
+  }
+  .hatch-dark {
+    background-image: repeating-linear-gradient(
+      -45deg,
+      rgba(10, 11, 12, 0.06) 0,
+      rgba(10, 11, 12, 0.06) 1px,
+      transparent 1px,
+      transparent 9px
+    );
+  }
+
+  /* Hero headline reveal. Pure CSS so it plays before hydration and
+     never hides content when JavaScript is unavailable; the global
+     reduced-motion rule collapses it to its final frame. */
+  @keyframes rise-line {
+    from {
+      transform: translateY(80%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+  .headline-rise {
+    animation: rise-line 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* Ghost display type — outlined headline for oversized backdrops. */
+  .text-ghost {
+    color: transparent;
+    -webkit-text-stroke: 1.5px rgba(255, 255, 255, 0.22);
+  }
+  .text-ghost-carbon {
+    color: transparent;
+    -webkit-text-stroke: 1.5px rgba(10, 11, 12, 0.18);
   }
 }
 
 @layer utilities {
-  /* Slate refinement: a screen-reader-only utility. Tailwind ships
-     `sr-only` by default, but we re-declare for explicitness alongside
-     the slate primitives that use it. */
   .visually-hidden {
     position: absolute;
     width: 1px;
@@ -122,46 +148,23 @@
     border: 0;
   }
 
-  /* Honor reduced-motion preferences for our breathing / shimmer
-     loops. Anything decorative pauses; layout-meaningful animations
-     keep their first frame so nothing snaps. */
+  /* Honor reduced-motion. Decorative loops stop entirely; everything
+     else collapses to its final frame so no content is hidden. */
   @media (prefers-reduced-motion: reduce) {
-    .animate-breathe,
-    .animate-shimmer,
-    .animate-ticker {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+      transition-duration: 0.01ms !important;
+    }
+
+    .animate-ticker,
+    .animate-scanline,
+    .animate-blink,
+    .animate-shimmer {
       animation: none !important;
     }
   }
-
-  .grain {
-    background-image: radial-gradient(circle at 1px 1px, rgba(20, 22, 26, 0.04) 1px, transparent 0);
-    background-size: 24px 24px;
-  }
-
-  .ink-grad {
-    background: linear-gradient(135deg, #14161a 0%, #3d424d 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
-
-  .gold-grad {
-    background: linear-gradient(135deg, #b8821f 0%, #c7821a 50%, #8a5e10 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
-
-  .ring-armed {
-    box-shadow: 0 0 0 1px #0a7589 inset;
-  }
-
-  .anim-rise > * {
-    animation: riseUp 480ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  }
-  .anim-rise > *:nth-child(2) { animation-delay: 60ms; }
-  .anim-rise > *:nth-child(3) { animation-delay: 120ms; }
-  .anim-rise > *:nth-child(4) { animation-delay: 180ms; }
-  .anim-rise > *:nth-child(5) { animation-delay: 240ms; }
-  .anim-rise > *:nth-child(6) { animation-delay: 300ms; }
 }

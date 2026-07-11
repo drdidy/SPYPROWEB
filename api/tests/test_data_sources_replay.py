@@ -34,13 +34,13 @@ def _frame(entry_open: float, exit_close: float) -> pd.DataFrame:
 
 
 def _window_touch_frame() -> pd.DataFrame:
-    idx = [_ts(9), _ts(10), _ts(11)]
+    idx = [_ts(9), _ts(10), _ts(11), _ts(12)]
     return pd.DataFrame(
         {
-            "Open": [101.0, 103.5, 104.0],
-            "High": [103.0, 105.0, 104.5],
-            "Low": [99.75, 103.0, 103.5],
-            "Close": [102.5, 104.0, 104.25],
+            "Open": [101.0, 103.5, 104.0, 104.4],
+            "High": [103.0, 105.0, 104.5, 105.0],
+            "Low": [99.75, 103.0, 103.5, 104.0],
+            "Close": [102.5, 104.0, 104.25, 104.75],
         },
         index=idx,
     )
@@ -73,7 +73,7 @@ def _line(name: str, price: float) -> DynamicLine:
     )
 
 
-def test_spy_replay_grades_first_9_to_11_reference_touch_to_hour_close():
+def test_spy_replay_grades_first_9_to_11_reference_touch_on_next_candle():
     bars = _window_touch_frame()
 
     block = _build_replay_block(
@@ -88,24 +88,26 @@ def test_spy_replay_grades_first_9_to_11_reference_touch_to_hour_close():
     )
 
     assert block["verdictOutcome"] == "WIN"
-    assert block["verdictPnl"] == 2.5
-    assert block["entry"]["rule"] == "ENTRY_WINDOW_TOUCH"
+    assert block["verdictPnl"] == 0.5
+    assert block["entry"]["time"] == _ts(10).isoformat()
+    assert block["entry"]["price"] == 103.5
+    assert block["entry"]["rule"] == "ENTRY_WINDOW_NEXT_CANDLE"
     assert block["entry"]["line"] == "Upper ref"
     assert block["exit"]["rule"] == "HOURLY_CLOSE"
 
 
-def test_spy_triggers_use_8am_reference_but_9_to_11_touch_window():
+def test_spy_triggers_use_9am_control_reference_and_9_to_11_touch_window():
     rows = _triggers_from_lines(
         primary_lines=[_line("UPPER", 100.0)],
         current_dt=_ts(10).to_pydatetime(),
         current_price=101.0,
         rth_today=pd.DataFrame(),
         rth_yesterday=pd.DataFrame(),
-        entry_reference_dt=_ts(8).to_pydatetime(),
+        entry_reference_dt=_ts(9).to_pydatetime(),
         slope=0.0,
     )
 
-    assert rows[0]["entryReferenceTime"] == _ts(8).isoformat()
+    assert rows[0]["entryReferenceTime"] == _ts(9).isoformat()
     assert rows[0]["touchWindowStart"] == _ts(9).isoformat()
     assert rows[0]["touchWindowEnd"] == _ts(11).isoformat()
 
@@ -113,12 +115,12 @@ def test_spy_triggers_use_8am_reference_but_9_to_11_touch_window():
 def test_spy_replay_includes_11am_ct_candle_in_plan_window():
     bars = pd.DataFrame(
         {
-            "Open": [104.0],
-            "High": [105.0],
-            "Low": [99.75],
-            "Close": [102.5],
+            "Open": [104.0, 102.75],
+            "High": [105.0, 104.0],
+            "Low": [99.75, 102.5],
+            "Close": [102.5, 103.5],
         },
-        index=[_ts(11)],
+        index=[_ts(11), _ts(12)],
     )
 
     block = _build_replay_block(
@@ -133,8 +135,9 @@ def test_spy_replay_includes_11am_ct_candle_in_plan_window():
     )
 
     assert block["verdictOutcome"] == "WIN"
-    assert block["verdictPnl"] == 2.5
-    assert block["entry"]["time"] == _ts(11).isoformat()
+    assert block["verdictPnl"] == 0.75
+    assert block["entry"]["time"] == _ts(12).isoformat()
+    assert block["entry"]["rule"] == "ENTRY_WINDOW_NEXT_CANDLE"
 
 
 def test_live_spy_state_uses_touch_window_trade_lifecycle():
@@ -166,10 +169,10 @@ def test_spy_live_touch_window_aggregates_5m_bars_to_completed_hour():
     )
 
     assert touch is not None
-    assert touch["entry_time"] == _ts(9)
-    assert touch["exit_time"] == _ts(10)
-    assert touch["entry_price"] == 100.0
-    assert touch["exit_price"] == 102.5
+    assert touch["entry_time"] == _ts(10)
+    assert touch["exit_time"] == _ts(11)
+    assert touch["entry_price"] == 102.5
+    assert touch["exit_price"] == 102.75
     assert touch["side"] == "LONG"
 
 
@@ -191,11 +194,11 @@ def test_spy_8am_setup_candle_arms_9am_entry_and_exits_9am_close():
     )
 
     assert touch is not None
-    assert touch["rule"] == "EIGHT_AM_SETUP_TOUCH"
+    assert touch["rule"] == "EIGHT_AM_SETUP_NEXT_CANDLE"
     assert touch["setup_time"] == _ts(8)
     assert touch["entry_time"] == _ts(9)
     assert touch["exit_time"] == _ts(10)
-    assert touch["entry_price"] == 100.0
+    assert touch["entry_price"] == 100.75
     assert touch["exit_price"] == 103.0
     assert touch["side"] == "LONG"
 

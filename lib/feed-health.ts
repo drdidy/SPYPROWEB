@@ -65,8 +65,8 @@ export interface FeedHealthState {
 }
 
 export const FEED_LABELS: Record<FeedId, string> = {
-  "spy-rails": "SPY rails",
-  "spx-rails": "ES Pivot Fan",
+  "spy-rails": "SPY structure",
+  "spx-rails": "ES Control Map",
   "spy-hit-rate": "SPY last-5",
   "spx-hit-rate": "ES last-5",
   "spy-last-session": "SPY last session",
@@ -74,15 +74,15 @@ export const FEED_LABELS: Record<FeedId, string> = {
   "daily-brief-preview": "Daily brief preview",
   "market-clock": "Market clock",
   "price-tick": "Last price",
-  "anchor-levels": "Anchor levels",
+  "anchor-levels": "Session setup",
   "trigger-lines": "Trigger map",
   "pre-open-bias": "Pre-open bias",
-  "options-chain": "Options intelligence",
+  "options-chain": "Execution lens",
   "signal-tape": "Signal tape",
   "risk-guardrails": "Risk guardrails",
   "session-clock": "Session clock",
-  "projection-engine": "Projection engine",
-  "calibration-store": "Calibration store",
+  "projection-engine": "Foresight",
+  "calibration-store": "Replay learning",
 };
 
 export const FEED_DEFAULTS = {

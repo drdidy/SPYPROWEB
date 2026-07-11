@@ -3,14 +3,8 @@ import { LegalPage } from "@/components/marketing/LegalPage";
 export const metadata = {
   title: "Terms of Service · SPY Prophet",
   description:
-    "Terms governing use of SPY Prophet, a closed-beta decision-support workspace.",
+    "Terms governing use of SPY Prophet, a decision-support workspace.",
 };
-
-// TODO(legal): every section below is engineering-drafted boilerplate.
-// Counsel must review before public launch. Specifically: arbitration
-// clause enforceability per state, dispute-resolution venue choice
-// (currently Delaware), the indemnification scope, and the SAAS
-// vs subscription characterization for sales-tax nexus.
 
 export default function TermsPage() {
   return (
@@ -44,12 +38,11 @@ export default function TermsPage() {
         Service if doing so violates the laws of your jurisdiction.
       </p>
 
-      <h2>3. Closed beta</h2>
+      <h2>3. Account access</h2>
       <p>
-        Access during closed beta is by invitation. We may suspend, modify,
-        or terminate access at any time without notice during the beta
-        period. Beta features may change materially from one session to the
-        next.
+        Access may be invitation-based or limited by plan. We may suspend,
+        modify, or terminate access if required for security, compliance, or
+        violation of these Terms.
       </p>
 
       <h2>4. Acceptable use</h2>
@@ -70,9 +63,9 @@ export default function TermsPage() {
 
       <h2>6. Fees</h2>
       <p>
-        Closed beta is offered free of charge. Future paid tiers will be
-        introduced under a separate subscription agreement. We will give
-        reasonable notice before any free-tier feature becomes paid.
+        Paid tiers, if offered, are governed by the plan and checkout terms
+        presented at purchase. We will give reasonable notice before changing
+        material plan access.
       </p>
 
       <h2>7. Disclaimers</h2>
@@ -112,8 +105,7 @@ export default function TermsPage() {
         arbitration administered by JAMS in accordance with its
         Comprehensive Arbitration Rules. The seat of arbitration shall be
         Wilmington, Delaware. The parties waive any right to participate in
-        a class action.{" "}
-        {/* TODO(legal): confirm arbitration enforceability per CA, NY, MA. */}
+        a class action.
       </p>
 
       <h2>11. Changes</h2>

@@ -5,16 +5,10 @@
 // snapshot from the browser via the same path the /replay workspace
 // uses.
 //
-// Why client-side fetch on /spx? The previous server-side path
-// silently fell back to the mock fixture (lib/spx-mock-data.ts -
-// 5872.00 / TAKE / ASCENDING) whenever the server function couldn't
-// reach /api/spx/snapshot. The most common cause: Vercel preview
-// deployments enforce Deployment Protection on the public URL, and
-// server-to-server fetches from inside a Vercel function get a 401
-// from that wall. The browser carries the user's bypass cookie so
-// /replay's client-side fetch sails through, but /spx's server
-// fetch did not - hence the user-reported "shows mock data on the
-// SPX Channel tab".
+// Why client-side fetch on /spx? The channel should use the same
+// authenticated browser path as /replay, especially on protected Vercel
+// preview deployments where a server-to-server request may receive a
+// 401 even though the user's browser session is authorized.
 //
 // Moving the fetch to the browser uses the same auth-cookie path as
 // /replay and produces identical results.
@@ -25,25 +19,27 @@ import { ArrowLeft, ArrowUpRight } from "lucide-react";
 
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { SectionLabel } from "@/components/ui/SectionLabel";
-import { ChannelStateRail } from "@/components/channel/ChannelStateRail";
 import { WhyThisStateLink } from "@/components/slate/WhyThisStateLink";
-import { SPXChannelHero } from "@/components/spx/SPXChannelHero";
+import { SPXDeviationFanPanel } from "@/components/spx/SPXDeviationFanPanel";
+import { ESPlanCountdownCard } from "@/components/spx/ESPlanCountdownCard";
 import { SPXPlaysSlate } from "@/components/spx/SPXPlaysSlate";
-import { SPXLineLadder } from "@/components/spx/SPXLineLadder";
 import { SPXSessionOrigin } from "@/components/spx/SPXSessionOrigin";
 import { SPXConfluence } from "@/components/spx/SPXConfluence";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { cn } from "@/lib/utils";
+import { formatDisplayLabel, formatEngineStateLabel } from "@/lib/display-labels";
 import { getSessionInfo } from "@/lib/sessions";
 import { canonicalizeEsSnapshot } from "@/lib/canonical-es";
 import type { EngineState } from "@/lib/states";
-import type { SpxProjectionChainInput } from "@/lib/spx-contract-projection";
 import type { SPXSnapshot } from "@/lib/types";
 
 interface Props {
   /** YYYY-MM-DD when launched from a /replay deep link. */
   replayDate?: string;
+  initialSnapshot?: SPXSnapshot;
+  initialSource?: "live" | "mock";
+  initialError?: string;
 }
 
 type FetchState =
@@ -63,19 +59,31 @@ interface IntradayReplayResponse {
   es?: Array<{ t: string; h: number; l: number; c: number }>;
 }
 
-export function SPXChannelClient({ replayDate }: Props) {
-  const [state, setState] = useState<FetchState>({ status: "loading" });
-  const [optionsChain, setOptionsChain] = useState<SpxProjectionChainInput | null>(null);
+export function SPXChannelClient({
+  replayDate,
+  initialSnapshot,
+  initialSource,
+  initialError,
+}: Props) {
+  const [state, setState] = useState<FetchState>(
+    initialSnapshot
+      ? { status: "ready", snap: initialSnapshot }
+      : { status: "loading" },
+  );
   const [esBars, setEsBars] = useState<Array<{ t: string; h: number; l: number; c: number }> | null>(null);
   const [showLoadingDetail, setShowLoadingDetail] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     const slowLoadTimer = window.setTimeout(() => {
       if (!cancelled) setShowLoadingDetail(true);
     }, 3500);
-    setState({ status: "loading" });
-    setOptionsChain(null);
+    if (!initialSnapshot) setState({ status: "loading" });
     setEsBars(null);
     setShowLoadingDetail(false);
     const url = replayDate
@@ -107,8 +115,6 @@ export function SPXChannelClient({ replayDate }: Props) {
             .catch(() => {
               if (!cancelled) setEsBars(null);
             });
-          const chain = await fetchSpxOptionsChain(replayDate);
-          if (!cancelled) setOptionsChain(chain);
           return;
         }
         // Try to surface the API's error body. The handler emits
@@ -124,6 +130,10 @@ export function SPXChannelClient({ replayDate }: Props) {
         );
         const trace = body.trace?.map(scrubProviderDetail).join(" - ");
         if (cancelled) return;
+        if (initialSnapshot) {
+          setState({ status: "ready", snap: initialSnapshot });
+          return;
+        }
         if (res.status === 503 || body.kind === "no_bars") {
           setState({ status: "no_bars", message });
         } else {
@@ -131,6 +141,10 @@ export function SPXChannelClient({ replayDate }: Props) {
         }
       } catch (e: unknown) {
         if (cancelled) return;
+        if (initialSnapshot) {
+          setState({ status: "ready", snap: initialSnapshot });
+          return;
+        }
         setState({
           status: "error",
           message:
@@ -142,64 +156,14 @@ export function SPXChannelClient({ replayDate }: Props) {
       cancelled = true;
       window.clearTimeout(slowLoadTimer);
     };
-  }, [replayDate]);
+  }, [initialSnapshot, replayDate]);
+
+  if (!hydrated) {
+    return <ESLoadingShell replayDate={replayDate} showLoadingDetail={false} />;
+  }
 
   if (state.status === "loading") {
-    return (
-      <div className="w-full max-w-[1440px] space-y-8 pb-16 pt-6">
-        {replayDate && <ReplayBanner date={replayDate} />}
-        <section
-          role="status"
-          aria-live="polite"
-          className="relative overflow-hidden rounded-[22px] border border-[#C9A227]/35 bg-[#071116] px-5 py-5 text-paper shadow-[0_24px_60px_-42px_rgba(7,17,22,0.95)] md:px-7 md:py-6"
-        >
-          <div
-            aria-hidden
-            className="absolute inset-0 opacity-[0.12] bg-[linear-gradient(rgba(244,228,192,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(244,228,192,0.10)_1px,transparent_1px)] bg-[size:42px_42px]"
-          />
-          <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
-            <div>
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="font-mono text-[10px] text-gold-soft/82 tracking-[0.20em] uppercase">
-                  ES - Pivot Fan - resolving
-                </span>
-                <span className="h-px w-10 bg-gold/45" />
-                <span className="font-mono text-[10px] text-paper/48 tracking-[0.20em] uppercase">
-                  No fallback values
-                </span>
-              </div>
-              <h1 className="mt-3 text-[34px] font-serif leading-none tracking-tight text-paper md:text-[44px]">
-                Building the ES structure map.
-              </h1>
-              <p className="mt-4 max-w-3xl text-[15px] leading-relaxed text-paper/72">
-                The live ES price, overnight bars, structure map, line ladder,
-                confluence, and decision tape are being assembled from the
-                current session. The page will only render measured values or
-                an explicit unavailable state.
-              </p>
-              {showLoadingDetail && (
-                <p className="mt-3 max-w-3xl rounded-[12px] border border-paper/12 bg-paper/8 px-3 py-2 text-[12px] leading-relaxed text-paper/62">
-                  This request is taking longer than usual. ES often resolves
-                  after the market-data function warms up; if a feed is missing,
-                  the structure map will switch to a named data state instead of
-                  displaying placeholders.
-                </p>
-              )}
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <LoadingStat label="Price" value="Resolving" />
-              <LoadingStat label="Structure" value="Building" />
-              <LoadingStat label="Tape" value="Queued" />
-            </div>
-          </div>
-        </section>
-        <Skeleton className="h-72 w-full" />
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-          <Skeleton className="h-64 w-full" />
-          <Skeleton className="h-64 w-full" />
-        </div>
-      </div>
-    );
+    return <ESLoadingShell replayDate={replayDate} showLoadingDetail={showLoadingDetail} />;
   }
 
   if (state.status === "no_bars") {
@@ -215,18 +179,16 @@ export function SPXChannelClient({ replayDate }: Props) {
           className="rounded-card border border-rule bg-paper-2/50 px-5 py-6 md:px-6 md:py-8"
         >
           <p className="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-3 mb-2">
-            ES - Pivot Fan
+            ES Control Map
           </p>
           <h1 className="font-serif text-h2 text-ink tracking-tight">
             Structure map forms after the configuration window
           </h1>
           <p className="mt-3 text-body text-ink-2 leading-snug max-w-2xl">
-            The engine plots from ES front-month overnight bars
-            (15:00 prev-day - 02:00 today CT). Outside that window -
-            on weekends, holidays, or when the data feed gaps - there
-            is nothing yet to plot. Check back during the next
-            overnight session, or open <code>/replay</code> to step
-            through a previous day.
+            The ES map appears when the next qualified session read is
+            available. Outside the planning window, the cleanest move is to
+            review a prior session in Replay or return when the next setup
+            begins.
           </p>
           <p className="mt-3 text-meta text-ink-3 font-mono">
             {state.message}
@@ -249,10 +211,10 @@ export function SPXChannelClient({ replayDate }: Props) {
         <ErrorState
           title={
             replayDate
-              ? `Couldn't load the ES snapshot for ${replayDate}`
-              : "Couldn't load the live ES snapshot"
+              ? `Couldn't load the ES read for ${replayDate}`
+              : "Couldn't load the live ES read"
           }
-          message={`${state.message}. The /replay tab uses the same endpoint and may be working - if it is, retry in a moment.`}
+          message={`${state.message}. Retry in a moment, or open Replay to review a prior session while the connection resets.`}
         />
         {state.trace && (
           <pre className="text-[11px] font-mono text-ink-3 whitespace-pre-wrap rounded-card border border-rule bg-paper-2/40 p-4 max-h-64 overflow-auto">
@@ -265,7 +227,10 @@ export function SPXChannelClient({ replayDate }: Props) {
 
   const snap = canonicalizeEsSnapshot(state.snap);
   const meta = snap._meta;
-  const session = getSessionInfo("SPX", new Date());
+  const snapshotNow = Number.isFinite(Date.parse(snap.asOf))
+    ? new Date(snap.asOf)
+    : new Date();
+  const session = getSessionInfo("SPX", snapshotNow);
   const currentState: EngineState =
     snap.currentState ??
     (snap.confluence.action === "TAKE"
@@ -274,38 +239,57 @@ export function SPXChannelClient({ replayDate }: Props) {
         ? "WATCH"
         : "STAND_DOWN");
   const nextEventISO = session.nextSignificantEvent.at.toISOString();
-  const transitionCondition = snap.flipCondition || reentryCondition(snap);
+  const esReferenceISO = new Date(session.rthOpen.getTime() - 30 * 60_000).toISOString();
+  const esEntryISO = new Date(session.rthOpen.getTime() + 30 * 60_000).toISOString();
+  const transitionCondition = snap.descendingDeviationFan
+    ? reentryCondition(snap)
+    : snap.flipCondition || reentryCondition(snap);
 
   return (
-    <div className="w-full max-w-[1440px] space-y-10 pb-16">
+    <div className="w-full max-w-[1440px] space-y-8 pb-16">
       {replayDate && <ReplayBanner date={replayDate} />}
-      <SpyContextStrip />
-      <header className="relative overflow-hidden rounded-[22px] border border-[#C9A227]/55 bg-[#071116] px-5 py-5 text-paper shadow-[0_24px_60px_-42px_rgba(7,17,22,0.95)] md:px-7 md:py-6">
+      {initialSource === "mock" && (
+        <div className="rounded-card border border-gold/35 bg-gold-tint px-4 py-3 text-[12px] leading-relaxed text-gold-ink shadow-card">
+          ES live read is temporarily unavailable. This channel is locked to
+          structure review until the session reconnects, and trade decisions
+          remain gated.
+          {initialError ? (
+            <span className="ml-2 font-mono text-[10px] uppercase tracking-[0.10em] text-gold-ink">
+              ES read unavailable
+            </span>
+          ) : null}
+        </div>
+      )}
+      <header className="contrast-dark relative overflow-hidden rounded-[18px] border border-[#C9A227]/55 bg-[#071116] px-5 py-4 text-paper shadow-[0_24px_60px_-42px_rgba(7,17,22,0.95)] md:px-6 md:py-5">
         <div
           aria-hidden
           className="absolute inset-0 opacity-[0.18] bg-[linear-gradient(rgba(244,228,192,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(244,228,192,0.10)_1px,transparent_1px)] bg-[size:42px_42px]"
         />
         <div className="relative flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
         <div>
-          <div className="flex items-center gap-3">
-            <span className="font-mono text-[10px] text-gold-soft/82 tracking-[0.20em] uppercase">
-              ES - Pivot Fan - session {snap.sessionDateCT}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.18em] text-gold-soft/82">
+              ES Channel
             </span>
-            <span className="h-px w-10 bg-gold/45" />
-            <span className="font-mono text-[10px] text-paper/48 tracking-[0.20em] uppercase">
+            <span className="hidden h-px w-10 bg-gold/45 sm:inline-block" />
+            <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.18em] text-gold-soft/70">
+              Session {snap.sessionDateCT}
+            </span>
+            <span className="hidden h-px w-10 bg-gold/45 sm:inline-block" />
+            <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.18em] text-paper/48">
               {dayLabel(snap.sessionDateCT)}
             </span>
           </div>
-          <h1 className="mt-3 text-[36px] font-serif leading-none tracking-tight text-paper md:text-[46px]">
-            ES Pivot Fan{" "}
-            <span className="text-gold-soft/72 italic font-light">read.</span>
+          <h1 className="mt-2 text-[34px] font-serif leading-none tracking-tight text-paper md:text-[42px]">
+            Today&apos;s ES{" "}
+            <span className="text-gold-soft/72 italic font-light">Control Map.</span>
           </h1>
-          <p className="mt-4 max-w-3xl text-[15px] leading-relaxed text-paper/72">
+          <p className="mt-3 max-w-3xl text-[14px] leading-relaxed text-paper/72">
             {heroSynthesis(snap)}
           </p>
-          <div className="mt-4 flex flex-wrap items-center gap-3">
+          <div className="mt-3 flex flex-wrap items-center gap-3">
             <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-paper/48 tabular-nums">
-              live | updated {formatHM(snap.asOf)} CT | next {formatHM(nextEventISO)} CT
+              Fresh read - updated {formatHM(snap.asOf)} CT - next {formatHM(nextEventISO)} CT
             </p>
             <WhyThisStateLink
               engine="SPX"
@@ -315,7 +299,7 @@ export function SPXChannelClient({ replayDate }: Props) {
                 weight: event.weight,
               }))}
               flipCondition={transitionCondition}
-              currentStateLabel={currentState.replace(/_/g, " ")}
+              currentStateLabel={formatEngineStateLabel(currentState)}
               className="border-paper/18 bg-paper/8 text-paper/78 hover:bg-paper/14"
             />
           </div>
@@ -349,7 +333,7 @@ export function SPXChannelClient({ replayDate }: Props) {
                   )}
                 {meta.offsetMethod && (
                   <span className="ml-1 text-ink-4">
-                    - {meta.offsetMethod.replace(/_/g, " ")}
+                    - {formatDisplayLabel(meta.offsetMethod)}
                   </span>
                 )}
               </span>
@@ -367,64 +351,76 @@ export function SPXChannelClient({ replayDate }: Props) {
         </div>
         <div className="hidden md:flex items-center gap-6 text-right">
           <Stat label="Last" value={snap.price.last.toFixed(2)} />
-          <Stat label="Fan zone" value={snap.fanRead?.label ?? "Resolving"} highlight={snap.scenario} />
-          <Stat label="Read" value={snap.scenario.replace(/_/g, " ")} />
+          <Stat
+            label="Control Line"
+            value={selectedControlPlanMap(snap)?.controlValue.toFixed(2) ?? "Resolving"}
+            highlight={snap.controlTradePlan?.status ?? "PENDING"}
+          />
+          <Stat
+            label="Location"
+            value={controlPlanLocation(snap)}
+          />
           {/* v9: Slope stat removed - proprietary engine parameter. */}
         </div>
         </div>
       </header>
-      {meta && <Diagnostics details={meta} />}
-      <ChannelStateRail
-        engine="ES"
-        current={currentState}
-        nextEventISO={nextEventISO}
-        nextEventLabel={session.nextSignificantEvent.label}
-        condition={transitionCondition}
-      />
-
-      <SPXChannelHero snap={snap} bars={esBars} />
 
       <section className="space-y-5">
-        <SectionLabel number="01">Plays</SectionLabel>
-        <SPXPlaysSlate snap={snap} optionsChain={optionsChain} />
+        <SectionLabel number="01">Control Map</SectionLabel>
+        <SPXDeviationFanPanel plan={snap.controlTradePlan} fan={snap.descendingDeviationFan} bars={esBars} />
       </section>
 
       <section className="space-y-5">
-        <SectionLabel number="02">Lines</SectionLabel>
-        <div className="grid grid-cols-12 gap-5">
-          <div className="col-span-12 xl:col-span-7">
-            <SPXLineLadder lines={snap.lines} price={snap.price.last} />
+        <SectionLabel number="02">Trade Plan</SectionLabel>
+        <SPXPlaysSlate snap={snap} />
+      </section>
+
+      <section className="space-y-5">
+        <SectionLabel number="03">Session Timing</SectionLabel>
+        <ESPlanCountdownCard
+          sessionDate={snap.sessionDateCT}
+          planOpenISO={session.configWindowStart.toISOString()}
+          planReadyISO={session.configWindowEnd.toISOString()}
+          referenceISO={esReferenceISO}
+          entryISO={esEntryISO}
+          rthCloseISO={session.rthClose.toISOString()}
+          nowISO={snap.asOf}
+          compact
+        />
+      </section>
+
+      <SpyContextStrip />
+
+      <details className="group rounded-card border border-rule bg-paper shadow-card">
+        <summary className="flex cursor-pointer items-center justify-between gap-3 px-5 py-4 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+          Advanced review
+          <span className="text-ink-4 transition group-open:rotate-45">+</span>
+        </summary>
+        <div className="space-y-5 border-t border-rule p-5">
+          {meta && <Diagnostics details={meta} />}
+          <div className="grid grid-cols-12 gap-5">
+            <div className="col-span-12">
+              <SPXConfluence
+                factors={snap.confluence.factors}
+                score={snap.confluence.score}
+                action={snap.confluence.action}
+              />
+            </div>
           </div>
-          <div className="col-span-12 xl:col-span-5">
-            <SPXConfluence
-              factors={snap.confluence.factors}
-              score={snap.confluence.score}
-              action={snap.confluence.action}
-            />
-          </div>
+          <SPXSessionOrigin snap={snap} />
+          <EsDecisionTape snap={snap} />
         </div>
-      </section>
-
-      <section className="space-y-5">
-        <SectionLabel number="03">Origin</SectionLabel>
-        <SPXSessionOrigin snap={snap} />
-      </section>
-
-      <section className="space-y-5">
-        <SectionLabel number="04">Tape</SectionLabel>
-        <EsDecisionTape snap={snap} />
-      </section>
+      </details>
 
       <footer className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-6 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-3">
-        <span>Not financial advice. Decision-support only. Rules v1.0.0.</span>
+        <span>Not financial advice. Decision-support only.</span>
         <span className="flex flex-wrap items-center gap-3">
           <Link href="/terms" className="hover:text-ink">Terms</Link>
           <Link href="/privacy" className="hover:text-ink">Privacy</Link>
-          <Link href="/risk" className="hover:text-ink">Options Risk</Link>
-          <span>Build 0.9.7</span>
-          <Link href="/contact" className="hover:text-ink">Report an issue</Link>
+          <Link href="/risk" className="hover:text-ink">Risk</Link>
+          <Link href="/contact" className="hover:text-ink">Contact</Link>
         </span>
-        <span className="hidden">Prophet - ES Pivot Fan</span>
+        <span className="hidden">Prophet - ES Control Map</span>
         <span className="hidden">Session surface</span>
       </footer>
     </div>
@@ -436,25 +432,47 @@ export function SPXChannelClient({ replayDate }: Props) {
 // ---------------------------------------------------------------------
 
 function heroSynthesis(snap: SPXSnapshot): string {
-  if (snap.lines.length < 4) {
-    return "ES Pivot Fan is resolving. The engine is standing down until the previous RTH high close and post-noon low wick are available.";
+  const map = selectedControlPlanMap(snap);
+  if (!map) {
+    return "The ES Control Map is resolving. Stand down until the Control Plan is available.";
   }
-  const action = snap.confluence.action.replace(/_/g, " ").toLowerCase();
-  const nearest = snap.lines
-    .slice()
-    .sort((a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice))[0];
-  const distance = nearest
-    ? ` Nearest structure is ${Math.abs(nearest.distanceFromPrice).toFixed(2)} pts away.`
-    : "";
-  return `ES Pivot Fan is mapped with a ${action} read.${distance} Waiting for qualified confirmation at the active fan reference.`;
+  const direction = map.direction === "DESCENDING" ? "descending" : "ascending";
+  return `The ${direction} Control Line is ${map.controlValue.toFixed(2)}. The next useful decision comes from a clean hourly touch and close.`;
 }
 
 function reentryCondition(snap: SPXSnapshot): string {
-  if (snap.flipCondition) return snap.flipCondition;
-  if (snap.plannedEnvelope) {
-    return `Qualified confirmation inside ${snap.plannedEnvelope.low.toFixed(2)}-${snap.plannedEnvelope.high.toFixed(2)} reactivates the play.`;
+  const plan = snap.controlTradePlan;
+  if (plan) {
+    const buy = plan.setups.find((setup) => setup.side === "BUY");
+    const sell = plan.setups.find((setup) => setup.side === "SELL");
+    const reads = [
+      buy ? `calls near ${buy.entryPrice.toFixed(2)}` : null,
+      sell ? `puts near ${sell.entryPrice.toFixed(2)}` : null,
+    ].filter(Boolean);
+    return reads.length
+      ? `Watch ${reads.join(" and ")}. A completed hourly candle must confirm before the next open.`
+      : "Control Plan is mapped, but no qualified setup is active yet.";
   }
-  return "Pivot Fan resolves after the previous RTH high close and post-noon low wick are available.";
+  if (snap.flipCondition) return snap.flipCondition;
+  return "Control Map resolves after the prior session anchor is available.";
+}
+
+function selectedControlPlanMap(snap: SPXSnapshot) {
+  const plan = snap.controlTradePlan;
+  if (!plan) return null;
+  if (plan.activeTrade?.mapId === plan.oppositeMap.id) return plan.oppositeMap;
+  const setupMapId = plan.setups[0]?.mapId;
+  if (setupMapId === plan.oppositeMap.id) return plan.oppositeMap;
+  if (plan.primaryMap.status === "ARMED") return plan.primaryMap;
+  return plan.oppositeMap;
+}
+
+function controlPlanLocation(snap: SPXSnapshot): string {
+  const plan = snap.controlTradePlan;
+  const map = selectedControlPlanMap(snap);
+  if (!plan || !map) return "Resolving";
+  if (plan.activeTrade) return `${plan.activeTrade.contractType} confirmed`;
+  return map.direction === "DESCENDING" ? "Descending Control" : "Ascending Control";
 }
 
 function formatHM(iso: string): string {
@@ -475,10 +493,10 @@ function SpyContextStrip() {
       className="group flex flex-wrap items-center justify-between gap-3 rounded-card border border-rule bg-paper px-4 py-3 text-[12px] text-ink-2 shadow-card transition-colors hover:bg-paper-tier2"
     >
       <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-3">
-        SPY context
+        Companion SPY Read
       </span>
       <span className="flex items-center gap-2">
-        SPY anchor structure remains the paired equity read for this ES session.
+        Companion SPY read opens the equity cross-check for this ES session.
         <ArrowUpRight
           size={13}
           className="text-ink-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
@@ -512,8 +530,8 @@ function EsDecisionTape({ snap }: { snap: SPXSnapshot }) {
   return (
     <Card>
       <CardHeader
-        eyebrow="Decision Trail"
-        title="ES session tape"
+        eyebrow="Session Events"
+        title="ES event log"
         meta={`${events.length} event${events.length === 1 ? "" : "s"} - replay-linked`}
       />
       <CardBody className="px-0 pb-0">
@@ -573,7 +591,7 @@ function ReplayBanner({ date }: { date: string }) {
         </span>
         <span aria-hidden className="h-3 w-px bg-gold/40" />
         <span className="text-ink-2 font-medium">
-          Showing the historical ES Pivot Fan for{" "}
+          Showing the historical ES Control Map for{" "}
           <span className="font-mono tabular-nums text-ink">{date}</span>
         </span>
       </div>
@@ -592,51 +610,6 @@ function ReplayBanner({ date }: { date: string }) {
       </Link>
     </div>
   );
-}
-
-function SourceBadge({ live }: { live: boolean }) {
-  const liveCls =
-    "bg-bull-tint text-bull-ink shadow-[inset_0_0_0_1px_rgba(14,124,80,0.30)]";
-  const offlineCls =
-    "bg-paper-2 text-ink-3 shadow-[inset_0_0_0_1px_rgba(20,22,26,0.10)]";
-  return (
-    <span
-      title={
-        live
-          ? "Live snapshot from API"
-          : "Snapshot unavailable. Engine is reconnecting; retry in a moment."
-      }
-      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-pill text-[9px] font-mono font-semibold uppercase tracking-[0.12em] ${live ? liveCls : offlineCls}`}
-    >
-      <span
-        className={`w-1 h-1 rounded-full ${live ? "bg-bull animate-breathe" : "bg-ink-4"}`}
-      />
-      {live ? "live" : "offline"}
-    </span>
-  );
-}
-
-async function fetchSpxOptionsChain(
-  replayDate?: string,
-): Promise<SpxProjectionChainInput | null> {
-  try {
-    const params = new URLSearchParams({ symbols: "SPX" });
-    if (replayDate) params.set("date", replayDate);
-    const res = await fetch(`/api/options/intel?${params.toString()}`, {
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
-    const json = (await res.json()) as {
-      symbols?: {
-        SPX?: {
-          chain?: SpxProjectionChainInput | null;
-        };
-      };
-    };
-    return json.symbols?.SPX?.chain ?? null;
-  } catch {
-    return null;
-  }
 }
 
 function dayLabel(isoDate: string): string {
@@ -674,6 +647,67 @@ function Stat({
         data-num
       >
         {value}
+      </div>
+    </div>
+  );
+}
+
+function ESLoadingShell({
+  replayDate,
+  showLoadingDetail,
+}: {
+  replayDate?: string;
+  showLoadingDetail: boolean;
+}) {
+  return (
+    <div className="w-full max-w-[1440px] space-y-8 pb-16 pt-6">
+      {replayDate && <ReplayBanner date={replayDate} />}
+      <section
+        role="status"
+        aria-live="polite"
+        className="contrast-dark relative overflow-hidden rounded-[22px] border border-[#C9A227]/35 bg-[#071116] px-5 py-5 text-paper shadow-[0_24px_60px_-42px_rgba(7,17,22,0.95)] md:px-7 md:py-6"
+      >
+        <div
+          aria-hidden
+          className="absolute inset-0 opacity-[0.12] bg-[linear-gradient(rgba(244,228,192,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(244,228,192,0.10)_1px,transparent_1px)] bg-[size:42px_42px]"
+        />
+        <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
+          <div>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="font-mono text-[10px] text-gold-soft/82 tracking-[0.20em] uppercase">
+              ES Control Map - resolving
+              </span>
+              <span className="h-px w-10 bg-gold/45" />
+              <span className="font-mono text-[10px] text-paper/48 tracking-[0.20em] uppercase">
+                Measured values only
+              </span>
+            </div>
+            <h1 className="mt-3 text-[34px] font-serif leading-none tracking-tight text-paper md:text-[44px]">
+              Building the ES structure map.
+            </h1>
+            <p className="mt-4 max-w-3xl text-[15px] leading-relaxed text-paper/72">
+              The live ES price, Control Line, gates, and session events
+              are being assembled from the current session.
+            </p>
+            {showLoadingDetail && (
+              <p className="mt-3 max-w-3xl rounded-[12px] border border-paper/12 bg-paper/8 px-3 py-2 text-[12px] leading-relaxed text-paper/62">
+                This request is taking longer than usual. If a feed is missing,
+                the structure map will switch to a named data state instead of
+                displaying placeholders.
+              </p>
+            )}
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <LoadingStat label="Price" value="Resolving" />
+            <LoadingStat label="Structure" value="Building" />
+            <LoadingStat label="Tape" value="Queued" />
+          </div>
+        </div>
+      </section>
+      <Skeleton className="h-72 w-full" />
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-64 w-full" />
       </div>
     </div>
   );

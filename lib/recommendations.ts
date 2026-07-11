@@ -12,6 +12,7 @@
 // the recommended action points at that workflow.
 
 import type { EngineState } from "@/lib/states";
+import { formatEngineStateLabel } from "@/lib/display-labels";
 
 export type Engine = "SPY" | "SPX";
 
@@ -20,7 +21,6 @@ export interface Recommendation {
   id:
     | "live-spy"
     | "live-spx"
-    | "options-cockpit"
     | "log-replay"
     | "daily-brief";
   /** Where the CTA navigates. */
@@ -71,17 +71,15 @@ export function forState(
   switch (state) {
     case "GO":
     case "ARMED":
-      // Trigger fired or about to fire → user wants the execution
-      // surface, not the channel page.
       return {
-        id: "options-cockpit",
-        href: "/options",
-        label: "Open Options Cockpit",
+        id: engine === "SPY" ? "live-spy" : "live-spx",
+        href: engine === "SPY" ? "/spy" : "/es",
+        label: engine === "SPY" ? "Open SPY Channel" : "Open ES Channel",
         reason: `${label} ${state === "GO" ? "live" : "armed"}`,
         description:
           state === "GO"
-            ? `${label} trigger fired — size the trade and place orders.`
-            : `${label} is armed at the entry trigger. Stage the order in the cockpit.`,
+            ? `${label} trigger fired. Check the channel before acting.`
+            : `${label} is armed at the entry trigger. Keep the channel open.`,
       };
 
     case "WAIT":
@@ -94,7 +92,7 @@ export function forState(
             id: "live-spy",
             href: "/spy",
             label: "Open SPY Channel",
-            reason: `SPY ${state.toLowerCase()}`,
+            reason: `SPY ${formatEngineStateLabel(state)}`,
             description:
               state === "WAIT"
                 ? "SPY structure is active. Watch for the next qualified confirmation."
@@ -104,7 +102,7 @@ export function forState(
             id: "live-spx",
             href: "/es",
             label: "Open ES Channel",
-            reason: `ES ${state.toLowerCase()}`,
+            reason: `ES ${formatEngineStateLabel(state)}`,
             description:
               state === "WAIT"
                 ? "ES structure is active. Watch for the next qualified confirmation."

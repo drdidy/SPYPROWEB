@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 import { StatusPill } from "@/components/ui/StatusPill";
 import type { SPXLine, SPXLineKind } from "@/lib/types";
@@ -6,23 +6,23 @@ import type { SPXLine, SPXLineKind } from "@/lib/types";
 const lineMeta: Record<SPXLineKind, { dot: string; label: string; group: string }> = {
   PREV_RTH_HIGH_ASC: {
     dot: "bg-ink-4",
-    label: "High Fan Ceiling",
-    group: "High Pivot Fan",
+    label: "High-pivot upper boundary",
+    group: "High pivot",
   },
   PREV_RTH_HIGH_DESC: {
     dot: "bg-bear",
-    label: "High Fan Floor",
-    group: "High Pivot Fan",
+    label: "High-pivot control",
+    group: "High pivot",
   },
   PREV_RTH_LOW_ASC: {
     dot: "bg-bull",
-    label: "Low Fan Ceiling",
-    group: "Low Pivot Fan",
+    label: "Low-pivot control",
+    group: "Low pivot",
   },
   PREV_RTH_LOW_DESC: {
     dot: "bg-ink-4",
-    label: "Low Fan Floor",
-    group: "Low Pivot Fan",
+    label: "Low-pivot lower boundary",
+    group: "Low pivot",
   },
   SWING_HIGH_ASC: {
     dot: "bg-gold",
@@ -48,13 +48,12 @@ const lineMeta: Record<SPXLineKind, { dot: string; label: string; group: string 
 
 function lineState(kind: SPXLineKind, distance: number): "armed" | "watching" | "stale" | "reference" | "bias" {
   if (kind === "PREV_RTH_HIGH_DESC") return "bias";
-  if (lineMeta[kind].group.endsWith("Pivot Fan")) return "reference";
+  if (lineMeta[kind].group.endsWith("pivot")) return "reference";
   const a = Math.abs(distance);
   if (a <= 3) return "armed";
   if (a <= 15) return "watching";
   return "stale";
 }
-
 function entryLineValue(line: SPXLine): number {
   return line.entryValue ?? line.currentValue;
 }
@@ -63,16 +62,16 @@ export function SPXLineLadder({ lines, price }: { lines: SPXLine[]; price: numbe
   return (
     <Card>
       <CardHeader
-        eyebrow="Pivot Fan"
-        title="08:00 CT operating levels"
-        meta={`Last ${price.toFixed(2)} · sorted by proximity`}
+        eyebrow="Level Details"
+        title="Operating levels"
+        meta={`Last ${price.toFixed(2)} - sorted by proximity`}
       />
       <CardBody className="px-0 pb-0">
-        <div className="grid grid-cols-12 px-5 pb-2 eyebrow text-ink-3">
+        <div className="hidden grid-cols-12 px-5 pb-2 eyebrow text-ink-3 sm:grid">
           <div className="col-span-4">Line</div>
           <div className="col-span-3">Group</div>
           <div className="col-span-2 text-right">Value</div>
-          <div className="col-span-2 text-right">Δ Price</div>
+          <div className="col-span-2 text-right">Price Gap</div>
           <div className="col-span-1 text-right">State</div>
         </div>
         <ul className="divide-y divide-rule border-t border-rule spx-ladder">
@@ -97,24 +96,26 @@ export function SPXLineLadder({ lines, price }: { lines: SPXLine[]; price: numbe
               return (
                 <li
                   key={l.kind}
-                  className="grid grid-cols-12 items-center px-5 py-3 hover:bg-paper-2/50 transition-colors spx-ladder-row"
+                  className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2 px-4 py-3 transition-colors hover:bg-paper-2/50 sm:grid-cols-12 sm:items-center sm:px-5 spx-ladder-row"
                   style={{ animationDelay: `${idx * 80}ms` }}
                 >
-                  <div className="col-span-4 flex items-center gap-2.5">
-                    <span className={`w-1.5 h-4 rounded-sm ${m.dot}`} />
-                    <span className="font-mono text-sm font-semibold text-ink">
+                  <div className="col-span-2 flex min-w-0 items-center gap-2.5 sm:col-span-4">
+                    <span className={`h-4 w-1.5 shrink-0 rounded-sm ${m.dot}`} />
+                    <span className="min-w-0 font-mono text-[13px] font-semibold leading-tight text-ink sm:text-sm">
                       {m.label}
                     </span>
                   </div>
-                  <div className="col-span-3 text-xs text-ink-2">{m.group}</div>
+                  <div className="col-span-1 text-[11px] leading-tight text-ink-2 sm:col-span-3 sm:text-xs">
+                    {m.group}
+                  </div>
                   <div
-                    className="col-span-2 text-right font-mono text-sm tabular-nums text-ink"
+                    className="col-span-1 text-right font-mono text-[13px] tabular-nums text-ink sm:col-span-2 sm:text-sm"
                     data-num
                   >
                     {entryValue.toFixed(2)}
                   </div>
                   <div
-                    className={`col-span-2 text-right font-mono text-sm tabular-nums ${
+                    className={`col-span-1 font-mono text-[13px] tabular-nums sm:col-span-2 sm:text-right sm:text-sm ${
                       distanceFromEntry >= 0 ? "text-bull-ink" : "text-bear-ink"
                     }`}
                     data-num
@@ -127,7 +128,7 @@ export function SPXLineLadder({ lines, price }: { lines: SPXLine[]; price: numbe
                       </span>
                     )}
                   </div>
-                  <div className="col-span-1 flex justify-end">
+                  <div className="col-span-1 flex justify-end sm:col-span-1">
                     <StatusPill variant={pillVariant} pulse={state === "armed"}>
                       {stateLabel}
                     </StatusPill>

@@ -1,11 +1,8 @@
 "use client";
 
-// GDPR / UK-GDPR-compliant consent banner. Deny by default for non-
-// essential cookies / analytics. Persists choice to localStorage so
-// the banner doesn't reappear on every visit.
-
-import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+
 import { getConsent, setConsent, type ConsentState } from "@/lib/analytics";
 
 export function ConsentBanner() {
@@ -13,11 +10,9 @@ export function ConsentBanner() {
 
   useEffect(() => {
     setConsentState(getConsent());
-    const onChange = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (detail === "accepted" || detail === "denied") {
-        setConsentState(detail);
-      }
+    const onChange = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      if (detail === "accepted" || detail === "denied") setConsentState(detail);
     };
     window.addEventListener("sp:consent", onChange);
     return () => window.removeEventListener("sp:consent", onChange);
@@ -30,36 +25,35 @@ export function ConsentBanner() {
       role="dialog"
       aria-modal="false"
       aria-label="Cookie consent"
-      // Bottom-anchored banner — doesn't block content access.
-      // A keyboard user can Tab through page first, then through the
-      // banner buttons.
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-rule bg-paper/95 backdrop-blur-md"
+      className="fixed bottom-4 left-4 right-4 z-40 border border-white/30 bg-black text-white shadow-2xl md:left-auto md:w-[460px]"
     >
-      <div className="max-w-[1240px] mx-auto px-7 py-4 flex flex-col md:flex-row md:items-center gap-3">
-        <p className="text-[12px] text-ink-2 leading-relaxed flex-1">
-          We use a small set of essential cookies to run the site. With your
-          consent we&apos;ll also load privacy-friendly analytics so we can
-          improve the workspace. See our{" "}
+      <div>
+        <div className="flex items-center justify-between border-b border-white/20 px-4 py-3">
+          <span className="text-[9px] font-black uppercase tracking-[0.12em] text-[#B8F23D]">Privacy</span>
+          <span className="text-[9px] font-bold uppercase tracking-[0.1em] text-white/50">Your choice</span>
+        </div>
+        <p className="px-4 py-3 text-[11px] leading-relaxed text-white/80 md:text-[12px]">
+          Essential cookies run SPY Prophet. Allow anonymous analytics to help improve the workspace?{" "}
           <Link
             href="/privacy"
-            className="underline underline-offset-2 hover:text-ink"
+            className="ml-1 font-black text-[#B8F23D] underline underline-offset-4"
           >
-            Privacy Policy
+            Privacy
           </Link>
           .
         </p>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="grid grid-cols-2 border-t border-white/20">
           <button
             type="button"
             onClick={() => setConsent("denied")}
-            className="h-9 px-4 rounded-pill bg-paper-2 text-ink-2 hover:text-ink hover:bg-paper-2/70 font-mono text-[11px] uppercase tracking-[0.10em] outline-none focus-visible:ring-2 focus-visible:ring-gold/40"
+            className="min-h-12 border-r border-white/30 px-5 text-[9px] font-black uppercase text-white hover:bg-white hover:text-black"
           >
             Decline
           </button>
           <button
             type="button"
             onClick={() => setConsent("accepted")}
-            className="h-9 px-4 rounded-pill bg-ink text-paper hover:bg-ink-2 font-mono text-[11px] font-semibold uppercase tracking-[0.10em] outline-none focus-visible:ring-2 focus-visible:ring-gold/40"
+            className="min-h-12 bg-[#B8F23D] px-5 text-[9px] font-black uppercase text-black hover:bg-white"
           >
             Accept analytics
           </button>

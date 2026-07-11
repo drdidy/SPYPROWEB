@@ -31,7 +31,7 @@ export function StructurePathChart({
   accent = "neutral",
   className,
   height = 170,
-  title = "Actual path vs rails",
+  title = "Actual path vs gates",
   frameless = false,
 }: {
   data?: StructureChartData | null;
@@ -85,7 +85,7 @@ export function StructurePathChart({
                 variant === "dark" ? "text-gold-soft/70" : "text-gold-ink",
               )}
             >
-              Chart unavailable
+              Structure pending
             </div>
             <div
               className={cn(
@@ -93,9 +93,8 @@ export function StructurePathChart({
                 variant === "dark" ? "text-paper/48" : "text-ink-3",
               )}
             >
-              Actual path and rails render only after both replay bars and
-              measured structure lines are available. No illustrative chart is
-              drawn in their place.
+              Actual path and gates render after replay bars and measured
+              structure lines are available.
             </div>
             {data?.date && (
               <div
@@ -152,6 +151,15 @@ export function StructurePathChart({
   const selectedLineValue = selectedLine ? lineValue(selectedLine, selectedMs) : null;
   const tooltipX = Math.min(W - PAD_R - 116, Math.max(PAD_L + 4, selectedX + 12));
   const tooltipY = Math.min(H - PAD_B - 54, Math.max(PAD_T + 4, selectedY - 30));
+  const labelRows = staggerLineLabels(
+    lines.map((line) => ({
+      key: line.label,
+      y: yOf(lineValue(line, t1)),
+    })),
+    PAD_T + 10,
+    H - PAD_B - 10,
+    largeCanvas ? 20 : 15,
+  );
   const touches = bars.flatMap((bar) => {
     const ms = new Date(bar.t).getTime();
     return lines
@@ -183,7 +191,7 @@ export function StructurePathChart({
           frameless
             ? "border-transparent bg-transparent"
             : variant === "dark"
-              ? "border-paper/10 bg-[#071218]/88"
+              ? "contrast-dark border-paper/10 bg-[#071218]/88"
               : "border-rule-soft bg-paper/80",
         )}
       >
@@ -222,7 +230,7 @@ export function StructurePathChart({
         style={{ height: Math.max(118, height - 30) }}
         role="img"
         tabIndex={0}
-        aria-label={`${data?.label} actual price path against engine rails`}
+        aria-label={`${data?.label} actual price path against engine gates`}
         onPointerMove={(event) => {
           setActiveIndex(nearestBarIndexFromPointer(event, bars, W, PAD_L, W - PAD_R, xOf));
         }}
@@ -235,7 +243,7 @@ export function StructurePathChart({
         <title>{title}</title>
         <desc>
           {data?.label} price path with current price {last.c.toFixed(2)}
-          plotted against the active reference lines.
+          plotted against the active Control Map gates.
         </desc>
         <style>{chartStyles}</style>
         <rect x="0" y="0" width={W} height={H} fill="transparent" />
@@ -250,6 +258,7 @@ export function StructurePathChart({
         {lines.map((line) => {
           const yStart = yOf(lineValue(line, t0));
           const yEnd = yOf(lineValue(line, t1));
+          const labelY = labelRows.get(line.label) ?? yEnd;
           const stroke = lineColor(line.tone, variant);
           const projectedNow = lineValue(line, new Date(last.t).getTime());
           return (
@@ -264,16 +273,27 @@ export function StructurePathChart({
                 strokeDasharray={line.tone === "anchor" ? undefined : "6 7"}
                 opacity={line.tone === "anchor" ? 0.95 : 0.72}
               />
-              <text
-                x={W - PAD_R + 8}
-                y={yEnd + 3}
-                fontSize={largeCanvas ? "14" : "12"}
-                fontFamily="var(--font-geist-mono)"
-                fontWeight="700"
-                fill={stroke}
-              >
-                {line.label} {projectedNow.toFixed(2)}
-              </text>
+              <g transform={`translate(${W - PAD_R + 8},${labelY})`}>
+                <rect
+                  x="-4"
+                  y={largeCanvas ? "-13" : "-11"}
+                  width={largeCanvas ? "150" : "112"}
+                  height={largeCanvas ? "18" : "15"}
+                  rx="5"
+                  fill={variant === "dark" ? "#071116" : "#FFFDF7"}
+                  opacity="0.82"
+                />
+                <text
+                  x="0"
+                  y="0"
+                  fontSize={largeCanvas ? "12" : "9.5"}
+                  fontFamily="var(--font-geist-mono)"
+                  fontWeight="700"
+                  fill={stroke}
+                >
+                  {largeCanvas ? `${line.label} ${projectedNow.toFixed(2)}` : compactLineLabel(line.label)}
+                </text>
+              </g>
             </g>
           );
         })}
@@ -450,6 +470,38 @@ function validLine(line: StructureChartLine): boolean {
   return !!line.anchorTime && Number.isFinite(line.anchorPrice) && Number.isFinite(line.slopePerHour);
 }
 
+function staggerLineLabels(
+  labels: Array<{ key: string; y: number }>,
+  minY: number,
+  maxY: number,
+  gap: number,
+): Map<string, number> {
+  const sorted = labels.slice().sort((a, b) => a.y - b.y);
+  const placed = new Map<string, number>();
+  let cursor = minY;
+  for (const label of sorted) {
+    const y = Math.min(maxY, Math.max(cursor, label.y));
+    placed.set(label.key, y);
+    cursor = y + gap;
+  }
+  const overflow = cursor - gap - maxY;
+  if (overflow > 0) {
+    for (const [key, y] of placed) {
+      placed.set(key, Math.max(minY, y - overflow));
+    }
+  }
+  return placed;
+}
+
+function compactLineLabel(label: string): string {
+  return label
+    .replace("Control Line", "Control")
+    .replace("North Gate", "N")
+    .replace("South Gate", "S")
+    .replace("Upper", "Up")
+    .replace("Lower", "Low");
+}
+
 function paletteFor(variant: "paper" | "dark") {
   return variant === "dark"
     ? {
@@ -465,16 +517,16 @@ function paletteFor(variant: "paper" | "dark") {
 }
 
 function accentColor(accent: "bull" | "bear" | "gold" | "violet" | "neutral", variant: "paper" | "dark"): string {
-  if (accent === "bull") return "#0E7C50";
-  if (accent === "bear") return "#B5301E";
-  if (accent === "gold") return "#B8821F";
-  if (accent === "violet") return "#7E5BAE";
+  if (accent === "bull") return variant === "dark" ? "#7EE0B5" : "#0E7C50";
+  if (accent === "bear") return variant === "dark" ? "#FF9B8C" : "#B5301E";
+  if (accent === "gold") return variant === "dark" ? "#F4E4C0" : "#B8821F";
+  if (accent === "violet") return variant === "dark" ? "#B9A7FF" : "#7E5BAE";
   return variant === "dark" ? "#F4E4C0" : "#14161A";
 }
 
 function lineColor(tone: StructureChartLine["tone"], variant: "paper" | "dark"): string {
-  if (tone === "upper") return "#0E7C50";
-  if (tone === "lower") return "#B5301E";
+  if (tone === "upper") return variant === "dark" ? "#7EE0B5" : "#0E7C50";
+  if (tone === "lower") return variant === "dark" ? "#FF9B8C" : "#B5301E";
   if (tone === "anchor") return variant === "dark" ? "#F4E4C0" : "#B8821F";
   return variant === "dark" ? "rgba(255,255,255,0.58)" : "#7E5BAE";
 }

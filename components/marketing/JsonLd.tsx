@@ -21,7 +21,7 @@ export function OrganizationJsonLd() {
     "@type": "Organization",
     name: "SPY Prophet",
     url: SITE_URL,
-    logo: `${SITE_URL}/icon`,
+    logo: `${SITE_URL}/icons/icon-512.png`,
     description:
       "A decision workspace for serious retail traders. Read the day before the day reads you.",
     foundingLocation: {

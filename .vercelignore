@@ -1,0 +1,17 @@
+.data/
+qa-screenshots/
+/output/
+/outputs/
+/data/
+/.next/
+/node_modules/
+playwright-report/
+test-results/
+tests/
+api/tests/
+next-start-*.log
+next-dev-*.log
+*.err.log
+*.tsbuildinfo
+visual-*.png
+qa-*.png

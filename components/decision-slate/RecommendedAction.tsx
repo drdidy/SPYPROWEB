@@ -13,7 +13,6 @@ import {
   ChevronRight,
   Rewind,
   Activity,
-  Target,
   Hourglass,
   type LucideIcon,
 } from "lucide-react";
@@ -29,7 +28,6 @@ import {
   StructurePathChart,
   type StructureChartData,
 } from "./StructurePathChart";
-import { ContractProjectionCard } from "@/components/options/ContractProjection";
 import type { ContractProjection } from "@/lib/contract-projection";
 import { SLATE_COPY } from "@/content/copy";
 import { FeedHeartbeat } from "./FeedHealthProvider";
@@ -39,7 +37,6 @@ import { VerdictActions } from "./VerdictActions";
 const ICONS: Record<Recommendation["id"], LucideIcon> = {
   "live-spy": Activity,
   "live-spx": Activity,
-  "options-cockpit": Target,
   "log-replay": Rewind,
   "daily-brief": BookOpen,
 };
@@ -47,7 +44,6 @@ const ICONS: Record<Recommendation["id"], LucideIcon> = {
 const COMMAND_COPY: Record<Recommendation["id"], { title: string; posture: string }> = {
   "live-spy": { title: "Track SPY Structure", posture: "SPY LIVE - WATCH STRUCTURE" },
   "live-spx": { title: "Track ES Structure", posture: "ES LIVE - WATCH STRUCTURE" },
-  "options-cockpit": { title: "Stage Execution", posture: "ORDER WINDOW - SIZE RISK" },
   "log-replay": { title: "Review The Tape", posture: "SESSION CLOSED - GRADE EXECUTION" },
   "daily-brief": { title: "Stand Aside", posture: "MARKETS QUIET - AWAIT STRUCTURE" },
 };
@@ -115,6 +111,7 @@ export function RecommendedAction({
     rec.id === "live-spx" ? spxProjection : spyProjection ?? spxProjection;
   const activeEntryCostStatus =
     rec.id === "live-spx" ? spxEntryCostStatus : spyEntryCostStatus;
+  const activeTicketEngine = rec.id === "live-spx" ? "ES" : "SPY";
   const chartAccent =
     rec.id === "live-spx"
       ? "violet"
@@ -129,7 +126,7 @@ export function RecommendedAction({
       aria-labelledby="recommended-action-heading"
       data-testid="recommended-action"
       className={cn(
-        "relative overflow-hidden rounded-[22px] border border-[#C9A227]/75 bg-[#071116] text-paper",
+        "contrast-dark relative overflow-hidden rounded-[22px] border border-[#C9A227]/75 bg-[#071116] text-paper",
         "shadow-[0_26px_70px_-34px_rgba(7,17,22,0.95),inset_0_1px_0_rgba(255,255,255,0.08)]",
         className,
       )}
@@ -147,11 +144,11 @@ export function RecommendedAction({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
             <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-gold-soft">
-              Command workspace
+              Decision Slate
             </span>
             <span aria-hidden className="h-px w-10 bg-gold/45" />
             <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-paper/48">
-              Decision Slate
+              Command view
             </span>
             {compactHeader && slateDateLabel && (
               <>
@@ -189,13 +186,13 @@ export function RecommendedAction({
           </div>
         </div>
       </div>
-      <div className="relative grid gap-0 lg:grid-cols-[180px_minmax(0,1fr)] xl:grid-cols-[210px_minmax(0,1fr)]">
+      <div className="relative grid gap-0 lg:grid-cols-[210px_minmax(0,1fr)] xl:grid-cols-[240px_minmax(0,1fr)]">
         <div className="px-5 py-6 md:px-6 md:py-7">
           <p
             id="recommended-action-heading"
             className="font-mono text-[10px] tracking-[0.20em] uppercase text-gold-soft font-semibold"
           >
-            Recommended next step
+            Today&apos;s next decision
           </p>
           <h2 className="mt-2 font-serif text-[40px] leading-[0.94] text-paper md:text-[48px]">
             {command.title}
@@ -228,28 +225,6 @@ export function RecommendedAction({
             sessionDate={sessionDate ?? new Date().toISOString().slice(0, 10)}
           />
 
-          <ScorecardMetrics
-            confidence={confidence}
-            activeProjection={activeProjection}
-            entryCostStatus={activeEntryCostStatus}
-            className="mt-7 lg:hidden"
-          />
-          {!entryCostInScorecard && activeProjection ? (
-            <ContractProjectionCard
-              projection={activeProjection}
-              compact
-              className="mt-5 border-paper/15 bg-paper/[0.06] text-paper [&_.text-ink]:!text-paper [&_.text-ink-3]:!text-paper/58 [&_.text-ink-4]:!text-paper/42 [&_.bg-paper]:!bg-paper/[0.08] [&_.bg-paper-2\\/55]:!bg-paper/[0.08]"
-            />
-          ) : !entryCostInScorecard ? (
-            <div className="mt-5 rounded-soft border border-paper/10 bg-paper/[0.045] px-3 py-2.5">
-              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-paper/42">
-                Entry cost model
-              </p>
-              <p className="mt-1 text-[12px] leading-snug text-paper/58">
-                Publishes when the live option chain has usable Greeks. No placeholder debit is shown.
-              </p>
-            </div>
-          ) : null}
         </div>
 
         <CommandRailDiagram
@@ -297,20 +272,6 @@ export function RecommendedAction({
                   </div>
                 </div>
               )}
-              <div className="rounded-soft border border-paper/10 bg-paper/[0.035] px-3 py-2.5">
-                <div className="text-[10px] uppercase tracking-[0.16em] text-paper/45">
-                  Data window
-                </div>
-                <div className="mt-1 text-paper">
-                  {activeChart ? `${activeChart.label} ${activeChart.date}` : "Awaiting bars"}
-                </div>
-              </div>
-              <div className="rounded-soft border border-paper/10 bg-paper/[0.035] px-3 py-2.5">
-                <div className="text-[10px] uppercase tracking-[0.16em] text-gold-soft">
-                  Session posture
-                </div>
-                <div className="mt-1 text-paper">Neutral</div>
-              </div>
             </div>
           )}
         </aside>
@@ -388,34 +349,23 @@ function ScorecardMetrics({
   compact?: boolean;
   className?: string;
 }) {
-  const entryTone = activeProjection
-    ? "text-gold-soft"
-    : entryCostStatus === "active"
-      ? "text-bull-soft"
-      : compact
-      ? "text-paper/76 text-[15px] leading-tight"
-      : "text-paper/72 text-[19px] leading-tight";
-  const entryCopy = entryCostCopy(activeProjection, entryCostStatus);
-
   if (compact) {
+    const ticketValue = activeProjection
+      ? `$${activeProjection.projectedEntry.mark.toFixed(2)}`
+      : entryCostStatus === "unavailable"
+        ? "Offline"
+        : "Waiting";
     return (
       <div
         className={cn(
-          "grid grid-cols-5 gap-2 rounded-[12px] border border-paper/10 bg-[#071116]/88 p-2 shadow-[0_18px_50px_-38px_rgba(0,0,0,0.95)]",
+          "contrast-dark grid grid-cols-4 gap-2 rounded-[12px] border border-paper/10 bg-[#071116]/88 p-2 shadow-[0_18px_50px_-38px_rgba(0,0,0,0.95)]",
           className,
         )}
       >
         <HeroMetric compact label="Confidence" value={`${confidence}%`} tone="text-gold-soft" />
         <HeroMetric compact label="Risk exposure" value="Low" tone="text-bull-soft" />
         <HeroMetric compact label="Reward setup" value="Neutral" tone="text-gold-soft" />
-        <HeroMetric compact label="Trend context" value="Range" tone="text-paper" />
-        <HeroMetric
-          compact
-          label="Entry cost"
-          value={entryCopy.value}
-          tone={entryTone}
-          tooltip={entryCopy.tooltip}
-        />
+        <HeroMetric compact label="Entry debit" value={ticketValue} tone={activeProjection ? "text-paper" : "text-paper/55"} />
       </div>
     );
   }
@@ -426,15 +376,10 @@ function ScorecardMetrics({
         <HeroMetric label="Confidence" value={`${confidence}%`} tone="text-gold-soft" />
         <HeroMetric label="Risk exposure" value="Low" tone="text-bull-soft" />
         <HeroMetric label="Reward setup" value="Neutral" tone="text-gold-soft" />
-        <HeroMetric label="Trend context" value="Range" tone="text-paper" />
-      </div>
-      <div className="mt-2">
         <HeroMetric
-          label="Entry cost"
-          value={entryCopy.value}
-          tone={entryTone}
-          tooltip={entryCopy.tooltip}
-          className="min-h-[70px]"
+          label="Entry debit"
+          value={activeProjection ? `$${activeProjection.projectedEntry.mark.toFixed(2)}` : entryCostStatus === "unavailable" ? "Offline" : "Waiting"}
+          tone={activeProjection ? "text-paper" : "text-paper/55"}
         />
       </div>
     </div>
@@ -478,21 +423,16 @@ function CommandRailDiagram({
     setEngine(next);
   };
 
-  const metricRail = (
-    <ScorecardMetrics
-      confidence={confidence}
-      activeProjection={projection}
-      entryCostStatus={entryCostStatus}
-      compact
-    />
-  );
+  void confidence;
+  void projection;
+  void entryCostStatus;
 
   if (!chart) {
     return (
-      <div className="hidden min-h-[820px] border-t border-paper/10 px-3 py-6 lg:block lg:border-l lg:border-t-0">
+      <div className="hidden min-h-[560px] border-t border-paper/10 px-3 py-5 lg:block lg:border-l lg:border-t-0">
         <div
           className={cn(
-            "relative flex h-full min-h-[768px] flex-col gap-4 overflow-hidden px-7 py-7 text-center",
+            "relative flex h-full min-h-[510px] flex-col gap-4 overflow-hidden px-7 py-6 text-center",
             frameless
               ? "rounded-none border-0 bg-paper/[0.018]"
               : "rounded-[10px] border border-paper/10 bg-paper/[0.035]",
@@ -504,15 +444,14 @@ function CommandRailDiagram({
             onSelect={selectEngine}
           />
           <EmptyWorkspaceChart />
-          {metricRail}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="hidden min-h-[820px] border-t border-paper/10 px-3 py-6 lg:block lg:border-l lg:border-t-0">
-      <div className="relative flex h-full min-h-[768px] flex-col gap-4">
+    <div className="hidden min-h-[560px] border-t border-paper/10 px-3 py-5 lg:block lg:border-l lg:border-t-0">
+      <div className="relative flex h-full min-h-[510px] flex-col gap-4">
         <ChartLensSwitcher
           engine={engine}
           otherEngine={otherEngine}
@@ -531,16 +470,118 @@ function CommandRailDiagram({
             data={chart}
             variant="dark"
             accent={accent}
-            height={610}
+            height={440}
             title={`${engine} path vs structure`}
             frameless={frameless}
           />
         </div>
-        {metricRail}
         <style>{lensStyles}</style>
       </div>
     </div>
   );
+}
+
+function OptionTicketPanel({
+  engine,
+  projection,
+  status,
+  compact = false,
+  className,
+}: {
+  engine: "SPY" | "ES";
+  projection?: ContractProjection | null;
+  status: EntryCostStatus;
+  compact?: boolean;
+  className?: string;
+}) {
+  const title = projection?.contractLabel ?? `${engine} option ticket`;
+  const statusCopy =
+    status === "unavailable"
+      ? "Chain unavailable"
+      : projection
+        ? "Ticket ready"
+        : "Waiting for chain";
+
+  return (
+    <div
+      className={cn(
+        "rounded-[14px] border border-paper/10 bg-paper/[0.045] p-3 text-paper shadow-[0_18px_50px_-40px_rgba(0,0,0,0.92)]",
+        compact ? "contrast-dark bg-[#071116]/72" : "",
+        className,
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-paper/42">
+            Options ticket
+          </div>
+          <div className="mt-1 truncate font-mono text-[12px] font-semibold uppercase tracking-[0.08em] text-gold-soft">
+            {title}
+          </div>
+        </div>
+        <span
+          className={cn(
+            "shrink-0 rounded-[6px] border px-2 py-1 font-mono text-[8px] uppercase tracking-[0.14em]",
+            projection
+              ? "border-bull/35 bg-bull-soft/10 text-bull-soft"
+              : "border-paper/10 bg-paper/[0.04] text-paper/48",
+          )}
+        >
+          {statusCopy}
+        </span>
+      </div>
+
+      {projection ? (
+        <>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <TicketMetric label="Now" value={`$${projection.currentMark.toFixed(2)}`} />
+            <TicketMetric label="At entry" value={`$${projection.projectedEntry.mark.toFixed(2)}`} tone="gold" />
+            <TicketMetric
+              label="At target"
+              value={projection.projectedTarget ? `$${projection.projectedTarget.mark.toFixed(2)}` : "Open"}
+              tone="bull"
+            />
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-3 font-mono text-[10px] uppercase tracking-[0.10em] text-paper/46">
+            <span>Bid/ask {formatTicketMoney(projection.currentBid)} / {formatTicketMoney(projection.currentAsk)}</span>
+            <span>Delta {projection.delta.toFixed(2)}</span>
+            <span>Gamma {projection.gamma.toFixed(3)}</span>
+          </div>
+        </>
+      ) : (
+        <p className="mt-3 text-[12px] leading-snug text-paper/58">
+          The ticket appears when the live chain and the engine entry line are both available.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function TicketMetric({
+  label,
+  value,
+  tone = "paper",
+}: {
+  label: string;
+  value: string;
+  tone?: "paper" | "gold" | "bull";
+}) {
+  const toneClass =
+    tone === "gold" ? "text-gold-soft" : tone === "bull" ? "text-bull-soft" : "text-paper";
+  return (
+    <div className="contrast-dark rounded-[10px] border border-paper/10 bg-[#071116]/58 px-2.5 py-2">
+      <div className="font-mono text-[8px] uppercase tracking-[0.16em] text-paper/38">
+        {label}
+      </div>
+      <div className={cn("mt-1 font-mono text-[13px] font-semibold tabular-nums", toneClass)}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function formatTicketMoney(value: number | null): string {
+  return value === null ? "--" : `$${value.toFixed(2)}`;
 }
 
 function ChartLensSwitcher({
@@ -566,7 +607,7 @@ function ChartLensSwitcher({
         <div
           role="tablist"
           aria-label="Workspace chart engine"
-          className="grid grid-cols-2 rounded-pill border border-paper/10 bg-[#071116]/72 p-1"
+          className="contrast-dark grid grid-cols-2 rounded-pill border border-paper/10 bg-[#071116]/72 p-1"
         >
           {(["SPY", "ES"] as const).map((item) => (
             <button
@@ -655,7 +696,7 @@ function EmptyWorkspaceChart() {
           </p>
         </div>
         <span className="rounded-[4px] border border-paper/10 bg-paper/[0.035] px-2 py-1 font-mono text-[8px] uppercase tracking-[0.14em] text-paper/42">
-          No synthetic chart
+          Measured data only
         </span>
       </div>
 
@@ -693,26 +734,26 @@ function EmptyWorkspaceChart() {
           <circle cx="652" cy="244" r="4" fill="rgba(244,228,192,0.45)" />
         </svg>
         <div className="absolute inset-0 grid place-items-center">
-          <div className="max-w-md rounded-[12px] border border-paper/10 bg-[#071116]/88 px-6 py-5 shadow-[0_18px_50px_-35px_rgba(0,0,0,0.9)]">
+          <div className="contrast-dark max-w-md rounded-[12px] border border-paper/10 bg-[#071116]/88 px-6 py-5 shadow-[0_18px_50px_-35px_rgba(0,0,0,0.9)]">
             <div className="mx-auto grid h-14 w-14 place-items-center rounded-[14px] border border-gold/25 bg-gold-soft/10 text-gold-soft">
               <span className="h-3 w-3 rounded-full bg-current animate-breathe" />
             </div>
             <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.18em] text-gold-soft/76">
-              Workspace chart awaiting bars
+              Structure canvas pending
             </p>
             <p className="mx-auto mt-3 max-w-sm text-[14px] leading-relaxed text-paper/68">
-              Actual price path, rails, and line touches will fill this canvas
-              when the data feed resolves. Until then, no fake levels are drawn.
+              Price path and active gates populate after the measured
+              session set is ready.
             </p>
             <div className="mx-auto mt-5 grid max-w-sm grid-cols-3 gap-2 font-mono text-[9px] uppercase tracking-[0.12em] text-paper/48">
               <span className="rounded-soft border border-paper/10 bg-paper/[0.04] px-2 py-2">
-                No fake chart
+                Awaiting bars
               </span>
               <span className="rounded-soft border border-paper/10 bg-paper/[0.04] px-2 py-2">
-                No entry
+                Entry gated
               </span>
               <span className="rounded-soft border border-paper/10 bg-paper/[0.04] px-2 py-2">
-                Brief first
+                Brief active
               </span>
             </div>
           </div>
@@ -723,35 +764,3 @@ function EmptyWorkspaceChart() {
 }
 
 type EntryCostStatus = "active" | "waiting" | "unavailable";
-
-function entryCostCopy(
-  projection: ContractProjection | null | undefined,
-  status: EntryCostStatus,
-): { value: string; tooltip: string } {
-  if (projection) {
-    return {
-      value: `$${projection.projectedEntry.debitPerContract}`,
-      tooltip:
-        "Estimated option debit at the planned entry line from the live chain and Greeks.",
-    };
-  }
-  if (status === "active") {
-    return {
-      value: "Chain active",
-      tooltip:
-        "The option chain is live. No debit is shown because the current slate has no unresolved entry projection with a valid option quote.",
-    };
-  }
-  if (status === "unavailable") {
-    return {
-      value: "No chain",
-      tooltip:
-        "The option-chain feed is unavailable for this engine right now, so the slate will not invent a debit.",
-    };
-  }
-  return {
-    value: "Chain waiting",
-    tooltip:
-      "The entry-cost model publishes only after the live option chain returns a usable quote and Greeks for the planned entry.",
-  };
-}

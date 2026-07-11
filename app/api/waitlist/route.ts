@@ -44,7 +44,6 @@ export async function POST(req: NextRequest) {
   // CSS and aria-hidden, so a non-empty value strongly indicates a
   // bot. Return 200 silently so the bot can't probe for the rejection.
   if (typeof body.website === "string" && body.website.trim() !== "") {
-    console.log("[waitlist] honeypot tripped — silent drop");
     return NextResponse.json({ ok: true });
   }
 
@@ -72,10 +71,9 @@ export async function POST(req: NextRequest) {
   }
 
   // ---- Turnstile / hCaptcha ----
-  // TODO(captcha): set TURNSTILE_SECRET (or HCAPTCHA_SECRET) in Vercel
-  // and the corresponding NEXT_PUBLIC_TURNSTILE_SITEKEY in the FE.
-  // Without a secret configured we trust the request — fine for
-  // closed-beta launch on a private URL, NOT for public traffic.
+  // Captcha is enforced when TURNSTILE_SECRET is configured. Closed
+  // beta previews can run without it; public traffic should set the
+  // secret and matching site key.
   const captchaOk = await verifyCaptcha(
     typeof body.turnstileToken === "string" ? body.turnstileToken : null,
   );
@@ -87,8 +85,8 @@ export async function POST(req: NextRequest) {
   }
 
   // ---- Email provider (double opt-in) ----
-  // TODO(email-provider): wire EMAIL_PROVIDER_API_KEY for the chosen
-  // ESP (e.g. Loops / Resend / Beehiiv). The provider must send a
+  // EMAIL_PROVIDER_API_KEY controls the selected email provider.
+  // The provider must send a
   // confirmation email; we don't add the lead to the active list
   // until the user clicks through. If unset, the lead is logged and
   // the request returns 200.
@@ -174,8 +172,8 @@ async function sendDoubleOptIn(lead: {
     logWaitlistLead("no_provider", lead);
     return true;
   }
-  // TODO(email-provider): implement the provider's add-with-double-opt-in
-  // endpoint here. Sketch for Loops:
+  // Provider implementation point: add-with-double-opt-in endpoint.
+  // Sketch for Loops:
   //   const res = await fetch("https://app.loops.so/api/v1/contacts/create", {
   //     method: "POST",
   //     headers: {
@@ -206,14 +204,16 @@ function logWaitlistLead(
   },
 ) {
   const domain = lead.email.split("@")[1] ?? "unknown";
-  console.log("[waitlist] lead accepted", {
-    mode,
-    emailDomain: domain.slice(0, 80),
-    hasReferrer: !!lead.referrer,
-    utm: lead.utm,
-    receivedAt: lead.receivedAt,
-    ipHash: hashForLog(lead.ip),
-  });
+  if (process.env.NODE_ENV !== "production") {
+    console.info("[waitlist] lead accepted", {
+      mode,
+      emailDomain: domain.slice(0, 80),
+      hasReferrer: !!lead.referrer,
+      utm: lead.utm,
+      receivedAt: lead.receivedAt,
+      ipHash: hashForLog(lead.ip),
+    });
+  }
 }
 
 function hashForLog(value: string): string {

@@ -1,6 +1,7 @@
 "use client";
+import { useMemo, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { PanelHeartbeat } from "@/components/channel/ChannelLiveBadge";
-import { Card } from "@/components/ui/Card";
+import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { WhyThisStateLink } from "@/components/slate/WhyThisStateLink";
 import {
@@ -9,6 +10,7 @@ import {
   type StructureChartLine,
 } from "@/components/decision-slate/StructurePathChart";
 import { PHASE_DEFINITIONS } from "@/content/phase-definitions";
+import { formatDirectionLabel, formatDisplayLabel, formatSentenceState } from "@/lib/display-labels";
 import type { AdaptedSnapshot, AnchorBand, AnchorGroup } from "@/lib/snapshot-adapter";
 import type { EngineState } from "@/lib/states";
 import type { DynamicLine } from "@/lib/types";
@@ -32,10 +34,20 @@ const headlineByState: Record<EngineState, string> = {
   WAIT: "Waiting on confirmation",
   ARMED: "Setup armed",
   GO: "Trade active",
-  COOLDOWN: "Touch-window complete",
+  COOLDOWN: "Window complete",
 };
 
 const SLOPE_PER_HOUR = 0.2;        // display fallback only; engine projects live values upstream
+const SPY_ROOM_HOURS = [8, 9, 10, 11, 12, 13, 14] as const;
+
+interface SpyHourBar {
+  hour: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  count: number;
+}
 
 function entryBandValue(band: AnchorBand): number | null {
   return band.entryValue ?? band.currentValue ?? null;
@@ -63,9 +75,9 @@ function buildSpyEntryFramework(
   }
   if (primary) {
     rows.push(
-      { label: "Main +", value: entryBandValue(primary.bands.upper) },
-      { label: "Main", value: entryBandValue(primary.bands.main), emphasized: true },
-      { label: "Main -", value: entryBandValue(primary.bands.lower) },
+      { label: "North Gate I", value: entryBandValue(primary.bands.upper) },
+      { label: "Control Line", value: entryBandValue(primary.bands.main), emphasized: true },
+      { label: "South Gate I", value: entryBandValue(primary.bands.lower) },
     );
   }
   return rows;
@@ -75,7 +87,7 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
   const bias = snap.bias.bias;
   const displayedState = snap.currentState;
   const displayedStateLabel =
-    PHASE_DEFINITIONS[displayedState]?.label ?? displayedState.replace(/_/g, " ");
+    PHASE_DEFINITIONS[displayedState]?.label ?? formatDisplayLabel(displayedState);
 
   const directionTone =
     bias === "BULLISH"
@@ -91,6 +103,7 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
 
   const anchor = snap.anchor;
   const primary = anchor?.primary ?? null;
+  const hasLivePrice = Number.isFinite(snap.currentPrice) && snap.currentPrice > 0;
   const priorRangeValid = isPriorRangeValid(snap.lines);
   const entryFramework = buildSpyEntryFramework(snap, primary, priorRangeValid);
 
@@ -99,9 +112,9 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
   // engine — and picks the closest of upper / main / lower.
   const distances = primary
     ? [
-        { label: "Upper ref", value: entryBandValue(primary.bands.upper) },
-        { label: "Main ref", value: entryBandValue(primary.bands.main) },
-        { label: "Lower ref", value: entryBandValue(primary.bands.lower) },
+        { label: "North Gate I", value: entryBandValue(primary.bands.upper) },
+        { label: "Control Line", value: entryBandValue(primary.bands.main) },
+        { label: "South Gate I", value: entryBandValue(primary.bands.lower) },
       ].filter((b) => b.value !== null)
     : [];
   const nearest = distances.reduce<{ label: string; dist: number; value: number } | null>(
@@ -125,9 +138,148 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
         dist: entryLineValue(nearestStructural) - snap.currentPrice,
       }
     : nearest;
-  const executionRead = buildExecutionRead(snap, nearestRead, displayedState, displayedStateLabel);
-
   const todayLabel = new Date().toISOString().slice(0, 10);
+  const controlValue = primary ? entryBandValue(primary.bands.main) : nearestRead?.value ?? null;
+  const upperOne = primary ? entryBandValue(primary.bands.upper) : null;
+  const lowerOne = primary ? entryBandValue(primary.bands.lower) : null;
+  const gateRows = buildSpyControlGates(primary);
+  const stateTitle =
+    displayedState === "STAND_DOWN"
+      ? "Stand down today"
+      : displayedState === "GO"
+        ? "Trade active"
+        : displayedState === "ARMED"
+          ? "Setup armed"
+          : displayedState === "WAIT" || displayedState === "WATCH"
+            ? "Wait for confirmation"
+            : "Awaiting setup window";
+  const locationCopy = nearestRead
+    ? `${formatSigned(nearestRead.dist)} pts from last`
+    : "Awaiting structure";
+
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader
+        eyebrow="Control Map"
+        title="Control Room"
+        meta={`${stateTitle} - ${nearestRead ? nearestRead.label : "map resolving"}`}
+        action={
+          <div className="flex items-center gap-2">
+            <PanelHeartbeat feedId="anchor-levels" />
+            <StatusPill variant={stateTone[displayedState] ?? "stale"} pulse>
+              {displayedStateLabel}
+            </StatusPill>
+          </div>
+        }
+      />
+      <CardBody className="space-y-5">
+        <div className="grid gap-3 md:grid-cols-4">
+          <SpyControlStat
+            label="Zone now"
+            value={nearestRead ? nearestRead.label : "Resolving"}
+            note={locationCopy}
+          />
+          <SpyControlStat
+            label="Open bias"
+            value={formatDirectionLabel(bias)}
+            note={snap.decision.windowET || "Awaiting window"}
+          />
+          <SpyControlStat
+            label="Control Line"
+            value={controlValue === null ? "Resolving" : controlValue.toFixed(2)}
+            note="SPY gate spacing"
+          />
+          <SpyControlStat
+            label="Last"
+            value={hasLivePrice ? snap.currentPrice.toFixed(2) : "--"}
+            note={stateTitle}
+          />
+        </div>
+
+        <SPYAnchorRoom snap={snap} />
+
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="rounded-[14px] border border-rule bg-paper-2/55 p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <div className="eyebrow text-ink-3">Nearest Gates</div>
+                <div className="mt-1 font-serif text-[22px] leading-none text-ink">
+                  Control Room reference values
+                </div>
+              </div>
+              <WhyThisStateLink
+                engine="SPY"
+                trace={snap.decisionTrace.map((event) => ({
+                  ts: event.ts,
+                  event: event.event,
+                  weight: event.weight,
+                }))}
+                flipCondition={snap.flipCondition}
+                currentStateLabel={displayedStateLabel}
+                className="hidden h-7 items-center gap-1.5 whitespace-nowrap rounded-pill border border-rule bg-paper px-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-2 transition-colors hover:border-rule-strong hover:bg-paper sm:inline-flex"
+              />
+            </div>
+            {gateRows.length > 0 ? (
+              <div className="grid gap-2 sm:grid-cols-3">
+                {gateRows.map((gate) => (
+                  <div
+                    key={gate.label}
+                    className={`rounded-[10px] border px-3 py-3 ${
+                      gate.active
+                        ? "border-gold/55 bg-gold-tint shadow-[0_0_0_1px_rgba(184,130,31,0.18)]"
+                        : "border-rule bg-paper"
+                    }`}
+                  >
+                    <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3">
+                      {gate.label}
+                    </div>
+                    <div className="mt-1 font-mono text-[15px] font-semibold tabular-nums text-ink" data-num>
+                      {gate.value === null ? "--" : gate.value.toFixed(2)}
+                    </div>
+                    <div className="mt-1 text-[11px] leading-snug text-ink-3">
+                      {gate.note}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-[12px] border border-rule bg-paper px-4 py-6 text-center text-[13px] text-ink-3">
+                SPY will publish the Control Line and gates once the anchor is available.
+              </div>
+            )}
+          </div>
+
+          <div className="contrast-dark rounded-[14px] border border-rule bg-[#071116] p-4 text-paper shadow-soft">
+            <div className="eyebrow text-paper/50">Active read</div>
+            <div className="mt-2 font-serif text-[27px] leading-none text-paper">
+              {headlineByState[displayedState] ?? displayedStateLabel}
+            </div>
+            <p className="mt-3 text-[12px] leading-relaxed text-paper/68">
+              {synthesisLine(snap, nearestRead, displayedState)}
+            </p>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <RoomStat
+                label="North"
+                value={upperOne === null ? "--" : upperOne.toFixed(2)}
+                note="First gate"
+              />
+              <RoomStat
+                label="South"
+                value={lowerOne === null ? "--" : lowerOne.toFixed(2)}
+                note="First gate"
+              />
+            </div>
+          </div>
+        </div>
+
+        {!priorRangeValid && (
+          <div className="rounded-soft border border-gold/30 bg-gold-tint px-3 py-2 font-mono text-[10px] uppercase tracking-[0.10em] text-gold-ink">
+            Prior range is being rechecked; the Control Map remains the primary read.
+          </div>
+        )}
+      </CardBody>
+    </Card>
+  );
 
   return (
     <Card className={`relative overflow-hidden ${heroBg}`}>
@@ -139,7 +291,7 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
         <div className="col-span-12 lg:col-span-5 p-5 sm:p-7 lg:pr-6 lg:pl-8 relative">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="eyebrow text-ink-3">SPY · Anchor Slate</span>
+              <span className="eyebrow text-ink-3">SPY Control Map</span>
               {/* v9: slope value hidden — proprietary engine
                   parameter. The SLOPE_PER_HOUR const remains the
                   source of truth for the bands' projection math
@@ -189,23 +341,23 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
 
           <div className="mt-3 inline-flex items-center gap-2 px-2 py-0.5 rounded-pill bg-paper-2 shadow-rule">
             <span className="font-mono text-[10px] tracking-[0.14em] text-ink-2 font-semibold">
-              {bias} · {snap.decision.windowET || "no window"}
+              {bias} | {snap.decision.windowET || "no window"}
             </span>
           </div>
 
           {/* First read: distance to nearest line */}
           <div className="mt-7 max-w-md">
             <div className="flex items-baseline justify-between mb-1.5">
-              <span className="eyebrow text-ink-3">Nearest 08:00 reference</span>
+              <span className="eyebrow text-ink-3">Nearest gate</span>
               {nearestRead ? (
                 <span className="font-mono text-sm text-ink tabular-nums">
-                  <span className="font-semibold">{nearestRead.label}</span>
-                  <span className="text-ink-4 ml-1.5">{nearestRead.value.toFixed(2)}</span>
+                  <span className="font-semibold">{nearestRead!.label}</span>
+                  <span className="text-ink-4 ml-1.5">{nearestRead!.value.toFixed(2)}</span>
                   <span
-                    className={`ml-1.5 ${nearestRead.dist >= 0 ? "text-bear-ink" : "text-bull-ink"}`}
+                    className={`ml-1.5 ${nearestRead!.dist >= 0 ? "text-bear-ink" : "text-bull-ink"}`}
                   >
-                    ({nearestRead.dist >= 0 ? "+" : ""}
-                    {nearestRead.dist.toFixed(2)} pts)
+                    ({nearestRead!.dist >= 0 ? "+" : ""}
+                    {nearestRead!.dist.toFixed(2)} pts)
                   </span>
                 </span>
               ) : (
@@ -219,7 +371,7 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{
-                    width: `${Math.max(2, Math.min(100, 100 - Math.abs(nearestRead.dist) * 20))}%`,
+                    width: `${Math.max(2, Math.min(100, 100 - Math.abs(nearestRead!.dist) * 20))}%`,
                   }}
                   transition={{ duration: 0.8, ease: [0.2, 0.8, 0.2, 1] }}
                   className="absolute inset-y-0 left-0 bg-ink rounded-full"
@@ -227,8 +379,8 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
               </div>
             ) : (
               <span className="block mt-2 text-ink-3 text-[13.5px]">
-                No qualifying anchor is active. The channel is using the
-                closest 08:00 structural reference until a qualified line arms.
+                SPY Control Map is resolving. Gates appear as soon as the
+                prior-session pivot is available.
               </span>
             )}
           </div>
@@ -236,21 +388,19 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
           <p className="mt-7 text-[15px] text-ink-2 leading-relaxed max-w-xl">
             {primary ? (
               <span className="block text-ink-3 text-[13.5px]">
-                Source candle <span className="font-mono">{anchorTimeLabel(primary)}</span> CT.{" "}
+                Control anchor <span className="font-mono">{anchorTimeLabel(primary!)}</span> CT.{" "}
                 {/* v9: slope value hidden — proprietary engine
                     parameter. The bands themselves still render
                     using the const above. */}
-                The operating bands are projected into the active window; values
-                stay visible without exposing the proprietary construction.
+                The Control Line and gates are projected into the active window.
               </span>
             ) : (
               <span className="block mt-2 text-ink-3 text-[13.5px]">
-                A qualified structural confirmation will update this read.
+                A fresh Control Map will update this read.
               </span>
             )}
           </p>
 
-          <ExecutionRead items={executionRead} className="hidden lg:block" />
         </div>
 
         <div className="hidden lg:block absolute left-[41.666%] top-7 bottom-7 w-px bg-rule" />
@@ -259,27 +409,20 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
         <div className="col-span-12 lg:col-span-7 p-5 sm:p-7 lg:pl-7 bg-paper-2/40 relative">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <span className="eyebrow text-ink-3">Anchor</span>
+              <span className="eyebrow text-ink-3">Control anchor</span>
               <div className="mt-1.5 text-title font-serif text-ink">
-                {primary ? primary.role.replace(/_/g, " ").toLowerCase() : "none today"}
+                {primary ? formatDisplayLabel(primary!.role) : "None Today"}
               </div>
             </div>
             <div className="text-right">
               <div className="eyebrow text-ink-3 mb-0.5">Last</div>
               <div className="font-mono text-[18px] font-semibold tabular-nums text-ink" data-num>
-                {snap.currentPrice.toFixed(2)}
+                {hasLivePrice ? snap.currentPrice.toFixed(2) : "--"}
               </div>
             </div>
           </div>
 
-          <StructurePathChart
-            data={buildSpyChannelChart(snap)}
-            variant="paper"
-            accent={bias === "BULLISH" ? "bull" : bias === "BEARISH" ? "bear" : "gold"}
-            height={460}
-            title="SPY price vs 08:00 references"
-            className="mb-4"
-          />
+          <SPYAnchorRoom snap={snap} className="mb-4" />
 
           {primary ? (
             <>
@@ -302,9 +445,9 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
             </>
           ) : (
             <div className="mb-4 rounded-soft bg-paper px-3 py-3 shadow-rule">
-              <div className="eyebrow text-ink-3 mb-1">Anchor lines today</div>
+              <div className="eyebrow text-ink-3 mb-1">Control Map</div>
               <p className="text-[12px] leading-snug text-ink-3">
-                No anchor today. Nearest structural line is{" "}
+                Control Map is resolving. Nearest structural line is{" "}
                 {nearestStructural
                   ? `${nearestStructural.name} ${entryLineValue(nearestStructural).toFixed(2)} (${nearestStructural.distanceFromPrice >= 0 ? "+" : ""}${nearestStructural.distanceFromPrice.toFixed(2)} pts from LAST).`
                   : "not available yet."}
@@ -312,23 +455,57 @@ export function SPYChannelHero({ snap }: { snap: AdaptedSnapshot }) {
             </div>
           )}
 
-          {primary && (
-            <div className="mt-3 grid grid-cols-2 gap-3 text-[11px]">
-              <AnchorCell
-                label="Primary"
-                group={primary}
-              />
-              <AnchorCell
-                label="Anchor 2"
-                group={anchor?.anchor2 ?? null}
-              />
-            </div>
-          )}
-          <ExecutionRead items={executionRead} className="lg:hidden" />
         </div>
       </div>
     </Card>
   );
+}
+
+function SpyControlStat({
+  label,
+  value,
+  note,
+}: {
+  label: string;
+  value: string;
+  note: string;
+}) {
+  return (
+    <div className="rounded-[12px] border border-rule bg-paper-2/65 px-4 py-3">
+      <div className="eyebrow text-ink-3">{label}</div>
+      <div className="mt-1 min-w-0 break-words font-mono text-[15px] font-semibold tabular-nums text-ink" data-num>
+        {value}
+      </div>
+      <div className="mt-1 text-[11px] leading-snug text-ink-3">{note}</div>
+    </div>
+  );
+}
+
+function buildSpyControlGates(primary: AnchorGroup | null): Array<{
+  label: string;
+  value: number | null;
+  note: string;
+  active?: boolean;
+}> {
+  if (!primary) return [];
+  return [
+    {
+      label: "North Gate I",
+      value: entryBandValue(primary.bands.upper),
+      note: "Upper entry and exit boundary",
+    },
+    {
+      label: "Control Line",
+      value: entryBandValue(primary.bands.main),
+      note: "Line in the sand",
+      active: true,
+    },
+    {
+      label: "South Gate I",
+      value: entryBandValue(primary.bands.lower),
+      note: "Lower entry and exit boundary",
+    },
+  ];
 }
 
 function synthesisLine(
@@ -337,7 +514,7 @@ function synthesisLine(
   displayedState: string,
 ): string {
   const bias = snap.bias.bias.toLowerCase();
-  const state = displayedState.replace(/_/g, " ").toLowerCase();
+  const state = formatSentenceState(displayedState);
   const engineCondition = cleanSpyExplanation(snap.flipCondition, snap.currentPrice);
   if (
     engineCondition &&
@@ -374,6 +551,7 @@ function buildExecutionRead(
   stateLabel: string,
 ): ExecutionReadItem[] {
   const condition = cleanSpyExplanation(snap.flipCondition, snap.currentPrice);
+  const priceText = Number.isFinite(snap.currentPrice) && snap.currentPrice > 0 ? snap.currentPrice.toFixed(2) : "--";
   const keyTrace =
     snap.decisionTrace.find((event) => event.weight === "key") ??
     snap.decisionTrace[0] ??
@@ -393,13 +571,13 @@ function buildExecutionRead(
       label: "Active reference",
       value: nearestRead ? `${nearestRead.label} ${nearestRead.value.toFixed(2)}` : "Awaiting line",
       detail: nearestRead
-        ? `${formatSigned(nearestRead.dist)} pts from LAST ${snap.currentPrice.toFixed(2)}.`
-        : "The engine has not returned a qualified 08:00 reference yet.",
+        ? `${formatSigned(nearestRead.dist)} pts from LAST ${priceText}.`
+        : "The engine has not returned a qualified Control Map yet.",
       tone: nearestRead && Math.abs(nearestRead.dist) <= 0.5 ? "watch" : "neutral",
     },
     {
       label: "Risk check",
-      value: snap.guardrails.chase.status.replace(/_/g, " "),
+      value: formatDisplayLabel(snap.guardrails.chase.status),
       detail: riskDetail,
       tone:
         snap.guardrails.chase.status === "BROKEN" ||
@@ -483,6 +661,10 @@ function formatSigned(value: number): string {
   return `${value >= 0 ? "+" : ""}${value.toFixed(2)}`;
 }
 
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
 function shortClock(iso: string): string {
   const ms = Date.parse(iso);
   if (!Number.isFinite(ms)) return "--:--";
@@ -499,11 +681,8 @@ function cleanSpyExplanation(text: string, spot: number): string {
   const gammaFlip = /(?:\s*)dealer gamma (?:positive|negative|flat) with flip near ([0-9]+(?:\.[0-9]+)?)(?:\.|,)?/i;
   const match = text.match(gammaFlip);
   if (!match) return text;
-  const flip = Number(match[1]);
-  if (!Number.isFinite(flip)) return text;
-  if (Math.abs(flip - spot) / spot <= 0.12) return text;
   const cleaned = text.replace(gammaFlip, "").replace(/\s{2,}/g, " ").trim();
-  return cleaned || "Options context is withheld until the live chain is inside a realistic SPY range.";
+  return cleaned || "Extra context is withheld until the session read is clean.";
 }
 
 function capitalize(value: string): string {
@@ -520,8 +699,22 @@ function isPriorRangeValid(lines: DynamicLine[]): boolean {
 function isActionableSpyReference(line: DynamicLine, priorRangeValid: boolean): boolean {
   if (line.kind === "DAY_OPEN") return false;
   if (/backup/i.test(line.name)) return false;
+  if (line.kind === "CONTROL" || line.kind === "NORTH_GATE" || line.kind === "SOUTH_GATE") return true;
   if (!priorRangeValid && (line.kind === "PDH" || line.kind === "PDL")) return false;
-  return line.isPrimary || /^Anchor\s/i.test(line.name) || line.kind === "PDH" || line.kind === "PDL";
+  return line.isPrimary || /^Anchor\s/i.test(line.name);
+}
+
+function spyRoomLabel(name: string): string {
+  if (/Control Line/i.test(name)) return "Control Line";
+  if (/North Gate/i.test(name)) return name;
+  if (/South Gate/i.test(name)) return name;
+  if (/PDH/i.test(name)) return "PDH";
+  if (/PDL/i.test(name)) return "PDL";
+  if (/UA/i.test(name)) return "Upper asc";
+  if (/UD/i.test(name)) return "Upper desc";
+  if (/LA/i.test(name)) return "Lower asc";
+  if (/LD/i.test(name)) return "Lower desc";
+  return name.replace(/^Anchor\s*/i, "Anchor ");
 }
 
 function anchorTimeLabel(g: AnchorGroup): string {
@@ -570,6 +763,499 @@ function BandStat({
         {dist.toFixed(2)}
       </div>
     </div>
+  );
+}
+
+function mapSpyRoomHourlyBars(
+  candles: Array<{ t: string; o: number; h: number; l: number; c: number }>,
+): Map<number, SpyHourBar> {
+  const out = new Map<number, SpyHourBar>();
+  for (const candle of candles) {
+    const hour = chicagoHour(candle.t);
+    if (hour === null || !SPY_ROOM_HOURS.includes(hour as (typeof SPY_ROOM_HOURS)[number])) {
+      continue;
+    }
+    if (
+      !Number.isFinite(candle.o) ||
+      !Number.isFinite(candle.h) ||
+      !Number.isFinite(candle.l) ||
+      !Number.isFinite(candle.c)
+    ) {
+      continue;
+    }
+    const existing = out.get(hour);
+    if (!existing) {
+      out.set(hour, {
+        hour,
+        open: candle.o,
+        high: candle.h,
+        low: candle.l,
+        close: candle.c,
+        count: 1,
+      });
+    } else {
+      existing.high = Math.max(existing.high, candle.h);
+      existing.low = Math.min(existing.low, candle.l);
+      existing.close = candle.c;
+      existing.count += 1;
+    }
+  }
+  return out;
+}
+
+function chicagoHour(iso: string): number | null {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return null;
+  const hourText = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    hour: "2-digit",
+    hour12: false,
+  }).format(d);
+  const hour = Number(hourText);
+  if (!Number.isFinite(hour)) return null;
+  return hour === 24 ? 0 : hour;
+}
+
+function formatSpyRoomHour(hour: number): string {
+  return `${String(hour).padStart(2, "0")}:00`;
+}
+
+function spyRoomHourRead(
+  hour: number,
+  hasBar: boolean,
+  hasPrice: boolean,
+): { title: string; body: string; badge: string } {
+  if (!hasPrice) {
+    return {
+      title: "Waiting for hourly price",
+      body: "SPY will animate into the room once a live price or hourly candle is available.",
+      badge: "waiting",
+    };
+  }
+  if (hour === 8) {
+    return {
+      title: "08:00 setup read",
+      body: hasBar
+        ? "This shows where the early SPY candle sits inside the Control Room."
+        : "The 08:00 setup read is waiting for a completed SPY candle.",
+      badge: "setup",
+    };
+  }
+  if (hour === 9) {
+    return {
+      title: "09:00 institutional read",
+      body: hasBar
+        ? "This is the primary SPY entry hour. Use it to see whether SPY accepted above a gate, lost a gate, or stayed trapped inside the room."
+        : "The 09:00 institutional read will fill in when that SPY candle is available.",
+      badge: "primary",
+    };
+  }
+  if (hour >= 10 && hour <= 11) {
+    return {
+      title: `${formatSpyRoomHour(hour)} confirmation room`,
+      body: hasBar
+        ? "This hour checks whether the move followed through or failed back inside the same Control Room."
+        : "This confirmation hour is waiting for a completed SPY candle.",
+      badge: "confirm",
+    };
+  }
+  return {
+    title: `${formatSpyRoomHour(hour)} extension room`,
+    body: hasBar
+      ? "This is a later extension read. It can show continuation or rejection, but the app should treat it as lower quality than the 09:00 primary window."
+      : "This later extension hour is waiting for a completed SPY candle.",
+    badge: "extension",
+  };
+}
+
+function SPYAnchorRoom({
+  snap,
+  className = "",
+}: {
+  snap: AdaptedSnapshot;
+  className?: string;
+}) {
+  const primary = snap.anchor?.primary ?? null;
+  const hourlyBars = useMemo(() => mapSpyRoomHourlyBars(snap.candles ?? []), [snap.candles]);
+  const [selectedHour, setSelectedHour] = useState(() => {
+    if (hourlyBars.has(9)) return 9;
+    const available = SPY_ROOM_HOURS.filter((hour) => hourlyBars.has(hour));
+    return available.at(-1) ?? 9;
+  });
+  const [selectedFocus, setSelectedFocus] = useState<"ceiling" | "price" | "floor">("price");
+  const selectedBar = hourlyBars.get(selectedHour) ?? null;
+  const selectedPrice = selectedBar?.close ?? snap.currentPrice;
+  const hasPrice = Number.isFinite(selectedPrice) && selectedPrice > 0;
+  const selectedSource = selectedBar
+    ? `${formatSpyRoomHour(selectedHour)} close`
+    : hasPrice
+      ? "Latest price"
+      : "Waiting";
+  const selectedRead = spyRoomHourRead(selectedHour, Boolean(selectedBar), hasPrice);
+  const bands = primary
+    ? [
+        { label: "North Gate I", value: entryBandValue(primary.bands.upper) },
+        { label: "Control Line", value: entryBandValue(primary.bands.main) },
+        { label: "South Gate I", value: entryBandValue(primary.bands.lower) },
+      ].filter((band): band is { label: string; value: number } => band.value !== null)
+    : snap.lines
+        .filter((line) => isActionableSpyReference(line, isPriorRangeValid(snap.lines)))
+      .map((line) => ({ label: spyRoomLabel(line.name), value: entryLineValue(line) }));
+  const ordered = bands.slice().sort((a, b) => a.value - b.value);
+  const lower = hasPrice
+    ? (ordered.filter((band) => band.value <= selectedPrice).at(-1) ?? null)
+    : null;
+  const upper = hasPrice
+    ? (ordered.find((band) => band.value > selectedPrice) ?? null)
+    : null;
+  const hasRoom = Boolean(lower && upper);
+  const roomProgress =
+    lower && upper
+      ? clampNumber(
+          (selectedPrice - lower.value) / Math.max(0.01, upper.value - lower.value),
+          0,
+          1,
+        )
+      : 0.5;
+  const carTop = lower && upper ? 76 - roomProgress * 52 : upper ? 70 : 30;
+  const nearCeiling = Math.abs(carTop - 24) < 14;
+  const nearFloor = Math.abs(carTop - 76) < 14;
+  const priceBadgeTop = nearCeiling ? 44 : nearFloor ? 56 : carTop;
+  const priceBadgeOffset = Math.abs(priceBadgeTop - carTop);
+  const floorDistance = lower ? selectedPrice - lower.value : null;
+  const ceilingDistance = upper ? upper.value - selectedPrice : null;
+  const title = hasRoom
+    ? `Between ${lower?.label} and ${upper?.label}`
+    : hasPrice && upper
+      ? `Below ${upper.label}`
+      : hasPrice && lower
+        ? `Above ${lower.label}`
+        : hasPrice
+          ? "Awaiting structure"
+          : "Awaiting live price";
+  const inspectedValue =
+    selectedFocus === "ceiling" ? upper?.value ?? null : selectedFocus === "floor" ? lower?.value ?? null : hasPrice ? selectedPrice : null;
+  const inspectedLabel =
+    selectedFocus === "ceiling" ? upper?.label ?? "Ceiling" : selectedFocus === "floor" ? lower?.label ?? "Floor" : selectedBar ? "SPY close" : "SPY last";
+  const inspectedDistance =
+    selectedFocus === "ceiling" ? ceilingDistance : selectedFocus === "floor" ? floorDistance : 0;
+  const inspectedNote =
+    selectedFocus === "price"
+      ? `${selectedSource} inside the selected hour room.`
+      : inspectedValue === null
+        ? "No gate is available on this side of the room."
+        : `${Math.abs(inspectedDistance ?? 0).toFixed(2)} pts from the selected price marker.`;
+  const moveHour = (delta: number) => {
+    const currentIndex = Math.max(0, SPY_ROOM_HOURS.indexOf(selectedHour));
+    const nextIndex = clampNumber(currentIndex + delta, 0, SPY_ROOM_HOURS.length - 1);
+    setSelectedHour(SPY_ROOM_HOURS[nextIndex]);
+  };
+  const inspectFromPointer = (event: MouseEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const pct = ((event.clientY - rect.top) / Math.max(1, rect.height)) * 100;
+    setSelectedFocus(pct < 38 ? "ceiling" : pct > 62 ? "floor" : "price");
+  };
+  const onRoomKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      moveHour(-1);
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      moveHour(1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setSelectedFocus("ceiling");
+    } else if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setSelectedFocus("floor");
+    } else if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      setSelectedFocus("price");
+    }
+  };
+
+  return (
+    <div className={`overflow-hidden rounded-[14px] border border-rule bg-ink text-paper shadow-card ${className}`}>
+      <div className="relative grid gap-0 lg:grid-cols-[minmax(0,1fr)_260px]">
+        <div className="relative min-h-[280px] p-4">
+          <div className="absolute inset-0 opacity-[0.14] [background-image:linear-gradient(rgba(255,255,255,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.06)_1px,transparent_1px)] [background-size:28px_28px]" />
+          <div className="relative flex items-start justify-between gap-3">
+            <div>
+              <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-gold-soft">
+                SPY Control Room
+              </div>
+              <motion.div
+                key={title}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.28 }}
+                className="mt-1 font-serif text-[24px] leading-none text-paper"
+              >
+                {title}
+              </motion.div>
+            </div>
+            <span className="rounded-[8px] border border-white/10 bg-white/[0.06] px-2.5 py-2 text-right font-mono text-[10px] uppercase tracking-[0.12em] text-paper/60">
+              Gate values
+              <span className="mt-0.5 block text-gold-soft">
+                {formatSpyRoomHour(selectedHour)}
+              </span>
+            </span>
+          </div>
+
+          <div
+            role="group"
+            tabIndex={0}
+            aria-label={`Interactive SPY Control Room, ${formatSpyRoomHour(selectedHour)}, ${title}`}
+            onClick={inspectFromPointer}
+            onKeyDown={onRoomKeyDown}
+            className="relative mt-5 h-[196px] cursor-crosshair overflow-hidden rounded-[14px] border border-white/10 bg-[radial-gradient(circle_at_50%_50%,rgba(184,130,31,0.16),rgba(255,255,255,0.035)_46%,rgba(0,0,0,0.12)_100%)] outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
+          >
+            <div className="absolute inset-x-3 top-3 z-10 flex items-center justify-between">
+              <span className="rounded-[8px] border border-white/10 bg-black/20 px-2 py-1 font-mono text-[9px] uppercase tracking-[0.14em] text-paper/58">
+                {selectedHour === 9 ? "institutional entry" : selectedRead.badge}
+              </span>
+              <span className="rounded-[8px] border border-gold/30 bg-gold/12 px-2 py-1 font-mono text-[9px] uppercase tracking-[0.14em] text-gold-soft">
+                Control Room
+              </span>
+            </div>
+            <div className="absolute bottom-4 left-1/2 top-4 w-[84px] -translate-x-1/2 rounded-full border border-white/10 bg-black/20 shadow-[inset_0_0_30px_rgba(0,0,0,0.40)]" />
+            <motion.div
+              key={`spy-room-${selectedHour}-${title}`}
+              className="absolute left-[calc(50%_-_66px)] top-[24%] h-[52%] w-[132px] rounded-[24px] border border-gold/40 bg-gold/12 shadow-[0_0_38px_rgba(184,130,31,0.20)]"
+              initial={{ opacity: 0, scaleX: 0.88 }}
+              animate={{ opacity: 1, scaleX: 1 }}
+              transition={{ duration: 0.42, ease: [0.2, 0.8, 0.2, 1] }}
+            />
+            <SpyRoomLine
+              type="ceiling"
+              top="24%"
+              label={upper?.label ?? "None"}
+              value={upper?.value ?? null}
+              distance={ceilingDistance}
+              active={selectedFocus === "ceiling"}
+              onSelect={() => setSelectedFocus("ceiling")}
+            />
+            <SpyRoomLine
+              type="floor"
+              top="76%"
+              label={lower?.label ?? "None"}
+              value={lower?.value ?? null}
+              distance={floorDistance}
+              active={selectedFocus === "floor"}
+              onSelect={() => setSelectedFocus("floor")}
+            />
+            <div
+              className="absolute left-1/2 z-50 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-gold/70 bg-paper shadow-[0_0_0_5px_rgba(184,130,31,0.15)]"
+              style={{ top: `${carTop}%` }}
+              aria-hidden
+            />
+            {priceBadgeOffset > 3 && (
+              <div
+                className="absolute left-1/2 z-10 w-px -translate-x-1/2 bg-gold/45"
+                style={{
+                  top: `${Math.min(carTop, priceBadgeTop)}%`,
+                  height: `${priceBadgeOffset}%`,
+                }}
+                aria-hidden
+              />
+            )}
+            <motion.div
+              key={`spy-price-${selectedHour}-${selectedPrice}`}
+              className="absolute left-1/2 z-30 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
+              style={{ top: `${priceBadgeTop}%` }}
+              initial={{ opacity: 0, scale: 0.84, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ duration: 0.38, delay: 0.08, ease: [0.2, 0.8, 0.2, 1] }}
+            >
+              <span className="relative flex h-14 w-24 items-center justify-center rounded-[16px] border border-gold/60 bg-ink shadow-[0_18px_46px_-18px_rgba(184,130,31,0.95)]">
+                <span className="absolute h-16 w-28 rounded-[20px] bg-gold/12 blur-md" />
+                <span className="relative text-center">
+                  <span className="block font-mono text-[8px] uppercase tracking-[0.14em] text-gold-soft">
+                    {selectedBar ? "SPY close" : "SPY last"}
+                  </span>
+                  <span className="block font-mono text-[13px] font-semibold tabular-nums text-paper">
+                    {hasPrice ? selectedPrice.toFixed(2) : "--"}
+                  </span>
+                </span>
+              </span>
+            </motion.div>
+          </div>
+          <div className="relative mt-3 grid grid-cols-4 gap-1.5 sm:grid-cols-7">
+            {SPY_ROOM_HOURS.map((hour) => {
+              const active = hour === selectedHour;
+              const hasBar = hourlyBars.has(hour);
+              return (
+                <button
+                  key={hour}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setSelectedHour(hour)}
+                  className={`h-9 rounded-[8px] border px-1 font-mono text-[10px] font-semibold tabular-nums transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/40 ${
+                    active
+                      ? "border-gold bg-gold text-ink shadow-glow"
+                      : "border-white/10 bg-white/[0.06] text-paper/78 hover:border-gold/50 hover:bg-white/[0.10]"
+                  }`}
+                  title={hasBar ? `${formatSpyRoomHour(hour)} SPY candle available` : "Uses latest available price until this candle is available"}
+                >
+                  {formatSpyRoomHour(hour)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="border-t border-white/10 bg-paper p-4 text-ink lg:border-l lg:border-t-0">
+          <div className="eyebrow text-ink-3">Gate read</div>
+          <div className="mt-2 rounded-[10px] border border-rule bg-paper-2/55 p-3">
+            <div className="font-serif text-[21px] leading-none text-ink">
+              {selectedRead.title}
+            </div>
+            <p className="mt-2 text-[12px] leading-relaxed text-ink-2">
+              {hasPrice
+                ? selectedRead.body
+                : "The hourly room activates when SPY candles and the Control Map are available."}
+            </p>
+          </div>
+          <p className="mt-2 text-[12px] leading-relaxed text-ink-2">
+            {hasPrice
+              ? "Each hour moves the SPY price marker against the same Control Map, so a novice can see whether price is pressing into a gate, holding a gate, or drifting in the middle."
+              : "The room activates when SPY price and Control Map values are available. Once live, it turns the gates into a simple position read instead of a raw chart."}
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <RoomStat
+              label="Hour"
+              value={hasPrice ? selectedPrice.toFixed(2) : "--"}
+              note={selectedSource}
+              active={selectedFocus === "price"}
+              onSelect={() => setSelectedFocus("price")}
+            />
+            <RoomStat
+              label="Ceiling"
+              value={upper ? upper.value.toFixed(2) : "None"}
+              note={ceilingDistance === null ? "Above map" : `${ceilingDistance.toFixed(2)} pts above`}
+              active={selectedFocus === "ceiling"}
+              onSelect={() => setSelectedFocus("ceiling")}
+            />
+            <RoomStat
+              label="Floor"
+              value={lower ? lower.value.toFixed(2) : "None"}
+              note={floorDistance === null ? "Below map" : `${floorDistance.toFixed(2)} pts below`}
+              active={selectedFocus === "floor"}
+              onSelect={() => setSelectedFocus("floor")}
+            />
+          </div>
+          <motion.div
+            key={`spy-inspect-${selectedHour}-${selectedFocus}`}
+            className="mt-3 rounded-[10px] border border-gold/25 bg-gold-tint/55 p-3"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.22 }}
+          >
+            <div className="eyebrow text-gold-ink">Room inspection</div>
+            <div className="mt-1 font-serif text-[20px] leading-none text-ink">
+              {inspectedLabel}
+            </div>
+            <div className="mt-1 font-mono text-[13px] font-semibold tabular-nums text-ink">
+              {inspectedValue === null ? "Waiting" : inspectedValue.toFixed(2)}
+            </div>
+            <p className="mt-2 text-[12px] leading-relaxed text-ink-2">
+              {inspectedNote}
+            </p>
+          </motion.div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SpyRoomLine({
+  type,
+  top,
+  label,
+  value,
+  distance,
+  active = false,
+  onSelect,
+}: {
+  type: "floor" | "ceiling";
+  top: string;
+  label: string;
+  value: number | null;
+  distance: number | null;
+  active?: boolean;
+  onSelect?: () => void;
+}) {
+  return (
+    <motion.button
+      type="button"
+      aria-pressed={active}
+      onClick={(event) => {
+        event.stopPropagation();
+        onSelect?.();
+      }}
+      className={`absolute inset-x-2 z-40 grid grid-cols-[minmax(56px,1fr)_76px_minmax(72px,1fr)] items-center gap-2 rounded-[10px] outline-none transition focus-visible:ring-2 focus-visible:ring-gold/45 sm:inset-x-3 sm:grid-cols-[minmax(0,1fr)_86px_minmax(0,1fr)] ${
+        active ? "bg-gold/10" : "hover:bg-white/[0.04]"
+      }`}
+      style={{ top, transform: "translateY(-50%)" }}
+      initial={{ opacity: 0, scaleX: 0.92 }}
+      animate={{ opacity: 1, scaleX: 1 }}
+      transition={{ duration: 0.34, ease: [0.2, 0.8, 0.2, 1] }}
+    >
+      <div className="min-w-0 text-right">
+        <div className="truncate font-mono text-[9px] font-semibold uppercase text-paper sm:text-[10px]">
+          {label}
+        </div>
+        <div className="truncate text-[10px] text-paper/50">
+          {distance === null ? "" : `${distance.toFixed(2)} pts`}
+        </div>
+      </div>
+      <div className="relative h-[24px]">
+        <motion.div
+          className="absolute left-0 right-0 top-1/2 h-px bg-gold"
+          initial={{ scaleX: 0 }}
+          animate={{ scaleX: 1 }}
+          transition={{ duration: 0.42 }}
+        />
+        <span className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gold shadow-[0_0_16px_rgba(184,130,31,0.78)]" />
+      </div>
+      <div className="min-w-0">
+        <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-gold-soft">
+          {type === "ceiling" ? "Ceiling" : "Floor"}
+        </div>
+        <div className="font-mono text-[11px] tabular-nums text-paper">
+          {value === null ? "--" : value.toFixed(2)}
+        </div>
+      </div>
+    </motion.button>
+  );
+}
+
+function RoomStat({
+  label,
+  value,
+  note,
+  active = false,
+  onSelect,
+}: {
+  label: string;
+  value: string;
+  note: string;
+  active?: boolean;
+  onSelect?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={`rounded-[8px] border px-2.5 py-2 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/35 ${
+        active ? "border-gold/35 bg-gold-tint/70" : "border-rule bg-paper-2/55 hover:border-gold/30 hover:bg-gold-tint/35"
+      }`}
+    >
+      <div className="eyebrow text-ink-3">{label}</div>
+      <div className="mt-1 font-mono text-[12px] font-semibold tabular-nums text-ink">
+        {value}
+      </div>
+      <div className="mt-0.5 text-[10px] leading-snug text-ink-3">{note}</div>
+    </button>
   );
 }
 
@@ -627,9 +1313,9 @@ function buildSpyChannelChart(snap: AdaptedSnapshot): StructureChartData | null 
   if (!primary || bars.length < 2) return null;
   const slopePerHour = -Math.abs(Number(snap.anchor?.slopePerHour ?? SLOPE_PER_HOUR));
   const lines = [
-    makeSpyChartLine("Upper ref", primary.bands.upper.anchorPrice, primary.anchorTime, slopePerHour, "upper"),
-    makeSpyChartLine("Main", primary.bands.main.anchorPrice, primary.anchorTime, slopePerHour, "anchor"),
-    makeSpyChartLine("Lower ref", primary.bands.lower.anchorPrice, primary.anchorTime, slopePerHour, "lower"),
+    makeSpyChartLine("North Gate I", primary.bands.upper.anchorPrice, primary.anchorTime, slopePerHour, "upper"),
+    makeSpyChartLine("Control Line", primary.bands.main.anchorPrice, primary.anchorTime, slopePerHour, "anchor"),
+    makeSpyChartLine("South Gate I", primary.bands.lower.anchorPrice, primary.anchorTime, slopePerHour, "lower"),
   ].filter((line): line is StructureChartLine => line !== null);
   if (lines.length === 0) return null;
   return { label: "SPY", date: new Date().toISOString().slice(0, 10), bars, lines };

@@ -33,9 +33,9 @@ const LINE_LABELS: Record<LineCode, string> = {
   LD: "Lower Descending",
   PR: "Primary Anchor",
   A2: "Anchor 2",
-  UR: "Upper Rail",
-  LR: "Lower Rail",
-  MR: "Main",
+  UR: "North Gate",
+  LR: "South Gate",
+  MR: "Control Line",
 };
 
 const STATE_LABELS: Record<ChannelState, string> = {
@@ -101,9 +101,9 @@ export const CHANNEL_CONFIG = {
       "session_clock",
     ],
     sections: {
-      plays: "Plays",
-      lines: "Lines",
-      tape: "Tape",
+      plays: "Trade Plan",
+      lines: "Control Gates",
+      tape: "Session Review",
     },
     lineLabels: LINE_LABELS,
     stateLabels: STATE_LABELS,

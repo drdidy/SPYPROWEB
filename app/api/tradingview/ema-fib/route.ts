@@ -11,6 +11,7 @@ import {
 } from "@/lib/ema-fib-alerts";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
@@ -82,8 +83,11 @@ function authorize(req: NextRequest):
   const configured = [
     process.env.SPYPROPHET_TRADINGVIEW_WEBHOOK_SECRET,
     process.env.ALERT_SECRET,
+    process.env.CRON_SECRET,
   ].filter((value): value is string => !!value);
-  const isProduction = process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
+
+  const isProduction =
+    process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production";
 
   if (configured.length === 0) {
     if (isProduction) {
@@ -97,8 +101,9 @@ function authorize(req: NextRequest):
   }
 
   const url = new URL(req.url);
-  const queryToken = url.searchParams.get("token");
-  const headerToken = req.headers.get("x-spyprophet-secret");
+  const queryToken = url.searchParams.get("token") || url.searchParams.get("secret");
+  const headerToken =
+    req.headers.get("x-spyprophet-secret") || req.headers.get("x-alert-secret");
   const authHeader = req.headers.get("authorization");
   const bearer = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
   const supplied = queryToken || headerToken || bearer;

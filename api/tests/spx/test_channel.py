@@ -145,10 +145,10 @@ def test_prev_rth_anchors_reads_thursday(es_candles_ascending_inside, es_offset,
     res = prev_rth_anchors(spx, session_date)
     assert res is not None
     high, low = res
-    assert high.price == pytest.approx(5876.00)
-    # Low Pivot is the lowest post-noon wick, not the lowest close.
-    assert low.price == pytest.approx(5867.00)
-    assert low.time == datetime(2026, 5, 7, 12, 0, tzinfo=CT)
+    assert high.price == pytest.approx(5878.50)
+    assert high.time == datetime(2026, 5, 7, 13, 0, tzinfo=CT)
+    assert low.price == pytest.approx(5849.00)
+    assert low.time == datetime(2026, 5, 7, 9, 0, tzinfo=CT)
 
 
 def test_build_lines_builds_previous_rth_framework(es_candles_ascending_inside, es_offset, session_date):
@@ -214,7 +214,7 @@ def test_build_lines_without_previous_rth_pivots_resolves_empty():
 def test_project_line_arithmetic():
     from _lib.spx.channel import Line
     anchor_t = datetime(2026, 5, 7, 17, tzinfo=CT)
-    line = Line("PREV_RTH_LOW_ASC", Anchor(5848.20, anchor_t), 1.04)
-    # 16 hours later: 5848.20 + 16 * 1.04 = 5864.84
+    line = Line("PREV_RTH_LOW_ASC", Anchor(5848.20, anchor_t), 1.00)
+    # 16 ES trading hours later: 5848.20 + 16 * 1.00 = 5864.20
     later = datetime(2026, 5, 8, 9, tzinfo=CT)
-    assert project_line(line, later) == pytest.approx(5864.84)
+    assert project_line(line, later) == pytest.approx(5864.20)

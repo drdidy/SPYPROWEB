@@ -6,11 +6,6 @@ export const metadata = {
     "Trading futures, equities, and options involves substantial risk of loss. Read this before using the Service.",
 };
 
-// TODO(legal): the options-specific risk paragraph below mirrors the
-// OCC's "Characteristics and Risks of Standardized Options" framing.
-// If we ever direct users to specific contracts or sizes, counsel must
-// review for FINRA Rule 2210 communications-with-the-public posture.
-
 export default function RiskPage() {
   return (
     <LegalPage

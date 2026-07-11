@@ -27,9 +27,10 @@ export function Card({
         "rounded-[14px] border border-rule-tier2 shadow-[0_14px_36px_-30px_rgba(20,22,26,0.42),0_1px_0_#E8E2D2] relative flex flex-col h-full overflow-hidden",
         "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-gold/55 before:to-transparent",
         "after:pointer-events-none after:absolute after:inset-0 after:bg-[radial-gradient(circle_at_18%_0%,rgba(184,130,31,0.07),transparent_32%)]",
+        "motion-safe:transition-[border-color,box-shadow,transform,background-color] motion-safe:duration-200 motion-safe:ease-swift hover:border-rule-strong hover:shadow-[0_18px_44px_-30px_rgba(20,22,26,0.38),0_1px_0_#E8E2D2]",
         toneCls,
         interactive &&
-          "transition-all duration-200 ease-swift hover:-translate-y-0.5 hover:border-rule-strong hover:shadow-[0_18px_44px_-28px_rgba(20,22,26,0.38),0_0_0_1px_#D4CBB6] cursor-pointer",
+          "hover:-translate-y-0.5 hover:shadow-[0_18px_44px_-28px_rgba(20,22,26,0.38),0_0_0_1px_#D4CBB6] cursor-pointer",
         className,
       )}
     >

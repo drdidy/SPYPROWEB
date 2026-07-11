@@ -1,17 +1,9 @@
 """ES structure line construction and projection.
 
-This module implements the geometry that defines the ES session:
-
-  1. Previous RTH swing-high close and post-noon RTH low wick.
-  2. Line construction: four major lines per active session.
-       PREV_RTH_HIGH_ASC  anchor=prev RTH high close, slope=+1.04
-       PREV_RTH_HIGH_DESC anchor=prev RTH high close, slope=-1.04
-       PREV_RTH_LOW_ASC   anchor=post-noon RTH low wick, slope=+1.04
-       PREV_RTH_LOW_DESC  anchor=post-noon RTH low wick, slope=-1.04
-     Optional minor watch:
-       SWING_HIGH_ASC      anchor=overnight high close when it exceeds
-                           the prior RTH high close, slope=+1.04
-  4. Projection: anchor_price + slope_per_hour * hours_since_anchor.
+This module implements the geometry that defines the ES session. The primary
+Control Map anchors from the prior RTH noon-to-2 PM high pivot when that window
+exists, with a deterministic pre-2 PM fallback for shortened sessions. The
+dealer-pressure reference uses the prior RTH low pivot as a secondary regime.
 """
 from __future__ import annotations
 
@@ -22,9 +14,10 @@ from typing import Literal, Optional
 from .candles import Candle, in_window, range_high_low, range_high_low_close
 from .constants import DEFAULT_SLOPE_PER_HOUR
 from .time_utils import (
+    es_trading_hours_between,
     hours_between,
     overnight_window,
-    previous_session_date,
+    previous_futures_session_date,
     rth_window,
     sydney_window,
     to_ct,
@@ -121,26 +114,47 @@ def tokyo_range(candles: list[Candle], session_date: date) -> Optional[SessionRa
 def prev_rth_anchors(
     candles: list[Candle], session_date: date
 ) -> Optional[tuple[Anchor, Anchor]]:
-    """Previous trading day's RTH high close and post-noon low wick.
+    """Previous futures session's control high and dealer-pressure low.
 
-    Returns None if no candles fall in the prior RTH window; this happens on
-    Mondays if the caller didn't supply Friday's bars.
+    The high anchor prefers the noon-to-2 PM RTH pivot. If a shortened futures
+    session has no bars in that window, it falls back to pre-2 PM bars so the
+    next session can still build a valid map.
     """
-    prev = previous_session_date(session_date)
-    bars = in_window(candles, rth_window(prev))
-    res = range_high_low_close(bars)
-    if res is None:
+    prev, bars = _previous_rth_bars(candles, session_date)
+    if prev is None:
         return None
 
-    post_noon = [bar for bar in bars if to_ct(bar.t).time() >= time(12, 0)]
-    if not post_noon:
+    high_bars = _control_high_candidate_bars(bars)
+    if not high_bars:
         return None
 
-    high, _, t_hi, _ = res
-    low_bar = min(post_noon, key=lambda bar: bar.l)
-    low = low_bar.l
-    t_lo = to_ct(low_bar.t)
-    return Anchor(price=high, time=t_hi), Anchor(price=low, time=t_lo)
+    high_bar = max(high_bars, key=lambda bar: float(bar.h))
+    low_bar = min(bars, key=lambda bar: float(bar.l))
+    return (
+        Anchor(price=float(high_bar.h), time=to_ct(high_bar.t)),
+        Anchor(price=float(low_bar.l), time=to_ct(low_bar.t)),
+    )
+
+
+def _previous_rth_bars(candles: list[Candle], session_date: date) -> tuple[date | None, list[Candle]]:
+    cursor = previous_futures_session_date(session_date)
+    for _ in range(7):
+        bars = in_window(candles, rth_window(cursor))
+        if bars:
+            return cursor, bars
+        cursor = previous_futures_session_date(cursor)
+    return None, []
+
+
+def _control_high_candidate_bars(bars: list[Candle]) -> list[Candle]:
+    noon_to_two = [
+        bar for bar in bars
+        if time(12, 0) <= to_ct(bar.t).time() < time(14, 0)
+    ]
+    if noon_to_two:
+        return noon_to_two
+    pre_two = [bar for bar in bars if to_ct(bar.t).time() < time(14, 0)]
+    return pre_two or bars
 
 
 # ---------------------------------------------------------------------------
@@ -220,9 +234,10 @@ def build_lines(
     """Build the ES structure lines for the active session.
 
     Direction and overnight anchors are retained for call-site compatibility.
-    The live ES framework uses the highest RTH close plus the lowest post-noon
-    RTH wick; each major pivot projects both ascending and descending lines.
-    If the overnight high close exceeds the prior RTH high close, the app also
+    The live ES framework uses the prior session's Control Map high plus the
+    dealer-pressure low; each major pivot projects both ascending and
+    descending lines.
+    If the overnight high exceeds the prior control pivot, the app also
     marks a minor ascending watch from that overnight pivot.
     """
     lines: list[Line] = []
@@ -241,4 +256,4 @@ def build_lines(
 
 def project_line(line: Line, at: datetime) -> float:
     """Value of `line` projected to time `at`."""
-    return line.anchor.price + line.slope_per_hour * hours_between(line.anchor.time, at)
+    return line.anchor.price + line.slope_per_hour * es_trading_hours_between(line.anchor.time, at)

@@ -47,6 +47,8 @@ VIX_SYMBOL = "^VIX"
 CENTRAL_TZ_NAME = "America/Chicago"
 CENTRAL_TZ_ALIASES = (CENTRAL_TZ_NAME, "US/Central")
 DEFAULT_SLOPE_PER_HOUR = 0.20
+SPY_CONTROL_GATE_SPACING = float(os.environ.get("SPY_CONTROL_GATE_SPACING", "3.4"))
+SPY_CONTROL_GATE_COUNT = int(os.environ.get("SPY_CONTROL_GATE_COUNT", "3"))
 TP1_TARGET_FRACTION = 0.50
 TP2_TARGET_FRACTION = 0.75
 STRUCTURE_CALIBRATION_KEYS = ("SPYPROPHET_STRUCTURE_CALIBRATION", "SPYPROPHET_SLOPE_PER_HOUR")
@@ -476,6 +478,9 @@ def display_line_name(name: str | None) -> str:
     if not name:
         return "-"
     normalized = str(name).strip().upper().replace(" ", "_")
+    control_label = spy_control_line_label(normalized)
+    if control_label:
+        return control_label
     primary = {
         "UA": "Upper Ascending Trigger",
         "UD": "Upper Descending Trigger",
@@ -501,6 +506,9 @@ def display_line_description(name: str | None) -> str:
     if not name:
         return "-"
     normalized = str(name).strip().upper().replace(" ", "_")
+    control_label = spy_control_line_label(normalized)
+    if control_label:
+        return f"{control_label} on the SPY Control Map"
     if normalized in descriptions:
         return descriptions[normalized]
     if normalized.startswith("S_ASC") or normalized.startswith("S_DESC"):
@@ -529,6 +537,9 @@ def compact_line_name(name: str | None) -> str:
         return "Pending"
     labels = {"UA": "Upper Ascending", "UD": "Upper Descending", "LA": "Lower Ascending", "LD": "Lower Descending"}
     normalized = str(name).strip().upper().replace(" ", "_")
+    control_label = spy_control_line_label(normalized)
+    if control_label:
+        return control_label
     return labels.get(normalized, display_line_name(name))
 
 
@@ -713,6 +724,15 @@ def find_high_pivot(rth_df: pd.DataFrame) -> Pivot:
     return Pivot("HIGH_PIVOT", float(df.loc[high_ts, "High"]), anchor_ts, "session_high", candle_color(df.loc[high_ts]), False)
 
 
+def find_high_close_pivot(rth_df: pd.DataFrame) -> Pivot:
+    if rth_df is None or rth_df.empty:
+        return _empty_pivot("HIGH_PIVOT")
+    df = rth_df.sort_index()
+    high_ts = df["Close"].idxmax()
+    anchor_ts = get_tradingview_anchor_time(high_ts)
+    return Pivot("HIGH_PIVOT", float(df.loc[high_ts, "Close"]), anchor_ts, "session_high_close", candle_color(df.loc[high_ts]), False)
+
+
 def find_low_pivot(rth_df: pd.DataFrame) -> Pivot:
     if rth_df is None or rth_df.empty:
         return _empty_pivot("LOW_PIVOT")
@@ -762,6 +782,70 @@ def build_primary_lines(high_pivot: Pivot, low_pivot: Pivot, slope_per_hour: flo
         DynamicLine("LA", low_pivot.price, low_pivot.timestamp, slope_per_hour, "ascending", "PUT_ZONE", "PRIMARY_LOW", True, "Lower ascending structure from low pivot"),
         DynamicLine("LD", low_pivot.price, low_pivot.timestamp, slope_per_hour, "descending", "CALL_ZONE", "PRIMARY_LOW", True, "Lower descending structure from low pivot"),
     ]
+
+
+def spy_control_line_label(name: str | None) -> str | None:
+    normalized = str(name or "").strip().upper()
+    numerals = {"1": "I", "2": "II", "3": "III"}
+    if normalized == "SPY_CONTROL":
+        return "Control Line"
+    if normalized.startswith("SPY_NORTH_"):
+        index = normalized.rsplit("_", 1)[-1]
+        return f"North Gate {numerals.get(index, index)}"
+    if normalized.startswith("SPY_SOUTH_"):
+        index = normalized.rsplit("_", 1)[-1]
+        return f"South Gate {numerals.get(index, index)}"
+    return None
+
+
+def build_spy_control_lines(
+    high_pivot: Pivot,
+    slope_per_hour: float = DEFAULT_SLOPE_PER_HOUR,
+    gate_spacing: float = SPY_CONTROL_GATE_SPACING,
+    gate_count: int = SPY_CONTROL_GATE_COUNT,
+) -> list[DynamicLine]:
+    if high_pivot is None or high_pivot.timestamp is None or pd.isna(high_pivot.price):
+        return []
+    gate_count = max(1, int(gate_count))
+    slope = abs(float(slope_per_hour))
+    spacing = abs(float(gate_spacing))
+    lines: list[DynamicLine] = []
+    for i in range(gate_count, 0, -1):
+        lines.append(DynamicLine(
+            f"SPY_NORTH_{i}",
+            float(high_pivot.price) + spacing * i,
+            high_pivot.timestamp,
+            slope,
+            "descending",
+            "CALL_ZONE",
+            "SPY_CONTROL_MAP",
+            True,
+            f"North Gate {i} above the SPY Control Line",
+        ))
+    lines.append(DynamicLine(
+        "SPY_CONTROL",
+        float(high_pivot.price),
+        high_pivot.timestamp,
+        slope,
+        "descending",
+        "MAIN",
+        "SPY_CONTROL_MAP",
+        True,
+        "SPY Control Line from the prior RTH high pivot close",
+    ))
+    for i in range(1, gate_count + 1):
+        lines.append(DynamicLine(
+            f"SPY_SOUTH_{i}",
+            float(high_pivot.price) - spacing * i,
+            high_pivot.timestamp,
+            slope,
+            "descending",
+            "PUT_ZONE",
+            "SPY_CONTROL_MAP",
+            True,
+            f"South Gate {i} below the SPY Control Line",
+        ))
+    return lines
 
 
 def build_secondary_lines(secondary_pivots: list[SecondaryPivot], slope_per_hour: float = DEFAULT_SLOPE_PER_HOUR) -> list[DynamicLine]:
@@ -1012,6 +1096,49 @@ def determine_preopen_bias(lines: list[DynamicLine], current_price: float, curre
     ct = get_central_tz()
     now = pd.Timestamp(current_dt)
     now = now.tz_localize(ct) if now.tzinfo is None else now.tz_convert(ct)
+    control = get_line_by_name(lines, "SPY_CONTROL")
+    if control is not None:
+        north = get_line_by_name(lines, "SPY_NORTH_1")
+        south = get_line_by_name(lines, "SPY_SOUTH_1")
+        control_v = control.tradable_value_at(now)
+        north_v = north.tradable_value_at(now) if north else float("nan")
+        south_v = south.tradable_value_at(now) if south else float("nan")
+        if pd.isna(control_v):
+            return BiasState(
+                "UNKNOWN", current_price, now, [], [], None, None, 0.0,
+                "SPY Control Map is still resolving.",
+                north_v, control_v, south_v, control_v,
+            )
+        active_names = {line.name for line in active_entry_lines(lines, current_price, now)}
+        line_values = [(line.name, line.tradable_value_at(now)) for line in lines if line.is_primary]
+        watched_call = [name for name, value in line_values if not pd.isna(value) and current_price > value and name in active_names]
+        watched_put = [name for name, value in line_values if not pd.isna(value) and current_price < value and name in active_names]
+        nearest = min(
+            [(abs(current_price - value), name, value) for name, value in line_values if name in active_names and not pd.isna(value)],
+            default=(float("nan"), None, float("nan")),
+            key=lambda row: row[0],
+        )
+        primary = nearest[1]
+        target_candidates = [(abs(value - current_price), name, value) for name, value in line_values if name != primary and not pd.isna(value)]
+        if current_price > nearest[2]:
+            directional_targets = [row for row in target_candidates if row[2] > current_price]
+        else:
+            directional_targets = [row for row in target_candidates if row[2] < current_price]
+        tp = min(directional_targets or target_candidates, default=(float("nan"), None, float("nan")), key=lambda row: row[0])[1]
+
+        preopen = now.time() < time(9, 0)
+        if current_price > control_v:
+            bias = "BULLISH" if preopen else "REGULAR_SESSION"
+            expl = "SPY is above the Control Line. Wait for a clean gate touch and candle close before acting."
+        elif current_price < control_v:
+            bias = "BEARISH" if preopen else "REGULAR_SESSION"
+            expl = "SPY is below the Control Line. Wait for a clean gate touch and candle close before acting."
+        else:
+            bias = "NEUTRAL"
+            expl = "SPY is sitting on the Control Line. Let the next gate close resolve direction."
+        score = calculate_bias_strength(current_price, north_v if not pd.isna(north_v) else control_v, south_v if not pd.isna(south_v) else control_v, bias)
+        return BiasState(bias, current_price, now, watched_call, watched_put, primary, tp, score, expl, north_v, control_v, south_v, control_v)
+
     ua = get_line_by_name(lines, "UA")
     ud = get_line_by_name(lines, "UD")
     la = get_line_by_name(lines, "LA")
@@ -1841,7 +1968,8 @@ def build_wait_discipline_items(
 __all__ = [
     # constants
     "SYMBOL", "VIX_SYMBOL", "CENTRAL_TZ_NAME", "CENTRAL_TZ_ALIASES",
-    "DEFAULT_SLOPE_PER_HOUR", "TP1_TARGET_FRACTION", "TP2_TARGET_FRACTION",
+    "DEFAULT_SLOPE_PER_HOUR", "SPY_CONTROL_GATE_SPACING", "SPY_CONTROL_GATE_COUNT",
+    "TP1_TARGET_FRACTION", "TP2_TARGET_FRACTION",
     "STRUCTURE_CALIBRATION_KEYS", "TARGET_OTM_STRIKE_DISTANCE",
     "FLOW_STRIKE_MAX_OTM_DISTANCE", "SPY_STRIKE_INCREMENT",
     "EXPECTED_OHLCV_COLUMNS", "RTH_SESSION_START", "RTH_SESSION_END",
@@ -1865,10 +1993,11 @@ __all__ = [
     "get_available_trading_days",
     # pivots
     "candle_color", "normalize_tradingview_anchor_time", "get_tradingview_anchor_time",
-    "find_high_pivot", "find_low_pivot", "find_primary_pivots", "find_secondary_pivots",
+    "find_high_pivot", "find_high_close_pivot", "find_low_pivot", "find_primary_pivots", "find_secondary_pivots",
     "get_hourly_candle_close_time",
     # lines
-    "calculate_slope_from_observed", "build_primary_lines", "build_secondary_lines",
+    "calculate_slope_from_observed", "build_primary_lines", "build_spy_control_lines",
+    "spy_control_line_label", "build_secondary_lines",
     "project_lines", "build_pivot_source_table", "zone_side_label",
     "build_structure_projection_table", "get_line_by_name", "get_lines_by_zone",
     "line_is_descending_entry", "line_is_ascending_entry", "structure_trigger_regime",

@@ -23,16 +23,16 @@ export function RiskGuardrails({
 }) {
   const [openKey, setOpenKey] = useState<string | null>(null);
   const rows = [
-    { key: "chase", label: "Chase Guard", icon: Gauge, value: state.chase, rule: "Blocks chasing after price moves too far beyond the planned entry." },
-    { key: "retest", label: "Retest", icon: RotateCcw, value: state.retest, rule: "Watches whether price returns to the rejected line before confirmation." },
-    { key: "structure", label: "Structure", icon: Shield, value: state.structure, rule: "Fails when the close breaks the line that justified the setup." },
-    { key: "daily", label: "Daily Risk", icon: CalendarClock, value: state.daily, rule: "Limits fresh entries once the daily signal budget or grade threshold is spent." },
+    { key: "chase", label: "Chase Guard", icon: Gauge, value: state.chase, note: "Protects you from late entries after the move has already stretched." },
+    { key: "retest", label: "Retest", icon: RotateCcw, value: state.retest, note: "Keeps the next entry tied to a clean return into structure." },
+    { key: "structure", label: "Structure", icon: Shield, value: state.structure, note: "Confirms the original level still matters before risk is added." },
+    { key: "daily", label: "Daily Risk", icon: CalendarClock, value: state.daily, note: "Keeps the day from turning into revenge mode." },
   ];
   return (
     <Card>
       <CardHeader
-        eyebrow="Risk Guardrails"
-        title="Why we are (or aren't) trading"
+        eyebrow="Trade Checks"
+        title="Is this still a clean setup?"
         action={healthAction}
       />
       <CardBody className="space-y-3">
@@ -66,11 +66,11 @@ export function RiskGuardrails({
               {openKey === r.key && (
                 <div className="border-t border-rule px-3 py-3 text-[12px] leading-relaxed text-ink-3">
                   <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-4">
-                    Rule
+                    Read
                   </div>
-                  <p className="mt-1">{r.rule}</p>
+                  <p className="mt-1">{r.note}</p>
                   <div className="mt-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-4">
-                    Current input
+                    Now
                   </div>
                   <p className="mt-1">{r.value.detail}</p>
                 </div>

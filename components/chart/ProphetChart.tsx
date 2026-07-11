@@ -1,5 +1,5 @@
 "use client";
-import { useMemo } from "react";
+import { useMemo, useState, type KeyboardEvent, type PointerEvent } from "react";
 import type { Candle, DynamicLine, Pivot, TradeSignal } from "@/lib/types";
 
 type Bounds = { xMin: number; xMax: number; yMin: number; yMax: number };
@@ -43,6 +43,7 @@ export function ProphetChart({
   currentPrice: number;
   height?: number;
 }) {
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const w = 1100;
   const h = height;
   const padL = 8;
@@ -133,13 +134,33 @@ export function ProphetChart({
   }, [bounds]);
 
   const candleWidth = Math.max(2, bounds.slotW * 0.6);
+  const selectedIndex =
+    candles.length > 0
+      ? Math.max(0, Math.min(candles.length - 1, activeIndex ?? candles.length - 1))
+      : null;
+  const selectedCandle = selectedIndex === null ? null : candles[selectedIndex];
+  const selectedX = selectedIndex === null ? null : xScale(selectedIndex);
+  const selectedY = selectedCandle ? yScale(selectedCandle.c) : null;
+  const tooltipX = selectedX === null ? 0 : Math.min(padL + innerW - 132, Math.max(padL + 4, selectedX + 12));
+  const tooltipY = selectedY === null ? 0 : Math.min(padT + innerH - 58, Math.max(padT + 4, selectedY - 30));
 
   // Last slot used for projecting lines forward to the right edge of
   // the rendered area (one slot beyond the last candle).
   const lastSlot = candles.length;
 
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-auto prophet-chart">
+    <svg
+      viewBox={`0 0 ${w} ${h}`}
+      className="w-full h-auto prophet-chart outline-none"
+      role="img"
+      tabIndex={0}
+      aria-label="Interactive Prophet chart. Move across the chart or use arrow keys to inspect candles."
+      onPointerMove={(event) => setActiveIndex(nearestCandleIndex(event, candles.length, w, padL, padL + innerW, xScale))}
+      onPointerLeave={() => setActiveIndex(null)}
+      onFocus={() => setActiveIndex((value) => value ?? Math.max(0, candles.length - 1))}
+      onKeyDown={(event) => setActiveIndex((value) => stepCandle(event, value ?? Math.max(0, candles.length - 1), candles.length))}
+    >
+      <title>Interactive Prophet chart</title>
       <defs>
         <linearGradient id="bullGrad" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={COLOR.bull} stopOpacity="0.06" />
@@ -205,6 +226,52 @@ export function ProphetChart({
           </g>
         );
       })}
+
+      {selectedCandle && selectedX !== null && selectedY !== null && (
+        <g className="chart-cursor">
+          <line
+            x1={selectedX}
+            x2={selectedX}
+            y1={padT}
+            y2={padT + innerH}
+            stroke={COLOR.gold}
+            strokeWidth={0.8}
+            strokeDasharray="3 5"
+            opacity={0.68}
+          />
+          <line
+            x1={padL}
+            x2={padL + innerW}
+            y1={selectedY}
+            y2={selectedY}
+            stroke={COLOR.ink}
+            strokeWidth={0.6}
+            strokeDasharray="2 5"
+            opacity={0.32}
+          />
+          <circle cx={selectedX} cy={selectedY} r={5} fill={COLOR.gold} stroke={COLOR.paper} strokeWidth={1.4} />
+          <g transform={`translate(${tooltipX}, ${tooltipY})`}>
+            <rect
+              width="126"
+              height="54"
+              rx="7"
+              fill={COLOR.paper}
+              stroke={COLOR.gold}
+              strokeOpacity="0.38"
+              filter="drop-shadow(0 10px 18px rgba(20,22,26,0.14))"
+            />
+            <text x="8" y="13" fontSize="8" fontFamily="var(--font-geist-mono)" fontWeight={700} fill={COLOR.ink3}>
+              {formatChartTime(selectedCandle.t)}
+            </text>
+            <text x="8" y="29" fontSize="12" fontFamily="var(--font-geist-mono)" fontWeight={800} fill={selectedCandle.c >= selectedCandle.o ? COLOR.bull : COLOR.bear}>
+              CLOSE {selectedCandle.c.toFixed(2)}
+            </text>
+            <text x="8" y="44" fontSize="8" fontFamily="var(--font-geist-mono)" fill={COLOR.ink2}>
+              H {selectedCandle.h.toFixed(2)}  L {selectedCandle.l.toFixed(2)}
+            </text>
+          </g>
+        </g>
+      )}
 
       {/* primary + secondary lines (draw-in animation) */}
       {lines.map((l, i) => {
@@ -405,6 +472,52 @@ export function ProphetChart({
       />
     </svg>
   );
+}
+
+function nearestCandleIndex(
+  event: PointerEvent<SVGSVGElement>,
+  count: number,
+  width: number,
+  minX: number,
+  maxX: number,
+  xScale: (slotIndex: number) => number,
+): number {
+  if (count <= 0) return 0;
+  const rect = event.currentTarget.getBoundingClientRect();
+  const x = ((event.clientX - rect.left) / Math.max(1, rect.width)) * width;
+  const clamped = Math.max(minX, Math.min(maxX, x));
+  let best = 0;
+  let dist = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < count; i += 1) {
+    const d = Math.abs(xScale(i) - clamped);
+    if (d < dist) {
+      dist = d;
+      best = i;
+    }
+  }
+  return best;
+}
+
+function stepCandle(event: KeyboardEvent<SVGSVGElement>, current: number, count: number): number {
+  if (event.key !== "ArrowLeft" && event.key !== "ArrowRight" && event.key !== "Home" && event.key !== "End") return current;
+  event.preventDefault();
+  if (event.key === "Home") return 0;
+  if (event.key === "End") return Math.max(0, count - 1);
+  return Math.max(0, Math.min(count - 1, current + (event.key === "ArrowLeft" ? -1 : 1)));
+}
+
+function formatChartTime(value: string): string {
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Chicago",
+      hour: "numeric",
+      minute: "2-digit",
+      month: "short",
+      day: "numeric",
+    }).format(new Date(value));
+  } catch {
+    return "Selected candle";
+  }
 }
 
 // CSS animations applied to SVG nodes via inline <style>. Keeps the

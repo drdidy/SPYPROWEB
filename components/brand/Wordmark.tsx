@@ -5,7 +5,14 @@
 
 import { Chip, CHIP_TONES } from "@/components/ui/Chip";
 
-export function Wordmark({ collapsed = false }: { collapsed?: boolean }) {
+export function Wordmark({
+  collapsed = false,
+  variant = "light",
+}: {
+  collapsed?: boolean;
+  variant?: "light" | "dark";
+}) {
+  const dark = variant === "dark";
   return (
     <div className="flex items-center gap-2.5 select-none">
       <svg width="27" height="27" viewBox="0 0 27 27" className="shrink-0" aria-hidden>
@@ -37,8 +44,8 @@ export function Wordmark({ collapsed = false }: { collapsed?: boolean }) {
       {!collapsed && (
         <div className="leading-none flex items-center gap-1.5">
           <div>
-            <div className="text-[9px] tracking-[0.28em] text-ink-3 mb-0.5">SPY</div>
-            <div className="text-[15px] font-serif font-medium tracking-tight text-ink">
+            <div className={dark ? "mb-0.5 text-[9px] tracking-[0.28em] text-white/50" : "mb-0.5 text-[9px] tracking-[0.28em] text-ink-3"}>SPY</div>
+            <div className={dark ? "font-serif text-[15px] font-medium tracking-tight text-white" : "font-serif text-[15px] font-medium tracking-tight text-ink"}>
               Prophet
             </div>
           </div>

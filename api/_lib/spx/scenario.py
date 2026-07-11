@@ -2,8 +2,8 @@
 
 ES now classifies price against a previous-RTH pivot framework:
 
-  - previous RTH swing-high close ascending and descending
-  - previous RTH post-noon low wick ascending and descending
+  - previous RTH control high ascending and descending
+  - previous RTH dealer-pressure low ascending and descending
   - the previous RTH high descending line is the major flow/bias reference
 
 Hourly confirmation remains rule-based: buys require a bearish touch that

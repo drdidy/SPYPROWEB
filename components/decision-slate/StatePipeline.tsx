@@ -24,6 +24,7 @@ import { ENGINE_STATES, type EngineState } from "@/lib/states";
 import { PHASE_DEFINITIONS } from "@/content/phase-definitions";
 import { Countdown } from "@/components/decision-slate/Countdown";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import { formatEngineStateLabel } from "@/lib/display-labels";
 import { displayEngine } from "@/lib/engine-labels";
 import { cn } from "@/lib/utils";
 import type { FeedId } from "@/lib/feed-health";
@@ -357,7 +358,7 @@ export function StatePipeline({
 
       <EngineFooterMetrics engine={engine} current={current} />
 
-      {/* Plain-English explanation underneath the stepper. */}
+      {/* Operator read underneath the stepper. */}
       {explanation && (
         <p className="mt-3 text-body text-ink-2 leading-snug">{explanation}</p>
       )}
@@ -501,14 +502,14 @@ export function SlateStateRail({
       <div className="mb-4 flex items-baseline justify-between gap-3">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3">
-            State rail
+            Process rail
           </p>
           <h2 className="mt-1 font-serif text-h2 text-ink">
-            Discipline sequence
+            Setup sequence
           </h2>
         </div>
         <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-4">
-          One rail per engine
+          SPY + ES
         </span>
       </div>
       <div className="space-y-4">
@@ -536,8 +537,8 @@ function StateRailRow({
         <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-ink-2">
           {displayEngine(engine)}
         </span>
-        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-3">
-          {PHASE_DEFINITIONS[current]?.label ?? current.replace(/_/g, " ")}
+        <span className="font-mono text-[11px] tracking-[0.02em] text-ink-3">
+          {PHASE_DEFINITIONS[current]?.label ?? formatEngineStateLabel(current)}
         </span>
       </div>
       <ol
@@ -660,14 +661,6 @@ export function EngineStatusChip({
 }
 
 function humanState(s: EngineState): string {
-  const m: Record<EngineState, string> = {
-    PRE_CONFIG: "pre-config",
-    STAND_DOWN: "standing down",
-    WATCH: "watching",
-    WAIT: "waiting",
-    ARMED: "armed",
-    GO: "live",
-    COOLDOWN: "cooldown",
-  };
-  return m[s];
+  if (s === "GO") return "Live";
+  return formatEngineStateLabel(s);
 }

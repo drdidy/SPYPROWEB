@@ -62,6 +62,7 @@ export interface UwDarkPool {
 export interface UwOptionContract {
   sessionDate?: string;
   optionSymbol: string | null;
+  streamerSymbol?: string | null;
   expiration: string | null;
   dte: number | null;
   strike: number | null;
@@ -131,6 +132,10 @@ export interface OptionsIntelBundle {
   sessionDate?: string;
   chainDate?: string;
   isHistoricalSession?: boolean;
+  premiumSignals?: {
+    flow?: "future" | "available" | string;
+    gex?: "future" | "available" | string;
+  };
   symbols: Record<string, UwSymbolIntel>;
 }
 

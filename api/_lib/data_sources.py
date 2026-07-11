@@ -1,7 +1,6 @@
 """Live data orchestration on top of prophet_core.
 
-Wraps external data providers (yfinance for SPY OHLC + ^VIX, optional
-Tastytrade for options) and feeds the engine. Returns a JSON-shaped
+Wraps external data providers and feeds the engine. Returns a JSON-shaped
 snapshot mirroring the design fixture so the frontend stays decoupled
 from the data source choice.
 
@@ -23,15 +22,14 @@ import pandas as pd
 
 from . import premarket_anchors as pma
 from . import prophet_core as pc
+from . import schwab
 from . import seed_snapshot
-from . import tastytrade
-from . import unusual_whales
 
-# Entry levels are the 08:00 CT values on the structure lines. The 08:00
-# candle can confirm a setup for a 09:00 entry; otherwise the operator
-# evaluates the 09:00, 10:00, and 11:00 CT candles against those fixed
-# references.
-ENTRY_REFERENCE_HOUR_CT = 8
+# Entry levels are the 09:00 CT values on the structure lines. The 08:00
+# candle can confirm against the 09:00 Control Map for a 09:00 entry;
+# otherwise the operator evaluates the 09:00, 10:00, and 11:00 CT candles
+# against those fixed references.
+ENTRY_REFERENCE_HOUR_CT = 9
 ENTRY_SETUP_HOUR_CT = 8
 ENTRY_WINDOW_START_HOUR_CT = 9
 ENTRY_WINDOW_END_HOUR_CT = 11
@@ -39,6 +37,22 @@ ENTRY_WINDOW_END_HOUR_CT = 11
 
 @pc.ttl_cache(ttl_seconds=60.0, maxsize=8)
 def fetch_spy_hourly(period: str = "60d") -> pd.DataFrame:
+    schwab_df = schwab.fetch_price_history_frame(
+        pc.SYMBOL,
+        period_type="day",
+        period=10,
+        frequency_type="minute",
+        frequency=30,
+        need_extended_hours=True,
+    )
+    if schwab_df is not None and not schwab_df.empty:
+        hourly = (
+            schwab_df.resample("60min", label="left", closed="left")
+            .agg({"Open": "first", "High": "max", "Low": "min", "Close": "last", "Volume": "sum"})
+            .dropna(subset=["Open", "High", "Low", "Close"])
+        )
+        if not hourly.empty:
+            return hourly
     try:
         import yfinance as yf
         df = yf.download(
@@ -125,6 +139,21 @@ def _structure_projection_time(now_ct: pd.Timestamp) -> pd.Timestamp:
 
 @pc.ttl_cache(ttl_seconds=30.0, maxsize=8)
 def fetch_spy_intraday(period: str = "1d", interval: str = "5m") -> pd.DataFrame:
+    frequency = 5
+    try:
+        frequency = max(1, int(str(interval).replace("m", "")))
+    except ValueError:
+        frequency = 5
+    schwab_df = schwab.fetch_price_history_frame(
+        pc.SYMBOL,
+        period_type="day",
+        period=10 if period != "1d" else 1,
+        frequency_type="minute",
+        frequency=frequency,
+        need_extended_hours=True,
+    )
+    if schwab_df is not None and not schwab_df.empty:
+        return schwab_df
     try:
         import yfinance as yf
         ticker = yf.Ticker(pc.SYMBOL)
@@ -207,7 +236,10 @@ def _replay_touch_window_entry(
     full-day drift. An 08:00 CT candle that tags an engine reference and
     closes away from it arms a 09:00 CT entry, exited at the 09:00 hourly
     close. Otherwise the first 09:00, 10:00, or 11:00 CT candle that tags a
-    reference is entered at that reference and exited at that hour's close.
+    reference arms the next hourly candle. The replay entry is the next
+    candle open and the replay exit is that next candle close. This matches
+    the live operating language: touch + close first, action on the next
+    candle.
     """
     if rth_today is None or rth_today.empty or not triggers:
         return None
@@ -239,6 +271,8 @@ def _replay_touch_window_entry(
             ct_ts = ct_ts.tz_convert(pc.get_central_tz())
         if not (ENTRY_SETUP_HOUR_CT <= ct_ts.hour <= ENTRY_WINDOW_END_HOUR_CT):
             continue
+        if completed_at is not None and not bool(bar.get("_Complete", True)):
+            continue
         high = float(bar["High"])
         low = float(bar["Low"])
         close = float(bar["Close"])
@@ -254,22 +288,23 @@ def _replay_touch_window_entry(
                     side = "SHORT"
                 else:
                     continue
-                if ct_ts.hour == ENTRY_SETUP_HOUR_CT:
-                    entry_time = ct_ts + pd.Timedelta(hours=1)
-                    exit_time = entry_time + pd.Timedelta(hours=1)
-                    exit_bar = hourly[hourly.index == entry_time]
-                    exit_price = float(exit_bar.iloc[0]["Close"]) if not exit_bar.empty else close
-                    rule = "EIGHT_AM_SETUP_TOUCH"
-                else:
-                    entry_time = ct_ts
-                    exit_time = ct_ts + pd.Timedelta(hours=1)
-                    exit_price = close
-                    rule = "ENTRY_WINDOW_TOUCH"
+                entry_time = ct_ts + pd.Timedelta(hours=1)
+                entry_bar = hourly[hourly.index == entry_time]
+                if entry_bar.empty:
+                    continue
+                entry_price = float(entry_bar.iloc[0]["Open"])
+                exit_time = entry_time + pd.Timedelta(hours=1)
+                exit_price = float(entry_bar.iloc[0]["Close"])
+                rule = (
+                    "EIGHT_AM_SETUP_NEXT_CANDLE"
+                    if ct_ts.hour == ENTRY_SETUP_HOUR_CT
+                    else "ENTRY_WINDOW_NEXT_CANDLE"
+                )
                 return {
                     "setup_time": ct_ts,
                     "entry_time": entry_time,
                     "exit_time": exit_time,
-                    "entry_price": level,
+                    "entry_price": entry_price,
                     "exit_price": exit_price,
                     "signal_type": signal_type,
                     "side": side,
@@ -284,12 +319,13 @@ def _entry_window_hourly_bars(
     *,
     completed_at: pd.Timestamp | None = None,
 ) -> pd.DataFrame:
-    """Aggregate 5m/hourly bars into the 08/09/10/11 CT decision candles.
+    """Aggregate 5m/hourly bars into the 08/09/10/11/12 CT replay candles.
 
     The strategy uses the 08:00 CT candle as a setup check, then evaluates
     the 09:00, 10:00, and 11:00 CT candles against the fixed 08:00 reference
-    values. Live mode only
-    uses an hour once that hour has closed, so a partial 10:00 candle cannot
+    values. The 12:00 CT candle is included only as the next-candle execution
+    bar for an 11:00 CT setup. Live mode only uses an hour once that hour has
+    closed, so a partial 10:00 candle cannot
     fabricate a confirmation at 10:12.
     """
     if frame is None or frame.empty:
@@ -309,9 +345,9 @@ def _entry_window_hourly_bars(
         ct_ts = pd.Timestamp(ts)
         ct_ts = ct_ts.tz_localize(ct) if ct_ts.tzinfo is None else ct_ts.tz_convert(ct)
         hour = ct_ts.replace(minute=0, second=0, microsecond=0)
-        if not (ENTRY_SETUP_HOUR_CT <= hour.hour <= ENTRY_WINDOW_END_HOUR_CT):
+        if not (ENTRY_SETUP_HOUR_CT <= hour.hour <= ENTRY_WINDOW_END_HOUR_CT + 1):
             continue
-        if completed_ts is not None and hour + pd.Timedelta(hours=1) > completed_ts:
+        if completed_ts is not None and hour > completed_ts.replace(minute=0, second=0, microsecond=0):
             continue
         buckets.setdefault(hour, []).append((ct_ts, row))
 
@@ -327,6 +363,7 @@ def _entry_window_hourly_bars(
             "High": max(float(row["High"]) for row in group),
             "Low": min(float(row["Low"]) for row in group),
             "Close": float(group[-1]["Close"]),
+            "_Complete": True if completed_ts is None else hour + pd.Timedelta(hours=1) <= completed_ts,
         })
         index.append(hour)
     return pd.DataFrame(rows, index=index)
@@ -365,6 +402,9 @@ def _open_zone_replay_entry(
 
 @pc.ttl_cache(ttl_seconds=60.0, maxsize=8)
 def fetch_last_close(symbol: str) -> float:
+    schwab_value = schwab.fetch_last_close(symbol)
+    if schwab_value == schwab_value:
+        return schwab_value
     try:
         import yfinance as yf
         df = yf.Ticker(symbol).history(period="2d", interval="1d", auto_adjust=False)
@@ -381,6 +421,9 @@ def fetch_last_close(symbol: str) -> float:
 @pc.ttl_cache(ttl_seconds=60.0, maxsize=8)
 def fetch_last_and_prev(symbol: str) -> tuple[float, float]:
     """Last close and prior-day close for a symbol; (nan, nan) on failure."""
+    schwab_last, schwab_prev = schwab.fetch_last_and_prev(symbol)
+    if schwab_last == schwab_last:
+        return schwab_last, schwab_prev
     try:
         import yfinance as yf
         df = yf.Ticker(symbol).history(period="5d", interval="1d", auto_adjust=False)
@@ -414,6 +457,9 @@ def _triggers_from_lines(
     }
 
     def _label_for(name: str) -> str:
+        control_label = pc.spy_control_line_label(name)
+        if control_label:
+            return control_label
         if name in name_to_label:
             return name_to_label[name]
         if name.startswith("ANC_"):
@@ -430,6 +476,12 @@ def _triggers_from_lines(
         """
         if line.name in name_to_label:
             return line.name
+        if line.name == "SPY_CONTROL":
+            return "CONTROL"
+        if line.name.startswith("SPY_NORTH_"):
+            return "NORTH_GATE"
+        if line.name.startswith("SPY_SOUTH_"):
+            return "SOUTH_GATE"
         if line.name.startswith("ANC_"):
             return "ANC_ASC" if line.direction == "ascending" else "ANC_DESC"
         return "UA"
@@ -650,14 +702,41 @@ def _anchor_payload_for_ui(
     entry_reference_dt: datetime,
     slope: float,
 ) -> dict | None:
-    """Structured payload for the SPY Channel hero diagram.
+    """Structured payload for the SPY Channel hero diagram."""
 
-    The SPY framework draws three parallel descending lines from each
-    qualifying premarket bearish candle (Upper / Main / Lower at +3.4 /
-    0 / -3.4 from anchor.low, all decaying at the calibrated slope).
-    The hero diagram needs the anchor timestamp + low and each band's
-    anchor price so it can project the lines forward visually.
-    """
+    def _control_group() -> dict | None:
+        main = next((l for l in primary_lines if l.name == "SPY_CONTROL"), None)
+        if main is None:
+            return None
+        upper = next((l for l in primary_lines if l.name == "SPY_NORTH_1"), None)
+        lower = next((l for l in primary_lines if l.name == "SPY_SOUTH_1"), None)
+        anchor_ts = pd.Timestamp(main.anchor_time).isoformat()
+        return {
+            "role": "CONTROL",
+            "anchorTime": anchor_ts,
+            "anchorLow": round(float(main.anchor_price), 2),
+            "entryReferenceTime": pd.Timestamp(entry_reference_dt).isoformat(),
+            "touchWindowEnd": pd.Timestamp(entry_reference_dt).replace(
+                hour=ENTRY_WINDOW_END_HOUR_CT, minute=0, second=0, microsecond=0
+            ).isoformat(),
+            "bands": {
+                "upper": {
+                    "anchorPrice": round(float(upper.anchor_price), 2) if upper else None,
+                    "currentValue": _line_current_or_none(upper, current_dt),
+                    "entryValue": _line_current_or_none(upper, entry_reference_dt),
+                },
+                "main": {
+                    "anchorPrice": round(float(main.anchor_price), 2),
+                    "currentValue": _line_current_or_none(main, current_dt),
+                    "entryValue": _line_current_or_none(main, entry_reference_dt),
+                },
+                "lower": {
+                    "anchorPrice": round(float(lower.anchor_price), 2) if lower else None,
+                    "currentValue": _line_current_or_none(lower, current_dt),
+                    "entryValue": _line_current_or_none(lower, entry_reference_dt),
+                },
+            },
+        }
 
     def _group(role_filter, name_prefix_starts_with: str | None = None) -> dict | None:
         if name_prefix_starts_with is not None:
@@ -702,7 +781,7 @@ def _anchor_payload_for_ui(
             },
         }
 
-    primary_group = _group(
+    primary_group = _control_group() or _group(
         role_filter=lambda l: False,
         name_prefix_starts_with="ANC_PRIMARY_",
     )
@@ -743,6 +822,29 @@ def _chart_lines_from_primary(
         "MAIN":       "var(--amber)",   # Main entry line
         "PUT_ZONE":   "var(--red)",     # Lower (-3.4)
     }
+
+    control_lines = [l for l in primary_lines if l.source == "SPY_CONTROL_MAP"]
+    if control_lines:
+        for line in control_lines:
+            v = line.tradable_value_at(current_dt)
+            if v is None or pd.isna(v):
+                continue
+            lines.append({
+                "label": pc.spy_control_line_label(line.name) or pc.display_line_name(line.name),
+                "value": round(float(v), 2),
+                "color": zone_color.get(line.zone_type, "var(--text-secondary)"),
+                "dash": line.zone_type != "MAIN",
+                "armed": line.zone_type == "MAIN",
+            })
+        if rth_today is not None and not rth_today.empty:
+            lines.append({
+                "label": "Open",
+                "value": round(float(rth_today.iloc[0]["Open"]), 2),
+                "color": "var(--text-secondary)",
+                "dash": True,
+                "armed": False,
+            })
+        return lines
 
     # Anchor-line path: render Upper / Main / Lower for each PRIMARY anchor
     # (and Anchor 2 if present). When no primary qualifies, fall back to the
@@ -892,7 +994,7 @@ def _pivot_source(
         "structureDay": str(structure_day) if structure_day is not None else None,
     }
     if structure_frame is not None and not structure_frame.empty:
-        col = "High" if pivot.name == "HIGH_PIVOT" else "Low"
+        col = "Close" if str(pivot.source).endswith("_close") else ("High" if pivot.name == "HIGH_PIVOT" else "Low")
         try:
             idx = structure_frame[col].idxmax() if pivot.name == "HIGH_PIVOT" else structure_frame[col].idxmin()
             row = structure_frame.loc[idx]
@@ -1247,7 +1349,9 @@ def _build_decision(
         else:
             rationale = f"SPY {current_price:.2f}. Waiting on the active triggers; no qualified rejection has printed."
 
-    # Confluence: append UW flow + dealer gamma when they tell a clear story.
+    # Optional premium pressure integrations can append confluence later.
+    # Launch keeps this read anchored to measured structure and broker
+    # option chains only.
     confluence_bits: list[str] = []
     if flow and flow.get("lean") in ("BULLISH", "BEARISH"):
         confluence_bits.append(
@@ -1379,7 +1483,12 @@ def _build_replay_block(
         "time": exit_time.isoformat(),
         "price": round(exit_price, 2),
         "rule": "HOURLY_CLOSE"
-        if entry_rule in {"ENTRY_WINDOW_TOUCH", "EIGHT_AM_SETUP_TOUCH"}
+        if entry_rule in {
+            "ENTRY_WINDOW_TOUCH",
+            "EIGHT_AM_SETUP_TOUCH",
+            "ENTRY_WINDOW_NEXT_CANDLE",
+            "EIGHT_AM_SETUP_NEXT_CANDLE",
+        }
         else "FORCED_1H",
     }
     block["verdictOutcome"] = "WIN" if pnl > 0 else ("LOSS" if pnl < 0 else "PUSH")
@@ -1445,20 +1554,18 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
 
     structure_frame = rth_yesterday if not rth_yesterday.empty else rth_today
     structure_day = prior_day if not rth_yesterday.empty else signal_day
-    high_pivot = pc.find_high_pivot(structure_frame)
+    high_pivot = pc.find_high_close_pivot(structure_frame)
     low_pivot = pc.find_low_pivot(structure_frame)
     slope = pc.get_structure_calibration()
     secondary_pivots = pc.find_secondary_pivots(structure_frame)
     secondary_lines = pc.build_secondary_lines(secondary_pivots, slope)
 
-    # Premarket-anchor primary lines (replaces UA/UD/LA/LD when a qualifying
-    # bearish anchor is found). Falls back to the old pivot lines otherwise.
+    # SPY now follows the ES-style Control Map: prior RTH high pivot close,
+    # descending Control Line, and 3.4-point gates above and below.
     anchor_payload = pma.find_premarket_anchors(df, signal_day)
-    anchor_lines = pma.build_all_anchor_lines(anchor_payload, slope)
-    if anchor_lines:
-        primary_lines = anchor_lines
-        primary_source = "premarket_anchor"
-    else:
+    primary_lines = pc.build_spy_control_lines(high_pivot, slope)
+    primary_source = "control_map"
+    if not primary_lines:
         primary_lines = pc.build_primary_lines(high_pivot, low_pivot, slope)
         primary_source = "pivot_fallback"
 
@@ -1472,7 +1579,7 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
         current_price = float(df["Close"].dropna().iloc[-1])
     price_feed_source = "backup"
     if not is_replay:
-        primary_quote = tastytrade.fetch_equity_quote("SPY")
+        primary_quote = schwab.fetch_equity_quote("SPY")
         if primary_quote is not None and primary_quote == primary_quote and primary_quote > 0:
             current_price = float(primary_quote)
             price_feed_source = "primary"
@@ -1526,23 +1633,22 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
         slope,
     )
 
-    # Trigger detection considers the 8am CT bar plus all RTH bars (8:30-15:00)
-    # so an 8am wick on the descending anchor line can fire the entry trigger.
+    # Trigger detection starts at 9am CT. The 8am bar is setup context;
+    # it should not create a primary entry by itself.
     if not rth_today.empty:
-        eight_am = pd.Timestamp(signal_day, tz=ct).replace(hour=8)
-        rth_end = pd.Timestamp(signal_day, tz=ct).replace(hour=15)
-        triggers_df = df[(df.index >= eight_am) & (df.index < rth_end)].sort_index()
+        entry_start = pd.Timestamp(signal_day, tz=ct).replace(hour=9)
+        entry_end = pd.Timestamp(signal_day, tz=ct).replace(hour=12)
+        triggers_df = df[(df.index >= entry_start) & (df.index < entry_end)].sort_index()
     else:
         triggers_df = rth_today
     raw_signals = pc.detect_rejection_signals(triggers_df, primary_lines, secondary_lines) if not triggers_df.empty else []
     signals = _signals_for_tape(raw_signals, current_price)
 
-    # Unusual Whales enrichment (returns None if key missing or upstream
-    # is unavailable; the snapshot stays valid either way). Fetched
-    # before the decision so flow + dealer gamma can append confluence
-    # to the rationale when the lean is decisive.
-    flow_summary = unusual_whales.fetch_flow_summary("SPY")
-    gex_summary = unusual_whales.fetch_gex_summary("SPY", center=current_price)
+    # Premium flow/GEX integrations are deliberately not part of the
+    # launch-critical path. The options surface uses broker chains for
+    # executable contract selection; pressure overlays can return later.
+    flow_summary = None
+    gex_summary = None
 
     decision = _build_decision(
         bias_state, bias_score, primary_lines, raw_signals,
@@ -1581,7 +1687,7 @@ def build_live_snapshot(replay_date: date | None = None) -> dict:
         slope,
     )
 
-    options = tastytrade.fetch_options_snapshot(current_price)
+    options = schwab.fetch_options_snapshot(current_price)
 
     market_context = _build_market_context(
         vix=vix,

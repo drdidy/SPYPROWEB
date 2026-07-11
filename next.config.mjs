@@ -24,6 +24,7 @@ const PERMISSIONS = [
   "payment=()",
   "usb=()",
 ].join(", ");
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
 // Origins we actually hit. Keep this list tight — every entry below
 // loosens CSP. If a vendor isn't loaded today, don't pre-allow it.
@@ -34,6 +35,7 @@ const CONNECT_SRC = [
 const SCRIPT_SRC = [
   "'self'",
   "'unsafe-inline'", // Next inline RSC payload. TODO(csp): nonces via middleware.
+  ...(!IS_PRODUCTION ? ["'unsafe-eval'"] : []), // Next dev tooling only.
   "https://challenges.cloudflare.com", // Turnstile widget
 ];
 const STYLE_SRC = [
@@ -43,7 +45,6 @@ const STYLE_SRC = [
 const FONT_SRC = ["'self'", "data:"];
 const IMG_SRC = ["'self'", "data:", "blob:"];
 const FRAME_SRC = ["https://challenges.cloudflare.com"]; // Turnstile iframe
-
 const CSP = [
   "default-src 'self'",
   `script-src ${SCRIPT_SRC.join(" ")}`,
@@ -56,8 +57,10 @@ const CSP = [
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",
-  "upgrade-insecure-requests",
-].join("; ");
+  // Keep local HTTP development usable. In production this still
+  // tells browsers to lift same-origin asset requests to HTTPS.
+  IS_PRODUCTION ? "upgrade-insecure-requests" : "",
+].filter(Boolean).join("; ");
 
 const SECURITY_HEADERS = [
   { key: "Strict-Transport-Security", value: HSTS },

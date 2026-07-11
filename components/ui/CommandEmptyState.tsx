@@ -19,12 +19,12 @@ export function CommandEmptyState({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-[16px] border border-[#D6BC75]/35 bg-[#071116] text-paper shadow-[0_24px_70px_-40px_rgba(7,17,22,0.95)]",
+        "contrast-dark relative overflow-hidden rounded-[16px] border border-[#D6BC75]/35 bg-[#071116] text-paper shadow-[0_24px_70px_-40px_rgba(7,17,22,0.95)]",
         className,
       )}
     >
       <div className="absolute inset-x-0 top-0 h-px bg-gold/55" />
-      <div className="relative grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-7 p-5 md:p-6">
+      <div className="relative grid grid-cols-1 2xl:grid-cols-[1fr_360px] gap-7 p-5 md:p-6">
         <div className="max-w-2xl">
           <div className="font-mono text-[10px] uppercase tracking-[0.20em] text-gold-soft">
             {eyebrow}
@@ -34,11 +34,11 @@ export function CommandEmptyState({
           </h3>
           <p className="mt-4 text-[14px] leading-relaxed text-paper/68">{body}</p>
           {rows.length > 0 && (
-            <div className="mt-6 grid grid-cols-1 gap-2.5 sm:grid-cols-3 lg:hidden">
+            <div className="mt-6 grid grid-cols-1 gap-2.5 sm:grid-cols-3 2xl:hidden">
               {rows.map((row) => (
                 <div
                   key={row.label}
-              className="border border-paper/10 bg-paper/[0.055] px-3 py-2.5 rounded-[8px] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                  className="border border-paper/10 bg-paper/[0.055] px-3 py-2.5 rounded-[8px] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
                 >
                   <div className="font-mono text-[9px] uppercase tracking-[0.16em] text-paper/40">
                     {row.label}
@@ -68,12 +68,12 @@ function ReadinessPanel({
       ? rows
       : [
           { label: "Status", value: "Unavailable" },
-          { label: "Display rule", value: "No synthetic data" },
-          { label: "Next step", value: "Waiting for source" },
+          { label: "Display rule", value: "Measured data only" },
+          { label: "Next step", value: "Waiting for signal" },
         ];
 
   return (
-    <div className="hidden lg:flex min-h-[220px] flex-col rounded-card border border-paper/10 bg-paper/[0.035] p-5">
+    <div className="hidden 2xl:flex min-h-[220px] flex-col rounded-card border border-paper/10 bg-paper/[0.035] p-5">
       <div className="font-mono text-[10px] uppercase tracking-[0.20em] text-gold-soft">
         Current status
       </div>
@@ -93,8 +93,8 @@ function ReadinessPanel({
         ))}
       </div>
       <p className="mt-auto pt-4 text-[12px] leading-relaxed text-paper/52">
-        This panel stays quiet until the source returns measured values. The app
-        does not draw illustrative charts or substitute stale levels here.
+        This panel stays quiet until the engine confirms measured structure.
+        Charts and levels resume when the current read is available.
       </p>
     </div>
   );

@@ -163,12 +163,12 @@ export function SpxDebugOverlay({ provenance, displayedSpx }: OverlayProps) {
         ["offset source", provenance.offsetSource],
         ["offset method", provenance.offsetMethod ?? "n/a"],
       ]
-    : [["state", "no _meta in snapshot — old shape or mock fallback"]];
+    : [["state", "diagnostic metadata unavailable"]];
 
   return (
     <div
       role="dialog"
-      aria-label="SPX debug overlay"
+      aria-label="SPX diagnostics panel"
       className={cn(
         "fixed bottom-4 right-4 z-50 max-w-[420px] w-full",
         "rounded-card border border-rule-strong bg-canvas",
@@ -183,7 +183,7 @@ export function SpxDebugOverlay({ provenance, displayedSpx }: OverlayProps) {
         <button
           type="button"
           onClick={() => setOpen(false)}
-          aria-label="Close debug overlay"
+          aria-label="Close diagnostics panel"
           className="text-ink-3 hover:text-ink rounded-soft outline-none focus-visible:ring-2 focus-visible:ring-gold/40"
         >
           <X size={14} aria-hidden />

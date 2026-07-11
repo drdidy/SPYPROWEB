@@ -34,7 +34,7 @@ export function enrichSpySnapshotWithOptions(
   };
 }
 
-function toOptionsRaw(chain: UwOptionChain | null | undefined): OptionsRaw | null {
+export function toOptionsRaw(chain: UwOptionChain | null | undefined): OptionsRaw | null {
   if (!chain || !chain.expiration) return null;
   const calls = chain.calls.map(toContract).filter(isContractRow);
   const puts = chain.puts.map(toContract).filter(isContractRow);
@@ -57,12 +57,16 @@ function toOptionsRaw(chain: UwOptionChain | null | undefined): OptionsRaw | nul
 function toContract(row: UwOptionContract): OptionsRaw["calls"][number] | null {
   if (!Number.isFinite(row.strike ?? NaN)) return null;
   return {
+    optionSymbol: row.optionSymbol,
     strike: row.strike!,
     bid: finiteOrNull(row.bid),
     ask: finiteOrNull(row.ask),
+    mark: finiteOrNull(row.mark),
     iv: finiteOrNull(row.iv),
     delta: finiteOrNull(row.delta),
     gamma: finiteOrNull(row.gamma),
+    theta: finiteOrNull(row.theta),
+    vega: finiteOrNull(row.vega),
     oi: row.oi,
     volume: row.volume,
   };
@@ -93,14 +97,6 @@ function toOptionsIntel(
   const pcr = chain.totals.pcr ?? (chain.totals.callOi ? chain.totals.putOi / chain.totals.callOi : 0);
   const alignment: OptionsIntel["alignment"] =
     pcr > 1.1 ? "OPPOSED" : pcr < 0.9 ? "ALIGNED" : "MIXED";
-  const bits = [
-    symbol.flow
-      ? `Flow ${symbol.flow.lean.toLowerCase()} (${symbol.flow.bullishCount} bull / ${symbol.flow.bearishCount} bear).`
-      : null,
-    symbol.gex
-      ? `Gamma ${symbol.gex.regime.toLowerCase()}${symbol.gex.flipPoint ? `; flip ${symbol.gex.flipPoint.toFixed(0)}` : ""}.`
-      : null,
-  ].filter(Boolean);
   const oiNote =
     alignment === "ALIGNED"
       ? `Call open interest dominates put open interest (PCR ${pcr.toFixed(2)}).`
@@ -115,7 +111,7 @@ function toOptionsIntel(
     putWall,
     highOI,
     alignment,
-    alignmentNote: [oiNote, ...bits].join(" "),
+    alignmentNote: `${oiNote} Use this as execution context; the engine structure remains the decision source.`,
   };
 }
 
@@ -210,5 +206,6 @@ function dteLabel(expiration: string): string {
 }
 
 function finiteOrNull(value: number | null | undefined): number | null {
-  return Number.isFinite(value ?? NaN) ? value! : null;
+  if (!Number.isFinite(value ?? NaN)) return null;
+  return Math.abs(value!) >= 900 ? null : value!;
 }

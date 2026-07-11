@@ -46,10 +46,8 @@ export function track(event: AnalyticsEvent): void {
   if (typeof window === "undefined") return;
   if (getConsent() !== "accepted") return;
 
-  // Plausible
-  // TODO(plausible): uncomment when NEXT_PUBLIC_PLAUSIBLE_DOMAIN is set
-  // and the script tag in app/(marketing)/layout.tsx loads. Plausible's
-  // global is window.plausible(name, { props }).
+  // Plausible loads when NEXT_PUBLIC_PLAUSIBLE_DOMAIN is present and
+  // app/(marketing)/layout.tsx has mounted the provider script.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const plausible = (window as any).plausible as
     | ((name: string, opts?: { props?: Record<string, unknown> }) => void)
@@ -88,7 +86,8 @@ export function captureException(err: unknown, ctx?: Record<string, unknown>) {
     console.error("[error]", err, ctx);
     return;
   }
-  // TODO(sentry): replace with Sentry.captureException(err, { extra: ctx }).
+  // Error provider hook point. Replace this console sink when SENTRY_DSN
+  // is configured and the SDK is installed.
   // eslint-disable-next-line no-console
   console.error("[error]", err, ctx);
 }

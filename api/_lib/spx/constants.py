@@ -17,10 +17,29 @@ CENTRAL_TZ_NAME = "America/Chicago"
 
 # ---------------------------------------------------------------------------
 # Slope: applied positive to ascending lines and negative to descending lines.
-# The previous-RTH ES framework uses the same magnitude on every structure line.
+# The primary ES Control Map uses the prior session's 11 AM-3 PM highest close.
 # ---------------------------------------------------------------------------
 
-DEFAULT_SLOPE_PER_HOUR = 1.04
+DEFAULT_SLOPE_PER_HOUR = 0.98
+
+# ES Control Map: the normal Control Line is projected from the prior day's
+# 11:00-15:00 highest close. The opposite map is projected from the lowest wick
+# in that same window and is used only after the first clean touch confirms it.
+ES_DEVIATION_SPACING = 34.0
+ES_HALF_GATE_TARGET = ES_DEVIATION_SPACING / 2
+ES_DUAL_MAP_PRIMARY_SLOPE_PER_HOUR = 0.98
+ES_DUAL_MAP_PRIMARY_ARM_DISTANCE = 26.0
+ES_DUAL_MAP_OPPOSITE_SLOPE_PER_HOUR = 1.22
+ES_DUAL_MAP_OPPOSITE_ARM_DISTANCE = 31.0
+ES_DEALER_PRESSURE_SLOPE_PER_HOUR = ES_DUAL_MAP_OPPOSITE_SLOPE_PER_HOUR
+ES_DEALER_PRESSURE_SPACING = ES_DEVIATION_SPACING
+ES_DEVIATION_BANDS = 3
+ES_TICK_SIZE = 0.25
+ES_OPEN_BIAS_TOLERANCE = ES_TICK_SIZE
+ES_DEVIATION_WINDOW_START_HOUR_CT = 8
+ES_DEVIATION_ENTRY_HOUR_CT = 9
+ES_DEVIATION_WINDOW_END_HOUR_CT = 12
+ES_DEVIATION_EXTENSION_END_HOUR_CT = 14
 
 # ---------------------------------------------------------------------------
 # Session windows (Central Time, naive `time` objects; combine with a date in

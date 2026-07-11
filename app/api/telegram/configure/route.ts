@@ -1,31 +1,38 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { isAlertRequestAuthorized } from "@/lib/alerts/auth";
 import {
-  isAuthorizedAlertToken,
-  maskChatId,
-  readTelegramBotProfile,
+  maskTelegramChatId,
   readStoredTelegramChatId,
   telegramBotToken,
-} from "@/lib/telegram-alerts";
+} from "@/lib/alerts/telegram";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function POST(req: NextRequest) {
-  const url = new URL(req.url);
-  const token = url.searchParams.get("token");
-  if (!isAuthorizedAlertToken(token)) {
+  if (!isAlertRequestAuthorized(req)) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
   const botToken = telegramBotToken();
-  if (!botToken || !token) {
+  if (!botToken) {
     return NextResponse.json(
-      { ok: false, error: "Telegram token or alert secret is not configured." },
+      { ok: false, error: "Telegram token is not configured." },
       { status: 503 },
     );
   }
 
-  const webhookUrl = `${url.origin}/api/telegram/webhook?token=${encodeURIComponent(token)}`;
+  const url = new URL(req.url);
+  const secret = url.searchParams.get("secret") || url.searchParams.get("token");
+  if (!secret) {
+    return NextResponse.json(
+      { ok: false, error: "Missing shared secret in query string." },
+      { status: 400 },
+    );
+  }
+
+  const webhookUrl = `${url.origin}/api/telegram/webhook?secret=${encodeURIComponent(secret)}`;
   const telegramRes = await fetch(`https://api.telegram.org/bot${botToken}/setWebhook`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -36,25 +43,18 @@ export async function POST(req: NextRequest) {
     }),
     cache: "no-store",
   });
-  const telegramBody = (await telegramRes.json().catch(() => null)) as
+  const body = (await telegramRes.json().catch(() => null)) as
     | { ok?: boolean; description?: string }
     | null;
 
   const storedChat = await readStoredTelegramChatId();
-  const botProfile = await readTelegramBotProfile();
   return NextResponse.json({
-    ok: telegramRes.ok && telegramBody?.ok !== false,
+    ok: telegramRes.ok && body?.ok !== false,
     telegram: {
-      ok: telegramBody?.ok ?? telegramRes.ok,
-      description: telegramBody?.description ?? null,
+      ok: body?.ok ?? telegramRes.ok,
+      description: body?.description ?? null,
     },
-    bot: botProfile
-      ? {
-          username: botProfile.username,
-          link: botProfile.username ? `https://t.me/${botProfile.username}` : null,
-        }
-      : null,
-    storedChat: maskChatId(storedChat),
+    storedChat: maskTelegramChatId(storedChat),
     nextStep: storedChat
       ? "Telegram chat is already bound."
       : "Send /start to the SPY Prophet Telegram bot once to bind this chat.",

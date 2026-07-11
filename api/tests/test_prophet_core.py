@@ -26,6 +26,7 @@ from _lib.prophet_core import (
     build_decision_state,
     build_pivot_source_table,
     build_primary_lines,
+    build_spy_control_lines,
     build_secondary_lines,
     build_structure_projection_table,
     build_trade_signal_from_rejection,
@@ -70,6 +71,7 @@ from _lib.prophet_core import (
     select_0dte_strikes,
     select_flow_aware_watch_contracts,
     select_watch_contracts,
+    spy_control_line_label,
 )
 
 
@@ -205,6 +207,16 @@ def test_build_primary_lines_and_override() -> None:
     assert all(l.slope_per_hour == DEFAULT_SLOPE_PER_HOUR for l in lines)
     lines2 = build_primary_lines(hp, lp, slope_per_hour=0.104)
     assert all(l.slope_per_hour == 0.104 for l in lines2)
+
+
+def test_build_spy_control_lines_from_high_pivot_close() -> None:
+    hp = Pivot("HIGH_PIVOT", 501.20, _ts("2026-04-28T12:00:00"), "session_high_close", "green", False)
+    lines = build_spy_control_lines(hp, slope_per_hour=0.20, gate_spacing=3.4, gate_count=2)
+    assert [l.name for l in lines] == ["SPY_NORTH_2", "SPY_NORTH_1", "SPY_CONTROL", "SPY_SOUTH_1", "SPY_SOUTH_2"]
+    assert [round(l.anchor_price, 2) for l in lines] == [508.0, 504.6, 501.2, 497.8, 494.4]
+    assert all(l.direction == "descending" and l.source == "SPY_CONTROL_MAP" for l in lines)
+    assert spy_control_line_label("SPY_CONTROL") == "Control Line"
+    assert spy_control_line_label("SPY_NORTH_2") == "North Gate II"
 
 
 def test_build_secondary_lines() -> None:

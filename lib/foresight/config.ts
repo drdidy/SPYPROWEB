@@ -43,15 +43,15 @@ export const SCENARIO_PRESETS: Record<
   { label: string; input: ScenarioInput }
 > = {
   gamma_flip: {
-    label: "Gamma flip moves",
+    label: "Pressure shift",
     input: { kind: "gamma_flip", shiftPts: 0.25 },
   },
   vol_expansion: {
-    label: "Vol expansion",
+    label: "Range expansion",
     input: { kind: "vol_expansion", multiplier: 1.2 },
   },
   vol_compression: {
-    label: "Vol compression",
+    label: "Range compression",
     input: { kind: "vol_compression", multiplier: 0.8 },
   },
   trend_continuation: {

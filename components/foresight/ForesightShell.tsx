@@ -12,10 +12,11 @@ import {
   RefreshCw,
   RotateCcw,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { FeedHeartbeat } from "@/components/decision-slate/FeedHealthProvider";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import { PanelState, type PanelStateKind } from "@/components/ui/PanelState";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { foresightCopy } from "@/content/foresight/copy";
@@ -41,11 +42,12 @@ export function ForesightShell({
   calibrationRecords: CalibrationRecord[];
   mockParam?: string | null;
 }) {
+  const [projectionView, setProjectionView] = useState<"focus" | "matrix">("focus");
   const stateCopy = foresightCopy.states[snapshot.status];
   const panelState = panelStateFor(snapshot.status, snapshot.matrix.lines.length);
 
   return (
-    <main className="w-full max-w-[1600px] space-y-5 pb-14">
+    <main className="w-full max-w-[1440px] space-y-6 pb-14">
       <Hero snapshot={snapshot} stateCopy={stateCopy} />
       <HeaderTiles snapshot={snapshot} />
       <StatusRow snapshot={snapshot} />
@@ -53,19 +55,37 @@ export function ForesightShell({
       <SectionLabel number="01">{foresightCopy.sections.projection}</SectionLabel>
       <Card className="overflow-visible">
         <CardHeader
-          eyebrow="Projection matrix"
-          title="Hour-by-hour structural map"
-          meta={`${snapshot.matrix.lines.length} lines · ${snapshot.matrix.hours.length} buckets · ${snapshot.projectionId}`}
+          eyebrow="Projection Desk"
+          title="Pick an hour. Read the nearest levels."
+          meta={`${snapshot.matrix.lines.length} lines / ${snapshot.matrix.hours.length} hour buckets`}
           action={<FeedHeartbeat feedId="projection-engine" />}
         />
         <CardBody className="space-y-4">
           <InfoStrip />
+          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Projection view">
+            <ProjectionModeButton
+              active={projectionView === "focus"}
+              onClick={() => setProjectionView("focus")}
+            >
+              Focus Board
+            </ProjectionModeButton>
+            <ProjectionModeButton
+              active={projectionView === "matrix"}
+              onClick={() => setProjectionView("matrix")}
+            >
+              Matrix
+            </ProjectionModeButton>
+          </div>
           <PanelState
             state={panelState}
             title={panelTitle(snapshot.status)}
             body={stateCopy}
           >
-            <ProjectionMatrixTable snapshot={snapshot} />
+            {projectionView === "focus" ? (
+              <ProjectionFocusBoard snapshot={snapshot} />
+            ) : (
+              <ProjectionMatrixTable snapshot={snapshot} />
+            )}
           </PanelState>
         </CardBody>
       </Card>
@@ -96,32 +116,35 @@ function Hero({
   stateCopy: string;
 }) {
   return (
-    <header className="rounded-card border border-rule-tier1 bg-paper-tier1 px-5 py-5 shadow-card md:px-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <header className="contrast-dark relative overflow-hidden rounded-[18px] border border-[#C9A227]/55 bg-[#071116] px-5 py-4 text-paper shadow-[0_24px_60px_-42px_rgba(7,17,22,0.95)] md:px-6 md:py-5">
+      <div
+        aria-hidden
+        className="absolute inset-0 opacity-[0.18] bg-[linear-gradient(rgba(244,228,192,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(244,228,192,0.10)_1px,transparent_1px)] bg-[size:42px_42px]"
+      />
+      <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-3xl">
-          <div className="font-mono text-[12px] uppercase tracking-[0.08em] text-gold-ink">
+          <div className="font-mono text-[10px] uppercase tracking-[0.20em] text-gold-soft/82">
             {foresightCopy.hero.eyebrow}
           </div>
-          <h1 className="mt-2 font-serif text-display text-ink">
+          <h1 className="mt-2 font-serif text-[34px] leading-none tracking-tight text-paper md:text-[42px]">
             {foresightCopy.hero.title}
           </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-2">
+          <p className="mt-3 max-w-2xl text-[14px] leading-relaxed text-paper/72">
             {foresightCopy.hero.lede}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <EngineToggle active={snapshot.engine} />
-          <StatusChip status={snapshot.status} />
+          <InfoTooltip label="Projection status" content={stateCopy} placement="bottom">
+            <span className="cursor-help">
+              <StatusChip status={snapshot.status} />
+            </span>
+          </InfoTooltip>
           <span className="rounded-pill border border-rule-strong bg-paper px-3 py-2 font-mono text-[11px] uppercase tracking-[0.10em] text-ink-2">
             {snapshot.sessionId}
           </span>
         </div>
       </div>
-      {stateCopy && (
-        <p className="mt-4 border-t border-rule-strong pt-3 text-sm leading-relaxed text-ink-2">
-          {stateCopy}
-        </p>
-      )}
     </header>
   );
 }
@@ -141,7 +164,7 @@ function EngineToggle({ active }: { active: "spy" | "es" }) {
               : "text-ink-3 hover:text-ink",
           )}
         >
-          {engine}
+          {engine.toUpperCase()}
         </a>
       ))}
     </div>
@@ -176,8 +199,8 @@ function HeaderTiles({ snapshot }: { snapshot: ProjectionSnapshot }) {
         icon={<Gauge className="h-4 w-4" aria-hidden />}
         label="PROJECTION FRESHNESS"
         value={formatTime(snapshot.generatedAt)}
-        detail={`Next refresh ${formatTime(snapshot.nextRefreshAt)} · tick ${snapshot.sourceLastTick ? formatTime(snapshot.sourceLastTick) : "unknown"}`}
-        foot={snapshot.ruleVersion}
+        detail={`Next refresh ${formatTime(snapshot.nextRefreshAt)} - latest read ${snapshot.sourceLastTick ? formatTime(snapshot.sourceLastTick) : "pending"}`}
+        foot={snapshot.status === "live" ? "Active" : "Standby"}
       />
     </div>
   );
@@ -236,8 +259,8 @@ function StatusRow({ snapshot }: { snapshot: ProjectionSnapshot }) {
       ok: snapshot.matrix.lines.length > 0,
     },
     {
-      label: "Projection built",
-      value: snapshot.status === "failed" ? "No" : "Yes",
+      label: "Projection state",
+      value: snapshot.status === "failed" ? "Planning mode" : "Ready",
       ok: snapshot.status !== "failed",
     },
     {
@@ -274,6 +297,178 @@ function InfoStrip() {
   return (
     <div className="rounded-soft border border-gold/25 bg-gold-tint px-4 py-3 text-sm leading-relaxed text-gold-ink">
       {foresightCopy.info}
+    </div>
+  );
+}
+
+function ProjectionModeButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={cn(
+        "h-9 rounded-pill border px-3 font-mono text-[11px] uppercase tracking-[0.10em] transition",
+        "outline-none focus-visible:ring-2 focus-visible:ring-gold/40",
+        active
+          ? "border-ink bg-ink text-paper"
+          : "border-rule bg-paper text-ink-3 hover:border-rule-strong hover:text-ink",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ProjectionFocusBoard({ snapshot }: { snapshot: ProjectionSnapshot }) {
+  const defaultIndex = Math.max(
+    0,
+    snapshot.matrix.hours.findIndex((hour) => hour.isCurrent),
+  );
+  const [selectedIndex, setSelectedIndex] = useState(defaultIndex);
+  const selectedHour = snapshot.matrix.hours[selectedIndex] ?? snapshot.matrix.hours[0];
+  const hourCells = snapshot.matrix.lines
+    .map((line, rowIndex) => ({
+      line,
+      cell: snapshot.matrix.cells[rowIndex]?.[selectedIndex],
+    }))
+    .filter((row): row is { line: ProjectionLine; cell: ProjectedLineValue } =>
+      Boolean(row.cell),
+    )
+    .sort((a, b) => Math.abs(a.cell.deltaFromLast) - Math.abs(b.cell.deltaFromLast));
+  const nearest = hourCells[0] ?? null;
+  const secondary = hourCells.slice(1, 4);
+
+  return (
+    <div className="overflow-hidden rounded-card border border-rule bg-paper">
+      <div className="border-b border-rule bg-paper-2/55 p-3">
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {snapshot.matrix.hours.map((hour, index) => (
+            <button
+              key={hour.at}
+              type="button"
+              onClick={() => setSelectedIndex(index)}
+              className={cn(
+                "min-h-11 min-w-[104px] rounded-soft border px-3 py-2 text-left transition",
+                "outline-none focus-visible:ring-2 focus-visible:ring-gold/40",
+                index === selectedIndex
+                  ? "border-ink bg-ink text-paper shadow-card ring-2 ring-gold/40"
+                  : "border-rule bg-paper text-ink-3 hover:border-rule-strong hover:text-ink",
+              )}
+            >
+              <div className="font-mono text-[11px] font-semibold uppercase tracking-[0.08em]">
+                {hour.label}
+              </div>
+              <div className={cn("mt-1 text-[11px]", index === selectedIndex ? "text-paper/72" : "text-ink-3")}>
+                {index === selectedIndex ? "Selected" : hour.isCurrent ? "Current" : hour.isObserved ? "Observed" : "Projected"}
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-0 lg:grid-cols-[minmax(0,0.88fr)_minmax(320px,0.52fr)]">
+        <div className="contrast-dark relative min-h-[330px] overflow-hidden bg-[#071116] p-5 text-paper">
+          <div
+            aria-hidden
+            className="absolute inset-0 opacity-[0.20] bg-[radial-gradient(circle_at_20%_20%,rgba(201,162,39,0.22),transparent_30%),linear-gradient(rgba(244,228,192,0.09)_1px,transparent_1px),linear-gradient(90deg,rgba(244,228,192,0.07)_1px,transparent_1px)] bg-[size:auto,46px_46px,46px_46px]"
+          />
+          <div className="relative flex h-full flex-col justify-between">
+            <div>
+              <div className="font-mono text-[11px] uppercase tracking-[0.14em] text-gold-soft/85">
+                {selectedHour?.label ?? "Hour"} focus
+              </div>
+              <h3 className="mt-2 max-w-xl font-serif text-[34px] leading-none tracking-tight text-paper md:text-[46px]">
+                {nearest ? nearest.cell.lineCode : "No line"}{" "}
+                <span className="italic text-gold-soft/75">
+                  is closest.
+                </span>
+              </h3>
+              <p className="mt-4 max-w-lg text-sm leading-relaxed text-paper/70">
+                {nearest
+                  ? `${lineLabel(snapshot.matrix.lines, nearest.cell.lineId)} sits at ${formatPrice(nearest.cell.value)} with ${signed(nearest.cell.deltaFromLast)} from last.`
+                  : "No projected reference has resolved for this hour yet."}
+              </p>
+            </div>
+
+            <div className="relative mt-8 h-28">
+              <div className="absolute left-0 right-0 top-1/2 h-px bg-paper/20" />
+              <div className="absolute left-[8%] top-1/2 h-20 w-px -translate-y-1/2 bg-bear/55" />
+              <div className="absolute left-1/2 top-1/2 h-24 w-px -translate-x-1/2 -translate-y-1/2 bg-gold/80 shadow-[0_0_24px_rgba(201,162,39,0.45)]" />
+              <div className="absolute right-[8%] top-1/2 h-20 w-px -translate-y-1/2 bg-bull/55" />
+              {secondary.map(({ cell }, index) => (
+                <div
+                  key={cell.lineId}
+                  className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-paper/55 bg-paper/35"
+                  style={{ left: `${22 + index * 28}%` }}
+                  title={`${cell.lineCode} ${formatPrice(cell.value)}`}
+                />
+              ))}
+              {nearest && (
+                <div
+                  className="absolute top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-paper bg-gold shadow-[0_0_0_10px_rgba(201,162,39,0.16)] transition-all duration-700"
+                  style={{ left: "50%" }}
+                  title={`${nearest.cell.lineCode} ${formatPrice(nearest.cell.value)}`}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t border-rule bg-paper-2/45 p-4 lg:border-l lg:border-t-0">
+          <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3">
+            Closest references
+          </div>
+          <div className="mt-3 space-y-2">
+            {hourCells.slice(0, 4).map(({ line, cell }, index) => (
+              <button
+                key={cell.lineId}
+                type="button"
+                className={cn(
+                  "flex w-full items-center justify-between gap-3 rounded-soft border px-3 py-3 text-left transition",
+                  index === 0
+                    ? "border-gold bg-gold-tint text-gold-ink"
+                    : "border-rule bg-paper text-ink-2 hover:border-rule-strong",
+                )}
+                title={`${line.code} ${line.label}`}
+              >
+                <span className="min-w-0">
+                  <span className="block font-mono text-[12px] font-semibold uppercase tracking-[0.08em]">
+                    {line.code}
+                  </span>
+                  <span className="mt-0.5 block truncate text-xs opacity-75">
+                    {line.label}
+                  </span>
+                </span>
+                <span className="text-right">
+                  <span className="num block font-mono text-[13px]">
+                    {formatPrice(cell.value)}
+                  </span>
+                  <span className="num mt-0.5 block font-mono text-[11px] opacity-75">
+                    {signed(cell.deltaFromLast)}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+          {nearest && (
+            <p className="mt-4 rounded-soft border border-rule bg-paper px-3 py-3 text-sm leading-relaxed text-ink-2">
+              Watch price behavior around{" "}
+              <span className="font-semibold text-ink">{nearest.cell.lineCode}</span>.
+              A clean hold or failure here is where the next decision begins.
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -362,8 +557,8 @@ function ProjectionMatrixTable({ snapshot }: { snapshot: ProjectionSnapshot }) {
         </table>
       </div>
       <div id="foresight-freshness" className="sr-only">
-        Projection generated at {formatTime(snapshot.generatedAt)} from source
-        tick {snapshot.sourceLastTick ? formatTime(snapshot.sourceLastTick) : "unknown"}.
+        Projection generated at {formatTime(snapshot.generatedAt)}. Latest
+        session read {snapshot.sourceLastTick ? formatTime(snapshot.sourceLastTick) : "pending"}.
       </div>
       <div className="space-y-3 lg:hidden">
         {snapshot.matrix.hours.map((hour, columnIndex) => {
@@ -425,7 +620,7 @@ function MatrixCell({
         : "text-ink-2";
   const title = `${line.code} ${line.label}, ${cell.hour.label}, projected ${formatPrice(
     cell.value,
-  )}, ${cell.method}, ${cell.confidence.band} confidence ${cell.confidence.score}/100, ${cell.projectionId}`;
+  )}, ${cell.confidence.band} confidence ${cell.confidence.score}/100`;
 
   return (
     <td
@@ -467,7 +662,7 @@ function ScenariosPanel({
       <CardHeader
         eyebrow="Assumption toggles"
         title="Stress the projection"
-        meta="Scenario changes are derived from the matrix; no server round trip is required for the math."
+        meta="Scenario changes stay local to the workspace so the read remains fast."
       />
       <CardBody className="space-y-3">
         <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
@@ -517,15 +712,15 @@ function CalibrationPanel({ records }: { records: CalibrationRecord[] }) {
       <Card>
         <CardHeader
           eyebrow="Read-only"
-          title="Calibration begins after replay"
+          title="Replay learning begins after review"
           meta="0 of 10 minimum records"
           action={<FeedHeartbeat feedId="calibration-store" />}
         />
         <CardBody>
           <PanelState
             state="empty-waiting"
-            title="No calibration corpus yet."
-            body="Replay will write projection errors after resolved sessions. Until at least 10 sessions exist, Foresight shows the matrix without claiming historical accuracy."
+            title="No replay set yet."
+            body="After enough resolved sessions, this panel will summarize how closely the planning view matched the day. Until then, Planning Lab stays a context tool."
           />
         </CardBody>
       </Card>
@@ -541,7 +736,7 @@ function CalibrationPanel({ records }: { records: CalibrationRecord[] }) {
     <Card>
       <CardHeader
         eyebrow="Recent errors"
-        title="Calibration"
+        title="Replay learning"
         meta={`${records.length} projection checks`}
         action={<FeedHeartbeat feedId="calibration-store" />}
       />
@@ -563,8 +758,9 @@ function StatusChip({ status }: { status: ForesightStatus }) {
     standby: "border-rule-strong bg-paper text-ink-2",
     live: "border-bull/30 bg-bull-tint text-bull-ink",
     stale: "border-gold/40 bg-gold-tint text-gold-ink",
-    failed: "border-bear/35 bg-bear-tint text-bear-ink",
+    failed: "border-gold/40 bg-gold-tint text-gold-ink",
   }[status];
+  const label = status === "failed" ? "planning" : status;
 
   return (
     <span
@@ -574,15 +770,15 @@ function StatusChip({ status }: { status: ForesightStatus }) {
         tone,
       )}
     >
-      {status === "failed" && <AlertTriangle className="mr-2 h-3.5 w-3.5" aria-hidden />}
+      {status === "failed" && <Clock3 className="mr-2 h-3.5 w-3.5" aria-hidden />}
       {status === "stale" && <RefreshCw className="mr-2 h-3.5 w-3.5" aria-hidden />}
-      {status}
+      {label}
     </span>
   );
 }
 
 function panelStateFor(status: ForesightStatus, lineCount: number): PanelStateKind {
-  if (status === "failed") return "failed";
+  if (status === "failed") return "empty-by-design";
   if (status === "resolving") return lineCount > 0 ? "partial" : "empty-waiting";
   if (status === "standby") return lineCount > 0 ? "ready" : "empty-by-design";
   if (lineCount === 0) return "empty-waiting";
@@ -590,7 +786,7 @@ function panelStateFor(status: ForesightStatus, lineCount: number): PanelStateKi
 }
 
 function panelTitle(status: ForesightStatus) {
-  if (status === "failed") return "Projection unavailable.";
+  if (status === "failed") return "Planning window is quiet.";
   if (status === "resolving") return "Projection is resolving.";
   if (status === "standby") return "Standby projection.";
   if (status === "stale") return "Projection is stale.";
@@ -629,10 +825,10 @@ function lineLabel(lines: ProjectionLine[], lineId: string) {
 
 function scenarioDescription(kind: ScenarioKind) {
   const descriptions: Record<ScenarioKind, string> = {
-    gamma_flip: "Shift line context by a small dealer-flip assumption.",
-    vol_expansion: "Widen projected movement by increasing active slopes.",
-    vol_compression: "Compress projected movement by reducing active slopes.",
-    trend_continuation: "Extend the current slope impulse a little farther.",
+    gamma_flip: "Check how the read behaves if pressure changes near a key area.",
+    vol_expansion: "Check how the read behaves if the session expands.",
+    vol_compression: "Check how the read behaves if the session compresses.",
+    trend_continuation: "Check how the read behaves if momentum continues.",
     mean_reversion: "Pull projected values modestly back toward LAST.",
   };
   return descriptions[kind];

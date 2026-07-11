@@ -9,12 +9,18 @@
     "lint": "next lint && node scripts/check-brief-public-copy.mjs",
     "typecheck": "tsc --noEmit",
     "test": "npm run test:unit",
-    "test:unit": "node -e \"console.log('unit test harness pending')\"",
+    "test:unit": "node scripts/run-stocks-unit-tests.mjs",
     "test:e2e": "node scripts/run-playwright-smoke.mjs",
     "test:e2e:smoke": "npx playwright test tests/dashboard/smoke.spec.ts --reporter=line --workers=1",
     "test:e2e:visual": "npx playwright test tests/visual --reporter=line --workers=1",
     "test:e2e:all": "npx playwright test tests/dashboard tests/critical tests/replay tests/visual --reporter=line --workers=1",
-    "test:a11y": "npx playwright test tests/a11y/critical.spec.ts --reporter=line --workers=1"
+    "test:a11y": "npx playwright test tests/a11y/critical.spec.ts --reporter=line --workers=1",
+    "calibrate:stocks": "node scripts/calibrate-stock-engine.mjs",
+    "calibrate:crypto": "node scripts/calibrate-crypto-engine.mjs",
+    "audit:desk": "node scripts/run-agent-desk-audit.mjs",
+    "backtest:ema-fib": "node scripts/backtest-ema-fib-alerts.mjs",
+    "research:ema-fib": "node scripts/research-ema-fib-windows.mjs",
+    "verify:pine-entry": "node scripts/verify-spy-prophet-entry-pro.mjs"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.0",
@@ -27,6 +33,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tailwind-merge": "^2.5.4",
+    "ws": "^8.20.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -36,6 +43,7 @@
     "@types/node": "^20.16.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
+    "@types/ws": "^8.18.1",
     "autoprefixer": "^10.4.20",
     "eslint": "^8.57.1",
     "eslint-config-next": "14.2.15",

@@ -1,29 +1,46 @@
-# SPY Prophet — Web
+# SPY Prophet Web
 
-Migration of [drdidy/SPYPROST](https://github.com/drdidy/SPYPROST) (Streamlit) to a real web stack.
+Production Next.js workspace for SPY Prophet, deployed on Vercel at
+`https://www.spyprophet.app`.
 
-## Layout
+## What Ships
 
-```
-api/   Python FastAPI backend → Render
-web/   Next.js 15 (App Router, TypeScript, Tailwind) → Vercel
-```
+- Next.js 14 App Router, React, TypeScript, Tailwind, and Vercel serverless routes.
+- Python API functions under `api/` for SPY, ES/SPX, replay, macro, and options data.
+- SPY Channel, ES Channel, Decision Slate, Replay, Foresight, Brief, Options,
+  Market Context, Order Flow, Signal Log, Learning, and Configuration surfaces.
+- No in-browser Babel, no design-editor tweak panel, and no random client-side
+  trading data generation in production source.
 
-## Status
-
-- `api/prophet_core.py` — pure trading engine ported from `drdidy/SPYPROST/app.py`.
-  No Streamlit, Plotly, yfinance, or other UI dependencies. Numerically equivalent
-  to the Streamlit version; parity is enforced by `api/tests/test_prophet_core.py`.
-- FastAPI app, `/health`, `/spy/snapshot`, render.yaml — pending follow-up PR.
-- `web/` Next.js scaffold + Prophet Chart page — pending follow-up PR.
-
-## Local development
+## Local Development
 
 ```bash
-cd api
-pip install -r requirements.txt   # added in follow-up PR
-pytest tests/                     # 40 parity tests must pass
+npm install
+npm run dev
 ```
 
-The Streamlit app at `drdidy/SPYPROST` keeps running in production. Business logic
-in `api/prophet_core.py` must stay numerically equivalent so we can A/B them.
+Useful checks:
+
+```bash
+npm run typecheck
+npm run lint
+npm run build
+npm run test:e2e:smoke
+npm run test:a11y
+pytest api/tests/test_data_sources_replay.py api/tests/spx/test_engine.py api/tests/spx/test_replay_grading.py
+```
+
+`next start` serves the Next.js app locally. Vercel serves the Python API
+functions in production, so local production-mode checks may show guarded
+fallback states for Python-backed feeds unless those routes are run through the
+Vercel runtime.
+
+## Deployment
+
+Production deploy:
+
+```bash
+npx vercel deploy --prod -y
+```
+
+The canonical production alias is `https://www.spyprophet.app`.

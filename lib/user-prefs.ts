@@ -3,8 +3,8 @@
 // back to the browser timezone when available. Session math remains Chicago-
 // anchored; display preferences are user-local.
 //
-// TODO(backend): once /api/me returns userPrefs.timezone, replace
-// the hardcoded default with the server value. Field shape we want:
+// Once /api/me returns userPrefs.timezone, replace the hardcoded
+// default with the server value. Field shape we want:
 //   { userPrefs: { timezone: string } }
 // Read at the request boundary in the dashboard's Server Component
 // and pass into the client tree as a prop.

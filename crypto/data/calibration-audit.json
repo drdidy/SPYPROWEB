@@ -1,0 +1,27 @@
+{
+  "generatedAt": "2026-05-25T05:19:32.051Z",
+  "method": {
+    "anchor": "highest_bearish_close_inside_new_york_active_session",
+    "controlLine": "anchor_close_projected_forward_by_asset_slope",
+    "gates": "asset_specific_distance_above_and_below_control_line",
+    "validation": "touch_plus_next_gate_resolution_scan"
+  },
+  "reports": [
+    {
+      "asset": "BTC",
+      "productId": "BTC-USD",
+      "days": 30,
+      "sessionsTested": 29,
+      "confidence": "needs_review",
+      "validation": "35% 8W 15U 6S"
+    },
+    {
+      "asset": "ETH",
+      "productId": "ETH-USD",
+      "days": 30,
+      "sessionsTested": 29,
+      "confidence": "medium",
+      "validation": "63% 10W 6U 13S"
+    }
+  ]
+}

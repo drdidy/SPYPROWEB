@@ -6,14 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 const TERMS_VERSION = "closed-beta-2026-05";
 
 export function SlateCompliance({
-  build = "Build 0.9.7",
-  environment = "production",
-  ruleVersion = "v1.0.0",
   requireAcknowledgement = false,
 }: {
-  build?: string;
-  environment?: string;
-  ruleVersion?: string;
   requireAcknowledgement?: boolean;
 }) {
   const userId = useAnonymousUserId();
@@ -72,17 +66,14 @@ export function SlateCompliance({
       <footer className="mt-8 rounded-card border border-rule bg-paper-tier2 px-4 py-3 text-[11px] text-ink-3">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <p>
-            TODO(legal): Not financial advice. Historical and live market data are
-            decision-support inputs only; options trading involves substantial risk.
+            Not financial advice. Historical and live market data are
+            decision-support inputs only. Trading involves substantial risk.
           </p>
           <div className="flex flex-wrap items-center gap-3 font-mono text-[10px] uppercase tracking-[0.12em]">
             <Link href="/terms" className="hover:text-ink">Terms</Link>
             <Link href="/privacy" className="hover:text-ink">Privacy</Link>
-            <Link href="/risk" className="hover:text-ink">Options risk</Link>
-            <span>{build}</span>
-            <span>{environment}</span>
-            <span>Rules {ruleVersion}</span>
-            <Link href="/contact" className="hover:text-ink">Report an issue</Link>
+            <Link href="/risk" className="hover:text-ink">Risk</Link>
+            <Link href="/contact" className="hover:text-ink">Contact</Link>
           </div>
         </div>
       </footer>

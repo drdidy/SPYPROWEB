@@ -51,7 +51,7 @@ export function GlossaryDrawerButton() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="font-serif text-[28px] leading-tight text-ink">Glossary</h2>
-                <p className="mt-1 text-sm text-ink-3">Plain-English definitions for the Open Brief.</p>
+                <p className="mt-1 text-sm text-ink-3">Clear definitions for Prophet vocabulary.</p>
               </div>
               <button
                 type="button"
@@ -129,7 +129,7 @@ export function ActionToolbar({ text }: { text: string }) {
 export function StickySubnav() {
   const [active, setActive] = useState("read-first");
   useEffect(() => {
-    const ids = ["read-first", "lines", "options", "news-calendar"];
+    const ids = ["read-first", "lines", "news-calendar"];
     const observer = new IntersectionObserver(
       (entries) => {
         const visible = entries
@@ -151,7 +151,6 @@ export function StickySubnav() {
         {[
           ["read-first", "Read First"],
           ["lines", "Lines"],
-          ["options", "Options"],
           ["news-calendar", "News & Calendar"],
         ].map(([id, label]) => (
           <a
@@ -179,10 +178,10 @@ export function LineLegend() {
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-rule bg-paper-2 px-3 py-2">
       <div className="flex flex-wrap gap-2 text-[12px] text-ink-2">
-        <LegendTerm label="WATCHING" note="nearby, no confirmed action" />
-        <LegendTerm label="ARMED" note="eligible for confirmation" />
-        <LegendTerm label="BREACHED" note="price moved through it" />
-        <LegendTerm label="CLEAR" note="not active this session" />
+        <LegendTerm label="WATCHING" note="near an important area" />
+        <LegendTerm label="ARMED" note="qualified, needs confirmation" />
+        <LegendTerm label="BREACHED" note="key area failed" />
+        <LegendTerm label="CLEAR" note="inactive this session" />
       </div>
       <button
         type="button"

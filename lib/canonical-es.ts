@@ -1,4 +1,11 @@
-import type { SPXSnapshot } from "@/lib/types";
+import type {
+  SPXAnchor,
+  SPXControlPlanMap,
+  SPXControlPlanSetup,
+  SPXControlPlanSignal,
+  SPXControlTradePlan,
+  SPXSnapshot,
+} from "@/lib/types";
 
 function isUsablePrice(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
@@ -24,6 +31,64 @@ function nativeOrOriginal(value: number, offset: number): number {
   return converted === null ? value : converted;
 }
 
+function convertAnchorToNative(anchor: SPXAnchor, offset: number): SPXAnchor {
+  return {
+    ...anchor,
+    price: nativeOrOriginal(anchor.price, offset),
+  };
+}
+
+function convertControlMapToNative(
+  map: SPXControlPlanMap,
+  offset: number,
+): SPXControlPlanMap {
+  return {
+    ...map,
+    anchor: convertAnchorToNative(map.anchor, offset),
+    controlValue: nativeOrOriginal(map.controlValue, offset),
+  };
+}
+
+function convertControlSetupToNative<
+  T extends SPXControlPlanSetup | SPXControlPlanSignal,
+>(setup: T, offset: number): T {
+  const converted = {
+    ...setup,
+    lineValue: nativeOrOriginal(setup.lineValue, offset),
+    entryPrice: nativeOrOriginal(setup.entryPrice, offset),
+    targetPrice: nativeOrOriginal(setup.targetPrice, offset),
+  };
+
+  if ("signalOpen" in setup) {
+    return {
+      ...converted,
+      signalOpen: nativeOrOriginal(setup.signalOpen, offset),
+      signalHigh: nativeOrOriginal(setup.signalHigh, offset),
+      signalLow: nativeOrOriginal(setup.signalLow, offset),
+      signalClose: nativeOrOriginal(setup.signalClose, offset),
+    } as T;
+  }
+
+  return converted as T;
+}
+
+function convertControlTradePlanToNative(
+  plan: SPXControlTradePlan | null | undefined,
+  offset: number,
+): SPXControlTradePlan | null | undefined {
+  if (!plan) return plan;
+  return {
+    ...plan,
+    primaryMap: convertControlMapToNative(plan.primaryMap, offset),
+    oppositeMap: convertControlMapToNative(plan.oppositeMap, offset),
+    activeTrade: plan.activeTrade
+      ? convertControlSetupToNative(plan.activeTrade, offset)
+      : null,
+    setups: plan.setups.map((setup) => convertControlSetupToNative(setup, offset)),
+    signals: plan.signals.map((signal) => convertControlSetupToNative(signal, offset)),
+  };
+}
+
 function rebuildScenarioExplanation(
   snap: SPXSnapshot,
   esLast: number,
@@ -31,27 +96,23 @@ function rebuildScenarioExplanation(
   const reason = snap.channel.reason?.trim();
   if (snap.channel.direction === "NONE") {
     return reason
-      ? `No ES Pivot Fan is active: ${reason} The engine is standing down until structure resolves.`
-      : "No ES Pivot Fan is active. The engine is standing down until structure resolves.";
+      ? `No ES Control Map is active: ${reason} The engine is standing down until structure resolves.`
+      : "No ES Control Map is active. The engine is standing down until structure resolves.";
   }
 
-  const envelope = snap.plannedEnvelope;
-  if (snap.scenario === "OUTSIDE_PLAY" && envelope) {
-    const inside = esLast >= envelope.low && esLast <= envelope.high;
-    const range = `${formatPrice(envelope.low)}-${formatPrice(envelope.high)}`;
-    return inside
-      ? `ES last ${formatPrice(esLast)} is inside the planned envelope (${range}), but no fan-qualified play is active.`
-      : `ES last ${formatPrice(esLast)} is outside the active play scope; re-entry into ${range} reactivates the play.`;
+  const plan = snap.controlTradePlan;
+  if (plan) {
+    const map =
+      plan.activeTrade?.mapId === plan.oppositeMap.id ||
+      plan.setups[0]?.mapId === plan.oppositeMap.id
+        ? plan.oppositeMap
+        : plan.primaryMap.status === "ARMED"
+          ? plan.primaryMap
+          : plan.oppositeMap;
+    return `ES last ${formatPrice(esLast)} is being evaluated against the ${map.direction === "DESCENDING" ? "descending" : "ascending"} Control Plan at ${formatPrice(map.controlValue)}.`;
   }
 
-  const existing = snap.scenarioExplanation || "";
-  if (existing) {
-    return existing.replace(
-      /Last print\s+\d+(?:\.\d+)?/i,
-      `ES last ${formatPrice(esLast)}`,
-    );
-  }
-  return `ES last ${formatPrice(esLast)} is being evaluated against the active Pivot Fan.`;
+  return `ES last ${formatPrice(esLast)} is waiting for the Control Plan to resolve.`;
 }
 
 function rewriteTraceEvent(event: string, snap: SPXSnapshot, esLast: number): string {
@@ -68,7 +129,10 @@ function rewriteTraceEvent(event: string, snap: SPXSnapshot, esLast: number): st
  * the canonical last print when it is available.
  */
 export function canonicalizeEsSnapshot(snap: SPXSnapshot): SPXSnapshot {
-  const esLast = snap._meta?.esSpot;
+  const esLast =
+    snap._meta?.offsetMethod === "close_anchored" && isUsablePrice(snap.price.last)
+      ? snap.price.last
+      : snap._meta?.esSpot;
   if (!isUsablePrice(esLast)) return snap;
   const offset = appliedOffset(snap);
   const alreadyNative = Math.abs(snap.price.last - esLast) < 0.01;
@@ -180,6 +244,10 @@ export function canonicalizeEsSnapshot(snap: SPXSnapshot): SPXSnapshot {
               : nativeOrOriginal(snap.rthBias.continuationValue, offset),
         }
       : snap.rthBias,
+    controlTradePlan: convertControlTradePlanToNative(
+      snap.controlTradePlan,
+      offset,
+    ),
   };
 
   return {
@@ -193,5 +261,8 @@ export function canonicalizeEsSnapshot(snap: SPXSnapshot): SPXSnapshot {
 }
 
 export function canonicalEsLast(snap: SPXSnapshot): number {
+  if (snap._meta?.offsetMethod === "close_anchored" && isUsablePrice(snap.price.last)) {
+    return snap.price.last;
+  }
   return isUsablePrice(snap._meta?.esSpot) ? snap._meta.esSpot : snap.price.last;
 }

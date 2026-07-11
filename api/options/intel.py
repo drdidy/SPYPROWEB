@@ -1,8 +1,8 @@
-"""GET /api/options/intel - options intelligence bundle.
+"""GET /api/options/intel - broker-backed options execution bundle.
 
-The endpoint aggregates Unusual Whales sections for the Options tab.
-It returns 200 with `available: false` when upstream data is absent so
-the app can render an honest empty state instead of a server error.
+The endpoint returns tradable option-chain data for the launch
+execution lens. Premium flow/GEX integrations stay out of the critical
+path until they are available as reliable add-ons.
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ _API_ROOT = Path(__file__).resolve().parents[1]
 if str(_API_ROOT) not in sys.path:
     sys.path.insert(0, str(_API_ROOT))
 
-from _lib import unusual_whales  # noqa: E402
+from _lib import options_chains  # noqa: E402
 
 
 def _symbols_from_path(path: str) -> tuple[str, ...]:
@@ -24,7 +24,7 @@ def _symbols_from_path(path: str) -> tuple[str, ...]:
     qs = parse_qs(parsed.query)
     raw = qs.get("symbols", ["SPY,SPX"])[0]
     symbols = [part.strip().upper() for part in raw.split(",") if part.strip()]
-    allowed = [s for s in symbols if s in {"SPY", "SPX"}]
+    allowed = [s for s in symbols if s in options_chains.SUPPORTED_SYMBOLS]
     return tuple(dict.fromkeys(allowed or ["SPY", "SPX"]))
 
 
@@ -39,7 +39,7 @@ def _date_from_path(path: str) -> str | None:
 class handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802 - Vercel contract
         body = json.dumps(
-            unusual_whales.fetch_options_bundle(
+            options_chains.fetch_options_bundle(
                 _symbols_from_path(self.path),
                 effective_date=_date_from_path(self.path),
             )

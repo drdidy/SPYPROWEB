@@ -1,0 +1,52 @@
+[
+  {
+    "sector": "index_etf",
+    "label": "Index ETF",
+    "slope_rate": 0.00027,
+    "distance_rate": 0.0041,
+    "description": "Broad-market ETF bucket. Uses the slower index-style rejection-line slope and tighter post-rejection distance."
+  },
+  {
+    "sector": "healthcare",
+    "label": "Healthcare",
+    "slope_rate": 0.0004,
+    "distance_rate": 0.01,
+    "description": "Defensive healthcare and major pharmaceutical equities."
+  },
+  {
+    "sector": "financials",
+    "label": "Financials",
+    "slope_rate": 0.00049,
+    "distance_rate": 0.01,
+    "description": "Banks, brokers, asset managers, exchanges, and payment-finance names."
+  },
+  {
+    "sector": "energy",
+    "label": "Energy",
+    "slope_rate": 0.0006,
+    "distance_rate": 0.008,
+    "description": "Integrated oil, exploration, services, refining, and natural-gas infrastructure."
+  },
+  {
+    "sector": "tech_mega_cap",
+    "label": "Tech Mega-Cap",
+    "slope_rate": 0.00066,
+    "distance_rate": 0.01,
+    "description": "Mega-cap and liquid large-cap technology, communication, software, semiconductor, and platform names."
+  },
+  {
+    "sector": "consumer_staples",
+    "label": "Consumer Staples",
+    "slope_rate": 0.001,
+    "distance_rate": 0.01,
+    "description": "Staples, beverage, household products, grocers, tobacco, and defensive retail leaders."
+  },
+  {
+    "sector": "high_vol_momentum",
+    "label": "High-Vol Momentum",
+    "slope_rate": 0.00066,
+    "distance_rate": 0.01,
+    "high_vol_extension_multiplier": 3,
+    "description": "Momentum names that share the tech-like mean slope but can extend two to three times the normal distance after rejection."
+  }
+]

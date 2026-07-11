@@ -3,8 +3,11 @@ from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 
 from _lib.spx.time_utils import (
+    es_trading_hours_between,
     hours_between,
+    next_es_candle_open,
     overnight_window,
+    previous_futures_session_date,
     previous_session_date,
     rth_window,
     session_date_ct,
@@ -41,6 +44,27 @@ def test_sunday_evening_belongs_to_monday_session():
     assert session_date_ct(dt) == date(2026, 5, 11)
 
 
+def test_weekday_evening_belongs_to_next_futures_session():
+    dt = datetime(2026, 5, 25, 18, 0, tzinfo=CT)
+    assert session_date_ct(dt) == date(2026, 5, 26)
+
+
+def test_holiday_after_early_halt_moves_to_next_session():
+    for hour in (12, 13, 16):
+        dt = datetime(2026, 5, 25, hour, 0, tzinfo=CT)
+        assert session_date_ct(dt) == date(2026, 5, 26)
+
+
+def test_regular_day_after_noon_stays_same_session():
+    dt = datetime(2026, 5, 26, 13, 0, tzinfo=CT)
+    assert session_date_ct(dt) == date(2026, 5, 26)
+
+
+def test_holiday_evening_reopen_belongs_to_next_futures_session():
+    dt = datetime(2026, 5, 25, 17, 0, tzinfo=CT)
+    assert session_date_ct(dt) == date(2026, 5, 26)
+
+
 def test_session_date_ct_walks_back_over_weekends():
     # Saturday early morning -> session is the Friday that just ended.
     dt = datetime(2026, 5, 9, 4, 0, tzinfo=CT)
@@ -51,6 +75,19 @@ def test_previous_session_date_skips_weekend():
     # Monday's prior trading day is Friday, not Sunday.
     monday = date(2026, 5, 11)
     assert previous_session_date(monday) == date(2026, 5, 8)
+
+
+def test_session_date_ct_keeps_market_holiday_for_live_futures_map():
+    memorial_day = datetime(2026, 5, 25, 8, 0, tzinfo=CT)
+    assert session_date_ct(memorial_day) == date(2026, 5, 25)
+
+
+def test_previous_session_date_skips_market_holiday():
+    assert previous_session_date(date(2026, 5, 26)) == date(2026, 5, 22)
+
+
+def test_previous_futures_session_date_keeps_market_holiday():
+    assert previous_futures_session_date(date(2026, 5, 26)) == date(2026, 5, 25)
 
 
 def test_overnight_window_spans_prev_day_to_session_boundary():
@@ -92,3 +129,38 @@ def test_hours_between_uses_ct_wall_clock_across_dst():
     a = datetime(2026, 3, 8, 1, 0, tzinfo=CT)
     b = datetime(2026, 3, 8, 3, 0, tzinfo=CT)
     assert hours_between(a, b) == 2.0
+
+
+def test_es_trading_hours_skip_weekend_closure():
+    friday_pivot = datetime(2026, 5, 22, 10, 0, tzinfo=CT)
+    monday_entry = datetime(2026, 5, 25, 9, 0, tzinfo=CT)
+    assert es_trading_hours_between(friday_pivot, monday_entry) == 22.0
+    assert es_trading_hours_between(monday_entry, friday_pivot) == -22.0
+
+
+def test_es_trading_hours_skip_memorial_day_midday_halt():
+    monday_pivot = datetime(2026, 5, 25, 9, 0, tzinfo=CT)
+    tuesday_entry = datetime(2026, 5, 26, 9, 0, tzinfo=CT)
+    assert es_trading_hours_between(monday_pivot, tuesday_entry) == 19.0
+
+
+def test_next_es_candle_open_skips_memorial_day_midday_halt():
+    candle = datetime(2026, 5, 25, 11, 0, tzinfo=CT)
+    assert next_es_candle_open(candle) == datetime(2026, 5, 25, 17, 0, tzinfo=CT)
+
+
+def test_es_trading_hours_skip_daily_maintenance_break():
+    start = datetime(2026, 5, 21, 15, 0, tzinfo=CT)
+    end = datetime(2026, 5, 21, 18, 0, tzinfo=CT)
+    assert es_trading_hours_between(start, end) == 2.0
+
+
+def test_next_es_candle_open_skips_daily_maintenance_break():
+    candle = datetime(2026, 5, 21, 15, 0, tzinfo=CT)
+    assert next_es_candle_open(candle) == datetime(2026, 5, 21, 17, 0, tzinfo=CT)
+
+
+def test_es_trading_hours_count_sunday_evening():
+    start = datetime(2026, 5, 24, 16, 0, tzinfo=CT)
+    end = datetime(2026, 5, 24, 20, 0, tzinfo=CT)
+    assert es_trading_hours_between(start, end) == 3.0

@@ -7,7 +7,7 @@ import { type ReactNode } from "react";
 
 interface Props {
   term: string;
-  /** Plain-English explanation, one sentence. */
+  /** Clear explanation, one sentence. */
   hint: string;
   children?: ReactNode;
 }

@@ -6,13 +6,6 @@ export const metadata = {
     "How SPY Prophet collects, uses, and shares personal data, and your rights under GDPR/UK-GDPR/CCPA.",
 };
 
-// TODO(legal): the data-subject-rights section assumes a generic
-// CCPA + GDPR overlap. If the company sells in the EEA at scale,
-// counsel should add a controller/processor matrix and the appropriate
-// SCC references for cross-border transfer. The retention table below
-// is engineering's best estimate — confirm with counsel and the
-// chosen email provider's DPA.
-
 export default function PrivacyPage() {
   return (
     <LegalPage
@@ -33,8 +26,8 @@ export default function PrivacyPage() {
           Optional UTM parameters and referrer captured at form submission.
         </li>
         <li>
-          <strong>Account data</strong> for beta users: email, display
-          name, billing details (when paid tiers ship — currently none).
+          <strong>Account data</strong>: email, display name, and billing
+          details when you use a paid plan.
         </li>
         <li>
           <strong>Workspace activity</strong>: anonymized session metrics
@@ -58,13 +51,12 @@ export default function PrivacyPage() {
         <li>To operate the Service and provide it to you.</li>
         <li>To respond to support requests and security incidents.</li>
         <li>To improve the Service through aggregated, anonymized analysis.</li>
-        <li>To communicate beta updates (you can unsubscribe at any time).</li>
+        <li>To communicate product updates (you can unsubscribe at any time).</li>
       </ul>
 
       <h2>How long we keep it</h2>
-      <p>{/* TODO(legal): confirm retention against email-provider DPA. */}</p>
       <ul>
-        <li>Waitlist email: until you unsubscribe or until the public launch + 12 months, whichever is sooner.</li>
+        <li>Waitlist email: until you unsubscribe or ask us to delete it.</li>
         <li>Account data: for the life of your account, plus 90 days after deletion for backup expiry.</li>
         <li>Server logs: 30 days.</li>
         <li>Anonymized usage metrics: 24 months.</li>
@@ -94,8 +86,7 @@ export default function PrivacyPage() {
         Our infrastructure is hosted in the United States. If you access
         the Service from outside the US, you understand that your data
         will be transferred to and processed in the US under appropriate
-        safeguards.{" "}
-        {/* TODO(legal): add SCC reference if EU traffic warrants. */}
+        safeguards.
       </p>
 
       <h2>Children</h2>

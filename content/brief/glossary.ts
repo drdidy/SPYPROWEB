@@ -6,110 +6,150 @@ export type BriefGlossaryTerm = {
 
 export const briefGlossary: Record<string, BriefGlossaryTerm> = {
   COOLDOWN: {
-    term: "Cooldown",
-    definition: "The system is standing down after a completed move until a fresh valid setup appears.",
+    term: "Reset",
+    definition: "The prior opportunity has finished. Prophet waits for the next clean setup before showing a new action.",
     href: "/learn#cooldown",
   },
   ARMED: {
     term: "Armed",
-    definition: "A setup is active, but the app is still waiting for the required confirmation before action.",
+    definition: "A qualified setup is live. Wait for final confirmation before taking action.",
     href: "/learn#armed",
   },
   WATCHING: {
     term: "Watching",
-    definition: "A line is close enough to monitor, but it has not produced a confirmed action.",
+    definition: "Price is near an important area. No trade is active until confirmation appears.",
   },
   BREACHED: {
     term: "Breached",
-    definition: "Price moved through a reference line instead of respecting it.",
+    definition: "Price crossed through a key area. Treat the prior read as weakened until structure rebuilds.",
   },
   "INSIDE DESCENDING": {
-    term: "Inside descending",
-    definition: "ES is trading inside a descending structural pair, so the next touch must confirm direction.",
+    term: "Inside Control Map",
+    definition: "Price is inside the active map, so direction must be confirmed by the next clean close.",
   },
   ASCENDING: {
-    term: "Ascending",
-    definition: "A structure line that rises through time and is judged at the session's active decision time.",
+    term: "Rising Reference",
+    definition: "A backup reference that rises through time. It is context, not a standalone trade signal.",
   },
   "ANCHOR MAIN": {
-    term: "Anchor main",
-    definition: "The primary reference line from the SPY anchor model for the current session.",
+    term: "Primary Control Line",
+    definition: "The main session reference for the current instrument.",
   },
   "ANCHOR UPPER": {
-    term: "Anchor upper",
-    definition: "The upper reference line from the SPY anchor model.",
+    term: "Primary North Gate",
+    definition: "The first important decision area above the Control Line.",
   },
   "BACKUP MAIN": {
-    term: "Backup main",
-    definition: "A secondary main reference used when the primary anchor is not the closest useful line.",
+    term: "Backup Control Line",
+    definition: "A secondary reference kept for context when the primary map is not the nearest useful read.",
   },
   "BACKUP UPPER": {
-    term: "Backup upper",
-    definition: "A secondary upper reference used for context, exits, or backup reaction checks.",
+    term: "Backup North Gate",
+    definition: "A secondary upper decision area used for context, exits, or reaction checks.",
   },
   PDH: {
-    term: "PDH",
-    definition: "Previous day high.",
+    term: "Previous Day High",
+    definition: "The prior regular-session high. Used as context around the active map.",
   },
   PDL: {
-    term: "PDL",
-    definition: "Previous day low.",
+    term: "Previous Day Low",
+    definition: "The prior regular-session low. Used as context around the active map.",
   },
   "DAY OPEN": {
-    term: "Day open",
+    term: "Session Open",
     definition: "The regular-session opening price for the current trading day.",
   },
   "PIVOT FAN": {
-    term: "Pivot Fan",
-    definition: "The ES reference model built from the prior RTH high close and the post-noon RTH low wick.",
+    term: "ES Control Map",
+    definition: "The ES operating map for the session: Control Line, gates, current price, and decision state.",
   },
   "SWING HIGH ASC/DESC": {
-    term: "Swing high asc/desc",
-    definition: "Legacy overnight swing-high references. The current ES read only promotes a higher overnight high as a minor ascending watch.",
+    term: "Overnight High Watch",
+    definition: "A contextual overnight high that can matter if price returns to that area cleanly.",
   },
   "SWING LOW ASC/DESC": {
-    term: "Swing low asc/desc",
-    definition: "Legacy overnight swing-low references retained for old replays.",
+    term: "Overnight Low Watch",
+    definition: "A contextual overnight low that can matter if price returns to that area cleanly.",
   },
   "TOUCH-WINDOW": {
-    term: "Touch-window",
-    definition: "The session window where a line touch can become an actionable setup after confirmation.",
-  },
-  GEX: {
-    term: "GEX",
-    definition: "Gamma exposure, a dealer-position estimate that helps describe whether hedging may amplify or dampen moves.",
-  },
-  FLIP: {
-    term: "Flip",
-    definition: "The price area where dealer gamma context is estimated to change sign.",
-  },
-  PCR: {
-    term: "PCR",
-    definition: "Put/call ratio, comparing put activity to call activity.",
-  },
-  "DARK PREMIUM": {
-    term: "Dark premium",
-    definition: "Estimated dollar value of dark-pool prints included in the options context.",
-  },
-  "DARK PRINTS": {
-    term: "Dark prints",
-    definition: "Count of dark-pool prints included in the current options read.",
-  },
-  "NET PREMIUM": {
-    term: "Net premium",
-    definition: "Premium-weighted difference between bullish and bearish options flow.",
+    term: "Decision Window",
+    definition: "The part of the session where a touch can become actionable after confirmation.",
   },
   CONVICTION: {
     term: "Conviction",
-    definition: "The app's internal strength read for whether a setup deserves attention.",
+    definition: "Prophet's strength read for whether a setup deserves attention.",
   },
   CONFLUENCE: {
-    term: "Confluence",
-    definition: "A combined read of multiple independent factors that support or oppose the setup.",
+    term: "Alignment",
+    definition: "A combined read of independent factors that support, oppose, or neutralize the setup.",
+  },
+  "CONTROL LINE": {
+    term: "Control Line",
+    definition: "The main decision reference for the session. Gates above and below it frame the plan.",
+  },
+  "DEVIATION FAN": {
+    term: "Gate Map",
+    definition: "The session's Control Line with the working gates above and below it.",
+  },
+  "CHASE GUARD": {
+    term: "Chase Guard",
+    definition: "A risk filter that blocks entries after price has already moved too far from the trigger area.",
+  },
+  "OPERATOR READ": {
+    term: "Trader Read",
+    definition: "The plain-language summary of what matters now and what should happen next.",
+  },
+  "ANCHOR SLATE": {
+    term: "Session References",
+    definition: "The primary areas that define the current trading map.",
+  },
+  "PROCESS RAIL": {
+    term: "State Path",
+    definition: "The setup sequence from preparation through action, reset, or stand down.",
+  },
+  "ACTIVE LINE": {
+    term: "Active Level",
+    definition: "The current decision area that price must respect or reclaim before a trade can qualify.",
+  },
+  "REJECTION": {
+    term: "Rejection",
+    definition: "A touch of a decision area followed by a close back away from it, showing that the area held.",
+  },
+  "RETEST": {
+    term: "Retest",
+    definition: "A second visit to the same area after confirmation. It only matters while the setup remains valid.",
+  },
+  "ENTRY WINDOW": {
+    term: "Entry Window",
+    definition: "The part of the session where fresh entries are allowed.",
   },
   INVALIDATION: {
     term: "Invalidation",
     definition: "The price or condition that says the current plan is no longer valid.",
+  },
+  "NORTH GATE": {
+    term: "North Gate",
+    definition: "A decision area above the Control Line.",
+  },
+  "SOUTH GATE": {
+    term: "South Gate",
+    definition: "A decision area below the Control Line.",
+  },
+  "CONTROL ROOM": {
+    term: "Control Room",
+    definition: "The visual map that shows current price, the Control Line, nearby gates, and the active decision state.",
+  },
+  "STAND DOWN": {
+    term: "Stand Down",
+    definition: "No fresh trade should be taken until the next valid setup appears.",
+  },
+  "TRADE ALLOWED": {
+    term: "Trade Allowed",
+    definition: "The setup has met the required conditions and is ready for the next execution step.",
+  },
+  "WAIT FOR SETUP": {
+    term: "Wait for Setup",
+    definition: "The map is prepared, but price has not produced a qualified entry yet.",
   },
 };
 

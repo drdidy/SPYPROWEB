@@ -5,6 +5,7 @@
 // no empty state.
 
 import { cn } from "@/lib/utils";
+import { formatEngineStateLabel } from "@/lib/display-labels";
 import type { EngineState } from "@/lib/states";
 
 interface Entry {
@@ -54,16 +55,23 @@ export function TimelineStrip({ engine, history, className }: Props) {
       >
         {history.map((e, i) => (
           <li key={`${e.ts}-${i}`} className="flex items-center gap-1.5">
-            <span
-              aria-hidden
-              className={cn("h-2 w-2 rounded-full", STATE_TONE[e.state] ?? "bg-ink-5")}
-            />
-            <span className="font-mono text-[10px] text-ink-3 tabular-nums">
-              {formatHM(e.ts)}
-            </span>
-            <span className="font-mono text-[10px] tracking-[0.10em] uppercase text-ink-2">
-              {e.state.replace(/_/g, " ")}
-            </span>
+            <details className="group relative">
+              <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-pill px-1.5 py-1 outline-none transition hover:bg-paper focus-visible:ring-2 focus-visible:ring-gold/40">
+                <span
+                  aria-hidden
+                  className={cn("h-2 w-2 rounded-full", STATE_TONE[e.state] ?? "bg-ink-5")}
+                />
+                <span className="font-mono text-[10px] text-ink-3 tabular-nums">
+                  {formatHM(e.ts)}
+                </span>
+                <span className="font-mono text-[10.5px] tracking-[0.02em] text-ink-2">
+                  {formatEngineStateLabel(e.state)}
+                </span>
+              </summary>
+              <div className="absolute left-0 top-7 z-20 w-48 rounded-[10px] border border-rule bg-paper p-3 text-[11px] leading-relaxed text-ink-3 shadow-lg">
+                {formatEngineStateLabel(e.state)} at {formatHM(e.ts)} CT.
+              </div>
+            </details>
             {i < history.length - 1 && (
               <span aria-hidden className="text-ink-4 ml-1">
                 →

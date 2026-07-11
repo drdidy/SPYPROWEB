@@ -6,11 +6,6 @@ export const metadata = {
     "What SPY Prophet is and isn't, regulatory status, and what you should know before using the Service.",
 };
 
-// TODO(legal): the "not investment advice" framing is the foundational
-// posture. Counsel should confirm the FINRA / NFA / SEC posture for
-// the educational-tool exemption, and add any state-specific BD
-// disclosures if a paid tier ever sells subscriptions in IL/CA/NY.
-
 export default function DisclosuresPage() {
   return (
     <LegalPage
@@ -58,7 +53,7 @@ export default function DisclosuresPage() {
         from a feature change or piece of commentary, we will disclose it.
       </p>
 
-      <h2>Data sources</h2>
+      <h2>Market information</h2>
       <p>
         Quotes shown on the Service may be delayed, sourced from third
         parties or broker/data-provider feeds, and may differ from your
@@ -75,13 +70,12 @@ export default function DisclosuresPage() {
         of mention.
       </p>
 
-      <h2>Methodology</h2>
+      <h2>Workflow</h2>
       <p>
-        Our reasoning framework — the &quot;read · project · decide&quot;
-        triad and the six-rule discipline — is described on the{" "}
-        <a href="/methodology">Methodology</a> page. The framework is
-        proprietary; numerical thresholds are not disclosed publicly to
-        prevent gaming.
+        Our reasoning framework is described at a high level on the{" "}
+        <a href="/methodology">Workflow</a> page. The framework is
+        proprietary; numerical thresholds and internal mechanics are not
+        disclosed publicly.
       </p>
 
       <h2>Contact</h2>

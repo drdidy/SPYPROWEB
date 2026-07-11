@@ -59,7 +59,8 @@ export function FeedHealthBadge({
       })
     : "—";
 
-  const title = `Last tick ${tickLabel} · feed: ${source}`;
+  void source;
+  const title = `Last refresh ${tickLabel} - session read`;
 
   return (
     <span

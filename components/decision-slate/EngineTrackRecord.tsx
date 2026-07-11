@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ChevronDown } from "lucide-react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { displayEngine } from "@/lib/engine-labels";
 import { InfoTooltip } from "@/components/ui/InfoTooltip";
@@ -32,10 +35,12 @@ const OUTCOME_LABEL: Record<SessionOutcome["outcome"], string> = {
 };
 
 export function EngineTrackRecord({ record, feedId, className }: Props) {
+  const [expanded, setExpanded] = useState(false);
   const pct =
     record.hitRate == null ? null : Math.round(record.hitRate * 100);
   const labelTone = record.engine === "SPX" ? "text-violet" : "text-ink-2";
-  const display = displayEngine(record.engine);
+  const display = record.label ?? displayEngine(record.engine);
+  const replayEngine = displayEngine(record.engine);
   const skipText = record.skips
     ? SLATE_COPY.trackRecord.skipLabel(record.skips)
     : null;
@@ -74,20 +79,24 @@ export function EngineTrackRecord({ record, feedId, className }: Props) {
 
         <div className="flex items-center gap-2">
           {feedId && <FeedHeartbeat feedId={feedId} />}
-          <InfoTooltip
-            label={pct == null ? "No graded sessions yet" : "Graded sessions"}
-            content={
-              summaryNeedsTooltip
-                ? `Engine watched the last ${record.sessions.length} session${
-                    record.sessions.length === 1 ? "" : "s"
-                  } but did not qualify a setup. A graded session is one the engine took to a confirmed entry trigger or replay open-zone continuation and tracked through to its exit.`
-                : "Sessions where the engine took a confirmed entry or replay open-zone continuation and tracked through exit. Skipped sessions are excluded from the percentage."
-            }
+          <button
+            type="button"
+            onClick={() => setExpanded((value) => !value)}
+            aria-expanded={expanded}
+            className={cn(
+              "inline-flex h-7 items-center gap-1 rounded-pill border border-rule bg-paper-2/70 px-2.5",
+              "font-mono text-[10px] uppercase tracking-[0.12em] text-ink-2 transition",
+              "hover:border-rule-strong hover:text-ink",
+              "outline-none focus-visible:ring-2 focus-visible:ring-gold/40",
+            )}
           >
-            <span className="cursor-help font-mono text-meta tabular-nums text-ink-2">
-              Methodology
-            </span>
-          </InfoTooltip>
+            Details
+            <ChevronDown
+              size={12}
+              aria-hidden
+              className={cn("transition-transform", expanded && "rotate-180")}
+            />
+          </button>
         </div>
       </div>
 
@@ -96,7 +105,7 @@ export function EngineTrackRecord({ record, feedId, className }: Props) {
           <div className="flex items-end justify-between gap-4">
             <div>
               <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-4">
-                Verified hit rate
+                {record.metricLabel ?? "Verified hit rate"}
               </div>
               <div className="mt-1 font-serif text-[34px] leading-none text-ink">
                 {pct == null ? "Pending" : `${pct}%`}
@@ -119,11 +128,6 @@ export function EngineTrackRecord({ record, feedId, className }: Props) {
             <Segment count={record.losses} total={totalSegments} className="bg-bear" />
             <Segment count={record.pushes} total={totalSegments} className="bg-state-neutral" />
             <Segment count={record.skips} total={totalSegments} className="bg-gold/70" />
-          </div>
-          <div className="mt-3 grid grid-cols-3 divide-x divide-rule">
-            <Metric label="Wins" value={record.wins} tone="text-bull-ink" />
-            <Metric label="Losses" value={record.losses} tone="text-bear-ink" />
-            <Metric label="Skips" value={record.skips} tone="text-gold-ink" />
           </div>
         </div>
         <div className="min-w-0">
@@ -153,7 +157,7 @@ export function EngineTrackRecord({ record, feedId, className }: Props) {
                         s.pnlPts == null
                           ? ""
                           : ` - ${s.pnlPts >= 0 ? "+" : ""}${s.pnlPts.toFixed(2)} pts`
-                      }`}
+                      }${s.note ? ` - ${s.note}` : ""}`}
                       className={cn(
                         "h-3.5 w-3.5 rounded-full cursor-help",
                         DOT_TONE[s.outcome],
@@ -175,9 +179,36 @@ export function EngineTrackRecord({ record, feedId, className }: Props) {
         </div>
       </div>
 
+      {expanded && (
+        <div className="mt-4 rounded-[8px] border border-rule-soft bg-paper-2/45 p-3">
+          <div className="grid grid-cols-3 divide-x divide-rule">
+            <Metric label="Wins" value={record.wins} tone="text-bull-ink" />
+            <Metric label="Losses" value={record.losses} tone="text-bear-ink" />
+            <Metric label="Skips" value={record.skips} tone="text-gold-ink" />
+          </div>
+          <div className="mt-3 flex items-start gap-2 border-t border-rule-soft pt-3 text-[12px] leading-relaxed text-ink-3">
+            <InfoTooltip
+              label={pct == null ? "No graded sessions yet" : "Scoring note"}
+              content={
+                record.methodology ??
+                (summaryNeedsTooltip
+                  ? `The engine watched the last ${record.sessions.length} session${
+                      record.sessions.length === 1 ? "" : "s"
+                    } but did not qualify a setup. A graded session is one with a confirmed entry or replay open-zone continuation tracked through exit.`
+                  : "Graded sessions are confirmed entries or replay open-zone continuations tracked through exit. Skipped sessions are excluded from the percentage.")
+              }
+            />
+            <span>
+              Percentages use graded sessions only. Skips stay visible so the
+              record does not imply every day was tradable.
+            </span>
+          </div>
+        </div>
+      )}
+
       <div className="mt-4 flex items-center justify-between gap-3 border-t border-rule-soft pt-3">
         <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-4">
-          Replay audit
+          Replay
         </span>
         <Link
           href={`/replay${record.sessions[0] ? `?date=${record.sessions[0].date}` : ""}&engine=${record.engine}`}
@@ -189,7 +220,7 @@ export function EngineTrackRecord({ record, feedId, className }: Props) {
             "outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
           )}
         >
-          Open {display} replay
+          Open {replayEngine}
           <ArrowRight size={11} className="text-ink-4" aria-hidden />
         </Link>
       </div>

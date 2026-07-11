@@ -12,7 +12,7 @@ export default function robots(): MetadataRoute.Robots {
         // closed beta and aren't useful in search results until we
         // open them up. Disallow indexing while keeping them
         // crawlable for owners and authed sessions.
-        disallow: ["/api/", "/dashboard", "/spy", "/spx", "/replay", "/foresight", "/options", "/log"],
+        disallow: ["/api/", "/dashboard", "/map", "/replay", "/log", "/learn", "/settings", "/spy", "/es", "/spx", "/stocks", "/crypto", "/foresight", "/options", "/brief", "/context", "/flow", "/agents"],
       },
     ],
     sitemap: `${SITE_URL}/sitemap.xml`,

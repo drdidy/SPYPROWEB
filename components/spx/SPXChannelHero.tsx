@@ -12,7 +12,7 @@ const scenarioLabel: Record<SPXScenario, string> = {
   BELOW_ASCENDING: "Below active structure",
   ABOVE_DESCENDING: "Below both ceilings",
   INSIDE_DESCENDING: "Between fan references",
-  BELOW_DESCENDING: "Below High Fan Floor",
+  BELOW_DESCENDING: "Below deviation floor",
   OUTSIDE_PLAY: "Outside the planned play",
 };
 
@@ -33,9 +33,9 @@ const actionToVariant: Record<SPXAction, "confirmed" | "watching" | "stale"> = {
 };
 
 const actionLabel: Record<SPXAction, string> = {
-  TAKE: "TAKE",
-  SELECTIVE: "SELECTIVE",
-  STAND_DOWN: "STAND DOWN",
+  TAKE: "Take",
+  SELECTIVE: "Selective",
+  STAND_DOWN: "Stand Down",
 };
 
 function entryLineValue(line: SPXLine): number {
@@ -74,6 +74,21 @@ export function SPXChannelHero({
     lowerLine && upperLine ? entryLineValue(upperLine) - entryLineValue(lowerLine) : null;
   const distToUpper = upperLine ? entryLineValue(upperLine) - snap.price.last : null;
   const distToLower = lowerLine ? snap.price.last - entryLineValue(lowerLine) : null;
+  const deviationFan = snap.descendingDeviationFan ?? null;
+  const zoneLower = deviationFan?.zone.lowerLine
+    ? deviationFan.lines.find((line) => line.label === deviationFan.zone.lowerLine)
+    : null;
+  const zoneUpper = deviationFan?.zone.upperLine
+    ? deviationFan.lines.find((line) => line.label === deviationFan.zone.upperLine)
+    : null;
+  const zoneWidth =
+    zoneLower && zoneUpper
+      ? Math.abs(zoneUpper.value - zoneLower.value)
+      : deviationFan?.spacing ?? null;
+  const distanceToZoneCeiling = zoneUpper ? zoneUpper.value - snap.price.last : null;
+  const distanceToZoneFloor = zoneLower ? snap.price.last - zoneLower.value : null;
+  const heroTitle = deviationFan ? deviationFan.zone.label : scenarioLabel[snap.scenario];
+  const heroChip = deviationFan ? "CONTROL ROOM" : scenarioShort[snap.scenario];
 
   return (
     <Card
@@ -89,7 +104,7 @@ export function SPXChannelHero({
         <div className="col-span-12 lg:col-span-5 p-5 sm:p-7 lg:pr-6 lg:pl-8 relative">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="eyebrow text-ink-3">ES - Pivot Fan</span>
+              <span className="eyebrow text-ink-3">ES Control Room</span>
               {/* v9: slope value hidden - proprietary engine
                   parameter, not for surface display. */}
               <span className="text-[10px] text-ink-4 font-mono">
@@ -106,21 +121,21 @@ export function SPXChannelHero({
             <DirectionGlyph direction={snap.channel.direction} tone={directionTone} />
             <AnimatePresence mode="wait">
               <motion.h1
-                key={snap.scenario}
+                key={heroTitle}
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -12 }}
                 transition={{ duration: 0.32, ease: [0.2, 0.8, 0.2, 1] }}
                 className={`text-display font-serif tracking-tight ${directionTone} leading-[1.02]`}
               >
-                {scenarioLabel[snap.scenario]}
+                {heroTitle}
               </motion.h1>
             </AnimatePresence>
           </div>
 
           <div className="mt-3 inline-flex items-center gap-2 px-2 py-0.5 rounded-pill bg-paper-2 shadow-rule">
             <span className="font-mono text-[10px] tracking-[0.14em] text-ink-2 font-semibold">
-              {scenarioShort[snap.scenario]}
+              {heroChip}
             </span>
           </div>
 
@@ -160,14 +175,16 @@ export function SPXChannelHero({
               pivot context as a leader sentence. The previous
               version stacked two italic blocks which read as sentimental. */}
           <p className="mt-7 text-[15px] text-ink-2 leading-relaxed max-w-xl">
-            {snap.fanRead?.summary ?? snap.scenarioExplanation}
-            <span className="text-ink-3 ml-1.5">{snap.channel.reason}</span>
+            {deviationFan
+              ? `The Control Line is projected from the prior RTH high anchor into the entry read, then the ${deviationFan.spacing.toFixed(0)}-point gates define the working edges. Direction comes from opening position and confirmed touch-and-close behavior.`
+              : snap.fanRead?.summary ?? snap.scenarioExplanation}
+            {!deviationFan && <span className="text-ink-3 ml-1.5">{snap.channel.reason}</span>}
           </p>
-          {snap.rthBias && (
+          {(deviationFan || snap.rthBias) && (
             <div className="mt-4 rounded-[12px] border border-rule bg-paper-2/65 px-3 py-3">
               <div className="eyebrow text-ink-3">RTH posture</div>
               <p className="mt-1 text-[13px] leading-relaxed text-ink-2">
-                {snap.rthBias.note}
+                {deviationFan?.openBias.note ?? snap.rthBias?.note}
               </p>
             </div>
           )}
@@ -180,9 +197,9 @@ export function SPXChannelHero({
         <div className="col-span-12 lg:col-span-7 p-5 sm:p-7 lg:pl-7 bg-paper-2/40 relative">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <span className="eyebrow text-ink-3">Fan read</span>
+            <span className="eyebrow text-ink-3">Control Room read</span>
               <div className="mt-1.5 text-title font-serif text-ink">
-                {snap.fanRead?.label ?? (snap.channel.direction === "NONE" ? "Resolving" : "Mapped")}
+                {deviationFan?.zone.label ?? snap.fanRead?.label ?? (snap.channel.direction === "NONE" ? "Resolving" : "Mapped")}
               </div>
             </div>
             <div className="text-right">
@@ -207,22 +224,22 @@ export function SPXChannelHero({
           {/* 3-stat band - gives the right rail visual gravity */}
           <div className="grid grid-cols-3 gap-2 mb-4">
             <RailStat
-              label="Major range"
-              value={activeGap !== null ? `${activeGap.toFixed(2)}` : "-"}
+              label="Zone width"
+              value={zoneWidth !== null ? `${zoneWidth.toFixed(2)}` : activeGap !== null ? `${activeGap.toFixed(2)}` : "-"}
               suffix="pts"
             />
             <RailStat
-              label="To major"
-              value={distToUpper !== null ? distToUpper.toFixed(2) : "-"}
+              label="To ceiling"
+              value={distanceToZoneCeiling !== null ? distanceToZoneCeiling.toFixed(2) : distToUpper !== null ? distToUpper.toFixed(2) : "-"}
               tone={
-                distToUpper !== null && distToUpper >= 0 ? "bear" : "bull"
+                (distanceToZoneCeiling ?? distToUpper) !== null && (distanceToZoneCeiling ?? distToUpper)! >= 0 ? "bear" : "bull"
               }
               suffix="pts"
             />
             <RailStat
-              label="To low ref"
-              value={distToLower !== null ? distToLower.toFixed(2) : "-"}
-              tone={distToLower !== null && distToLower >= 0 ? "bull" : "bear"}
+              label="To floor"
+              value={distanceToZoneFloor !== null ? distanceToZoneFloor.toFixed(2) : distToLower !== null ? distToLower.toFixed(2) : "-"}
+              tone={(distanceToZoneFloor ?? distToLower) !== null && (distanceToZoneFloor ?? distToLower)! >= 0 ? "bull" : "bear"}
               suffix="pts"
             />
           </div>
@@ -304,7 +321,7 @@ function RailStat({
       </div>
       {isBlank && (
         <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.08em] text-ink-4">
-          Why blank?
+          Pending
         </div>
       )}
     </div>
@@ -351,6 +368,7 @@ function FanDiagram({
   bars: Array<{ t: string; h: number; l: number; c: number }> | null;
 }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [selectedDeviationHour, setSelectedDeviationHour] = useState(9);
   const W = 760;
   const H = 460;
   const PAD_L = 54;
@@ -380,9 +398,12 @@ function FanDiagram({
     ? new Date(cleanBars[0].t).getTime()
     : new Date(snap.overnight.window.start).getTime();
   const tNow = new Date(snap.asOf).getTime();
-  const tEnd = cleanBars.at(-1)?.t
+  const baseEnd = cleanBars.at(-1)?.t
     ? new Date(cleanBars.at(-1)!.t).getTime()
     : tNow + 60 * 60 * 1000;
+  const deviationFan = snap.descendingDeviationFan ?? null;
+  const deviationEnd = deviationFan ? Date.parse(deviationFan.extensionEnd) : Number.NaN;
+  const tEnd = Number.isFinite(deviationEnd) ? Math.max(baseEnd, deviationEnd) : baseEnd;
 
   const ceiling =
     snap.lines.find((l) => l.kind === "PREV_RTH_HIGH_DESC") ??
@@ -391,9 +412,32 @@ function FanDiagram({
     snap.lines.find((l) => l.kind === "PREV_RTH_LOW_DESC") ??
     snap.lines.find((l) => l.kind === "SWING_LOW_ASC");
 
+  const deviationOverlayLines = deviationFan
+    ? deviationFan.lines
+        .slice()
+        .sort((a, b) => Math.abs(a.distanceFromPrice) - Math.abs(b.distanceFromPrice))
+        .slice(0, 7)
+        .sort((a, b) => b.currentValue - a.currentValue)
+    : [];
+  const deviationValueAtHour = (
+    line: (typeof deviationOverlayLines)[number],
+    hour: number,
+  ) => line.value + (deviationFan?.slopePerHour ?? -1.00) * (hour - 9);
+
   const yPoints: number[] = [snap.price.last];
   for (const bar of cleanBars) yPoints.push(bar.h, bar.l, bar.c);
-  for (const line of snap.lines) yPoints.push(entryLineValue(line), line.currentValue, line.anchorPrice);
+  if (!deviationFan) {
+    for (const line of snap.lines) yPoints.push(entryLineValue(line), line.currentValue, line.anchorPrice);
+  }
+  for (const line of deviationOverlayLines) {
+    yPoints.push(
+      deviationValueAtHour(line, 8),
+      line.value,
+      deviationValueAtHour(line, selectedDeviationHour),
+      deviationValueAtHour(line, 14),
+    );
+  }
+  if (deviationFan) yPoints.push(deviationFan.anchor.price);
   let yMin = Math.min(...yPoints);
   let yMax = Math.max(...yPoints);
   const pad = (yMax - yMin) * 0.12 || 4;
@@ -468,13 +512,15 @@ function FanDiagram({
   const selectedX = Math.max(PAD_L, Math.min(W - PAD_R, xOf(selectedMs)));
   const selectedPrice = selected?.c ?? snap.price.last;
   const selectedY = yOf(selectedPrice);
-  const selectedLine = snap.lines
-    .slice()
-    .sort(
-      (a, b) =>
-        Math.abs(projectAt(a.anchorPrice, a.anchorTime, a.slopePerHour, selectedMs) - selectedPrice) -
-        Math.abs(projectAt(b.anchorPrice, b.anchorTime, b.slopePerHour, selectedMs) - selectedPrice),
-    )[0];
+  const selectedLine = deviationFan
+    ? null
+    : snap.lines
+        .slice()
+        .sort(
+          (a, b) =>
+            Math.abs(projectAt(a.anchorPrice, a.anchorTime, a.slopePerHour, selectedMs) - selectedPrice) -
+            Math.abs(projectAt(b.anchorPrice, b.anchorTime, b.slopePerHour, selectedMs) - selectedPrice),
+        )[0];
   const selectedLineValue = selectedLine
     ? projectAt(selectedLine.anchorPrice, selectedLine.anchorTime, selectedLine.slopePerHour, selectedMs)
     : null;
@@ -483,6 +529,58 @@ function FanDiagram({
 
   const rthOpen = new Date(snap.sessionDateCT + "T08:30:00-05:00").getTime();
   const xRTH = xOf(rthOpen);
+  const deviationWindow =
+    deviationFan &&
+    Number.isFinite(Date.parse(deviationFan.windowStart)) &&
+    Number.isFinite(Date.parse(deviationFan.windowEnd)) &&
+    Number.isFinite(Date.parse(deviationFan.extensionEnd))
+      ? {
+          start: Date.parse(deviationFan.windowStart),
+          entry: Date.parse(deviationFan.entryReferenceTime),
+          primaryEnd: Date.parse(deviationFan.windowEnd),
+          extensionEnd: Date.parse(deviationFan.extensionEnd),
+        }
+      : null;
+  const deviationHours = deviationWindow ? [8, 9, 10, 11, 12, 13, 14] : [];
+  const selectedDeviationTime = deviationWindow
+    ? deviationWindow.entry + (selectedDeviationHour - 9) * 3_600_000
+    : null;
+  const selectedDeviationPriceRead = deviationHourPrice(
+    selectedDeviationHour,
+    snap.sessionDateCT,
+    deviationFan,
+    cleanBars,
+  );
+  const selectedDeviationPrice = selectedDeviationPriceRead?.value ?? snap.price.last;
+  const selectedDeviationX =
+    selectedDeviationTime !== null
+      ? Math.max(PAD_L, Math.min(W - PAD_R, xOf(selectedDeviationTime)))
+      : null;
+  const deviationLensLines = deviationOverlayLines
+    .map((line) => {
+      const selectedValue = deviationValueAtHour(line, selectedDeviationHour);
+      return {
+        ...line,
+        selectedValue,
+        selectedDistance: selectedValue - selectedDeviationPrice,
+      };
+    })
+    .sort((a, b) => b.selectedValue - a.selectedValue);
+  const deviationLensNearest = deviationLensLines
+    .slice()
+    .sort((a, b) => Math.abs(a.selectedDistance) - Math.abs(b.selectedDistance))
+    .slice(0, 3);
+  const selectedDeviationZone = describeDeviationLensZone(
+    deviationLensLines,
+    selectedDeviationPrice,
+  );
+  const activeZoneLower = deviationFan?.zone.lowerLine
+    ? deviationOverlayLines.find((line) => line.label === deviationFan.zone.lowerLine) ?? null
+    : null;
+  const activeZoneUpper = deviationFan?.zone.upperLine
+    ? deviationOverlayLines.find((line) => line.label === deviationFan.zone.upperLine) ?? null
+    : null;
+  const selectedDeviationWindowLabel = deviationHourWindowLabel(selectedDeviationHour);
   const lineLabels = distributeEsChartLabels(
     snap.lines.map((line) => {
       const endValue = projectAt(line.anchorPrice, line.anchorTime, line.slopePerHour, tEnd);
@@ -498,23 +596,33 @@ function FanDiagram({
     PAD_T + 16,
     H - PAD_B - 16,
   );
+  const currentPriceLabelY = avoidEsPriceLabelY(
+    yPrice - 14,
+    [
+      ...lineLabels.map((label) => label.labelY - 12),
+      ...deviationLensNearest.map((line) => yOf(line.selectedValue) - 10),
+    ],
+    PAD_T + 2,
+    H - PAD_B - 24,
+  );
 
   return (
-    <svg
-      viewBox={`0 0 ${W} ${H}`}
-      className="w-full spx-diagram"
-      tabIndex={0}
-      role="img"
-      aria-label="ES Pivot Fan chart with interactive price crosshair"
-      onPointerMove={(event) => {
-        setActiveIndex(nearestEsBarIndexFromPointer(event, cleanBars, W, PAD_L, W - PAD_R, xOf));
-      }}
-      onPointerLeave={() => setActiveIndex(null)}
-      onFocus={() => setActiveIndex((value) => value ?? Math.max(0, cleanBars.length - 1))}
-      onKeyDown={(event) => {
-        setActiveIndex((value) => stepEsIndex(event, value ?? Math.max(0, cleanBars.length - 1), cleanBars.length));
-      }}
-    >
+    <div>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full spx-diagram"
+        tabIndex={0}
+        role="img"
+        aria-label="ES Control Room chart showing the session Control Line, gate map, and current price"
+        onPointerMove={(event) => {
+          setActiveIndex(nearestEsBarIndexFromPointer(event, cleanBars, W, PAD_L, W - PAD_R, xOf));
+        }}
+        onPointerLeave={() => setActiveIndex(null)}
+        onFocus={() => setActiveIndex((value) => value ?? Math.max(0, cleanBars.length - 1))}
+        onKeyDown={(event) => {
+          setActiveIndex((value) => stepEsIndex(event, value ?? Math.max(0, cleanBars.length - 1), cleanBars.length));
+        }}
+      >
       <style>{spxDiagramStyles}</style>
       {/* horizontal price gridlines */}
       {[0.25, 0.5, 0.75].map((f) => {
@@ -604,14 +712,290 @@ function FanDiagram({
             fill="#5A5A5A"
             letterSpacing="0.08em"
           >
-            PIVOT FAN AWAITS RTH PIVOTS
+            CONTROL MAP AWAITS RTH ANCHOR
           </text>
         </g>
       )}
-      {bandPath && <path d={bandPath} fill={railFill} className="spx-band" />}
+      {!deviationFan && bandPath && <path d={bandPath} fill={railFill} className="spx-band" />}
+
+      {/* ES gate map: sloped levels with a selectable hour lens. */}
+      {deviationWindow && (
+        <g className="spx-deviation-ladder" aria-label="ES Control Map gates">
+          <rect
+            x={Math.max(PAD_L, xOf(deviationWindow.start))}
+            y={PAD_T}
+            width={Math.max(0, Math.min(W - PAD_R, xOf(deviationWindow.primaryEnd)) - Math.max(PAD_L, xOf(deviationWindow.start)))}
+            height={H - PAD_T - PAD_B}
+            fill="rgba(184,134,11,0.035)"
+          />
+          <rect
+            x={Math.max(PAD_L, xOf(deviationWindow.primaryEnd))}
+            y={PAD_T}
+            width={Math.max(0, Math.min(W - PAD_R, xOf(deviationWindow.extensionEnd)) - Math.max(PAD_L, xOf(deviationWindow.primaryEnd)))}
+            height={H - PAD_T - PAD_B}
+            fill="rgba(184,134,11,0.018)"
+          />
+          {activeZoneLower && activeZoneUpper && (
+            <motion.path
+              d={[
+                `M ${Math.max(PAD_L, xOf(deviationWindow.start))},${yOf(deviationValueAtHour(activeZoneUpper, 8))}`,
+                `L ${Math.min(W - PAD_R, xOf(deviationWindow.extensionEnd))},${yOf(deviationValueAtHour(activeZoneUpper, 14))}`,
+                `L ${Math.min(W - PAD_R, xOf(deviationWindow.extensionEnd))},${yOf(deviationValueAtHour(activeZoneLower, 14))}`,
+                `L ${Math.max(PAD_L, xOf(deviationWindow.start))},${yOf(deviationValueAtHour(activeZoneLower, 8))}`,
+                "Z",
+              ].join(" ")}
+              fill="rgba(184,130,31,0.105)"
+              stroke="#B8860B"
+              strokeOpacity={0.18}
+              strokeWidth={0.8}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.36 }}
+            />
+          )}
+          <g aria-label="Control Room entry marker">
+            <line
+              x1={xOf(deviationWindow.entry)}
+              y1={PAD_T}
+              x2={xOf(deviationWindow.entry)}
+              y2={H - PAD_B}
+              stroke="#14161A"
+              strokeWidth={0.9}
+              strokeDasharray="5 4"
+              opacity={0.44}
+            />
+            <rect
+              x={Math.max(PAD_L + 4, Math.min(W - PAD_R - 98, xOf(deviationWindow.entry) - 48))}
+              y={PAD_T + 30}
+              width="96"
+              height="18"
+              rx="7"
+              fill="#FFFDF7"
+              stroke="#14161A"
+              strokeOpacity={0.16}
+            />
+            <text
+              x={Math.max(PAD_L + 52, Math.min(W - PAD_R - 50, xOf(deviationWindow.entry)))}
+              y={PAD_T + 42.5}
+              fontSize="7.5"
+              fontFamily="var(--font-geist-mono)"
+              fontWeight="800"
+              fill="#14161A"
+              textAnchor="middle"
+              letterSpacing="0.06em"
+            >
+              CONTROL ROOM
+            </text>
+          </g>
+          {deviationOverlayLines.map((line) => {
+            const color = line.isMain ? "#14161A" : "#B8860B";
+            const strokeWidth = line.isMain ? 2.15 : 1.25;
+            const anchorMs = deviationFan ? Date.parse(deviationFan.anchor.time) : Number.NaN;
+            const startsAtAnchor = line.isMain && Number.isFinite(anchorMs);
+            const xStart = startsAtAnchor
+              ? Math.max(PAD_L, xOf(anchorMs))
+              : Math.max(PAD_L, xOf(deviationWindow.start));
+            const xPrimaryEnd = Math.min(W - PAD_R, xOf(deviationWindow.primaryEnd));
+            const xExtensionEnd = Math.min(W - PAD_R, xOf(deviationWindow.extensionEnd));
+            const yStart = startsAtAnchor && deviationFan
+              ? yOf(deviationFan.anchor.price)
+              : yOf(deviationValueAtHour(line, 8));
+            const yPrimaryEnd = yOf(deviationValueAtHour(line, 12));
+            const yExtensionEnd = yOf(deviationValueAtHour(line, 14));
+            return (
+              <g key={`dev-${line.index}`}>
+                {startsAtAnchor && deviationFan && (
+                  <g className="spx-anchor">
+                    <circle
+                      cx={xStart}
+                      cy={yStart}
+                      r={9}
+                      fill={color}
+                      opacity={0}
+                      className="spx-anchor-pulse"
+                    />
+                    <circle
+                      cx={xStart}
+                      cy={yStart}
+                      r={3.8}
+                      fill="#FFFDF7"
+                      stroke={color}
+                      strokeWidth={1.5}
+                    />
+                  </g>
+                )}
+                <line
+                  x1={xStart}
+                  x2={xPrimaryEnd}
+                  y1={yStart}
+                  y2={yPrimaryEnd}
+                  stroke={color}
+                  strokeWidth={strokeWidth}
+                  opacity={line.isMain ? 0.92 : 0.64}
+                  className="spx-ref-line"
+                />
+                <line
+                  x1={xPrimaryEnd}
+                  x2={xExtensionEnd}
+                  y1={yPrimaryEnd}
+                  y2={yExtensionEnd}
+                  stroke={color}
+                  strokeWidth={strokeWidth}
+                  strokeDasharray="3 5"
+                  opacity={line.isMain ? 0.58 : 0.38}
+                />
+              </g>
+            );
+          })}
+          {selectedDeviationX !== null && (
+            <motion.g
+              key={`lens-${selectedDeviationHour}`}
+              initial={{ opacity: 0.64 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.28, ease: [0.2, 0.8, 0.2, 1] }}
+            >
+              <motion.line
+                x1={selectedDeviationX}
+                y1={PAD_T}
+                x2={selectedDeviationX}
+                y2={H - PAD_B}
+                stroke="#B8860B"
+                strokeWidth={1.1}
+                strokeDasharray="4 4"
+                opacity={0.86}
+                initial={false}
+                animate={{ x1: selectedDeviationX, x2: selectedDeviationX }}
+                transition={{ duration: 0.46, ease: [0.2, 0.8, 0.2, 1] }}
+              />
+              <rect
+                x={Math.max(PAD_L + 4, Math.min(W - PAD_R - 58, selectedDeviationX - 27))}
+                y={PAD_T + 8}
+                width="54"
+                height="18"
+                rx="7"
+                fill="#14161A"
+              />
+              <text
+                x={Math.max(PAD_L + 31, Math.min(W - PAD_R - 31, selectedDeviationX))}
+                y={PAD_T + 20.5}
+                fontSize="8"
+                fontFamily="var(--font-geist-mono)"
+                fontWeight="800"
+                fill="#FFFDF7"
+                textAnchor="middle"
+              >
+                {formatHourLabel(selectedDeviationHour)}
+              </text>
+              {deviationLensNearest.map((line, index) => {
+                const y = yOf(line.selectedValue);
+                const color = line.isMain ? "#14161A" : "#B8860B";
+                const labelX = Math.min(W - PAD_R - 5, selectedDeviationX + 12 + index * 9);
+                return (
+                  <motion.g
+                    key={`dev-lens-${line.index}`}
+                    initial={{ opacity: 0, scale: 0.72 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.32, delay: index * 0.04 }}
+                  >
+                    <circle
+                      cx={selectedDeviationX}
+                      cy={y}
+                      r={line.isMain ? 8.5 : 7}
+                      fill={color}
+                      opacity={0.08}
+                    />
+                    <circle
+                      cx={selectedDeviationX}
+                      cy={y}
+                      r={line.isMain ? 4.1 : 3.5}
+                      fill="#FFFDF7"
+                      stroke={color}
+                      strokeWidth={1.4}
+                    />
+                    <path
+                      d={`M ${selectedDeviationX + 5},${y} L ${labelX},${y}`}
+                      stroke={color}
+                      strokeOpacity={0.38}
+                      strokeWidth={0.7}
+                    />
+                    <rect
+                      x={labelX}
+                      y={y - 10}
+                      width="74"
+                      height="20"
+                      rx="6"
+                      fill="#FFFDF7"
+                      stroke={color}
+                      strokeOpacity={0.24}
+                    />
+                    <text
+                      x={labelX + 7}
+                      y={y + 3}
+                      fontSize="7.6"
+                      fontFamily="var(--font-geist-mono)"
+                      fontWeight="800"
+                      fill={color}
+                    >
+                      {line.label} {line.selectedValue.toFixed(0)}
+                    </text>
+                  </motion.g>
+                );
+              })}
+              <text
+                x={Math.max(PAD_L + 6, Math.min(W - PAD_R - 72, selectedDeviationX + 4))}
+                y={H - PAD_B - 6}
+                fontSize="7.5"
+                fontFamily="var(--font-geist-mono)"
+                fontWeight="800"
+                fill="#8A6117"
+                letterSpacing="0.08em"
+              >
+                {selectedDeviationWindowLabel.toUpperCase()}
+              </text>
+            </motion.g>
+          )}
+          {deviationFan && (
+            <g aria-label="Opening bias read">
+              <rect
+                x={PAD_L + 8}
+                y={PAD_T + 8}
+                width="176"
+                height="28"
+                rx="8"
+                fill="#FFFDF7"
+                stroke={deviationFan.openBias.direction === "BULLISH" ? "#0E7C50" : deviationFan.openBias.direction === "BEARISH" ? "#B5301E" : "#B8860B"}
+                strokeOpacity={0.26}
+              />
+              <text
+                x={PAD_L + 18}
+                y={PAD_T + 20}
+                fontSize="7"
+                fontFamily="var(--font-geist-mono)"
+                fontWeight="800"
+                fill="#5A5A5A"
+                letterSpacing="0.08em"
+              >
+                OPEN BIAS
+              </text>
+              <text
+                x={PAD_L + 18}
+                y={PAD_T + 31}
+                fontSize="9"
+                fontFamily="var(--font-geist-mono)"
+                fontWeight="800"
+                fill={deviationFan.openBias.direction === "BULLISH" ? "#0E7C50" : deviationFan.openBias.direction === "BEARISH" ? "#B5301E" : "#8A6117"}
+              >
+                {deviationFan.openBias.direction === "PENDING"
+                  ? "WAITING FOR 8:30 OPEN"
+                  : `${deviationFan.openBias.direction} UNTIL MAIN FLIP`}
+              </text>
+            </g>
+          )}
+        </g>
+      )}
 
       {/* ES Pivot Fan lines with exact projected values */}
-      {snap.lines.map((line, index) => {
+      {!deviationFan && snap.lines.map((line, index) => {
         const start = new Date(line.anchorTime).getTime();
         const endValue = projectAt(line.anchorPrice, line.anchorTime, line.slopePerHour, tEnd);
         const entryValue = entryLineValue(line);
@@ -755,7 +1139,7 @@ function FanDiagram({
       )}
 
       {/* anchor dots */}
-      {ceiling && snap.channel.direction !== "NONE" && (
+      {!deviationFan && ceiling && snap.channel.direction !== "NONE" && (
         <g className="spx-anchor">
           <circle
             cx={xOf(new Date(ceiling.anchorTime).getTime())}
@@ -775,7 +1159,7 @@ function FanDiagram({
           />
         </g>
       )}
-      {floor && snap.channel.direction !== "NONE" && (
+      {!deviationFan && floor && snap.channel.direction !== "NONE" && (
         <g className="spx-anchor spx-anchor-delayed">
           <circle
             cx={xOf(new Date(floor.anchorTime).getTime())}
@@ -813,7 +1197,7 @@ function FanDiagram({
         <circle cx={xNow} cy={yPrice} r={8} fill="#14161A" opacity={0.12} className="spx-price-halo" />
         <rect
           x={Math.min(W - PAD_R - 96, xNow + 8)}
-          y={Math.max(PAD_T + 2, yPrice - 14)}
+          y={currentPriceLabelY}
           width="88"
           height="22"
           rx="6"
@@ -822,7 +1206,7 @@ function FanDiagram({
         />
         <text
           x={Math.min(W - PAD_R - 52, xNow + 52)}
-          y={Math.max(PAD_T + 17, yPrice + 1)}
+          y={currentPriceLabelY + 15}
           fontSize="9.5"
           fontFamily="var(--font-geist-mono)"
           fill="#14161A"
@@ -832,7 +1216,92 @@ function FanDiagram({
         </text>
       </g>
 
-    </svg>
+      </svg>
+
+      {deviationWindow && (
+        <div className="mt-3 rounded-[10px] border border-rule bg-paper/82 px-3 py-3 shadow-rule">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="eyebrow text-ink-3">Control Room time lens</div>
+              <div className="mt-1 font-serif text-[18px] leading-tight text-ink">
+                {selectedDeviationZone.label}
+              </div>
+            </div>
+            <div className="rounded-[8px] border border-rule bg-paper-2 px-2.5 py-1.5 text-right">
+              <div className="font-mono text-[10px] uppercase text-ink-3">
+                {selectedDeviationWindowLabel}
+              </div>
+              <div className="font-mono text-[13px] font-semibold tabular-nums text-ink">
+                {formatHourLabel(selectedDeviationHour)}
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-4 gap-1 sm:grid-cols-7">
+            {deviationHours.map((hour) => {
+              const active = hour === selectedDeviationHour;
+              return (
+                <button
+                  key={hour}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setSelectedDeviationHour(hour)}
+                  className={`h-8 rounded-[8px] border px-1 font-mono text-[10px] font-semibold tabular-nums transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/30 ${
+                    active
+                      ? "border-gold bg-ink text-paper shadow-glow"
+                      : "border-rule bg-paper-2 text-ink-2 hover:border-gold/60 hover:bg-gold-tint"
+                  }`}
+                >
+                  {formatHourLabel(hour)}
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-4">
+            <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-[8px] border border-gold/35 bg-gold-tint/70 px-2.5 py-2">
+              <span className="h-5 w-1 rounded-full bg-gold" aria-hidden />
+              <div>
+                <div className="font-mono text-[10px] font-semibold uppercase text-ink">
+                  ES close
+                </div>
+                <div className="font-mono text-[12px] tabular-nums text-ink-2">
+                  {selectedDeviationPrice.toFixed(2)}
+                </div>
+              </div>
+              <div className="font-mono text-[10px] uppercase text-gold-ink">
+                {selectedDeviationPriceRead?.label ?? "Latest"}
+              </div>
+            </div>
+            {deviationLensNearest.map((line) => (
+              <div
+                key={`read-${line.index}`}
+                className="grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-[8px] border border-rule bg-paper-2/55 px-2.5 py-2"
+              >
+                <span
+                  className={`h-5 w-1 rounded-full ${line.isMain ? "bg-ink" : "bg-gold/70"}`}
+                  aria-hidden
+                />
+                <div>
+                  <div className="font-mono text-[10px] font-semibold uppercase text-ink">
+                    {line.label}
+                  </div>
+                  <div className="font-mono text-[12px] tabular-nums text-ink-2">
+                    {line.selectedValue.toFixed(2)}
+                  </div>
+                </div>
+                <div
+                  className={`font-mono text-[11px] tabular-nums ${
+                    line.selectedDistance >= 0 ? "text-bull-ink" : "text-bear-ink"
+                  }`}
+                >
+                  {line.selectedDistance >= 0 ? "+" : ""}
+                  {line.selectedDistance.toFixed(2)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -872,6 +1341,99 @@ function stepEsIndex(
   if (event.key === "End") return Math.max(0, length - 1);
   const delta = event.key === "ArrowLeft" ? -1 : 1;
   return Math.max(0, Math.min(length - 1, current + delta));
+}
+
+type DeviationLensReadableLine = {
+  label: string;
+  selectedValue: number;
+  selectedDistance: number;
+  isMain: boolean;
+};
+
+function describeDeviationLensZone(
+  lines: DeviationLensReadableLine[],
+  price: number,
+): { label: string } {
+  const ordered = lines
+    .filter((line) => Number.isFinite(line.selectedValue))
+    .slice()
+    .sort((a, b) => a.selectedValue - b.selectedValue);
+  if (ordered.length === 0) return { label: "Deviation zone unavailable" };
+
+  let lower: DeviationLensReadableLine | null = null;
+  let upper: DeviationLensReadableLine | null = null;
+  for (const line of ordered) {
+    if (line.selectedValue <= price) lower = line;
+    if (line.selectedValue > price && upper === null) upper = line;
+  }
+
+  if (lower && upper) return { label: `Between ${lower.label} and ${upper.label}` };
+  if (upper) return { label: `Below ${upper.label}` };
+  if (lower) return { label: `Above ${lower.label}` };
+  return { label: "Deviation zone unavailable" };
+}
+
+function deviationHourWindowLabel(hour: number): string {
+  if (hour < 9) return "Setup read";
+  if (hour < 12) return "Primary window";
+  if (hour < 14) return "Extension window";
+  return "Extension close";
+}
+
+function formatHourLabel(hour: number): string {
+  return `${String(hour).padStart(2, "0")}:00`;
+}
+
+function deviationHourPrice(
+  hour: number,
+  sessionDateCT: string,
+  fan: SPXSnapshot["descendingDeviationFan"] | null,
+  bars: Array<{ t: string; c: number }>,
+): { value: number; label: string } | null {
+  const engineClose = fan?.hourlyCloses?.find(
+    (item) => item.hour === hour && Number.isFinite(item.close),
+  );
+  if (engineClose) {
+    return { value: engineClose.close, label: "Close" };
+  }
+
+  const bar = bars
+    .filter(
+      (item) =>
+        Number.isFinite(item.c) &&
+        ctDateKey(item.t) === sessionDateCT &&
+        ctHour(item.t) === hour,
+    )
+    .at(-1);
+  if (bar) {
+    return { value: bar.c, label: "Bar" };
+  }
+
+  return null;
+}
+
+function ctHour(iso: string): number | null {
+  const value = Number(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Chicago",
+      hour: "2-digit",
+      hour12: false,
+    }).format(new Date(iso)),
+  );
+  return Number.isFinite(value) ? value : null;
+}
+
+function ctDateKey(iso: string): string | null {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(iso));
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  return year && month && day ? `${year}-${month}-${day}` : null;
 }
 
 function formatChartTime(iso: string): string {
@@ -926,6 +1488,29 @@ function distributeEsChartLabels(
     ...label,
     labelY: Math.max(minY, Math.min(maxY, label.labelY)),
   }));
+}
+
+function avoidEsPriceLabelY(
+  preferredY: number,
+  occupiedY: number[],
+  minY: number,
+  maxY: number,
+): number {
+  const labelHeight = 22;
+  const gap = 6;
+  const collides = (candidate: number) =>
+    occupiedY.some((y) => Math.abs(candidate - y) < labelHeight + gap);
+  const clamped = Math.max(minY, Math.min(maxY, preferredY));
+  if (!collides(clamped)) return clamped;
+
+  for (let step = 1; step <= 8; step += 1) {
+    const down = Math.min(maxY, clamped + step * (labelHeight + gap));
+    if (!collides(down)) return down;
+    const up = Math.max(minY, clamped - step * (labelHeight + gap));
+    if (!collides(up)) return up;
+  }
+
+  return clamped < (minY + maxY) / 2 ? maxY : minY;
 }
 
 function lineCode(kind: string): string {

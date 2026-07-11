@@ -12,7 +12,7 @@ import type {
   ScenarioInput,
 } from "@/lib/contracts/foresight";
 import type { DynamicLine } from "@/lib/types";
-import type { SPXLine, SPXSnapshot } from "@/lib/types";
+import type { SPXSnapshot } from "@/lib/types";
 import {
   currentPrice as mockCurrentPrice,
   lines as mockLines,
@@ -96,8 +96,7 @@ export function buildEsForesightSnapshot({
   const sessionId = snap.sessionDateCT || toCtSessionId(new Date(generatedAt));
   const projectionId = `proj_es_${sessionId.replaceAll("-", "")}_${hashSeed(generatedAt)}`;
   const hours = buildHourBuckets(new Date(generatedAt), sessionId);
-  const rawLines = selectEsForesightLines(snap.lines);
-  const lines = rawLines.map(toEsProjectionLine).slice(0, 6);
+  const lines = esControlPlanForesightLines(snap, generatedAt);
   const last = snap.price.last;
   const status = resolveStatus({ mock, source, lineCount: lines.length, generatedAt });
   const adjustedLines = activeScenarios.length
@@ -229,52 +228,37 @@ function selectSpyForesightLines(lines: DynamicLine[], mock: string | null | und
   return out.slice(0, 6);
 }
 
-function selectEsForesightLines(lines: SPXLine[]): SPXLine[] {
-  const order = [
-    "PREV_RTH_HIGH_ASC",
-    "PREV_RTH_HIGH_DESC",
-    "PREV_RTH_LOW_ASC",
-    "PREV_RTH_LOW_DESC",
-  ];
-  return order
-    .map((kind) => lines.find((line) => line.kind === kind))
-    .filter((line): line is SPXLine => Boolean(line));
-}
-
-function toEsProjectionLine(line: SPXLine): ProjectionLine {
-  const codeByKind: Record<string, LineCode> = {
-    PREV_RTH_HIGH_ASC: "UR",
-    PREV_RTH_HIGH_DESC: "UD",
-    PREV_RTH_LOW_ASC: "LA",
-    PREV_RTH_LOW_DESC: "LR",
-    SWING_HIGH_ASC: "UA",
-    SWING_HIGH_DESC: "UD",
-    SWING_LOW_ASC: "LA",
-    SWING_LOW_DESC: "LD",
-  };
-  return {
-    id: stableId(line.kind, 0),
-    code: codeByKind[line.kind] ?? "MR",
-    type: line.slopePerHour === 0 ? "horizontal" : line.slopePerHour > 0 ? "ascending" : "descending",
-    label: esLineLabel(line.kind),
-    sourceName: line.name || line.kind,
-    slopePerHour: Number.isFinite(line.slopePerHour) ? line.slopePerHour : 0,
-    currentValue: Number.isFinite(line.currentValue) ? line.currentValue : line.anchorPrice,
-  };
-}
-
-function esLineLabel(kind: string): string {
-  const labels: Record<string, string> = {
-    PREV_RTH_HIGH_ASC: "Previous RTH high ascending",
-    PREV_RTH_HIGH_DESC: "Previous RTH high descending",
-    PREV_RTH_LOW_ASC: "Previous RTH low ascending",
-    PREV_RTH_LOW_DESC: "Previous RTH low descending",
-    SWING_HIGH_ASC: "Overnight higher pivot ascending",
-    SWING_HIGH_DESC: "Swing high descending",
-    SWING_LOW_ASC: "Swing low ascending",
-    SWING_LOW_DESC: "Swing low descending",
-  };
-  return labels[kind] ?? kind.replaceAll("_", " ").toLowerCase();
+function esControlPlanForesightLines(snap: SPXSnapshot, generatedAt: string): ProjectionLine[] {
+  const plan = snap.controlTradePlan;
+  if (!plan) return [];
+  const map =
+    plan.activeTrade?.mapId === plan.oppositeMap.id ||
+    plan.setups[0]?.mapId === plan.oppositeMap.id
+      ? plan.oppositeMap
+      : plan.primaryMap.status === "ARMED"
+        ? plan.primaryMap
+        : plan.oppositeMap;
+  const anchorMs = Date.parse(map.anchor.time);
+  const generatedMs = Date.parse(generatedAt);
+  const slope = Number.isFinite(map.slopePerHour) ? map.slopePerHour : 0;
+  const base =
+    Number.isFinite(anchorMs) && Number.isFinite(generatedMs)
+      ? map.anchor.price + slope * ((generatedMs - anchorMs) / 3_600_000)
+      : map.controlValue;
+  const type: LineType = slope > 0 ? "ascending" : slope < 0 ? "descending" : "horizontal";
+  return [
+    { code: "UR" as LineCode, label: "Half-Gate +", sourceName: "ES Control Plan", offset: plan.targetDistance },
+    { code: "MR" as LineCode, label: "Control Line", sourceName: map.label, offset: 0 },
+    { code: "LR" as LineCode, label: "Half-Gate -", sourceName: "ES Control Plan", offset: -plan.targetDistance },
+  ].map((line, index) => ({
+    id: stableId(`ES_CONTROL_${line.code}`, index),
+    code: line.code,
+    type,
+    label: line.label,
+    sourceName: line.sourceName,
+    slopePerHour: slope,
+    currentValue: base + line.offset,
+  }));
 }
 
 function projectedValue(line: ProjectionLine, generatedAt: string, at: string) {

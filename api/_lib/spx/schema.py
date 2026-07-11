@@ -45,7 +45,13 @@ SPXFanZone = Literal[
     "BELOW_HIGH_FLOOR",
     "PENDING",
 ]
-SPXRthBiasDirection = Literal["BULLISH", "BEARISH", "PENDING"]
+SPXRthBiasDirection = Literal["BULLISH", "BEARISH", "NEUTRAL", "PENDING"]
+SPXDeviationBiasDirection = Literal["BULLISH", "BEARISH", "NEUTRAL", "PENDING"]
+SPXDeviationSignalSide = Literal["BUY", "SELL"]
+SPXDeviationWindowKey = Literal["SETUP", "PRIMARY", "EXTENSION", "CLOSED"]
+SPXDeviationWindowStatus = Literal["UPCOMING", "ACTIVE", "CLOSED"]
+SPXControlTradeStatus = Literal["WAITING", "ARMED", "TRIGGERED", "CLOSED", "NO_CASH_SESSION"]
+SPXControlMapId = Literal["DESCENDING_CLOSE", "ASCENDING_LOW"]
 SPXAction = Literal["TAKE", "SELECTIVE", "STAND_DOWN"]
 SPXSide = Literal["BUY", "SELL"]
 SPXContractType = Literal["CALL", "PUT"]
@@ -240,6 +246,165 @@ class SPXRthBias(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class SPXDeviationFanLine(BaseModel):
+    index: int
+    label: str
+    value: float
+    current_value: float = Field(..., alias="currentValue")
+    open_value: float = Field(..., alias="openValue")
+    distance_from_price: float = Field(..., alias="distanceFromPrice")
+    is_main: bool = Field(..., alias="isMain")
+
+    model_config = {"populate_by_name": True}
+
+
+class SPXDeviationFanBias(BaseModel):
+    direction: SPXDeviationBiasDirection
+    open_price: Optional[float] = Field(default=None, alias="openPrice")
+    main_value: float = Field(..., alias="mainValue")
+    distance_from_main: Optional[float] = Field(default=None, alias="distanceFromMain")
+    note: str
+
+    model_config = {"populate_by_name": True}
+
+
+class SPXDeviationFanSignal(BaseModel):
+    side: SPXDeviationSignalSide
+    window_key: SPXDeviationWindowKey = Field(..., alias="windowKey")
+    window_label: str = Field(..., alias="windowLabel")
+    line_index: int = Field(..., alias="lineIndex")
+    line_label: str = Field(..., alias="lineLabel")
+    line_value: float = Field(..., alias="lineValue")
+    candle_time: str = Field(..., alias="candleTime")
+    next_candle_time: str = Field(..., alias="nextCandleTime")
+    close: float
+    note: str
+
+    model_config = {"populate_by_name": True}
+
+
+class SPXDeviationEntryWindow(BaseModel):
+    key: SPXDeviationWindowKey
+    label: str
+    start: str
+    end: str
+    status: SPXDeviationWindowStatus
+    guidance: str
+
+
+class SPXDeviationHourlyClose(BaseModel):
+    hour: int
+    label: str
+    time: str
+    close: float
+
+
+class SPXDeviationZone(BaseModel):
+    label: str
+    posture: str
+    lower_line: Optional[str] = Field(default=None, alias="lowerLine")
+    upper_line: Optional[str] = Field(default=None, alias="upperLine")
+    call_entry_line: Optional[str] = Field(default=None, alias="callEntryLine")
+    call_entry_value: Optional[float] = Field(default=None, alias="callEntryValue")
+    put_entry_line: Optional[str] = Field(default=None, alias="putEntryLine")
+    put_entry_value: Optional[float] = Field(default=None, alias="putEntryValue")
+    room_read: Optional[str] = Field(default=None, alias="roomRead")
+    broken_gate_line: Optional[str] = Field(default=None, alias="brokenGateLine")
+    broken_gate_value: Optional[float] = Field(default=None, alias="brokenGateValue")
+    broken_gate_role: Optional[Literal["RESISTANCE", "SUPPORT"]] = Field(default=None, alias="brokenGateRole")
+    broken_gate_note: Optional[str] = Field(default=None, alias="brokenGateNote")
+    next_reference: str = Field(..., alias="nextReference")
+    distance_to_next: float = Field(..., alias="distanceToNext")
+    guidance: str
+
+    model_config = {"populate_by_name": True}
+
+
+class SPXDescendingDeviationFan(BaseModel):
+    anchor: SPXAnchor
+    slope_per_hour: float = Field(..., alias="slopePerHour")
+    spacing: float
+    window_start: str = Field(..., alias="windowStart")
+    entry_reference_time: str = Field(..., alias="entryReferenceTime")
+    window_end: str = Field(..., alias="windowEnd")
+    extension_end: str = Field(..., alias="extensionEnd")
+    entry_main: float = Field(..., alias="entryMain")
+    current_main: float = Field(..., alias="currentMain")
+    open_main: float = Field(..., alias="openMain")
+    open_bias: SPXDeviationFanBias = Field(..., alias="openBias")
+    zone: SPXDeviationZone
+    active_window: SPXDeviationEntryWindow = Field(..., alias="activeWindow")
+    entry_windows: List[SPXDeviationEntryWindow] = Field(..., alias="entryWindows")
+    hourly_closes: List[SPXDeviationHourlyClose] = Field(
+        default_factory=list, alias="hourlyCloses",
+    )
+    nearest_line: SPXDeviationFanLine = Field(..., alias="nearestLine")
+    lines: List[SPXDeviationFanLine]
+    recent_signals: List[SPXDeviationFanSignal] = Field(
+        default_factory=list, alias="recentSignals",
+    )
+
+    model_config = {"populate_by_name": True}
+
+
+class SPXControlPlanMap(BaseModel):
+    id: SPXControlMapId
+    label: str
+    direction: Literal["DESCENDING", "ASCENDING"]
+    anchor: SPXAnchor
+    slope_per_hour: float = Field(..., alias="slopePerHour")
+    control_value: float = Field(..., alias="controlValue")
+    arm_distance: float = Field(..., alias="armDistance")
+    distance_from_open: Optional[float] = Field(default=None, alias="distanceFromOpen")
+    status: Literal["ARMED", "DISTANT", "PENDING"]
+
+    model_config = {"populate_by_name": True}
+
+
+class SPXControlPlanSetup(BaseModel):
+    side: SPXSide
+    contract_type: SPXContractType = Field(..., alias="contractType")
+    map_id: SPXControlMapId = Field(..., alias="mapId")
+    map_label: str = Field(..., alias="mapLabel")
+    entry_line: SPXLineKind = Field(..., alias="entryLine")
+    entry_line_label: str = Field(..., alias="entryLineLabel")
+    line_value: float = Field(..., alias="lineValue")
+    entry_price: float = Field(..., alias="entryPrice")
+    target_price: float = Field(..., alias="targetPrice")
+    target_distance: float = Field(..., alias="targetDistance")
+    status: Literal["WATCHING", "TRIGGERED", "CHASING"]
+    thesis: str
+
+    model_config = {"populate_by_name": True}
+
+
+class SPXControlPlanSignal(SPXControlPlanSetup):
+    signal_time: str = Field(..., alias="signalTime")
+    entry_time: str = Field(..., alias="entryTime")
+    signal_open: float = Field(..., alias="signalOpen")
+    signal_high: float = Field(..., alias="signalHigh")
+    signal_low: float = Field(..., alias="signalLow")
+    signal_close: float = Field(..., alias="signalClose")
+    note: str
+
+
+class SPXControlTradePlan(BaseModel):
+    status: SPXControlTradeStatus
+    label: str
+    entry_reference_time: str = Field(..., alias="entryReferenceTime")
+    signal_window_start: str = Field(..., alias="signalWindowStart")
+    signal_window_end: str = Field(..., alias="signalWindowEnd")
+    target_distance: float = Field(..., alias="targetDistance")
+    primary_map: SPXControlPlanMap = Field(..., alias="primaryMap")
+    opposite_map: SPXControlPlanMap = Field(..., alias="oppositeMap")
+    active_trade: Optional[SPXControlPlanSignal] = Field(default=None, alias="activeTrade")
+    setups: List[SPXControlPlanSetup] = Field(default_factory=list)
+    signals: List[SPXControlPlanSignal] = Field(default_factory=list)
+    guidance: str
+
+    model_config = {"populate_by_name": True}
+
+
 class SPXSnapshot(BaseModel):
     symbol: Literal["SPX"] = "SPX"
     as_of: str = Field(..., alias="asOf")
@@ -277,5 +442,11 @@ class SPXSnapshot(BaseModel):
     )
     score_bands: Optional[SPXScoreBands] = Field(default=None, alias="scoreBands")
     rth_bias: Optional[SPXRthBias] = Field(default=None, alias="rthBias")
+    descending_deviation_fan: Optional[SPXDescendingDeviationFan] = Field(
+        default=None, alias="descendingDeviationFan",
+    )
+    control_trade_plan: Optional[SPXControlTradePlan] = Field(
+        default=None, alias="controlTradePlan",
+    )
 
     model_config = {"populate_by_name": True}

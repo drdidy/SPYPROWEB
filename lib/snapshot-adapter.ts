@@ -7,11 +7,12 @@
 //
 // Goal: every visible value on /dashboard is either live or
 // computed from live values. Option-chain fields come through
-// raw.options. Yahoo Finance feeds the underlying yfinance bars
-// behind raw.candles + raw.quote + raw.context. Unusual Whales
-// integration plugs in here when its endpoint lands.
+// raw.options. Market data feeds the underlying bars behind
+// raw.candles + raw.quote + raw.context. Premium flow context
+// can plug in here when that surface is active.
 import { getSessionInfo, formatConfigWindow } from "./sessions";
 import { nearReferencePriceLabel } from "./market-data-quality";
+import { formatDirectionLabel, formatDisplayLabel } from "./display-labels";
 import type {
   BiasState,
   Candle,
@@ -222,8 +223,8 @@ export interface ReplayBlock {
 export interface OptionsRaw {
   expiration: string;
   atm: number;
-  calls: Array<{ strike: number; bid: number | null; ask: number | null; iv: number | null; delta: number | null; gamma: number | null; oi: number; volume: number }>;
-  puts: Array<{ strike: number; bid: number | null; ask: number | null; iv: number | null; delta: number | null; gamma: number | null; oi: number; volume: number }>;
+  calls: Array<{ optionSymbol?: string | null; strike: number; bid: number | null; ask: number | null; mark?: number | null; iv: number | null; delta: number | null; gamma: number | null; theta?: number | null; vega?: number | null; oi: number; volume: number }>;
+  puts: Array<{ optionSymbol?: string | null; strike: number; bid: number | null; ask: number | null; mark?: number | null; iv: number | null; delta: number | null; gamma: number | null; theta?: number | null; vega?: number | null; oi: number; volume: number }>;
   totals: {
     callOi: number;
     putOi: number;
@@ -279,8 +280,7 @@ export interface AdaptedSnapshot {
   optionsIntel: OptionsIntel | null;
   strikes: SelectedStrikes | null;
   signalTicks: SignalTick[];
-  // Standalone Unusual Whales context (also null until the upstream
-  // returns data). Distinct from the options panel.
+  // Standalone premium flow context. Distinct from the options panel.
   flow: FlowSummary | null;
   gex: GexSummary | null;
   marketContext: MarketContextRaw | null;
@@ -634,7 +634,7 @@ function mapOptions(raw: RawSnapshot): { intel: OptionsIntel | null; strikes: Se
   const last = raw.quote.last;
   if (!opt) {
     // Honest empty state. The OptionsIntelPanel renders its own
-    // "chain not yet loaded" state instead of synthesized fake numbers.
+    // "chain not yet loaded" state instead of inferred numbers.
     return { intel: null, strikes: null };
   }
 
@@ -670,19 +670,19 @@ function mapOptions(raw: RawSnapshot): { intel: OptionsIntel | null; strikes: Se
       : alignment === "OPPOSED"
         ? `Put OI dominates call OI (PCR ${pcr.toFixed(2)}).`
         : `Put-call OI roughly balanced (PCR ${pcr.toFixed(2)}).`;
-  // Enrich with Unusual Whales flow + GEX when available so the alignment
-  // line names dealer regime and net-buying lean instead of OI alone.
+  // Enrich with premium flow context when available so the alignment
+  // line can include pressure and positioning instead of OI alone.
   const uwBits: string[] = [];
   if (raw.flow) {
     uwBits.push(
-      `Flow ${raw.flow.lean.toLowerCase()} (${raw.flow.bullishCount} bull / ${raw.flow.bearishCount} bear, net $${Math.round(raw.flow.premiumNet / 1000)}k)`,
+      `Flow ${formatDirectionLabel(raw.flow.lean)} (${raw.flow.bullishCount} Bull / ${raw.flow.bearishCount} Bear, net $${Math.round(raw.flow.premiumNet / 1000)}k)`,
     );
   }
   if (raw.gex) {
     const flipLabel = nearReferencePriceLabel(raw.gex.flipPoint, last);
     const flipSuffix = /^\d/.test(flipLabel) ? ` (flip ${flipLabel})` : "";
     uwBits.push(
-      `Gamma ${raw.gex.regime.toLowerCase()}${flipSuffix}`,
+      `Gamma ${formatDirectionLabel(raw.gex.regime)}${flipSuffix}`,
     );
   }
   const alignmentNote = uwBits.length
@@ -813,8 +813,8 @@ function mapSignalTicks(raw: RawSnapshot): SignalTick[] {
       s.dir === "down" ? "PUT" : s.dir === "up" ? "CALL" : "NOTE";
     const body =
       s.entry !== null
-        ? `${s.line} rejection at ${s.entry.toFixed(2)} (${s.status.replace(/_/g, " ").toLowerCase()}).`
-        : `${s.line} signal printed (${s.status.replace(/_/g, " ").toLowerCase()}).`;
+        ? `${s.line} rejection at ${s.entry.toFixed(2)} (${formatDisplayLabel(s.status)}).`
+        : `${s.line} signal recorded (${formatDisplayLabel(s.status)}).`;
     return {
       time: s.ts,
       type,
