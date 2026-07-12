@@ -36,29 +36,19 @@ export default async function Page({
       : events.filter((event) => event.category === filter);
 
   return (
-    <div>
-      <header className="grid border-b border-carbon lg:grid-cols-[0.42fr_0.58fr]">
-        <div className="flex flex-col justify-between bg-cobalt p-5 text-white md:p-10">
-          <p className="microlabel">Journal / {source}</p>
-          <div className="pt-14">
-            <p className="num text-[72px] font-black leading-none md:text-[84px]">
-              {events.length.toString().padStart(2, "0")}
-            </p>
-            <p className="microlabel mt-3 text-white">
-              Qualified events today
-            </p>
-          </div>
-        </div>
-        <div className="p-5 py-10 md:p-10">
-          <h1 className="max-w-[820px] text-[12vw] font-black leading-[0.88] tracking-[-0.01em] sm:text-[44px] md:text-[64px] xl:text-[82px]">
+    <div className="workspace-canvas">
+      <header className="workspace-intro grid lg:grid-cols-[1fr_300px]">
+        <div className="relative z-10 p-5 py-10 md:p-10 md:py-12">
+          <p className="microlabel text-mineral">Journal / {source}</p>
+          <h1 className="workspace-title mt-5">
             Review every signal from the session.
           </h1>
-          <p className="mt-7 max-w-[680px] text-[15px] leading-relaxed text-carbon/60">
+          <p className="workspace-copy mt-5">
             See trade alerts, level changes, risk warnings, and notes in time order. Open Replay when you need the candles behind an event.
           </p>
           <Link
             href="/replay"
-            className="group mt-8 inline-flex h-11 items-center gap-2 bg-carbon px-4 text-[11px] font-black uppercase tracking-[0.1em] text-white transition-colors hover:bg-cobalt"
+            className="workspace-button group mt-7"
           >
             Open Replay
             <ArrowRight
@@ -67,10 +57,19 @@ export default async function Page({
             />
           </Link>
         </div>
+        <div className="relative z-10 flex flex-col justify-end border-t border-white/10 bg-white/[0.025] p-5 text-white md:p-8 lg:border-l lg:border-t-0">
+          <p className="microlabel text-white/50">Qualified events today</p>
+          <div className="mt-8">
+            <p className="num text-[64px] font-black leading-none text-lime md:text-[76px]">
+              {events.length.toString().padStart(2, "0")}
+            </p>
+            <p className="microlabel mt-3 text-white/45">Recorded by the Engine</p>
+          </div>
+        </div>
       </header>
 
       <nav
-        className="flex overflow-x-auto border-b border-carbon bg-white"
+        className="grid grid-cols-5 border-b border-white/10 bg-[#0c1114] text-white md:flex md:overflow-x-auto"
         aria-label="Journal filters"
       >
         {FILTERS.map((item) => {
@@ -84,15 +83,15 @@ export default async function Page({
               href={item === "All" ? "/log" : `/log?filter=${item}`}
               aria-current={filter === item ? "page" : undefined}
               className={cn(
-                "flex h-14 min-w-[112px] items-center justify-center gap-2.5 border-r border-carbon/15 px-5 text-[11px] font-black uppercase tracking-[0.1em] transition-colors",
-                filter === item ? "bg-lime" : "hover:bg-optic",
+                "flex h-14 min-w-0 items-center justify-center gap-1 border-r border-white/10 px-1 text-[9px] font-black uppercase tracking-[0.04em] transition-colors md:min-w-[112px] md:gap-2.5 md:px-5 md:text-[11px] md:tracking-[0.08em]",
+                filter === item ? "bg-white/[0.07] text-lime" : "text-white/55 hover:bg-white/[0.035] hover:text-white",
               )}
             >
               {item}
               <span
                 className={cn(
                   "num text-[10px] font-bold",
-                  filter === item ? "text-carbon/70" : "text-carbon/60",
+                  filter === item ? "text-mineral" : "text-white/60",
                 )}
               >
                 {count.toString().padStart(2, "0")}
@@ -113,7 +112,7 @@ export default async function Page({
           ))}
         </ol>
       ) : (
-        <section className="hatch-dark grid min-h-[430px] place-items-center p-8 text-center">
+        <section className="workspace-surface hatch-dark grid min-h-[430px] place-items-center p-8 text-center">
           <div>
             <span
               className="mx-auto grid h-10 w-10 place-items-center border border-carbon/25"

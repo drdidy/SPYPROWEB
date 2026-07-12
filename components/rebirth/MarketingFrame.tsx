@@ -28,13 +28,13 @@ export function MarketingFrame({ children }: { children: React.ReactNode }) {
                 SPY Prophet
               </span>
               <span className="microlabel mt-0.5 block text-white/65">
-                Private intelligence
+                Trading workspace
               </span>
             </span>
           </Link>
           <Link
             href="/dashboard"
-            className="ml-auto border border-mineral/30 px-4 py-3 text-[11px] font-black uppercase tracking-[0.08em] text-mineral transition-colors hover:bg-mineral hover:text-carbon"
+            className="workspace-button ml-auto"
           >
             Open console
           </Link>

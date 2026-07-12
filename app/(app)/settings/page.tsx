@@ -1,22 +1,20 @@
 import { SettingsClient } from "@/components/settings/SettingsClient";
+import Image from "next/image";
 
 export const dynamic = "force-dynamic";
 
 export default function Page() {
   return (
-    <div>
-      <header className="grid border-b border-carbon lg:grid-cols-[0.38fr_0.62fr]">
-        <div className="flex flex-col justify-between bg-coral p-5 md:p-10">
-          <p className="microlabel">System</p>
-          <p className="microlabel mt-20 text-carbon/85">
-            Delivery / feeds / readiness
-          </p>
-        </div>
-        <div className="p-5 py-10 md:p-10">
-          <h1 className="max-w-[850px] text-[12vw] font-black leading-[0.86] tracking-[-0.01em] sm:text-[44px] md:text-[64px] xl:text-[84px]">
+    <div className="workspace-canvas">
+      <header className="workspace-intro">
+        <Image src="/images/market-depth-exchange-v1.png" alt="" fill className="object-cover object-right opacity-15" sizes="100vw" />
+        <div className="absolute inset-0 bg-gradient-to-r from-carbon via-carbon/92 to-carbon/50" />
+        <div className="relative z-10 p-5 py-10 md:p-10 md:py-12">
+          <p className="microlabel text-mineral">System readiness</p>
+          <h1 className="workspace-title mt-5">
             Check every connection before the market opens.
           </h1>
-          <p className="mt-6 max-w-[660px] text-[15px] leading-relaxed text-carbon/60">
+          <p className="workspace-copy mt-5">
             Confirm market data, Telegram delivery, and system readiness here. A connected service only confirms delivery; it does not confirm a trade.
           </p>
         </div>

@@ -1,4 +1,5 @@
 import { ArrowRight, Download } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
 import { briefGlossary } from "@/content/brief/glossary";
@@ -8,33 +9,31 @@ export const dynamic = "force-static";
 
 export default function Page() {
   return (
-    <div>
-      <header className="grid border-b border-carbon lg:grid-cols-[0.38fr_0.62fr]">
-        <div className="flex flex-col justify-between bg-lime p-5 md:p-10">
-          <p className="microlabel">Prophet field manual</p>
-          <p className="mt-20 max-w-[320px] text-[14px] font-bold leading-relaxed">
-            Learn the rules before the session so you do not have to interpret them while price is moving.
-          </p>
-        </div>
-        <div className="p-5 py-10 md:p-10">
-          <h1 className="max-w-[860px] text-[12vw] font-black leading-[0.86] tracking-[-0.01em] sm:text-[46px] md:text-[68px] xl:text-[90px]">
+    <div className="workspace-canvas">
+      <header className="workspace-intro">
+        <Image src="/images/market-depth-trader-v1.png" alt="" fill className="object-cover object-right opacity-20" sizes="100vw" />
+        <div className="absolute inset-0 bg-gradient-to-r from-carbon via-carbon/90 to-carbon/40" />
+        <div className="relative z-10 p-5 py-10 md:p-10 md:py-12">
+          <p className="microlabel text-mineral">Field manual</p>
+          <h1 className="workspace-title mt-5">
             Learn how to read each instruction.
           </h1>
-          <p className="mt-7 max-w-[650px] text-[15px] leading-relaxed text-carbon/60">
+          <p className="workspace-copy mt-5">
             Understand market structure, risk, options, alerts, and Replay. The proprietary calculations remain private.
           </p>
+          <p className="microlabel mt-7 text-lime">Learn before the session. Decide faster when price moves.</p>
         </div>
       </header>
 
-      <section className="border-b border-carbon">
-        <div className="border-b border-carbon px-5 py-5 md:px-10">
-          <p className="microlabel text-cobalt">Downloadable guides</p>
+      <section className="workspace-surface border-b border-carbon">
+        <div className="border-b border-carbon/15 px-5 py-5 md:px-10">
+          <p className="microlabel text-context-ink">Downloadable guides</p>
         </div>
         <div className="grid md:grid-cols-2 xl:grid-cols-3">
           {learningResources.map((resource, index) => (
             <article
               key={resource.slug}
-              className={`flex min-h-[380px] flex-col p-5 transition-colors hover:bg-white md:p-8 ${index > 0 ? "border-t border-carbon/15 md:border-l md:border-t-0" : ""}`}
+              className={`flex min-h-[340px] flex-col bg-white/35 p-5 transition-colors hover:bg-white md:p-8 ${index > 0 ? "border-t border-carbon/10 md:border-l md:border-t-0" : ""}`}
             >
               <p className="num text-[11px] font-bold text-cobalt">
                 {String(index + 1).padStart(2, "0")}
@@ -74,9 +73,9 @@ export default function Page() {
       </section>
 
       <section className="grid lg:grid-cols-[0.45fr_0.55fr]">
-        <div className="bg-coral p-5 py-12 md:p-10">
-          <p className="microlabel">Five-day start</p>
-          <ol className="mt-10 border-t border-carbon">
+        <div className="bg-[#11191c] p-5 py-12 text-white md:p-10">
+          <p className="microlabel text-mineral">Five-day start</p>
+          <ol className="mt-10 border-t border-white/20">
             {[
               "Sessions and symbols",
               "Candles and rejection",
@@ -86,7 +85,7 @@ export default function Page() {
             ].map((lesson, index) => (
               <li
                 key={lesson}
-                className="flex items-center gap-5 border-b border-carbon py-4"
+                className="flex items-center gap-5 border-b border-white/15 py-4"
               >
                 <span className="num text-[11px] font-bold">
                   0{index + 1}
@@ -97,7 +96,7 @@ export default function Page() {
           </ol>
           <Link
             href="/replay"
-            className="group mt-8 inline-flex h-11 items-center gap-2 bg-carbon px-4 text-[10px] font-black uppercase tracking-[0.1em] text-white transition-colors hover:bg-cobalt"
+            className="workspace-button group mt-8"
           >
             Practice in Replay
             <ArrowRight
@@ -106,7 +105,7 @@ export default function Page() {
             />
           </Link>
         </div>
-        <div className="p-5 py-12 md:p-10">
+        <div className="workspace-surface p-5 py-12 md:p-10">
           <p className="microlabel text-cobalt">Plain-language glossary</p>
           <div className="mt-8 border-t border-carbon">
             {Object.values(briefGlossary).map((item, index) => (

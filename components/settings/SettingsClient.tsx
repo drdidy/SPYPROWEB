@@ -48,8 +48,8 @@ export function SettingsClient() {
   );
 
   return (
-    <div className="border-t border-carbon">
-      <section className="grid lg:grid-cols-2">
+    <div className="workspace-surface">
+      <section className="grid border-b border-carbon/15 lg:grid-cols-2">
         <ConnectionField
           icon={Bot}
           number="01"
@@ -70,14 +70,14 @@ export function SettingsClient() {
             ["Chat linked", alerts?.telegramChat],
             ["Cloud monitor", alerts?.cloudMonitor],
           ]}
-          className="border-t border-carbon lg:border-l lg:border-t-0"
+          className="border-t border-carbon/15 lg:border-l lg:border-t-0"
         />
       </section>
 
-      <section className="grid border-t border-carbon xl:grid-cols-[0.72fr_1.28fr]">
-        <div className="bg-cobalt p-5 py-12 text-white md:p-10">
-          <p className="microlabel">Phone sequence</p>
-          <h2 className="mt-5 max-w-[420px] text-[32px] font-black leading-[0.95] md:text-[40px]">
+      <section className="grid border-t border-carbon/15 xl:grid-cols-[0.62fr_1.38fr]">
+        <div className="bg-[#11191c] p-5 py-10 text-white md:p-10">
+          <p className="microlabel text-mineral">Phone sequence</p>
+          <h2 className="mt-5 max-w-[420px] text-[28px] font-black leading-[0.98] md:text-[34px]">
             Every notification should move the decision forward.
           </h2>
         </div>
@@ -91,7 +91,7 @@ export function SettingsClient() {
             <li
               key={title}
               className={cn(
-                "flex min-h-[220px] flex-col p-5 md:p-7",
+                "flex min-h-[190px] flex-col p-5 md:p-7",
                 index > 0 &&
                   "border-t border-carbon/15 sm:border-l sm:border-t-0",
               )}
@@ -108,7 +108,7 @@ export function SettingsClient() {
         </ol>
       </section>
 
-      <section className="border-t border-carbon bg-optic">
+      <section className="border-t border-carbon/15 bg-[#f3f2ed]">
         <div className="flex items-center border-b border-carbon p-5 md:px-10 md:py-6">
           <div>
             <p className="microlabel text-carbon/60">Readiness</p>
@@ -160,7 +160,7 @@ function ConnectionField({
 }) {
   const ready = checks.every(([, value]) => value === true);
   return (
-    <article className={`min-h-[390px] p-5 md:p-10 ${className}`}>
+    <article className={`min-h-[330px] bg-white/30 p-5 md:p-9 ${className}`}>
       <div className="flex items-center justify-between">
         <span className="grid h-11 w-11 place-items-center bg-carbon text-lime">
           <Icon size={19} aria-hidden="true" />
@@ -171,8 +171,8 @@ function ConnectionField({
       </div>
       <p
         className={cn(
-          "microlabel mt-12 inline-flex px-2.5 py-1.5",
-          ready ? "bg-lime" : "bg-coral",
+          "microlabel mt-10 inline-flex border px-2.5 py-1.5",
+          ready ? "border-go-ink/30 bg-go-ink/10 text-go-ink" : "border-stop-ink/25 bg-stop-ink/10 text-stop-ink",
         )}
       >
         {ready ? "Connected" : "Needs setup"}

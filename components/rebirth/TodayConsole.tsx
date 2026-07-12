@@ -1,4 +1,5 @@
 import { AlertTriangle, ArrowRight } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
 import type { ContractProjection } from "@/lib/contract-projection";
@@ -76,11 +77,13 @@ export function TodayConsole({
     !liveEnough || spySource === "degraded" || spxSource === "degraded";
 
   return (
-    <div>
+    <div className="workspace-canvas">
       {/* ========================= COMMAND HEADER ======================== */}
-      <section className="grid border-b border-white/10 bg-carbon text-white xl:grid-cols-[minmax(0,1.45fr)_minmax(380px,0.55fr)]">
-        <div className="cinematic-grid flex flex-col justify-between px-5 py-10 md:px-10 md:py-12 xl:px-14">
-          <div>
+      <section className="workspace-intro grid xl:grid-cols-[minmax(0,1.45fr)_minmax(340px,0.55fr)]">
+        <div className="relative flex min-h-[430px] flex-col justify-between overflow-hidden px-5 py-9 md:px-10 md:py-11 xl:px-12">
+          <Image src="/images/prophet-command-desk.png" alt="" fill priority className="object-cover object-right opacity-20" sizes="75vw" />
+          <div className="absolute inset-0 bg-gradient-to-r from-carbon via-carbon/95 to-carbon/55" />
+          <div className="relative z-10">
             <div className="flex flex-wrap items-center gap-2">
               <SourceTag label="SPY" source={spySource} />
               <SourceTag label="ES / SPX" source={spxSource} />
@@ -89,19 +92,19 @@ export function TodayConsole({
               </span>
             </div>
 
-            <div className="mt-10 flex flex-wrap items-center gap-x-5 gap-y-3">
+            <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3">
               <p className="microlabel text-mineral">Current command</p>
               <StateLadder current={state} live={liveEnough} />
             </div>
 
-            <h1 className="mt-5 max-w-[900px] text-[13vw] font-black leading-[0.88] tracking-normal sm:text-[48px] md:text-[62px] xl:text-[76px]">
+            <h1 className="workspace-title mt-5">
               {command.label}
             </h1>
-            <p className="mt-6 max-w-[720px] text-[15px] font-medium leading-relaxed text-white/60 md:text-[17px]">
+            <p className="workspace-copy mt-5">
               {command.body}
             </p>
           </div>
-          <div className="mt-14 grid grid-cols-2 border-t border-white/20 sm:grid-cols-4">
+          <div className="relative z-10 mt-10 grid grid-cols-2 border-t border-white/15 sm:grid-cols-4">
             <CommandFact label="Focus" value={spxUsable ? "ES / SPX" : "SPY"} />
             <CommandFact
               label="Direction"
@@ -121,9 +124,9 @@ export function TodayConsole({
           </div>
         </div>
 
-        <aside className="flex flex-col border-t border-mineral/20 bg-ink p-5 text-white md:p-8 xl:border-l xl:border-t-0">
+        <aside className="relative z-10 flex flex-col border-t border-white/10 bg-white/[0.025] p-5 text-white backdrop-blur-md md:p-8 xl:border-l xl:border-t-0">
           <p className="microlabel">Trade requirements</p>
-          <h2 className="mt-5 max-w-[380px] text-[28px] font-black leading-[0.98] md:text-[32px]">
+          <h2 className="mt-5 max-w-[380px] text-[24px] font-black leading-[1.02] md:text-[28px]">
             Every requirement must pass before entry.
           </h2>
           <div className="mt-9 border-t border-white/20">
@@ -151,7 +154,7 @@ export function TodayConsole({
       <CommandStrip label={command.label} tone={command.tone} />
 
       {/* ========================= STRUCTURE FIELD ======================= */}
-      <section className="bg-carbon text-white">
+      <section className="border-b border-white/10 bg-[#0c1114] text-white">
         <div className="flex items-center justify-between gap-4 border-b border-white/15 px-5 py-4 md:px-10">
           <div>
             <p className="microlabel text-white/60">Nearest market levels</p>
@@ -161,7 +164,7 @@ export function TodayConsole({
           </div>
           <Link
             href="/map"
-            className="group inline-flex h-10 shrink-0 items-center gap-2 border border-lime/60 px-4 text-[11px] font-black uppercase tracking-[0.1em] text-lime transition-colors hover:bg-lime hover:text-carbon"
+            className="workspace-button group shrink-0"
           >
             Open map
             <ArrowRight
@@ -188,8 +191,8 @@ export function TodayConsole({
       </section>
 
       {/* ===================== TICKET / RISK / ALERTS ==================== */}
-      <section className="grid border-b border-carbon xl:grid-cols-[1.1fr_0.9fr]">
-        <div id="contract" className="bg-context p-5 text-white md:p-10">
+      <section className="grid border-b border-white/10 xl:grid-cols-[1.1fr_0.9fr]">
+        <div id="contract" className="bg-[#11191c] p-5 text-white md:p-9">
           <div className="flex items-center justify-between gap-4">
             <p className="microlabel">Execution ticket</p>
             <span className="microlabel border border-white/40 px-2.5 py-1.5 text-white">
@@ -214,7 +217,7 @@ export function TodayConsole({
             </div>
           )}
         </div>
-        <div className="grid bg-white sm:grid-cols-2">
+        <div className="grid bg-[#f3f2ed] sm:grid-cols-2">
           <RiskBlock risk={risk} />
           <AlertBlock />
         </div>

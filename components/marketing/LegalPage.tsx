@@ -9,21 +9,21 @@ interface Props {
 
 export function LegalPage({ eyebrow, title, lastUpdated, children }: Props) {
   return (
-    <article className="bg-[#F5F6F1] text-[#0A0B0C]">
-      <header className="grid border-b border-black lg:grid-cols-[0.34fr_0.66fr]">
-        <div className="bg-[#3157FF] p-5 text-white md:p-10">
-          <p className="text-[9px] font-black uppercase">{eyebrow}</p>
-          <p className="mt-20 text-[10px] font-bold uppercase text-white/70">
-            Last updated {lastUpdated}
+    <article className="workspace-surface">
+      <header className="workspace-intro grid lg:grid-cols-[220px_1fr]">
+        <div className="relative z-10 flex flex-col justify-between border-b border-white/10 bg-white/[0.025] p-5 text-white md:p-8 lg:border-b-0 lg:border-r">
+          <p className="microlabel text-mineral">{eyebrow}</p>
+          <p className="microlabel mt-16 text-white/45">
+            Updated {lastUpdated}
           </p>
         </div>
-        <div className="p-5 md:p-10">
-          <h1 className="max-w-[900px] text-[46px] font-black leading-[0.88] md:text-[72px] xl:text-[92px]">
+        <div className="relative z-10 p-5 py-10 md:p-10 md:py-12">
+          <h1 className="workspace-title">
             {title}
           </h1>
         </div>
       </header>
-      <div className="prose prose-neutral mx-auto max-w-[920px] px-5 py-16 text-[14px] leading-relaxed prose-headings:font-black prose-headings:leading-tight prose-a:font-bold prose-a:text-[#3157FF] prose-a:underline-offset-4 md:px-10 md:py-24">
+      <div className="prose prose-neutral mx-auto max-w-[900px] px-5 py-14 text-[15px] leading-relaxed prose-headings:font-black prose-headings:leading-tight prose-a:font-bold prose-a:text-context-ink prose-a:underline-offset-4 md:px-10 md:py-20">
         {children}
       </div>
     </article>

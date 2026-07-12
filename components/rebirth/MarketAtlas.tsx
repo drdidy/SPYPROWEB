@@ -1,4 +1,5 @@
 import { ArrowRight } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
 import type { AdaptedSnapshot } from "@/lib/snapshot-adapter";
@@ -54,21 +55,23 @@ export function MarketAtlas({
     : [];
 
   return (
-    <div className="bg-carbon text-white">
-      <header className="grid border-b border-white/20 lg:grid-cols-[1fr_auto] lg:items-end">
-        <div className="px-5 py-10 md:px-10 md:py-14">
+    <div className="workspace-canvas text-white">
+      <header className="workspace-intro grid lg:grid-cols-[1fr_auto] lg:items-end">
+        <Image src="/images/market-duality-hall-v1.png" alt="" fill className="object-cover object-center opacity-20" sizes="100vw" />
+        <div className="absolute inset-0 bg-gradient-to-r from-carbon via-carbon/90 to-carbon/45" />
+        <div className="relative z-10 px-5 py-10 md:px-10 md:py-12">
           <p className="microlabel text-mineral">Private market map</p>
-          <h1 className="mt-6 max-w-[1050px] text-[13vw] font-black leading-[0.86] tracking-normal sm:text-[50px] md:text-[72px] xl:text-[96px]">
+          <h1 className="workspace-title mt-5">
             See the levels that matter now.
           </h1>
-          <p className="mt-7 max-w-[720px] text-[15px] leading-relaxed text-white/60">
+          <p className="workspace-copy mt-5">
             Compare current price with the nearest verified support and
             resistance. Check the distance to each level before taking a trade.
           </p>
         </div>
         <Link
           href="/dashboard"
-          className="group m-5 inline-flex h-12 items-center justify-center gap-3 bg-lime px-5 text-[11px] font-black uppercase tracking-[0.1em] text-carbon transition-colors hover:bg-white lg:m-10"
+          className="workspace-button relative z-10 m-5 lg:m-10"
         >
           Return to Today
           <ArrowRight
@@ -78,7 +81,7 @@ export function MarketAtlas({
         </Link>
       </header>
 
-      <section className="grid lg:grid-cols-2">
+      <section className="grid bg-[#0c1114] lg:grid-cols-2">
         <AtlasInstrument
           symbol="SPY"
           subtitle="Intraday levels"
@@ -96,10 +99,10 @@ export function MarketAtlas({
         />
       </section>
 
-      <section className="grid border-t border-white/20 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="bg-optic p-5 py-12 text-carbon md:p-10">
+      <section className="grid border-t border-white/10 lg:grid-cols-[1.15fr_0.85fr]">
+        <div className="workspace-surface p-5 py-11 md:p-10">
           <p className="microlabel text-cobalt">Room to target</p>
-          <h2 className="mt-6 max-w-[820px] text-[36px] font-black leading-[0.92] tracking-normal md:text-[52px] xl:text-[64px]">
+          <h2 className="mt-5 max-w-[760px] text-[34px] font-black leading-[0.96] tracking-normal md:text-[46px]">
             Skip the trade when the next level blocks the target.
           </h2>
           <div className="mt-10 grid border-t border-carbon sm:grid-cols-2">
@@ -111,9 +114,9 @@ export function MarketAtlas({
             />
           </div>
         </div>
-        <div className="bg-coral p-5 py-12 text-carbon md:p-10">
-          <p className="microlabel">How to use the map</p>
-          <ol className="mt-8 border-t border-carbon">
+        <div className="bg-[#11191c] p-5 py-11 text-white md:p-10">
+          <p className="microlabel text-mineral">How to use the map</p>
+          <ol className="mt-8 border-t border-white/20">
             <Rule
               number="01"
               title="A touch is not an entry"
@@ -324,11 +327,11 @@ function Rule({
   body: string;
 }) {
   return (
-    <li className="grid grid-cols-[44px_1fr] border-b border-carbon py-5">
-      <span className="font-mono text-[10px] font-bold">{number}</span>
+    <li className="grid grid-cols-[44px_1fr] border-b border-white/20 py-5">
+      <span className="font-mono text-[10px] font-bold text-mineral">{number}</span>
       <div>
         <p className="text-[14px] font-black">{title}</p>
-        <p className="mt-2 text-[12px] leading-relaxed text-carbon/75">
+        <p className="mt-2 text-[12px] leading-relaxed text-white/60">
           {body}
         </p>
       </div>

@@ -177,18 +177,18 @@ export function ReplayLab({ initialDate }: { initialDate: string | null }) {
   const vixRegime = historicalVix ? historicalVix.c < 15 ? "Calm" : historicalVix.c < 20 ? "Normal" : historicalVix.c < 25 ? "Elevated" : "High" : "Unavailable";
 
   return (
-    <div className="bg-carbon text-white">
-      <header className="grid border-b border-white/20 lg:grid-cols-[1fr_auto] lg:items-end">
-        <div className="p-5 py-10 md:p-10">
-          <p className="microlabel text-lime">Session replay</p>
-          <h1 className="mt-6 text-[13vw] font-black leading-[0.86] tracking-normal sm:text-[48px] md:text-[70px] xl:text-[90px]">
+    <div className="workspace-canvas text-white">
+      <header className="workspace-intro grid lg:grid-cols-[1fr_auto] lg:items-end">
+        <div className="relative z-10 p-5 py-10 md:p-10 md:py-12">
+          <p className="microlabel text-mineral">Session replay</p>
+          <h1 className="workspace-title mt-5">
             Replay the session bar by bar.
           </h1>
-          <p className="mt-6 max-w-[680px] text-[15px] leading-relaxed text-white/60">
+          <p className="workspace-copy mt-5">
             Review SPY or ES without seeing future candles. Check what was known at each moment and where an actual Engine alert appeared.
           </p>
         </div>
-        <div className="m-5 flex flex-wrap border border-white/30 lg:m-10">
+        <div className="relative z-10 m-5 flex flex-wrap border border-white/20 bg-white/[0.035] backdrop-blur-md lg:m-10">
           <label className="microlabel flex h-12 items-center gap-2 border-r border-white/30 px-4">
             <CalendarDays size={14} aria-hidden="true" />
             <input
@@ -228,8 +228,8 @@ export function ReplayLab({ initialDate }: { initialDate: string | null }) {
         setSpeed={setSpeed}
       />
 
-      <section className="grid min-h-[620px] lg:grid-cols-[210px_1fr_270px]">
-        <div className="order-2 border-b border-white/20 p-5 lg:order-none lg:border-b-0 lg:border-r lg:p-7">
+      <section className="grid min-h-[620px] bg-[#0c1114] lg:grid-cols-[220px_1fr_286px]">
+        <div className="order-2 border-b border-white/10 bg-white/[0.018] p-5 lg:order-none lg:border-b-0 lg:border-r lg:p-7">
           <ReadLabel label="Instrument" />
           <p className="mt-3 text-[32px] font-black">{instrument}</p>
           <ReadLabel label="Session date" className="mt-10" />
@@ -286,7 +286,7 @@ export function ReplayLab({ initialDate }: { initialDate: string | null }) {
           <p className="microlabel mt-3 text-lime">Replay only</p>
         </div>
 
-        <div className="hud-grid order-1 relative min-h-[430px] overflow-hidden border-b border-white/20 lg:order-none lg:border-b-0 lg:border-r">
+        <div className="hud-grid order-1 relative min-h-[430px] overflow-hidden border-b border-white/10 bg-[#090d0f] lg:order-none lg:border-b-0 lg:border-r">
           {status === "ready" && visible.length > 0 ? (
             <>
               <CandleChart
@@ -345,7 +345,7 @@ export function ReplayLab({ initialDate }: { initialDate: string | null }) {
           )}
         </div>
 
-        <div className="order-3 p-5 lg:order-none lg:p-7">
+        <div className="order-3 bg-white/[0.018] p-5 lg:order-none lg:p-7">
           <ReadLabel label="Current bar" accent />
           <p className="num mt-4 text-[22px] font-black">
             {current ? time(current.t) : "--"}
@@ -466,7 +466,7 @@ function ReplayTransport({
   setSpeed: Dispatch<SetStateAction<(typeof SPEEDS)[number]>>;
 }) {
   return (
-    <section className="grid border-b border-white/20 bg-black p-4 md:grid-cols-[auto_auto_1fr_auto] md:items-center md:gap-5 md:px-8">
+    <section className="grid border-b border-white/10 bg-[#080b0d] p-4 md:grid-cols-[auto_auto_1fr_auto] md:items-center md:gap-5 md:px-8">
       <div className="flex" role="group" aria-label="Replay transport">
         <Control label="Reset" onClick={() => { setCursor(1); setPlaying(false); }} icon={RotateCcw} />
         <Control label="Back one bar" onClick={() => setCursor((value) => Math.max(1, value - 1))} icon={SkipBack} />

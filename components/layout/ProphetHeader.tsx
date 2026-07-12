@@ -1,6 +1,6 @@
 "use client";
 
-import { Menu, X } from "lucide-react";
+import { Menu, Settings, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -8,12 +8,12 @@ import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/dashboard", label: "Today", index: "01" },
-  { href: "/map", label: "Map", index: "02" },
-  { href: "/replay", label: "Replay", index: "03" },
-  { href: "/log", label: "Journal", index: "04" },
-  { href: "/agents", label: "Review AI", index: "05" },
-  { href: "/learn", label: "Learn", index: "06" },
+  { href: "/dashboard", label: "Today" },
+  { href: "/map", label: "Map" },
+  { href: "/replay", label: "Replay" },
+  { href: "/log", label: "Journal" },
+  { href: "/agents", label: "Review AI" },
+  { href: "/learn", label: "Learn" },
 ];
 
 export function ProphetHeader() {
@@ -73,13 +73,13 @@ export function ProphetHeader() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-carbon text-optic shadow-[0_12px_36px_rgba(0,0,0,0.22)]">
-        <div className="flex h-[64px] items-stretch" data-testid="topbar">
+      <header className="sticky top-0 z-50 border-b border-white/[0.08] bg-carbon/95 text-optic shadow-[0_18px_55px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+        <div className="flex h-[68px] items-stretch" data-testid="topbar">
           <Link
             href="/dashboard"
-            className="flex shrink-0 items-center gap-3 border-r border-white/10 px-4 md:w-[210px] md:px-5"
+            className="flex shrink-0 items-center gap-3 border-r border-white/[0.08] px-4 md:w-[228px] md:px-6"
           >
-            <span className="grid h-9 w-9 shrink-0 place-items-center border border-mineral/30 bg-white/[0.04] text-[16px] font-black text-lime">
+            <span className="grid h-9 w-9 shrink-0 place-items-center border border-mineral/35 bg-mineral/[0.06] text-[16px] font-black text-lime shadow-[inset_0_0_24px_rgba(143,211,200,0.06)]">
               P
             </span>
             <span className="hidden sm:block">
@@ -87,13 +87,13 @@ export function ProphetHeader() {
                 SPY Prophet
               </span>
               <span className="microlabel mt-1 block text-[10px] text-white/65">
-                Private intelligence
+                Trading workspace
               </span>
             </span>
           </Link>
 
           <nav
-            className="hidden items-stretch xl:flex"
+            className="hidden items-center gap-1 px-3 xl:flex"
             aria-label="Primary navigation"
           >
             {NAV.map((item) => {
@@ -104,18 +104,10 @@ export function ProphetHeader() {
                   href={item.href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "relative flex items-center gap-2 border-r border-white/10 px-3.5 text-[11px] font-black uppercase tracking-[0.08em] transition-colors 2xl:px-5",
-                    active ? "bg-white/[0.06] text-lime" : "text-white/65 hover:bg-white/[0.04] hover:text-white",
+                    "relative flex h-10 items-center px-3.5 text-[11px] font-bold uppercase tracking-[0.06em] transition-colors 2xl:px-4",
+                    active ? "bg-white/[0.07] text-lime after:absolute after:inset-x-3 after:bottom-0 after:h-px after:bg-mineral" : "text-white/55 hover:bg-white/[0.035] hover:text-white",
                   )}
                 >
-                  <span
-                    className={cn(
-                      "font-mono text-[10px] font-bold",
-                      active ? "text-mineral" : "text-white/65",
-                    )}
-                  >
-                    {item.index}
-                  </span>
                   {item.label}
                 </Link>
               );
@@ -123,7 +115,7 @@ export function ProphetHeader() {
           </nav>
 
           <div className="ml-auto flex items-stretch">
-            <div className="hidden items-center gap-3 border-l border-white/10 px-4 2xl:flex">
+            <div className="hidden items-center gap-3 border-l border-white/[0.08] px-4 2xl:flex">
               <span
                 className={cn(
                   "h-2.5 w-2.5",
@@ -136,7 +128,7 @@ export function ProphetHeader() {
                 aria-hidden="true"
               />
               <div>
-                <p className="microlabel text-white/65">Telegram</p>
+                <p className="microlabel text-white/50">Alerts</p>
                 <p className="mt-1 text-[11px] font-bold leading-none">
                   {alertsReady === true
                     ? "Connected"
@@ -146,8 +138,8 @@ export function ProphetHeader() {
                 </p>
               </div>
             </div>
-            <div className="hidden min-w-[128px] flex-col items-start justify-center border-l border-white/10 px-4 2xl:flex">
-              <p className="microlabel text-white/65">Chicago</p>
+            <div className="hidden min-w-[128px] flex-col items-start justify-center border-l border-white/[0.08] px-4 2xl:flex">
+              <p className="microlabel text-white/50">Chicago</p>
               <p className="num mt-1 text-[13px] font-bold leading-none">
                 {clock ? `${clock} CT` : "--:--:-- CT"}
               </p>
@@ -155,12 +147,14 @@ export function ProphetHeader() {
             <Link
               href="/settings"
               aria-current={isActive("/settings") ? "page" : undefined}
+              aria-label="Settings"
+              title="Settings"
               className={cn(
-                "hidden items-center border-l border-white/10 px-4 text-[11px] font-black uppercase tracking-[0.08em] xl:flex",
+                "hidden w-[58px] items-center justify-center border-l border-white/[0.08] xl:flex",
                 isActive("/settings") ? "bg-white/[0.06] text-lime" : "text-white/65 hover:bg-white/[0.04] hover:text-white",
               )}
             >
-              Settings
+              <Settings size={17} aria-hidden="true" />
             </Link>
             <button
               type="button"
@@ -189,18 +183,10 @@ export function ProphetHeader() {
                   href={item.href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex h-16 items-center gap-4 border-b border-white/15 px-5 text-[15px] font-black uppercase tracking-[0.08em]",
+                "flex h-16 items-center border-b border-white/15 px-5 text-[15px] font-black uppercase tracking-[0.08em]",
                     active && "bg-white/[0.07] text-lime",
                   )}
                 >
-                  <span
-                    className={cn(
-                      "font-mono text-[10px] font-bold",
-                      active ? "text-mineral" : "text-white/65",
-                    )}
-                  >
-                    {item.index}
-                  </span>
                   {item.label}
                 </Link>
               );
@@ -212,26 +198,16 @@ export function ProphetHeader() {
                 isActive("/settings") && "bg-white/[0.07] text-lime",
               )}
             >
-              <span
-                className={cn(
-                  "font-mono text-[10px] font-bold",
-                  isActive("/settings") ? "text-mineral" : "text-white/65",
-                )}
-              >
-                07
-              </span>
+              <Settings size={16} aria-hidden="true" />
               Settings
             </Link>
           </nav>
         )}
       </header>
-      <div className="flex h-8 items-center overflow-hidden border-b border-white/10 bg-ink text-optic">
-        <p className="microlabel flex h-full shrink-0 items-center border-r border-mineral/20 px-4 text-mineral">
-          Protocol
-        </p>
-        <p className="truncate px-4 font-mono text-[10px] font-bold uppercase tracking-[0.08em] text-white/70">
-          Verify source. Read state. Respect risk. Then act.
-        </p>
+      <div className="flex h-7 items-center overflow-hidden border-b border-white/[0.07] bg-[#0a0e10] px-4 text-optic md:px-6">
+        <span className="h-1.5 w-1.5 bg-mineral" aria-hidden="true" />
+        <p className="microlabel ml-3 truncate text-white/45">Live workspace</p>
+        <p className="microlabel ml-auto hidden text-white/35 sm:block">Verify data before acting</p>
       </div>
     </>
   );

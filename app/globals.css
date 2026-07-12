@@ -102,6 +102,82 @@
     backdrop-filter: blur(18px);
   }
 
+  .workspace-canvas {
+    min-height: 100%;
+    background:
+      radial-gradient(circle at 82% -10%, rgba(143, 211, 200, 0.09), transparent 34%),
+      #0a0d0f;
+  }
+
+  .workspace-intro {
+    position: relative;
+    overflow: hidden;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    background: #0a0d0f;
+    color: #f4f2ec;
+  }
+
+  .workspace-intro::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(rgba(143, 211, 200, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(143, 211, 200, 0.03) 1px, transparent 1px);
+    background-size: 88px 64px;
+    mask-image: linear-gradient(to right, black, transparent 72%);
+  }
+
+  .workspace-title {
+    max-width: 900px;
+    font-size: clamp(2.5rem, 5vw, 4.5rem) !important;
+    line-height: 0.94 !important;
+    letter-spacing: 0 !important;
+    font-weight: 900;
+  }
+
+  .workspace-copy {
+    max-width: 700px;
+    color: rgba(255, 255, 255, 0.64);
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  .workspace-panel {
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.035);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.18);
+  }
+
+  .workspace-surface {
+    background: #f3f2ed;
+    color: #080b0d;
+  }
+
+  .workspace-button {
+    display: inline-flex;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    border: 1px solid rgba(216, 200, 148, 0.58);
+    padding: 0 16px;
+    color: #e7d9aa;
+    font-family: var(--font-geist-mono);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
+  }
+
+  .workspace-button:hover {
+    border-color: #d8c894;
+    background: #d8c894;
+    color: #07090a;
+  }
+
   /* Diagonal hatch for "no data / closed" zones. */
   .hatch {
     background-image: repeating-linear-gradient(

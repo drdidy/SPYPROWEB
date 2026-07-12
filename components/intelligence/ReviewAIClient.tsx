@@ -36,26 +36,26 @@ export function ReviewAIClient() {
   if (!snapshot || error) return <DeskError retry={() => void load(date)} />;
 
   return (
-    <div className="bg-optic text-carbon">
-      <header className="relative grid overflow-hidden border-b border-white/10 bg-carbon text-white xl:grid-cols-[minmax(0,1.2fr)_420px]">
-        <Image src="/images/prophet-evidence-archive-v1.png" alt="" fill className="object-cover object-right opacity-55" sizes="100vw" />
-        <div className="absolute inset-0 bg-gradient-to-r from-carbon via-carbon/90 to-carbon/25" />
-        <div className="cinematic-grid relative z-10 p-5 py-10 md:p-10 xl:p-14">
+    <div className="workspace-surface">
+      <header className="workspace-intro grid xl:grid-cols-[minmax(0,1.2fr)_370px]">
+        <Image src="/images/prophet-evidence-archive-v1.png" alt="" fill className="object-cover object-right opacity-35" sizes="100vw" />
+        <div className="absolute inset-0 bg-gradient-to-r from-carbon via-carbon/92 to-carbon/35" />
+        <div className="relative z-10 p-5 py-10 md:p-10 md:py-12">
           <div className="flex flex-wrap items-center gap-3">
             <span className="microlabel border border-mineral/30 px-2.5 py-1.5 text-mineral">Review AI</span>
             <span className="microlabel text-white/65">Uses recorded signals and completed sessions</span>
           </div>
-          <h1 className="mt-8 max-w-[900px] text-[13vw] font-black leading-[0.88] tracking-normal sm:text-[52px] md:text-[72px] xl:text-[88px]">
+          <h1 className="workspace-title mt-7">
             Review the trade.<br /><span className="text-mineral">Prepare for tomorrow.</span>
           </h1>
-          <p className="mt-7 max-w-[720px] text-[15px] leading-relaxed text-white/60 md:text-[17px]">
+          <p className="workspace-copy mt-5">
             Review AI compares TradingView alerts, replay bars, options data, the Daily Brief, and verified news. It explains what happened and suggests what deserves further testing. It never changes the trading rules automatically.
           </p>
         </div>
-        <div className="relative z-10 flex flex-col justify-between border-t border-mineral/20 bg-ink/90 p-5 text-white backdrop-blur-sm md:p-8 xl:border-l xl:border-t-0">
+        <div className="relative z-10 flex flex-col justify-between border-t border-white/10 bg-white/[0.025] p-5 text-white backdrop-blur-md md:p-8 xl:border-l xl:border-t-0">
           <div>
             <p className="microlabel">Plan for the next session</p>
-            <h2 className="mt-5 text-[30px] font-black leading-[0.98]">{snapshot.ai.headline}</h2>
+            <h2 className="mt-5 text-[26px] font-black leading-[1.02]">{snapshot.ai.headline}</h2>
             <p className="mt-5 text-[13px] font-semibold leading-relaxed text-white/60">{snapshot.ai.nextSessionFocus}</p>
           </div>
           <div className="mt-10 border-t border-white/20 pt-4">
@@ -65,7 +65,7 @@ export function ReviewAIClient() {
         </div>
       </header>
 
-      <section className="flex flex-wrap items-center gap-3 border-b border-carbon bg-white px-5 py-3 md:px-10">
+      <section className="flex flex-wrap items-center gap-3 border-b border-carbon/15 bg-white px-5 py-3 md:px-10">
         <label className="flex h-11 items-center gap-3 border border-carbon px-3">
           <CalendarDays size={15} aria-hidden="true" />
           <span className="sr-only">Review date</span>
@@ -78,8 +78,8 @@ export function ReviewAIClient() {
         <p className="microlabel ml-auto text-carbon/60">As of {formatDateTime(snapshot.asOf)}</p>
       </section>
 
-      <section className="grid border-b border-carbon lg:grid-cols-[0.72fr_1.28fr]">
-        <div className="bg-context p-5 text-white md:p-10">
+      <section className="grid border-b border-carbon/15 lg:grid-cols-[0.68fr_1.32fr]">
+        <div className="bg-[#11191c] p-5 text-white md:p-10">
           <p className="microlabel">Session scorecard / {snapshot.sessionDate}</p>
           <div className="mt-9 grid grid-cols-2 border border-white/35">
             <Score label="Wins" value={snapshot.scorecard.wins} />
@@ -101,11 +101,11 @@ export function ReviewAIClient() {
         </div>
       </section>
 
-      <section className="border-b border-carbon bg-carbon text-white">
+      <section className="border-b border-white/10 bg-[#0a0d0f] text-white">
         <div className="grid lg:grid-cols-[0.38fr_0.62fr]">
           <div className="border-b border-white/20 p-5 py-10 md:p-10 lg:border-b-0 lg:border-r">
             <p className="microlabel text-lime">Ideas to test</p>
-            <h2 className="mt-6 text-[36px] font-black leading-[0.95] md:text-[48px]">Test changes before using them live.</h2>
+            <h2 className="mt-6 text-[32px] font-black leading-[0.98] md:text-[40px]">Test changes before using them live.</h2>
             <p className="mt-6 text-[13px] leading-relaxed text-white/90">A suggested improvement remains a research idea until enough completed trades support it.</p>
           </div>
           <div>
@@ -182,7 +182,23 @@ function EmptyReview() {
   return <div className="mt-7 flex gap-3 border border-carbon/25 bg-white p-5"><TriangleAlert size={17} className="mt-0.5 shrink-0 text-cobalt" /><div><p className="text-[14px] font-black">No completed engine trade for this date.</p><p className="mt-2 text-[12px] leading-relaxed text-carbon/60">A trade review requires a completed entry and exit. Select another date or wait for the next completed alert sequence.</p></div></div>;
 }
 
-function DeskLoading() { return <div className="hatch grid min-h-[680px] place-items-center"><div className="text-center"><BrainCircuit className="mx-auto animate-pulse text-cobalt" size={30} /><p className="mt-5 text-[24px] font-black">Reviewing verified evidence</p></div></div>; }
+function DeskLoading() {
+  return (
+    <div className="hatch grid min-h-[680px] place-items-center bg-[#0a0d0f] px-6 text-white">
+      <div className="text-center">
+        <BrainCircuit
+          className="mx-auto animate-pulse text-mineral"
+          size={30}
+          aria-hidden="true"
+        />
+        <p className="mt-5 text-[22px] font-black md:text-[24px]">
+          Reviewing verified evidence
+        </p>
+        <p className="microlabel mt-3 text-white/45">Completed sessions only</p>
+      </div>
+    </div>
+  );
+}
 function DeskError({ retry }: { retry: () => void }) { return <div className="grid min-h-[680px] place-items-center p-8 text-center"><div><TriangleAlert className="mx-auto text-coral" size={30} /><h1 className="mt-5 text-[32px] font-black">Review desk unavailable</h1><button onClick={retry} className="mt-6 h-11 bg-carbon px-5 text-[11px] font-black uppercase text-white">Try again</button></div></div>; }
 function signed(value: number) { return `${value >= 0 ? "+" : ""}${value.toFixed(2)}`; }
 function time(value: string) { return new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", hour: "numeric", minute: "2-digit" }).format(new Date(value)); }
